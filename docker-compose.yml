@@ -12,16 +12,16 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - HOSTNAME=0.0.0.0
-      - NEXT_PUBLIC_SITE_URL=https://totem.xpoint.com.br
+      - NEXT_PUBLIC_SITE_URL=https://totem.xpointsolucoes.com.br
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/health"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 15s
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.totem.rule=Host(`totem.xpoint.com.br`)"
+      - "traefik.http.routers.totem.rule=Host(`totem.xpointsolucoes.com.br`)"
       - "traefik.http.routers.totem.entrypoints=websecure"
       - "traefik.http.routers.totem.tls.certresolver=letsencrypt"
       - "traefik.http.services.totem.loadbalancer.server.port=3000"
