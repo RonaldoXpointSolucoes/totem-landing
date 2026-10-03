@@ -19,6 +19,9 @@ export interface CartItem {
 }
 
 export type OrderStatus =
+  | "awaiting_custom_analysis"
+  | "custom_approved"
+  | "custom_rejected"
   | "awaiting_payment"
   | "paid"
   | "in_production"

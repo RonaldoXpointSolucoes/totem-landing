@@ -1071,6 +1071,105 @@ export default function AdminPage() {
               </div>
             </div>
 
+            {/* Avaliação e Precificação de Personalização Especial (Engenharia CNC) */}
+            {selectedOrder.status === "awaiting_custom_analysis" ||
+            selectedOrder.status === "custom_approved" ||
+            selectedOrder.order_number.startsWith("CUST-") ? (
+              <div className="p-5 rounded-2xl bg-indigo-950/30 border border-indigo-500/30 space-y-4">
+                <div className="flex items-center gap-2">
+                  <Wrench className="w-5 h-5 text-indigo-400" />
+                  <h4 className="font-extrabold text-white text-sm">
+                    Painel do Engenheiro CNC — Avaliação de Gabarito & Corte
+                  </h4>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">
+                      Acréscimo de Usinagem CNC (R$)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="Ex: 280.00"
+                      defaultValue={(selectedOrder.total_cents - selectedOrder.subtotal_cents) / 100 || 0}
+                      id="custom_adj_input"
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">
+                      Parecer Técnico de Engenharia
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Viável corte sob medida com folga +1.5mm"
+                      defaultValue="Viável usinagem e fixação com gabarito especial."
+                      id="custom_notes_input"
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                  <button
+                    onClick={async () => {
+                      const adjInput = document.getElementById("custom_adj_input") as HTMLInputElement;
+                      const notesInput = document.getElementById("custom_notes_input") as HTMLInputElement;
+                      const adjVal = Math.round(parseFloat(adjInput?.value || "0") * 100);
+                      const notesVal = notesInput?.value || "";
+
+                      const res = await fetch(`/api/customizations/${selectedOrder.$id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          feasibility: "approved",
+                          customAdjustmentCents: adjVal,
+                          engineeringNotes: notesVal,
+                        }),
+                      });
+                      const json = await res.json();
+                      if (json.ok) {
+                        addAuditLog(
+                          "Aprovação de Orçamento Especial",
+                          selectedOrder.order_number,
+                          `Aprovado com acréscimo de ${formatBRL(adjVal)}`
+                        );
+                        loadOrders();
+                        setSelectedOrder(null);
+                      }
+                    }}
+                    className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-emerald-600/20"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Aprovar Orçamento e Liberar ao Cliente</span>
+                  </button>
+
+                  <button
+                    onClick={async () => {
+                      const res = await fetch(`/api/customizations/${selectedOrder.$id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          feasibility: "rejected",
+                          customAdjustmentCents: 0,
+                          engineeringNotes: "Inviável dimensionalmente para este padrão de gabinete.",
+                        }),
+                      });
+                      const json = await res.json();
+                      if (json.ok) {
+                        addAuditLog("Recusa de Orçamento Especial", selectedOrder.order_number, "Inviável");
+                        loadOrders();
+                        setSelectedOrder(null);
+                      }
+                    }}
+                    className="px-4 py-2.5 bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 font-bold rounded-xl text-xs transition-all"
+                  >
+                    Recusar Inviável
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
             <button
               onClick={() => setSelectedOrder(null)}
               className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-xs transition-all"
