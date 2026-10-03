@@ -24,6 +24,10 @@ import {
   ChevronRight,
   Database,
   ExternalLink,
+  BarChart3,
+  TrendingUp,
+  Users,
+  Target,
 } from "lucide-react";
 
 interface OrderItem {
@@ -90,7 +94,7 @@ export default function AdminPage() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Navegação do painel
-  const [activeTab, setActiveTab] = useState<"orders" | "catalog" | "logs">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "catalog" | "analytics" | "logs">("orders");
   const [catalogSubTab, setCatalogSubTab] = useState<"models" | "colors" | "peripherals">("models");
 
   // Dados
@@ -98,6 +102,10 @@ export default function AdminPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
+
+  // Analytics de Funil
+  const [funnelData, setFunnelData] = useState<any>(null);
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
 
   // Catálogo
   const [catalogData, setCatalogData] = useState<any>(null);
@@ -180,10 +188,27 @@ export default function AdminPage() {
     }
   };
 
+  // Carregar Telemetria de Funil & Abandono
+  const loadAnalytics = async () => {
+    setIsLoadingAnalytics(true);
+    try {
+      const res = await fetch("/api/analytics/funnel");
+      const json = await res.json();
+      if (json.ok) {
+        setFunnelData(json);
+      }
+    } catch (err) {
+      console.error("Erro ao carregar telemetria de funil:", err);
+    } finally {
+      setIsLoadingAnalytics(false);
+    }
+  };
+
   useEffect(() => {
     if (isAuthenticated) {
       loadOrders();
       loadCatalog();
+      loadAnalytics();
     }
   }, [isAuthenticated]);
 
@@ -395,11 +420,12 @@ export default function AdminPage() {
               onClick={() => {
                 loadOrders();
                 loadCatalog();
+                loadAnalytics();
               }}
               className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center gap-1.5 transition-colors border border-slate-700/60"
               title="Sincronizar dados"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingOrders || isLoadingCatalog ? "animate-spin" : ""}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingOrders || isLoadingCatalog || isLoadingAnalytics ? "animate-spin" : ""}`} />
               <span className="hidden sm:inline">Atualizar</span>
             </button>
             <a
@@ -449,6 +475,21 @@ export default function AdminPage() {
           >
             <Layers className="w-4 h-4" />
             <span>Catálogo & Precificação</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab("analytics");
+              loadAnalytics();
+            }}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all shrink-0 ${
+              activeTab === "analytics"
+                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25"
+                : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+            }`}
+          >
+            <BarChart3 className="w-4 h-4 text-cyan-400" />
+            <span>Analytics & Funil</span>
           </button>
 
           <button
@@ -935,6 +976,194 @@ export default function AdminPage() {
                   </div>
                 )}
               </>
+            )}
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* ABA: ANALYTICS E FUNIL DE CONVERSÃO */}
+        {/* ======================================================== */}
+        {activeTab === "analytics" && (
+          <div className="space-y-6 animate-fade-in">
+            {/* Header com Atualizar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/60 border border-slate-800 p-5 rounded-2xl">
+              <div>
+                <h3 className="font-extrabold text-white text-lg flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-cyan-400" />
+                  Telemetria de Funil de Vendas B2B & Taxas de Abandono
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Métricas em tempo real de jornada, abandono de etapas do configurador e conversão de pedidos Pix.
+                </p>
+              </div>
+              <button
+                onClick={loadAnalytics}
+                disabled={isLoadingAnalytics}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all self-start sm:self-auto shadow-md shadow-indigo-600/20"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoadingAnalytics ? "animate-spin" : ""}`} />
+                <span>Atualizar Métricas</span>
+              </button>
+            </div>
+
+            {/* 4 Cards de KPI */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl">
+                <span className="text-xs font-semibold text-slate-400 block mb-1">
+                  Total de Sessões / Visitas
+                </span>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-3xl font-extrabold text-white">
+                    {funnelData?.funnel?.totalSessions || 0}
+                  </span>
+                  <span className="text-xs text-indigo-400 font-bold bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">
+                    Sessões
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl">
+                <span className="text-xs font-semibold text-slate-400 block mb-1">
+                  Taxa de Conversão Global
+                </span>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-3xl font-extrabold text-emerald-400">
+                    {funnelData?.funnel?.globalConversionRate || 0}%
+                  </span>
+                  <span className="text-xs text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                    Final / Topo
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl">
+                <span className="text-xs font-semibold text-slate-400 block mb-1">
+                  Pix Copia e Cola Emitidos
+                </span>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-3xl font-extrabold text-cyan-400">
+                    {funnelData?.counts?.pix_generated || 0}
+                  </span>
+                  <span className="text-xs text-cyan-400 font-bold bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20">
+                    Etapa 6
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl">
+                <span className="text-xs font-semibold text-slate-400 block mb-1">
+                  Vendas / Pix Compensados
+                </span>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-3xl font-extrabold text-purple-400">
+                    {funnelData?.counts?.purchase || 0}
+                  </span>
+                  <span className="text-xs text-purple-400 font-bold bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">
+                    Concluídos
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Tabela do Funil com Taxas de Abandono */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 space-y-4 shadow-xl">
+              <div className="border-b border-slate-800 pb-3">
+                <h4 className="font-extrabold text-white text-base">
+                  Desempenho por Etapa & Análise de Drop-off (Abandono)
+                </h4>
+                <p className="text-xs text-slate-400">
+                  Identifique os pontos exatos de evasão do cliente desde a visualização até a compra.
+                </p>
+              </div>
+
+              <div className="space-y-4 pt-2">
+                {funnelData?.funnel?.stages?.map((stage: any, index: number) => {
+                  const isTop = index === 0;
+                  const isHighDropoff = stage.dropoffRateFromPrevious > 50;
+
+                  return (
+                    <div
+                      key={stage.stageId}
+                      className="p-4 bg-slate-950/70 border border-slate-800/80 rounded-xl space-y-2"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <span className="w-6 h-6 rounded-full bg-slate-800 text-indigo-400 font-bold text-xs flex items-center justify-center border border-slate-700">
+                            {stage.stepNumber}
+                          </span>
+                          <div>
+                            <span className="font-bold text-white text-sm">{stage.label}</span>
+                            <span className="text-[10px] text-slate-500 font-mono ml-2">
+                              ({stage.eventName})
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-4 text-xs font-mono">
+                          <div>
+                            <span className="text-slate-500 block text-[10px]">Contagem</span>
+                            <span className="font-extrabold text-white text-sm">{stage.count}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block text-[10px]">Retenção da Etapa</span>
+                            <span className="font-bold text-emerald-400">
+                              {stage.conversionRateFromPrevious}%
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block text-[10px]">Taxa de Abandono</span>
+                            <span
+                              className={`font-bold px-2 py-0.5 rounded text-[11px] ${
+                                isTop
+                                  ? "text-slate-500"
+                                  : isHighDropoff
+                                  ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                                  : "bg-amber-500/10 text-amber-400"
+                              }`}
+                            >
+                              {isTop ? "—" : `${stage.dropoffRateFromPrevious}%`}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Barra de Progresso Visual */}
+                      <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-800">
+                        <div
+                          className="h-full bg-gradient-to-r from-indigo-500 via-cyan-400 to-emerald-400 transition-all duration-500 rounded-full"
+                          style={{
+                            width: `${Math.max(4, Math.min(100, stage.overallConversionRate))}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Resumo de Modelos Populares */}
+            {funnelData?.funnel?.popularModels && Object.keys(funnelData.funnel.popularModels).length > 0 && (
+              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 space-y-4">
+                <h4 className="font-extrabold text-white text-sm">
+                  Modelos de Gabinete Mais Selecionados pelos Clientes
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {Object.entries(funnelData.funnel.popularModels).map(([mId, count]: [string, any]) => (
+                    <div
+                      key={mId}
+                      className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex justify-between items-center text-xs"
+                    >
+                      <span className="font-semibold text-slate-300 capitalize">
+                        {mId.replace("cabinet-", "Totem ")}
+                      </span>
+                      <span className="font-mono font-bold text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-800/30">
+                        {count} seleções
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         )}

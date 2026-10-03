@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Hero, ModelsSection, HowItWorks, Differentials, Footer } from "@/components/marketing";
 import { ConfiguratorWizard } from "@/components/configurator";
 import { CartView } from "@/components/cart";
@@ -8,17 +8,27 @@ import { CheckoutView } from "@/components/checkout";
 import { CartProvider, useCart } from "@/modules/cart/CartContext";
 import { Badge, Button } from "@/components/ui";
 import { Cpu, ArrowRight, ShoppingCart, Sparkles, Layers } from "lucide-react";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 
 function MainAppContent() {
   const [viewMode, setViewMode] = useState<"landing" | "configurator" | "cart" | "checkout">("landing");
   const [selectedModelId, setSelectedModelId] = useState<string>("cabinet-floor");
   const { totalItems, setEditingItem, items } = useCart();
 
+  useEffect(() => {
+    trackEvent(ANALYTICS_EVENTS.VIEW_HOME, { page: "landing" });
+  }, []);
+
   const handleStartConfigurator = (modelId?: string) => {
     setEditingItem(null); // Limpa edição anterior para nova configuração
+    const chosenModel = modelId || selectedModelId;
     if (modelId) {
       setSelectedModelId(modelId);
     }
+    trackEvent(ANALYTICS_EVENTS.START_CONFIGURATOR, {
+      modelId: chosenModel,
+      source: "navigation_action",
+    });
     setViewMode("configurator");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };

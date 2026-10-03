@@ -37,3 +37,6 @@ next-env.d.ts
 screenshot_*.png
 *.log
 
+# automated backups
+backups/totem_db_*
+

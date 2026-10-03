@@ -22,6 +22,7 @@ import { StickyBottomBar } from "./StickyBottomBar";
 import { ConfiguratorModalCustomization } from "./ConfiguratorModalCustomization";
 import { Card, Badge, Button, Modal } from "@/components/ui";
 import { ShoppingCart, CheckCircle2, ArrowRight, RotateCcw } from "lucide-react";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 
 interface ConfiguratorWizardProps {
   initialModelId?: string;
@@ -135,6 +136,57 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     }
   };
 
+  const handleSelectModel = (model: CabinetModel) => {
+    setSelectedModel(model);
+    trackEvent(ANALYTICS_EVENTS.SELECT_CABINET_MODEL, {
+      modelId: model.id,
+      modelName: model.name,
+      basePriceCents: model.basePriceCents,
+    });
+  };
+
+  const handleSelectColor = (color: ColorOption) => {
+    setSelectedColor(color);
+    trackEvent(ANALYTICS_EVENTS.SELECT_COLOR, {
+      colorId: color.id,
+      colorName: color.name,
+      priceAdjustmentCents: color.priceAdjustmentCents,
+    });
+  };
+
+  const handleSelectMonitor = (monitor: MonitorOption | null) => {
+    setSelectedMonitor(monitor);
+    trackEvent(ANALYTICS_EVENTS.SELECT_MONITOR, {
+      monitorId: monitor?.id || null,
+      monitorName: monitor?.displayName || "Nenhum",
+    });
+  };
+
+  const handleSelectPrinter = (printer: PrinterOption | null) => {
+    setSelectedPrinter(printer);
+    trackEvent(ANALYTICS_EVENTS.SELECT_PRINTER, {
+      printerId: printer?.id || null,
+      printerName: printer?.displayName || "Nenhum",
+    });
+  };
+
+  const handleSelectReader = (reader: BarcodeReaderOption | null) => {
+    setSelectedReader(reader);
+    trackEvent(ANALYTICS_EVENTS.SELECT_BARCODE_READER, {
+      readerId: reader?.id || null,
+      readerName: reader?.displayName || "Nenhum",
+      enabled: true,
+    });
+  };
+
+  const handleToggleReader = (use: boolean) => {
+    setUseReader(use);
+    trackEvent(ANALYTICS_EVENTS.SELECT_BARCODE_READER, {
+      enabled: use,
+      readerId: use ? selectedReader?.id || null : null,
+    });
+  };
+
   const handleAddToCart = () => {
     const configuration: TotemConfiguration = {
       model: selectedModel,
@@ -152,6 +204,13 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
       // Adiciona novo item ao carrinho
       addItem(configuration, 1);
     }
+
+    trackEvent(ANALYTICS_EVENTS.ADD_TO_CART, {
+      modelId: selectedModel.id,
+      modelName: selectedModel.name,
+      totalPriceCents: pricing.totalPriceCents,
+      isEditing: !!editingItem,
+    });
 
     setIsCartSuccessModalOpen(true);
   };
@@ -290,7 +349,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
               <StepModel
                 models={catalog.models}
                 selectedModel={selectedModel}
-                onSelectModel={setSelectedModel}
+                onSelectModel={handleSelectModel}
               />
             )}
 
@@ -298,7 +357,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
               <StepColor
                 colors={catalog.colors}
                 selectedColor={selectedColor}
-                onSelectColor={setSelectedColor}
+                onSelectColor={handleSelectColor}
               />
             )}
 
@@ -306,7 +365,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
               <StepMonitor
                 monitors={catalog.monitors}
                 selectedMonitor={selectedMonitor}
-                onSelectMonitor={setSelectedMonitor}
+                onSelectMonitor={handleSelectMonitor}
                 onRequestCustomization={() => setIsCustomModalOpen(true)}
               />
             )}
@@ -315,7 +374,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
               <StepPrinter
                 printers={catalog.printers}
                 selectedPrinter={selectedPrinter}
-                onSelectPrinter={setSelectedPrinter}
+                onSelectPrinter={handleSelectPrinter}
                 onRequestCustomization={() => setIsCustomModalOpen(true)}
               />
             )}
@@ -325,8 +384,8 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                 readers={catalog.readers}
                 useReader={useReader}
                 selectedReader={selectedReader}
-                onToggleUseReader={setUseReader}
-                onSelectReader={setSelectedReader}
+                onToggleUseReader={handleToggleReader}
+                onSelectReader={handleSelectReader}
                 onRequestCustomization={() => setIsCustomModalOpen(true)}
               />
             )}

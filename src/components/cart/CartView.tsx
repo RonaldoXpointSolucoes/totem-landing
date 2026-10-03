@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   CheckCircle2,
 } from "lucide-react";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 
 interface CartViewProps {
   onContinueShopping: () => void;
@@ -170,7 +171,14 @@ export const CartView: React.FC<CartViewProps> = ({
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => duplicateItem(id)}
+                        onClick={() => {
+                          duplicateItem(id);
+                          trackEvent(ANALYTICS_EVENTS.DUPLICATE_ITEM, {
+                            itemId: id,
+                            modelId: model.id,
+                            modelName: model.name,
+                          });
+                        }}
                         title="Duplicar configuração para compra em lote"
                         className="h-8 px-2.5 text-xs text-slate-300"
                       >
@@ -252,7 +260,13 @@ export const CartView: React.FC<CartViewProps> = ({
             <Button
               variant="primary"
               size="lg"
-              onClick={onProceedToCheckout}
+              onClick={() => {
+                trackEvent(ANALYTICS_EVENTS.BEGIN_CHECKOUT, {
+                  totalItems,
+                  totalPriceCents,
+                });
+                onProceedToCheckout();
+              }}
               className="w-full font-bold shadow-indigo-600/30 shadow-lg"
             >
               Avançar para o Checkout <ArrowRight className="w-4 h-4 ml-2" />

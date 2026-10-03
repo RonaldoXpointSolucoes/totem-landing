@@ -24,6 +24,7 @@ import {
   Wrench,
   Check
 } from "lucide-react";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 
 interface CheckoutViewProps {
   onBackToCart: () => void;
@@ -116,6 +117,12 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
         const res = await fetch(`/api/checkout/status?orderId=${orderDetails.id}`);
         const data = await res.json();
         if (data.ok && data.isPaid) {
+          trackEvent(ANALYTICS_EVENTS.PURCHASE, {
+            orderId: orderDetails.id,
+            orderNumber: orderDetails.orderNumber,
+            totalCents: orderDetails.totalCents,
+            source: "webhook_polling",
+          });
           setOrderDetails((prev) =>
             prev
               ? {
@@ -241,6 +248,12 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
       }
 
       setOrderDetails(data.order);
+      trackEvent(ANALYTICS_EVENTS.PIX_GENERATED, {
+        orderId: data.order.id,
+        orderNumber: data.order.orderNumber,
+        totalCents: data.order.totalCents,
+        paymentMethod: "pix",
+      });
       setStep("awaiting_pix");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err: any) {
@@ -262,6 +275,12 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   // Simulação de Pagamento Confirmado (MVP 0)
   const handleSimulatePaymentConfirmation = () => {
     if (!orderDetails) return;
+    trackEvent(ANALYTICS_EVENTS.PURCHASE, {
+      orderId: orderDetails.id,
+      orderNumber: orderDetails.orderNumber,
+      totalCents: orderDetails.totalCents,
+      source: "manual_simulation",
+    });
     setOrderDetails({
       ...orderDetails,
       status: "paid",
