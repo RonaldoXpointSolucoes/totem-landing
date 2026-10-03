@@ -36,6 +36,32 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
 }) => {
   const { addItem, updateItem, editingItem, setEditingItem } = useCart();
 
+  // Catálogo dinâmico sincronizado com o Appwrite (com fallback imediato para dados estáticos)
+  const [catalog, setCatalog] = useState({
+    models: CABINET_MODELS,
+    colors: COLOR_OPTIONS,
+    monitors: HOMOLOGATED_MONITORS,
+    printers: HOMOLOGATED_PRINTERS,
+    readers: HOMOLOGATED_READERS,
+  });
+
+  useEffect(() => {
+    fetch("/api/catalog")
+      .then((res) => res.json())
+      .then((res) => {
+        if (res?.ok && res.data) {
+          setCatalog({
+            models: res.data.cabinetModels?.length ? res.data.cabinetModels : CABINET_MODELS,
+            colors: res.data.colors?.length ? res.data.colors : COLOR_OPTIONS,
+            monitors: res.data.monitors?.length ? res.data.monitors : HOMOLOGATED_MONITORS,
+            printers: res.data.printers?.length ? res.data.printers : HOMOLOGATED_PRINTERS,
+            readers: res.data.barcodeReaders?.length ? res.data.barcodeReaders : HOMOLOGATED_READERS,
+          });
+        }
+      })
+      .catch((err) => console.warn("Catálogo offline:", err));
+  }, []);
+
   // 1. Estado da Configuração (se estiver em edição, carrega a configuração existente)
   const [selectedModel, setSelectedModel] = useState<CabinetModel>(() => {
     if (editingItem) return editingItem.configuration.model;
@@ -262,7 +288,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
           <div className="lg:col-span-8 space-y-6">
             {step === 1 && (
               <StepModel
-                models={CABINET_MODELS}
+                models={catalog.models}
                 selectedModel={selectedModel}
                 onSelectModel={setSelectedModel}
               />
@@ -270,7 +296,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
 
             {step === 2 && (
               <StepColor
-                colors={COLOR_OPTIONS}
+                colors={catalog.colors}
                 selectedColor={selectedColor}
                 onSelectColor={setSelectedColor}
               />
@@ -278,7 +304,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
 
             {step === 3 && (
               <StepMonitor
-                monitors={HOMOLOGATED_MONITORS}
+                monitors={catalog.monitors}
                 selectedMonitor={selectedMonitor}
                 onSelectMonitor={setSelectedMonitor}
                 onRequestCustomization={() => setIsCustomModalOpen(true)}
@@ -287,7 +313,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
 
             {step === 4 && (
               <StepPrinter
-                printers={HOMOLOGATED_PRINTERS}
+                printers={catalog.printers}
                 selectedPrinter={selectedPrinter}
                 onSelectPrinter={setSelectedPrinter}
                 onRequestCustomization={() => setIsCustomModalOpen(true)}
@@ -296,7 +322,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
 
             {step === 5 && (
               <StepReader
-                readers={HOMOLOGATED_READERS}
+                readers={catalog.readers}
                 useReader={useReader}
                 selectedReader={selectedReader}
                 onToggleUseReader={setUseReader}

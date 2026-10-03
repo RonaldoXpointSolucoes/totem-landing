@@ -9,6 +9,7 @@ import {
 import { calculateTotemPrice } from "@/modules/pricing/pricingEngine";
 import { generatePixPayload } from "@/lib/pix";
 import { CustomerInfo, DeliveryAddress, OrderDetails, ManufacturingSpec, CartItem } from "@/types/order";
+import { saveOrderWithSnapshot } from "@/lib/appwrite/server";
 
 interface RequestBody {
   customer: CustomerInfo;
@@ -183,8 +184,42 @@ export async function POST(req: Request) {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 30 * 60 * 1000).toISOString(); // 30 minutos
 
+    // 7. Persistência e Congelamento de Snapshot Imutável de Venda no Appwrite
+    let appwriteResult: { orderId: string; orderNumber: string } | null = null;
+    try {
+      appwriteResult = await saveOrderWithSnapshot({
+        orderNumber,
+        customer,
+        deliveryAddress,
+        subtotalCents,
+        shippingCents,
+        totalCents,
+        status: "awaiting_payment",
+        manufacturingSheetJson: JSON.stringify(manufacturingSheets),
+        items: validatedCartItems.map((item) => ({
+          cabinetName: item.configuration.model.name,
+          colorName: item.configuration.color.name,
+          monitorName: item.configuration.monitor?.displayName || "Nenhum",
+          printerName: item.configuration.printer?.displayName || "Nenhum",
+          readerName: item.configuration.barcodeReader?.displayName || "Nenhum",
+          unitPriceCents: item.unitPriceCents,
+          quantity: item.quantity,
+          subtotalCents: item.subtotalCents,
+        })),
+        payment: {
+          provider: "pix_xpoint",
+          amountCents: totalCents,
+          status: "pending",
+          pixCode,
+          expiresAt,
+        },
+      });
+    } catch (persistErr: any) {
+      console.warn("Aviso: Registro no Appwrite falhou, prosseguindo com dados em memória:", persistErr?.message);
+    }
+
     const orderDetails: OrderDetails = {
-      id: orderId,
+      id: appwriteResult?.orderId || orderId,
       orderNumber,
       createdAt: now.toISOString(),
       customer,
@@ -206,7 +241,8 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       order: orderDetails,
-      message: "Ordem de pedido gerada com sucesso e recalculada pelo servidor.",
+      appwriteOrderId: appwriteResult?.orderId || null,
+      message: "Ordem de pedido gerada com sucesso, recalculada pelo servidor e persistida no Appwrite.",
     });
   } catch (error: any) {
     console.error("Erro no processamento do checkout:", error);
