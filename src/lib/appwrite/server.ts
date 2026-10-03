@@ -243,3 +243,118 @@ export async function getAppwriteCatalog() {
     })),
   };
 }
+
+/**
+ * Consulta administrativa de todos os itens do catálogo (ativos e inativos).
+ */
+export async function getAllCatalogAdmin() {
+  const db = getServerDatabases();
+  const dbId = APPWRITE_CONFIG.databaseId;
+  const cols = APPWRITE_CONFIG.collections;
+
+  const [modelsRes, colorsRes, monitorsRes, printersRes, readersRes] =
+    await Promise.all([
+      db.listDocuments(dbId, cols.cabinetModels, [Query.orderAsc("sort_order"), Query.limit(100)]),
+      db.listDocuments(dbId, cols.colors, [Query.limit(100)]),
+      db.listDocuments(dbId, cols.monitors, [Query.limit(100)]),
+      db.listDocuments(dbId, cols.printers, [Query.limit(100)]),
+      db.listDocuments(dbId, cols.barcodeReaders, [Query.limit(100)]),
+    ]);
+
+  return {
+    models: modelsRes.documents,
+    colors: colorsRes.documents,
+    monitors: monitorsRes.documents,
+    printers: printersRes.documents,
+    readers: readersRes.documents,
+  };
+}
+
+/**
+ * Atualiza um item do catálogo (preço, status, descrição).
+ */
+export async function updateCatalogItemAdmin(collection: string, docId: string, data: Record<string, any>) {
+  const db = getServerDatabases();
+  const dbId = APPWRITE_CONFIG.databaseId;
+  return await db.updateDocument(dbId, collection, docId, data);
+}
+
+/**
+ * Cria um novo item no catálogo do Appwrite.
+ */
+export async function createCatalogItemAdmin(collection: string, data: Record<string, any>) {
+  const db = getServerDatabases();
+  const dbId = APPWRITE_CONFIG.databaseId;
+  return await db.createDocument(dbId, collection, ID.unique(), data);
+}
+
+/**
+ * Lista todos os pedidos para o painel administrativo com seus itens e pagamentos.
+ */
+export async function listAllOrdersAdmin(statusFilter?: string) {
+  const db = getServerDatabases();
+  const dbId = APPWRITE_CONFIG.databaseId;
+  const cols = APPWRITE_CONFIG.collections;
+
+  const queries = [Query.orderDesc("$createdAt"), Query.limit(50)];
+  if (statusFilter && statusFilter !== "all") {
+    queries.push(Query.equal("status", statusFilter));
+  }
+
+  const ordersRes = await db.listDocuments(dbId, cols.orders, queries);
+
+  // Carrega itens e pagamentos vinculados
+  const enrichedOrders = await Promise.all(
+    ordersRes.documents.map(async (orderDoc: any) => {
+      const [itemsRes, paymentsRes] = await Promise.all([
+        db.listDocuments(dbId, cols.orderItems, [
+          Query.equal("order_id", orderDoc.$id),
+          Query.limit(50),
+        ]),
+        db.listDocuments(dbId, cols.payments, [
+          Query.equal("order_id", orderDoc.$id),
+          Query.orderDesc("$createdAt"),
+          Query.limit(1),
+        ]),
+      ]);
+
+      return {
+        ...orderDoc,
+        items: itemsRes.documents,
+        payment: paymentsRes.documents[0] || null,
+      };
+    })
+  );
+
+  return enrichedOrders;
+}
+
+/**
+ * Atualiza o status de um pedido e transita o pagamento se necessário.
+ */
+export async function updateOrderStatusAdmin(orderId: string, newStatus: string) {
+  const db = getServerDatabases();
+  const dbId = APPWRITE_CONFIG.databaseId;
+  const cols = APPWRITE_CONFIG.collections;
+
+  const updatedOrder = await db.updateDocument(dbId, cols.orders, orderId, {
+    status: newStatus,
+  });
+
+  // Se o pedido foi marcado como pago, atualiza a transação Pix correspondente
+  if (newStatus === "paid") {
+    const paymentsRes = await db.listDocuments(dbId, cols.payments, [
+      Query.equal("order_id", orderId),
+      Query.limit(1),
+    ]);
+    if (paymentsRes.documents.length > 0) {
+      await db.updateDocument(dbId, cols.payments, paymentsRes.documents[0].$id, {
+        status: "paid",
+        paid_at: new Date().toISOString(),
+      });
+    }
+  }
+
+  return updatedOrder;
+}
+
