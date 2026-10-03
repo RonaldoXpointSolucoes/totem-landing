@@ -39,16 +39,16 @@ export const Differentials: React.FC = () => {
   ];
 
   return (
-    <section className="py-16 md:py-24 border-t border-slate-800/80">
+    <section className="py-16 md:py-24 border-t border-black/5 dark:border-slate-800/80 bg-[#fbfbfd] dark:bg-[#090a0f] transition-colors duration-300">
       <div className="max-w-6xl mx-auto px-4">
         <div className="text-center max-w-2xl mx-auto mb-14 space-y-3">
           <Badge variant="primary" className="text-xs">
             Diferenciais de Fábrica
           </Badge>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-[#1d1d1f] dark:text-white tracking-tight">
             Engenharia pensada para quem opera no mundo real
           </h2>
-          <p className="text-sm sm:text-base text-slate-400">
+          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
             Qualidade industrial com foco em durabilidade, facilidade de manutenção e segurança física.
           </p>
         </div>
@@ -57,13 +57,13 @@ export const Differentials: React.FC = () => {
           {items.map((item, idx) => (
             <div
               key={idx}
-              className="p-6 rounded-2xl border border-slate-800/80 bg-slate-900/50 backdrop-blur-sm space-y-3 hover:border-slate-700 transition-colors"
+              className="p-6 rounded-[24px] border border-black/5 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 backdrop-blur-sm space-y-3 shadow-sm hover:shadow-md dark:hover:border-slate-700 transition-all"
             >
-              <div className="p-3 w-fit rounded-xl bg-slate-800/60 border border-slate-700/60">
+              <div className="p-3 w-fit rounded-2xl bg-[#f5f5f7] dark:bg-slate-800/60 border border-black/5 dark:border-slate-700/60">
                 {item.icon}
               </div>
-              <h3 className="text-base font-bold text-white">{item.title}</h3>
-              <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">{item.desc}</p>
+              <h3 className="text-base font-bold text-[#1d1d1f] dark:text-white">{item.title}</h3>
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">{item.desc}</p>
             </div>
           ))}
         </div>

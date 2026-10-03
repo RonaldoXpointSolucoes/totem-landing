@@ -5,3 +5,4 @@ export * from "./Input";
 export * from "./Modal";
 export * from "./Drawer";
 export * from "./RadioGroup";
+export * from "./ThemeToggle";

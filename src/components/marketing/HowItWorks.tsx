@@ -33,16 +33,16 @@ export const HowItWorks: React.FC = () => {
   ];
 
   return (
-    <section className="py-16 md:py-24 border-t border-slate-800/80 bg-slate-950/40">
+    <section className="py-16 md:py-24 border-t border-black/5 dark:border-slate-800/80 bg-white dark:bg-slate-950/40 transition-colors duration-300">
       <div className="max-w-6xl mx-auto px-4">
         <div className="text-center max-w-2xl mx-auto mb-14 space-y-3">
           <Badge variant="accent" className="text-xs">
             Processo Produtivo Descomplicado
           </Badge>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-[#1d1d1f] dark:text-white tracking-tight">
             Como funciona seu pedido sob medida
           </h2>
-          <p className="text-sm sm:text-base text-slate-400">
+          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
             Você não precisa de projetos CAD complexos. Nós já temos os templates homologados.
           </p>
         </div>
@@ -51,21 +51,21 @@ export const HowItWorks: React.FC = () => {
           {steps.map((st) => (
             <div
               key={st.num}
-              className="relative p-6 rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur-md flex flex-col justify-between"
+              className="relative p-6 rounded-[24px] border border-black/5 dark:border-slate-800 bg-[#f5f5f7] dark:bg-slate-900/60 backdrop-blur-md flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow"
             >
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700/60">
+                  <div className="p-3 rounded-2xl bg-white dark:bg-slate-800/80 border border-black/5 dark:border-slate-700/60 shadow-sm">
                     {st.icon}
                   </div>
-                  <span className="text-2xl font-black text-slate-700 select-none">{st.num}</span>
+                  <span className="text-2xl font-black text-slate-400 dark:text-slate-700 select-none">{st.num}</span>
                 </div>
-                <h3 className="text-base font-bold text-white mb-2">{st.title}</h3>
-                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                <h3 className="text-base font-bold text-[#1d1d1f] dark:text-white mb-2">{st.title}</h3>
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
                   {st.description}
                 </p>
               </div>
-              <div className="mt-6 pt-3 border-t border-slate-800/60 flex items-center gap-1.5 text-[11px] text-indigo-400 font-semibold">
+              <div className="mt-6 pt-3 border-t border-black/5 dark:border-slate-800/60 flex items-center gap-1.5 text-[11px] text-[#0071e3] dark:text-indigo-400 font-semibold">
                 Passo homologado ✓
               </div>
             </div>

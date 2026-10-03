@@ -14,17 +14,17 @@ export const ModelsSection: React.FC<ModelsSectionProps> = ({
   onSelectModelToConfigure,
 }) => {
   return (
-    <section id="modelos" className="py-16 md:py-24 border-t border-slate-800/80">
+    <section id="modelos" className="py-16 md:py-24 border-t border-black/5 dark:border-slate-800/80 bg-[#fbfbfd] dark:bg-[#090a0f] transition-colors duration-300">
       <div className="max-w-6xl mx-auto px-4">
         {/* Cabeçalho da Seção */}
         <div className="text-center max-w-2xl mx-auto mb-12 space-y-3">
           <Badge variant="primary" className="text-xs">
             Modelos de Linha
           </Badge>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-[#1d1d1f] dark:text-white tracking-tight">
             Escolha o formato ideal para seu espaço
           </h2>
-          <p className="text-sm sm:text-base text-slate-400">
+          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
             Três plataformas projetadas com padrões industriais, rigidez estrutural e fácil manutenção.
           </p>
         </div>
@@ -35,33 +35,33 @@ export const ModelsSection: React.FC<ModelsSectionProps> = ({
             <Card
               key={model.id}
               interactive
-              className="flex flex-col justify-between p-6 glass-card-hover border-slate-800 bg-slate-900/70"
+              className="flex flex-col justify-between p-6 rounded-[28px] border border-black/5 dark:border-slate-800 bg-white dark:bg-slate-900/70 shadow-lg dark:shadow-2xl transition-all hover:shadow-xl dark:hover:border-slate-700"
             >
               <div>
                 {/* Imagem do Modelo */}
-                <div className="relative aspect-[3/4] w-full rounded-xl bg-slate-950/70 border border-slate-800/80 p-6 flex items-center justify-center mb-6 overflow-hidden">
+                <div className="relative aspect-[3/4] w-full rounded-2xl bg-[#f5f5f7] dark:bg-slate-950/70 border border-black/5 dark:border-slate-800/80 p-6 flex items-center justify-center mb-6 overflow-hidden">
                   <img
                     src={model.mainImage}
                     alt={model.name}
-                    className="h-full w-auto object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)] transition-transform duration-300 hover:scale-105"
+                    className="h-full w-auto object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.15)] dark:drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)] transition-transform duration-300 hover:scale-105"
                   />
                   <div className="absolute top-3 right-3">
-                    <span className="text-[11px] font-semibold text-slate-400 bg-slate-900/90 border border-slate-800 px-2.5 py-0.5 rounded-full">
+                    <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 bg-white/90 dark:bg-slate-900/90 border border-black/5 dark:border-slate-800 px-2.5 py-0.5 rounded-full shadow-sm">
                       {model.slug === "floor" ? "Mais Popular" : "Sob Medida"}
                     </span>
                   </div>
                 </div>
 
                 {/* Título e Descrição */}
-                <h3 className="text-xl font-bold text-white mb-2">{model.name}</h3>
-                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mb-4">
+                <h3 className="text-xl font-bold text-[#1d1d1f] dark:text-white mb-2">{model.name}</h3>
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
                   {model.description}
                 </p>
 
                 {/* Especificações Rápidas */}
                 {model.dimensions && (
-                  <div className="flex items-center gap-2 text-[11px] text-slate-400 py-2 border-y border-slate-800/60 mb-4">
-                    <Maximize2 className="w-3.5 h-3.5 text-indigo-400" />
+                  <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 py-2 border-y border-black/5 dark:border-slate-800/60 mb-4">
+                    <Maximize2 className="w-3.5 h-3.5 text-[#0071e3] dark:text-indigo-400" />
                     <span>
                       {model.dimensions.heightMm}mm (A) × {model.dimensions.widthMm}mm (L) ×{" "}
                       {model.dimensions.depthMm}mm (P)
@@ -73,19 +73,18 @@ export const ModelsSection: React.FC<ModelsSectionProps> = ({
               {/* Preço e Botão de Ação */}
               <div className="pt-2">
                 <div className="mb-3">
-                  <span className="text-[11px] text-slate-400">Preço inicial</span>
-                  <p className="text-xl font-extrabold text-white">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">Preço inicial</span>
+                  <p className="text-xl font-extrabold text-[#1d1d1f] dark:text-white">
                     {formatBRL(model.basePriceCents)}
                   </p>
                 </div>
-                <Button
-                  variant="primary"
-                  className="w-full justify-between group"
+                <button
+                  className="w-full py-3 px-4 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white text-xs font-bold flex items-center justify-between transition-all duration-200 shadow-md shadow-blue-500/20 active:scale-95 group cursor-pointer"
                   onClick={() => onSelectModelToConfigure(model.id)}
                 >
                   <span>Configurar Este</span>
                   <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                </Button>
+                </button>
               </div>
             </Card>
           ))}

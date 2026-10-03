@@ -132,21 +132,25 @@ const schemaOrgJsonLd = {
   ],
 };
 
+import { ThemeProvider } from "@/lib/theme/ThemeContext";
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" className="dark">
+    <html lang="pt-BR" suppressHydrationWarning>
       <head>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaOrgJsonLd) }}
         />
       </head>
-      <body className="min-h-screen bg-[#090a0f] text-slate-100 antialiased selection:bg-indigo-500 selection:text-white">
-        {children}
+      <body className="min-h-screen bg-white dark:bg-[#090a0f] text-[#1d1d1f] dark:text-slate-100 antialiased selection:bg-[#0071e3] selection:text-white transition-colors duration-300">
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );
