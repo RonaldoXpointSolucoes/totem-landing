@@ -4,6 +4,7 @@ import {
   getAllCatalogAdmin,
   updateCatalogItemAdmin,
   createCatalogItemAdmin,
+  deleteCatalogItemAdmin,
 } from "@/lib/appwrite/server";
 import { APPWRITE_CONFIG } from "@/lib/appwrite/config";
 
@@ -110,6 +111,42 @@ export async function POST(req: Request) {
   } catch (error: any) {
     return NextResponse.json(
       { ok: false, error: "Falha ao criar item: " + error?.message },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(req: Request) {
+  const isAuth = await verifyAuth();
+  if (!isAuth) {
+    return NextResponse.json({ ok: false, error: "Acesso não autorizado." }, { status: 401 });
+  }
+
+  try {
+    const { collectionType, documentId } = await req.json();
+
+    const colMap: Record<string, string> = {
+      models: APPWRITE_CONFIG.collections.cabinetModels,
+      colors: APPWRITE_CONFIG.collections.colors,
+      monitors: APPWRITE_CONFIG.collections.monitors,
+      printers: APPWRITE_CONFIG.collections.printers,
+      readers: APPWRITE_CONFIG.collections.barcodeReaders,
+    };
+
+    const targetCollection = colMap[collectionType];
+    if (!targetCollection || !documentId) {
+      return NextResponse.json({ ok: false, error: "Parâmetros inválidos para exclusão." }, { status: 400 });
+    }
+
+    await deleteCatalogItemAdmin(targetCollection, documentId);
+
+    return NextResponse.json({
+      ok: true,
+      message: "Item excluído com sucesso do catálogo.",
+    });
+  } catch (error: any) {
+    return NextResponse.json(
+      { ok: false, error: "Falha ao excluir item: " + error?.message },
       { status: 500 }
     );
   }

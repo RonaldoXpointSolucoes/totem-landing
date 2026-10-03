@@ -1,16 +1,22 @@
 export interface CabinetModel {
   id: string;
   name: string;
-  slug: "wall" | "floor" | "countertop";
+  slug: string;
   description: string;
   basePriceCents: number;
   active: boolean;
   sortOrder: number;
   mainImage: string;
+  images?: string[];
   dimensions?: {
     heightMm: number;
     widthMm: number;
     depthMm: number;
+    steelGauge?: string;
+    vesaPattern?: string;
+    weightKg?: number;
+    notes?: string;
+    images?: string[];
   };
 }
 

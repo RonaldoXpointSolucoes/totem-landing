@@ -289,6 +289,15 @@ export async function createCatalogItemAdmin(collection: string, data: Record<st
 }
 
 /**
+ * Remove um item do catálogo no Appwrite.
+ */
+export async function deleteCatalogItemAdmin(collection: string, docId: string) {
+  const db = getServerDatabases();
+  const dbId = APPWRITE_CONFIG.databaseId;
+  return await db.deleteDocument(dbId, collection, docId);
+}
+
+/**
  * Lista todos os pedidos para o painel administrativo com seus itens e pagamentos.
  */
 export async function listAllOrdersAdmin(statusFilter?: string) {
