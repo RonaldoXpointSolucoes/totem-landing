@@ -107,6 +107,40 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     return () => clearInterval(interval);
   }, [step]);
 
+  // Live polling automático em tempo real para detectar compensação do Pix via Webhook
+  useEffect(() => {
+    if (step !== "awaiting_pix" || !orderDetails?.id) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/checkout/status?orderId=${orderDetails.id}`);
+        const data = await res.json();
+        if (data.ok && data.isPaid) {
+          setOrderDetails((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  status: "paid",
+                  payment: {
+                    ...prev.payment,
+                    status: "paid",
+                    paidAt: data.paidAt || new Date().toISOString(),
+                  },
+                }
+              : null
+          );
+          setStep("paid");
+          clearCart();
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+      } catch (err) {
+        // Silencioso em caso de oscilação transitória
+      }
+    }, 2500);
+
+    return () => clearInterval(pollInterval);
+  }, [step, orderDetails?.id, clearCart]);
+
   // Formatação MM:SS
   const formatTimer = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -438,10 +472,12 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   // TELA 2: AGUARDANDO PAGAMENTO PIX
   // ----------------------------------------------------
   if (step === "awaiting_pix" && orderDetails) {
-    // URL do QR Code via gerador público em alta fidelidade
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=12&data=${encodeURIComponent(
-      orderDetails.payment.pixCode
-    )}`;
+    // QR Code autêntico gerado pelo Gateway Pix (Data URL ou fallback)
+    const qrCodeUrl =
+      orderDetails.payment.qrCodeUrl ||
+      `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=12&data=${encodeURIComponent(
+        orderDetails.payment.pixCode
+      )}`;
 
     return (
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6 animate-in fade-in-50 duration-500">
@@ -495,6 +531,10 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                 height={220}
                 className="w-48 h-48 sm:w-56 sm:h-56 block object-contain"
               />
+            </div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Detecção em Tempo Real Ativa (compensação sem refresh)</span>
             </div>
             <span className="text-xs text-slate-400 flex items-center gap-1.5">
               <QrCode className="w-4 h-4 text-cyan-400" />

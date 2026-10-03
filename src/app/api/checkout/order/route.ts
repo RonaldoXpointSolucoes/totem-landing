@@ -10,6 +10,7 @@ import { calculateTotemPrice } from "@/modules/pricing/pricingEngine";
 import { generatePixPayload } from "@/lib/pix";
 import { CustomerInfo, DeliveryAddress, OrderDetails, ManufacturingSpec, CartItem } from "@/types/order";
 import { saveOrderWithSnapshot } from "@/lib/appwrite/server";
+import { createPixCharge } from "@/lib/payments/pixGateway";
 
 interface RequestBody {
   customer: CustomerInfo;
@@ -172,17 +173,14 @@ export async function POST(req: Request) {
     const shippingCents = 0; // Promocional
     const totalCents = subtotalCents + shippingCents;
 
-    // 6. Geração do Código Pix Copia e Cola EMV Oficial
-    const pixCode = generatePixPayload({
-      pixKey: "pix@totempro.com.br",
-      merchantName: "TOTEM PRO ENGENHARIA CNC",
-      merchantCity: "SAO PAULO",
-      txId: orderNumber.replace("-", ""),
+    // 6. Geração Dinâmica da Cobrança Pix com QR Code Real pelo Gateway
+    const pixCharge = await createPixCharge({
+      orderNumber,
       amountCents: totalCents,
+      customer,
     });
-
+    const { pixCode, qrCodeBase64, expiresAt, provider } = pixCharge;
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 30 * 60 * 1000).toISOString(); // 30 minutos
 
     // 7. Persistência e Congelamento de Snapshot Imutável de Venda no Appwrite
     let appwriteResult: { orderId: string; orderNumber: string } | null = null;
@@ -233,6 +231,7 @@ export async function POST(req: Request) {
         status: "pending",
         method: "pix",
         pixCode,
+        qrCodeUrl: qrCodeBase64,
         expiresAt,
       },
       manufacturingSheets,
