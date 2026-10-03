@@ -20,8 +20,9 @@ import { StepReader } from "./StepReader";
 import { StepReview } from "./StepReview";
 import { StickyBottomBar } from "./StickyBottomBar";
 import { ConfiguratorModalCustomization } from "./ConfiguratorModalCustomization";
+import { TotemViewer3DWrapper } from "./TotemViewer3DWrapper";
 import { Card, Badge, Button, Modal } from "@/components/ui";
-import { ShoppingCart, CheckCircle2, ArrowRight, RotateCcw } from "lucide-react";
+import { ShoppingCart, CheckCircle2, ArrowRight, RotateCcw, Box } from "lucide-react";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 
 interface ConfiguratorWizardProps {
@@ -105,6 +106,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
   // Modais de apoio
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
   const [isCartSuccessModalOpen, setIsCartSuccessModalOpen] = useState(false);
+  const [isMobileViewerOpen, setIsMobileViewerOpen] = useState(false);
 
   // 2. Motor de Cálculo de Preço Reativo e Autoritativo
   const pricing = useMemo(() => {
@@ -273,8 +275,8 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Coluna Esquerda: Preview Visual Permanente do Totem */}
           <div className="hidden lg:block lg:col-span-4 sticky top-6">
-            <Card className="p-6 border-slate-800 bg-slate-900/60 backdrop-blur-xl">
-              <div className="flex items-center justify-between mb-4">
+            <Card className="p-6 border-slate-800 bg-slate-900/60 backdrop-blur-xl space-y-5">
+              <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                   Visualização do Totem
                 </span>
@@ -283,33 +285,16 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                 </Badge>
               </div>
 
-              {/* Render do Totem com Swatch de Cor */}
-              <div className="relative aspect-[3/4] w-full rounded-2xl bg-slate-950/80 border border-slate-800 p-6 flex flex-col items-center justify-center overflow-hidden">
-                <img
-                  src={selectedModel.mainImage}
-                  alt={selectedModel.name}
-                  className="h-full w-auto object-contain drop-shadow-[0_15px_30px_rgba(79,70,229,0.25)] transition-all duration-300"
-                />
-
-                {/* Indicador de Cor Selecionada */}
-                <div className="absolute bottom-3 left-3 right-3 p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-3.5 h-3.5 rounded-full border border-slate-600"
-                      style={{ background: selectedColor.hexReference }}
-                    />
-                    <span className="font-semibold text-slate-200">{selectedColor.name}</span>
-                  </div>
-                  {selectedColor.priceAdjustmentCents > 0 && (
-                    <span className="text-indigo-400 font-bold">
-                      +{formatBRL(selectedColor.priceAdjustmentCents)}
-                    </span>
-                  )}
-                </div>
-              </div>
+              {/* Visualizador 3D Desacoplado com Alternância 2D/3D */}
+              <TotemViewer3DWrapper
+                selectedModel={selectedModel}
+                selectedColor={selectedColor}
+                hasPrinter={!!selectedPrinter}
+                hasScanner={useReader && !!selectedReader}
+              />
 
               {/* Resumo Dinâmico Lateral */}
-              <div className="mt-5 space-y-2.5 text-xs border-t border-slate-800/80 pt-4 text-slate-400">
+              <div className="space-y-2.5 text-xs border-t border-slate-800/80 pt-4 text-slate-400">
                 <div className="flex justify-between">
                   <span>Modelo:</span>
                   <span className="font-semibold text-white">{selectedModel.name}</span>
@@ -345,6 +330,31 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
 
           {/* Coluna Direita: Área do Passo Ativo */}
           <div className="lg:col-span-8 space-y-6">
+            {/* Banner Mobile para Visualização 3D On-Demand */}
+            <div className="lg:hidden">
+              <button
+                onClick={() => setIsMobileViewerOpen(true)}
+                className="w-full p-3.5 rounded-2xl bg-gradient-to-r from-indigo-950/60 via-slate-900 to-slate-950 border border-indigo-500/30 flex items-center justify-between text-left shadow-lg active:scale-[0.98] transition-all"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-600/20 border border-indigo-400/30 flex items-center justify-center text-cyan-300">
+                    <Box className="w-5 h-5 animate-pulse" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-white block">
+                      Visualizar Gabinete em 3D (360°)
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      Girar modelo, inspecionar portas e aberturas CNC
+                    </span>
+                  </div>
+                </div>
+                <Badge variant="accent" className="text-[10px]">
+                  3D Live
+                </Badge>
+              </button>
+            </div>
+
             {step === 1 && (
               <StepModel
                 models={catalog.models}
@@ -464,6 +474,24 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
             <ShoppingCart className="w-3.5 h-3.5 mr-1.5" />
             Ir para o Carrinho
           </Button>
+        </div>
+      </Modal>
+
+      {/* Modal de Visualização 3D Mobile */}
+      <Modal
+        isOpen={isMobileViewerOpen}
+        onClose={() => setIsMobileViewerOpen(false)}
+        title="Visualizador 3D — Totem Pro"
+        description="Gire o modelo em 360° com o dedo, inspecione a furação CNC e abra a porta técnica."
+        className="max-w-xl"
+      >
+        <div className="py-2">
+          <TotemViewer3DWrapper
+            selectedModel={selectedModel}
+            selectedColor={selectedColor}
+            hasPrinter={!!selectedPrinter}
+            hasScanner={useReader && !!selectedReader}
+          />
         </div>
       </Modal>
     </div>

@@ -7,3 +7,4 @@ export * from "./StepReader";
 export * from "./StepReview";
 export * from "./StickyBottomBar";
 export * from "./ConfiguratorModalCustomization";
+export * from "./TotemViewer3DWrapper";
