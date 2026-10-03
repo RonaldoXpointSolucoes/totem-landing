@@ -1,0 +1,894 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { useCart } from "@/modules/cart/CartContext";
+import { formatBRL } from "@/modules/pricing/pricingEngine";
+import { CustomerInfo, DeliveryAddress, OrderDetails, ManufacturingSpec } from "@/types/order";
+import { Card, Button, Input, Badge } from "@/components/ui";
+import {
+  ArrowLeft,
+  ShieldCheck,
+  CheckCircle2,
+  Copy,
+  Clock,
+  QrCode,
+  Printer,
+  Sparkles,
+  Building2,
+  User,
+  Truck,
+  CreditCard,
+  AlertCircle,
+  Cpu,
+  FileText,
+  Wrench,
+  Check
+} from "lucide-react";
+
+interface CheckoutViewProps {
+  onBackToCart: () => void;
+  onOrderCompleted: () => void;
+}
+
+// Máscaras de entrada
+function maskCPF(value: string) {
+  return value
+    .replace(/\D/g, "")
+    .slice(0, 11)
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+}
+
+function maskCNPJ(value: string) {
+  return value
+    .replace(/\D/g, "")
+    .slice(0, 14)
+    .replace(/^(\d{2})(\d)/, "$1.$2")
+    .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d)/, ".$1/$2")
+    .replace(/(\d{4})(\d)/, "$1-$2");
+}
+
+function maskPhone(value: string) {
+  return value
+    .replace(/\D/g, "")
+    .slice(0, 11)
+    .replace(/^(\d{2})(\d)/, "($1) $2")
+    .replace(/(\d{5})(\d{4})$/, "$1-$2");
+}
+
+function maskCEP(value: string) {
+  return value
+    .replace(/\D/g, "")
+    .slice(0, 8)
+    .replace(/^(\d{5})(\d)/, "$1-$2");
+}
+
+export const CheckoutView: React.FC<CheckoutViewProps> = ({
+  onBackToCart,
+  onOrderCompleted,
+}) => {
+  const { items, totalPriceCents, clearCart } = useCart();
+
+  // Estados do Fluxo
+  const [step, setStep] = useState<"form" | "awaiting_pix" | "paid">("form");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
+
+  // Estados do Formulário
+  const [personType, setPersonType] = useState<"individual" | "company">("individual");
+  const [name, setName] = useState("");
+  const [document, setDocument] = useState("");
+  const [email, setEmail] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+
+  // Endereço
+  const [cep, setCep] = useState("");
+  const [street, setStreet] = useState("");
+  const [number, setNumber] = useState("");
+  const [complement, setComplement] = useState("");
+  const [neighborhood, setNeighborhood] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [isLoadingCep, setIsLoadingCep] = useState(false);
+
+  // Estados Pix
+  const [copied, setCopied] = useState(false);
+  const [timeLeftSeconds, setTimeLeftSeconds] = useState(1800); // 30 minutos
+
+  // Timer decrescente para a tela de Pix
+  useEffect(() => {
+    if (step !== "awaiting_pix") return;
+    const interval = setInterval(() => {
+      setTimeLeftSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [step]);
+
+  // Formatação MM:SS
+  const formatTimer = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  // Busca automática de CEP via ViaCEP
+  const handleCepChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawVal = e.target.value;
+    const masked = maskCEP(rawVal);
+    setCep(masked);
+
+    const cleanCep = rawVal.replace(/\D/g, "");
+    if (cleanCep.length === 8) {
+      setIsLoadingCep(true);
+      setErrorMsg(null);
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+        const data = await res.json();
+        if (data.erro) {
+          setErrorMsg("CEP não encontrado. Por favor, preencha o endereço manualmente.");
+        } else {
+          setStreet(data.logradouro || "");
+          setNeighborhood(data.bairro || "");
+          setCity(data.localidade || "");
+          setState(data.uf || "");
+        }
+      } catch (err) {
+        console.error("Erro ao consultar ViaCEP:", err);
+      } finally {
+        setIsLoadingCep(false);
+      }
+    }
+  };
+
+  // Envio do Pedido para o Backend (com recálculo server-side)
+  const handleSubmitOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+
+    // Validações básicas
+    if (!name.trim()) return setErrorMsg("Por favor, preencha o Nome Completo ou Razão Social.");
+    if (!document.trim()) return setErrorMsg("Por favor, preencha o CPF ou CNPJ.");
+    if (!email.trim() || !email.includes("@")) return setErrorMsg("Por favor, informe um e-mail válido.");
+    if (!whatsapp.trim() || whatsapp.replace(/\D/g, "").length < 10) {
+      return setErrorMsg("Por favor, informe um WhatsApp válido com DDD.");
+    }
+    if (!cep.trim() || !street.trim() || !number.trim() || !city.trim()) {
+      return setErrorMsg("Por favor, preencha o endereço de entrega completo.");
+    }
+    if (items.length === 0) {
+      return setErrorMsg("O carrinho está vazio.");
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const payload = {
+        customer: {
+          personType,
+          name: name.trim(),
+          document: document.trim(),
+          email: email.trim().toLowerCase(),
+          whatsapp: whatsapp.trim(),
+        },
+        deliveryAddress: {
+          cep: cep.trim(),
+          street: street.trim(),
+          number: number.trim(),
+          complement: complement.trim(),
+          neighborhood: neighborhood.trim(),
+          city: city.trim(),
+          state: state.trim(),
+        },
+        items: items.map((i) => ({
+          id: i.id,
+          modelId: i.configuration.model.id,
+          colorId: i.configuration.color.id,
+          monitorId: i.configuration.monitor?.id || null,
+          printerId: i.configuration.printer?.id || null,
+          hasScanner: !!i.configuration.barcodeReader,
+          customizationNotes: i.configuration.customizationNotes || "",
+          quantity: i.quantity,
+        })),
+      };
+
+      const res = await fetch("/api/checkout/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Não foi possível gerar a ordem de pedido.");
+      }
+
+      setOrderDetails(data.order);
+      setStep("awaiting_pix");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (err: any) {
+      console.error("Erro no checkout:", err);
+      setErrorMsg(err.message || "Erro inesperado ao gerar pedido.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Ação de Copiar Código Pix
+  const handleCopyPix = () => {
+    if (!orderDetails?.payment.pixCode) return;
+    navigator.clipboard.writeText(orderDetails.payment.pixCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  // Simulação de Pagamento Confirmado (MVP 0)
+  const handleSimulatePaymentConfirmation = () => {
+    if (!orderDetails) return;
+    setOrderDetails({
+      ...orderDetails,
+      status: "paid",
+      payment: {
+        ...orderDetails.payment,
+        status: "paid",
+        paidAt: new Date().toISOString(),
+      },
+    });
+    setStep("paid");
+    clearCart(); // Esvazia o carrinho após confirmação de compra
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // ----------------------------------------------------
+  // TELA 3: PAGAMENTO CONFIRMADO & FICHA TÉCNICA CNC
+  // ----------------------------------------------------
+  if (step === "paid" && orderDetails) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8 space-y-8 animate-in fade-in-50 duration-500">
+        {/* Banner de Sucesso */}
+        <Card className="p-6 md:p-8 border-emerald-500/30 bg-gradient-to-b from-emerald-950/40 via-slate-900 to-slate-950 text-center space-y-4">
+          <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center text-emerald-400 shadow-xl shadow-emerald-500/20 animate-in zoom-in-75">
+            <CheckCircle2 className="w-10 h-10" />
+          </div>
+
+          <Badge variant="success" className="mx-auto text-xs py-1 px-3">
+            PAGAMENTO PIX CONFIRMADO ✓
+          </Badge>
+
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+            Ordem de Fabricação Liberada!
+          </h1>
+
+          <p className="text-sm text-slate-300 max-w-lg mx-auto leading-relaxed">
+            Seu pagamento foi autenticado com sucesso. A ordem de produção já foi enviada à nossa
+            fábrica com as medidas milimétricas e cortes técnicos para início imediato na Router CNC.
+          </p>
+
+          <div className="pt-2 flex flex-wrap justify-center items-center gap-4 text-xs font-mono text-slate-400">
+            <span className="p-2 rounded-lg bg-slate-950/80 border border-slate-800">
+              Protocolo: <strong className="text-emerald-400">{orderDetails.orderNumber}</strong>
+            </span>
+            <span className="p-2 rounded-lg bg-slate-950/80 border border-slate-800">
+              Data: <strong className="text-slate-200">{new Date(orderDetails.payment.paidAt || Date.now()).toLocaleString("pt-BR")}</strong>
+            </span>
+            <span className="p-2 rounded-lg bg-slate-950/80 border border-slate-800">
+              Total Pago: <strong className="text-white">{formatBRL(orderDetails.totalCents)}</strong>
+            </span>
+          </div>
+
+          <div className="pt-4 flex flex-wrap justify-center gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => window.print()}
+              className="font-semibold text-xs border-slate-700 bg-slate-800/80 hover:bg-slate-700"
+            >
+              <Printer className="w-4 h-4 mr-2 text-cyan-400" />
+              Imprimir Ficha Técnica de Produção
+            </Button>
+            <Button
+              variant="outline"
+              onClick={onOrderCompleted}
+              className="font-semibold text-xs border-slate-700 text-slate-300"
+            >
+              Voltar ao Início / Novo Totem
+            </Button>
+          </div>
+        </Card>
+
+        {/* Ficha Técnica de Fabricação para CNC (Print-friendly) */}
+        <div id="ficha-tecnica-cnc" className="space-y-6">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-400">
+                <Wrench className="w-4 h-4" />
+              </div>
+              <h2 className="text-lg font-bold text-white tracking-tight">
+                Ficha Técnica de Engenharia & Usinagem CNC
+              </h2>
+            </div>
+            <span className="text-xs font-mono text-indigo-400 bg-indigo-950/50 px-2.5 py-1 rounded border border-indigo-800/50">
+              STATUS: LIBERADO PARA CORTE
+            </span>
+          </div>
+
+          {/* Dados do Cliente e Local de Entrega */}
+          <Card className="p-5 border-slate-800/80 bg-slate-900/60 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <div>
+              <span className="text-slate-500 uppercase tracking-wider font-bold block mb-1">
+                Destinatário / Empresa
+              </span>
+              <p className="font-bold text-white text-sm">{orderDetails.customer.name}</p>
+              <p className="text-slate-400">
+                {orderDetails.customer.personType === "individual" ? "CPF" : "CNPJ"}: {orderDetails.customer.document}
+              </p>
+              <p className="text-slate-400">WhatsApp: {orderDetails.customer.whatsapp}</p>
+              <p className="text-slate-400">E-mail: {orderDetails.customer.email}</p>
+            </div>
+            <div>
+              <span className="text-slate-500 uppercase tracking-wider font-bold block mb-1">
+                Endereço de Expedição
+              </span>
+              <p className="font-semibold text-slate-200">
+                {orderDetails.deliveryAddress.street}, {orderDetails.deliveryAddress.number}
+                {orderDetails.deliveryAddress.complement ? ` - ${orderDetails.deliveryAddress.complement}` : ""}
+              </p>
+              <p className="text-slate-400">
+                {orderDetails.deliveryAddress.neighborhood} — {orderDetails.deliveryAddress.city}/{orderDetails.deliveryAddress.state}
+              </p>
+              <p className="text-slate-400">CEP: {orderDetails.deliveryAddress.cep}</p>
+            </div>
+          </Card>
+
+          {/* Detalhamento de Cada Totem para a Fábrica */}
+          <div className="space-y-4">
+            {orderDetails.manufacturingSheets.map((sheet) => (
+              <Card
+                key={sheet.itemIndex}
+                className="p-5 border-slate-800 bg-slate-950/70 space-y-4"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded bg-indigo-600/30 text-indigo-300 text-xs font-mono font-bold flex items-center justify-center border border-indigo-500/40">
+                      #{sheet.itemIndex}
+                    </span>
+                    <h3 className="text-base font-bold text-white">{sheet.cabinetModelName}</h3>
+                  </div>
+                  <Badge variant="secondary" className="text-[11px] font-mono">
+                    Cor: {sheet.colorName}
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  {/* Chassi e Dimensões */}
+                  <div className="p-3 rounded-lg bg-slate-900/60 border border-slate-800/60 space-y-1.5">
+                    <div className="font-bold text-slate-300 flex items-center gap-1.5">
+                      <Cpu className="w-3.5 h-3.5 text-indigo-400" />
+                      Dimensões Externas do Gabinete:
+                    </div>
+                    <p className="text-slate-400 font-mono text-[11px]">
+                      Altura: <strong>{sheet.dimensionsMm.heightMm} mm</strong> | Largura: <strong>{sheet.dimensionsMm.widthMm} mm</strong> | Profundidade: <strong>{sheet.dimensionsMm.depthMm} mm</strong>
+                    </p>
+                    <p className="text-slate-500 text-[11px]">
+                      Acabamento: {sheet.finishType}
+                    </p>
+                  </div>
+
+                  {/* Recorte do Monitor */}
+                  <div className="p-3 rounded-lg bg-slate-900/60 border border-slate-800/60 space-y-1.5">
+                    <div className="font-bold text-slate-300 flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-cyan-400" />
+                      Recorte da Tela / Berço do Monitor:
+                    </div>
+                    <p className="text-slate-200 font-medium">{sheet.screenSpecs.monitorName}</p>
+                    <p className="text-slate-400 font-mono text-[11px]">
+                      Rasgo: {sheet.screenSpecs.screenCutoutMm}
+                    </p>
+                    <p className="text-slate-400 font-mono text-[11px]">
+                      Fixação: {sheet.screenSpecs.vesaPattern}
+                    </p>
+                  </div>
+
+                  {/* Recorte da Impressora */}
+                  <div className="p-3 rounded-lg bg-slate-900/60 border border-slate-800/60 space-y-1.5">
+                    <div className="font-bold text-slate-300 flex items-center gap-1.5">
+                      <Printer className="w-3.5 h-3.5 text-amber-400" />
+                      Abertura da Impressora Térmica:
+                    </div>
+                    <p className="text-slate-200 font-medium">{sheet.printerSpecs.printerName}</p>
+                    <p className="text-slate-400 font-mono text-[11px]">
+                      Saída: {sheet.printerSpecs.slotOpeningMm}
+                    </p>
+                    <p className="text-slate-400 font-mono text-[11px]">
+                      Capacidade: {sheet.printerSpecs.rollSize}
+                    </p>
+                  </div>
+
+                  {/* Scanner & Fechamento */}
+                  <div className="p-3 rounded-lg bg-slate-900/60 border border-slate-800/60 space-y-1.5">
+                    <div className="font-bold text-slate-300 flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      Leitor Óptico & Segurança:
+                    </div>
+                    <p className="text-slate-200 font-medium">{sheet.scannerSpecs.scannerName}</p>
+                    <p className="text-slate-400 font-mono text-[11px]">
+                      {sheet.scannerSpecs.windowSpecs}
+                    </p>
+                    <p className="text-slate-500 text-[11px]">
+                      {sheet.securityLock}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800/60 text-[11px] text-slate-400 font-mono flex items-center justify-between">
+                  <span>Ventilação: {sheet.ventilationSpecs}</span>
+                  <span className="text-emerald-400 font-bold">100% Homologado CNC</span>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ----------------------------------------------------
+  // TELA 2: AGUARDANDO PAGAMENTO PIX
+  // ----------------------------------------------------
+  if (step === "awaiting_pix" && orderDetails) {
+    // URL do QR Code via gerador público em alta fidelidade
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=12&data=${encodeURIComponent(
+      orderDetails.payment.pixCode
+    )}`;
+
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-8 space-y-6 animate-in fade-in-50 duration-500">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setStep("form")}
+          className="text-xs text-slate-400 hover:text-white"
+        >
+          <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
+          Voltar e alterar dados
+        </Button>
+
+        <Card className="p-6 md:p-8 border-indigo-500/30 bg-slate-900/90 backdrop-blur-xl space-y-6 text-center">
+          {/* Header do Pix */}
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold">
+              <Clock className="w-3.5 h-3.5 animate-pulse" />
+              Aguardando Pagamento Pix — Expira em: {formatTimer(timeLeftSeconds)}
+            </div>
+
+            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+              Pague com Pix para Iniciar a Fabricação
+            </h1>
+            <p className="text-xs text-slate-400 max-w-md mx-auto">
+              Pedido <strong className="text-indigo-400 font-mono">{orderDetails.orderNumber}</strong> • Escaneie o QR Code abaixo no app do seu banco ou utilize o código Copia e Cola.
+            </p>
+          </div>
+
+          {/* Valor em Destaque */}
+          <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col items-center justify-center">
+            <span className="text-xs uppercase tracking-wider text-slate-500 font-bold">
+              Valor Total do Pix
+            </span>
+            <span className="text-3xl sm:text-4xl font-black text-indigo-400 mt-1">
+              {formatBRL(orderDetails.totalCents)}
+            </span>
+            <span className="text-[11px] text-slate-500 mt-1">
+              Beneficiário: TOTEM PRO ENGENHARIA CNC (X-Point)
+            </span>
+          </div>
+
+          {/* QR Code Gráfico */}
+          <div className="flex flex-col items-center justify-center space-y-3">
+            <div className="p-3 bg-white rounded-2xl shadow-xl shadow-indigo-950/50 border-4 border-slate-800 inline-block">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={qrCodeUrl}
+                alt="QR Code Pix"
+                width={220}
+                height={220}
+                className="w-48 h-48 sm:w-56 sm:h-56 block object-contain"
+              />
+            </div>
+            <span className="text-xs text-slate-400 flex items-center gap-1.5">
+              <QrCode className="w-4 h-4 text-cyan-400" />
+              Aponte a câmera do seu aplicativo bancário
+            </span>
+          </div>
+
+          {/* Pix Copia e Cola */}
+          <div className="space-y-2 text-left">
+            <label className="text-xs font-semibold text-slate-300 block">
+              Código Pix Copia e Cola
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                readOnly
+                value={orderDetails.payment.pixCode}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-mono text-slate-400 select-all focus:outline-none"
+              />
+              <Button
+                variant={copied ? "primary" : "secondary"}
+                onClick={handleCopyPix}
+                className="shrink-0 h-10 px-4 font-bold text-xs"
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-4 h-4 mr-1.5 text-emerald-400" />
+                    Copiado!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4 mr-1.5 text-cyan-400" />
+                    Copiar
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* Bloco de Simulação / Homologação (MVP 0) */}
+          <div className="p-4 rounded-xl bg-gradient-to-r from-amber-950/30 to-indigo-950/30 border border-amber-500/30 text-left space-y-3">
+            <div className="flex items-start gap-2.5">
+              <Sparkles className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                  Ambiente de Simulação de Pagamento (MVP 0)
+                </h4>
+                <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                  Para validar o fluxo de ponta a ponta sem efetuar cobrança bancária real nesta fase,
+                  clique no botão abaixo para simular a liquidação imediata do Pix e gerar a Ficha Técnica de Fabricação para a Router CNC.
+                </p>
+              </div>
+            </div>
+
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={handleSimulatePaymentConfirmation}
+              className="w-full font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/20"
+            >
+              ⚡ Simular Pagamento Pix Confirmado
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  // ----------------------------------------------------
+  // TELA 1: FORMULÁRIO ENXUTO DE CHECKOUT
+  // ----------------------------------------------------
+  return (
+    <div className="max-w-5xl mx-auto px-4 py-8 space-y-6 animate-in fade-in-50 duration-300">
+      {/* Top Header */}
+      <div className="flex items-center justify-between">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onBackToCart}
+          className="text-xs text-slate-400 hover:text-white"
+        >
+          <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
+          Voltar ao Carrinho
+        </Button>
+
+        <div className="flex items-center gap-1.5 text-xs text-slate-400">
+          <ShieldCheck className="w-4 h-4 text-emerald-400" />
+          <span>Checkout Seguro SSL & Pix Direto</span>
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+          Finalização do Pedido
+        </h1>
+        <p className="text-xs sm:text-sm text-slate-400">
+          Informe seus dados de faturamento e o endereço de entrega para gerarmos a ordem de fabricação.
+        </p>
+      </div>
+
+      {errorMsg && (
+        <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-3">
+          <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmitOrder} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Coluna Esquerda: Dados do Cliente e Endereço */}
+        <div className="lg:col-span-7 space-y-6">
+          {/* Card 1: Tipo de Comprador e Dados */}
+          <Card className="p-5 sm:p-6 border-slate-800 bg-slate-900/60 backdrop-blur-xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <User className="w-4 h-4 text-indigo-400" />
+                1. Dados do Comprador
+              </h2>
+
+              {/* Seletor PF / PJ */}
+              <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPersonType("individual");
+                    setDocument("");
+                  }}
+                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                    personType === "individual"
+                      ? "bg-indigo-600 text-white shadow"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  Pessoa Física
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPersonType("company");
+                    setDocument("");
+                  }}
+                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                    personType === "company"
+                      ? "bg-indigo-600 text-white shadow"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  Pessoa Jurídica
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">
+                  {personType === "individual" ? "Nome Completo" : "Razão Social da Empresa"} *
+                </label>
+                <Input
+                  type="text"
+                  placeholder={personType === "individual" ? "Ex: João da Silva" : "Ex: X-Point Soluções Tecnológicas Ltda"}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">
+                    {personType === "individual" ? "CPF" : "CNPJ"} *
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder={personType === "individual" ? "000.000.000-00" : "00.000.000/0000-00"}
+                    value={document}
+                    onChange={(e) =>
+                      setDocument(personType === "individual" ? maskCPF(e.target.value) : maskCNPJ(e.target.value))
+                    }
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">
+                    WhatsApp para Acompanhamento *
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="(00) 00000-0000"
+                    value={whatsapp}
+                    onChange={(e) => setWhatsapp(maskPhone(e.target.value))}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">
+                  E-mail Corporativo / Faturamento *
+                </label>
+                <Input
+                  type="email"
+                  placeholder="contato@empresa.com.br"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+          </Card>
+
+          {/* Card 2: Endereço de Entrega */}
+          <Card className="p-5 sm:p-6 border-slate-800 bg-slate-900/60 backdrop-blur-xl space-y-5">
+            <div className="pb-3 border-b border-slate-800 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <Truck className="w-4 h-4 text-cyan-400" />
+                2. Endereço de Entrega da Carga
+              </h2>
+              {isLoadingCep && (
+                <span className="text-[11px] text-cyan-400 animate-pulse">Buscando CEP...</span>
+              )}
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">CEP *</label>
+                  <Input
+                    type="text"
+                    placeholder="00000-000"
+                    value={cep}
+                    onChange={handleCepChange}
+                    required
+                  />
+                </div>
+                <div className="sm:col-span-2 flex items-end">
+                  <span className="text-[11px] text-slate-400 mb-2">
+                    Preenchimento automático via ViaCEP ao digitar 8 números.
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="sm:col-span-2">
+                  <label className="block text-slate-300 font-semibold mb-1">Logradouro / Rua *</label>
+                  <Input
+                    type="text"
+                    placeholder="Ex: Av. Paulista"
+                    value={street}
+                    onChange={(e) => setStreet(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Número *</label>
+                  <Input
+                    type="text"
+                    placeholder="Ex: 1000"
+                    value={number}
+                    onChange={(e) => setNumber(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Complemento</label>
+                  <Input
+                    type="text"
+                    placeholder="Sala 402, Bloco B"
+                    value={complement}
+                    onChange={(e) => setComplement(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Bairro *</label>
+                  <Input
+                    type="text"
+                    placeholder="Bela Vista"
+                    value={neighborhood}
+                    onChange={(e) => setNeighborhood(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Cidade / UF *</label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      placeholder="São Paulo"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      required
+                      className="flex-1"
+                    />
+                    <Input
+                      type="text"
+                      placeholder="SP"
+                      value={state}
+                      onChange={(e) => setState(e.target.value)}
+                      required
+                      className="w-14 text-center uppercase"
+                      maxLength={2}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Coluna Direita: Resumo do Pedido & Botão de Pagamento */}
+        <div className="lg:col-span-5 sticky top-24 space-y-4">
+          <Card className="p-6 border-slate-800 bg-slate-900/80 backdrop-blur-xl space-y-5">
+            <h2 className="text-base font-bold text-white pb-3 border-b border-slate-800 flex items-center gap-2">
+              <CreditCard className="w-4 h-4 text-indigo-400" />
+              Resumo da Compra
+            </h2>
+
+            {/* Lista dos Totens do Pedido */}
+            <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+              {items.map((item, idx) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/80 text-xs"
+                >
+                  <div className="flex items-center gap-2.5 truncate">
+                    <span className="w-5 h-5 rounded bg-slate-800 text-slate-300 text-[10px] font-bold flex items-center justify-center shrink-0">
+                      {idx + 1}
+                    </span>
+                    <div className="truncate">
+                      <p className="font-bold text-slate-200 truncate">{item.configuration.model.name}</p>
+                      <p className="text-[10px] text-slate-400">
+                        {item.configuration.color.name} • Qtd: {item.quantity}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="font-semibold text-indigo-300 shrink-0">
+                    {formatBRL(item.subtotalCents)}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Valores Financeiros */}
+            <div className="space-y-2 pt-3 border-t border-slate-800 text-xs">
+              <div className="flex justify-between text-slate-400">
+                <span>Subtotal dos Gabinetes:</span>
+                <span className="font-semibold text-slate-200">{formatBRL(totalPriceCents)}</span>
+              </div>
+              <div className="flex justify-between text-slate-400">
+                <span>Frete Rodoviário Especial:</span>
+                <span className="text-emerald-400 font-semibold">Grátis (Promocional Brasil)</span>
+              </div>
+              <div className="pt-2 border-t border-slate-800 flex justify-between items-baseline">
+                <span className="text-sm font-bold text-white">Total a Pagar (Pix):</span>
+                <span className="text-2xl font-black text-indigo-400">
+                  {formatBRL(totalPriceCents)}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 text-[11px] text-slate-400 space-y-1">
+              <div className="flex items-center gap-1.5 font-semibold text-slate-300">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>Garantia de Recálculo Confiável</span>
+              </div>
+              <p>
+                Os preços foram recalculados diretamente pelos nossos servidores conforme especificações de engenharia CNC.
+              </p>
+            </div>
+
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              disabled={isSubmitting || items.length === 0}
+              className="w-full font-bold shadow-indigo-600/30 shadow-lg text-sm"
+            >
+              {isSubmitting ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Processando Pedido...
+                </span>
+              ) : (
+                <>
+                  Gerar Pix & Concluir Pedido
+                  <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
+                </>
+              )}
+            </Button>
+          </Card>
+        </div>
+      </form>
+    </div>
+  );
+};

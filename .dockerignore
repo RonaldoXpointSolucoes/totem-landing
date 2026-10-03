@@ -1,0 +1,16 @@
+node_modules
+.next
+.git
+.gitignore
+.agents
+.gemini
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.env*.local
+*.md
+!README.md
+screenshot_*.png
+*.log
+.DS_Store
+Thumbs.db
