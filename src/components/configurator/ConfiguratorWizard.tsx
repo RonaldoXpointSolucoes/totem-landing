@@ -84,7 +84,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
       const found = CABINET_MODELS.find((m) => m.id === initialModelId);
       if (found) return found;
     }
-    return CABINET_MODELS[0];
+    return CABINET_MODELS.find((m) => m.id === "cabinet-wall") || CABINET_MODELS[0];
   });
 
   const [selectedColor, setSelectedColor] = useState<ColorOption>(() => {
@@ -247,7 +247,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
 
   const handleResetForNewTotem = () => {
     setEditingItem(null);
-    setSelectedModel(CABINET_MODELS[0]);
+    setSelectedModel(CABINET_MODELS.find((m) => m.id === "cabinet-wall") || CABINET_MODELS[0]);
     setSelectedColor(COLOR_OPTIONS[0]);
     setSelectedMonitor(HOMOLOGATED_MONITORS[0]);
     setSelectedPrinter(HOMOLOGATED_PRINTERS[0]);

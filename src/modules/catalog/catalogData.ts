@@ -8,30 +8,6 @@ import {
 
 export const CABINET_MODELS: CabinetModel[] = [
   {
-    id: "cabinet-floor",
-    name: "Gabinete de Chão",
-    slug: "floor",
-    description:
-      "Design imponente e estruturado com base de alta estabilidade, fechaduras traseiras duplas e compartimento interno dedicado para CPU, nobreak e guilhotina.",
-    basePriceCents: 149000, // R$ 1.490,00
-    active: true,
-    sortOrder: 1,
-    mainImage: "/models/cabinet-floor.svg",
-    weightKg: 36.5,
-    package: {
-      heightCm: 170,
-      widthCm: 52,
-      depthCm: 42,
-      grossWeightKg: 40.0,
-    },
-    dimensions: {
-      heightMm: 1650,
-      widthMm: 480,
-      depthMm: 380,
-      weightKg: 36.5,
-    },
-  },
-  {
     id: "cabinet-wall",
     name: "Gabinete de Parede",
     slug: "wall",
@@ -39,7 +15,7 @@ export const CABINET_MODELS: CabinetModel[] = [
       "Máximo aproveitamento do espaço físico em ambientes de tráfego intenso. Fixação vertical reforçada com passagem interna oculta para cabeamento e ventilação ativa.",
     basePriceCents: 99000, // R$ 990,00
     active: true,
-    sortOrder: 2,
+    sortOrder: 1,
     mainImage: "/models/cabinet-wall.svg",
     weightKg: 14.5,
     package: {
@@ -61,25 +37,50 @@ export const CABINET_MODELS: CabinetModel[] = [
     slug: "countertop",
     description:
       "Formato compacto e altamente ergonômico, ideal para checkouts expressos, balcões de atendimento, recepções clínicas e pagamentos rápidos.",
-    basePriceCents: 89000, // R$ 890,00
+    basePriceCents: 95000, // R$ 950,00
     active: true,
-    sortOrder: 3,
+    sortOrder: 2,
     mainImage: "/models/cabinet-countertop.svg",
-    weightKg: 11.8,
+    weightKg: 11.0,
     package: {
-      heightCm: 68,
+      heightCm: 65,
       widthCm: 45,
       depthCm: 32,
-      grossWeightKg: 13.2,
+      grossWeightKg: 12.5,
     },
     dimensions: {
       heightMm: 620,
       widthMm: 400,
       depthMm: 290,
-      weightKg: 11.8,
+      weightKg: 11.0,
+    },
+  },
+  {
+    id: "cabinet-floor",
+    name: "Gabinete de Chão",
+    slug: "floor",
+    description:
+      "Design imponente e estruturado com base de alta estabilidade, fechaduras traseiras duplas e compartimento interno dedicado para CPU, nobreak e guilhotina.",
+    basePriceCents: 149000, // R$ 1.490,00
+    active: true,
+    sortOrder: 3,
+    mainImage: "/models/cabinet-floor.svg",
+    weightKg: 36.5,
+    package: {
+      heightCm: 170,
+      widthCm: 52,
+      depthCm: 42,
+      grossWeightKg: 40.0,
+    },
+    dimensions: {
+      heightMm: 1650,
+      widthMm: 480,
+      depthMm: 380,
+      weightKg: 36.5,
     },
   },
 ];
+
 
 export const COLOR_OPTIONS: ColorOption[] = [
   {

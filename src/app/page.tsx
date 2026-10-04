@@ -38,10 +38,10 @@ function HomeContent() {
 
   const handleStartConfigurator = (modelId?: string) => {
     trackEvent(ANALYTICS_EVENTS.START_CONFIGURATOR, {
-      modelId: modelId || "cabinet-floor",
+      modelId: modelId || "cabinet-wall",
       source: "navigation_action",
     });
-    const target = modelId ? `/monte-seu-totem?modelo=${modelId}` : "/monte-seu-totem";
+    const target = modelId ? `/monte-seu-totem?modelo=${modelId}` : "/monte-seu-totem?modelo=cabinet-wall";
     router.push(target);
   };
 
@@ -60,13 +60,13 @@ function HomeContent() {
       <main className="flex-1">
         {/* Hero Apple iMac com Animação de Abertura Fan-Out e Suporte Completo Claro/Escuro */}
         <AppleHero
-          onStartConfigurator={() => handleStartConfigurator("cabinet-floor")}
+          onStartConfigurator={() => handleStartConfigurator("cabinet-wall")}
           onExploreModels={handleExploreModels}
         />
 
         {/* Bento Section Apple (Cards arredondados e busca de periféricos) */}
         <AppleBentoSection
-          onStartConfigurator={() => handleStartConfigurator("cabinet-floor")}
+          onStartConfigurator={() => handleStartConfigurator("cabinet-wall")}
         />
 
         {/* Modelos de Totem */}
@@ -101,7 +101,7 @@ function HomeContent() {
             </p>
             <div className="pt-2">
               <button
-                onClick={() => handleStartConfigurator("cabinet-floor")}
+                onClick={() => handleStartConfigurator("cabinet-wall")}
                 className="px-8 py-3.5 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white font-bold text-sm sm:text-base shadow-xl shadow-blue-500/25 active:scale-95 transition-all inline-flex items-center gap-2 cursor-pointer"
               >
                 <Sparkles className="w-5 h-5" />

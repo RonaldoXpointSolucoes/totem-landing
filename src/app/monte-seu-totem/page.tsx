@@ -13,13 +13,13 @@ function MonteSeuTotemContent() {
   const router = useRouter();
   const { items, setEditingItem, editingItem } = useCart();
 
-  const modeloParam = searchParams.get("modelo") || undefined;
+  const modeloParam = searchParams.get("modelo") || "cabinet-wall";
   const etapaParam = parseInt(searchParams.get("etapa") || "1", 10);
   const editParam = searchParams.get("edit");
 
   useEffect(() => {
     trackEvent(ANALYTICS_EVENTS.START_CONFIGURATOR, {
-      modelId: modeloParam || "cabinet-floor",
+      modelId: modeloParam,
       source: "url_route_monte_seu_totem",
     });
 
