@@ -25,14 +25,14 @@ export const StepPrinter: React.FC<StepPrinterProps> = ({
           <Badge variant="accent" className="text-xs">
             Etapa 04 de 06
           </Badge>
-          <span className="text-[11px] sm:text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+          <span className="text-[11px] sm:text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-500/20">
             Não altera o preço padrão (+ R$ 0)
           </span>
         </div>
-        <h2 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
+        <h2 className="text-xl sm:text-3xl font-black text-[#1d1d1f] dark:text-white tracking-tight">
           Qual impressora será utilizada?
         </h2>
-        <p className="text-xs sm:text-sm text-slate-400">
+        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
           O gabinete será usinado com o rasgo de saída de papel e o berço interno específico para sua impressora.
         </p>
       </div>
@@ -46,37 +46,37 @@ export const StepPrinter: React.FC<StepPrinterProps> = ({
               interactive
               selected={isSelected}
               onClick={() => onSelectPrinter(printer)}
-              className="p-4 flex items-center justify-between gap-3"
+              className="p-4 sm:p-4.5 flex items-center justify-between gap-3"
             >
-              <div className="flex items-center gap-3.5">
+              <div className="flex items-center gap-3.5 min-w-0">
                 <div
-                  className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${
+                  className={`w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 transition-colors ${
                     isSelected
-                      ? "border-indigo-500 bg-indigo-600/30 text-indigo-300"
-                      : "border-slate-800 bg-slate-950 text-slate-400"
+                      ? "border-[#0071e3] bg-blue-50 dark:bg-indigo-600/30 text-[#0071e3] dark:text-indigo-300"
+                      : "border-black/10 dark:border-slate-800 bg-[#f8f9fa] dark:bg-slate-950 text-slate-500 dark:text-slate-400"
                   }`}
                 >
                   <Printer className="w-5 h-5" />
                 </div>
-                <div>
-                  <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">
+                <div className="min-w-0">
+                  <span className="text-xs font-bold text-[#0071e3] dark:text-cyan-400 uppercase tracking-wider">
                     {printer.brand}
                   </span>
-                  <h3 className="text-sm font-semibold text-white">{printer.displayName}</h3>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
+                  <h3 className="text-sm font-bold text-[#1d1d1f] dark:text-white truncate mt-0.5">{printer.displayName}</h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                     Bobina: {printer.paperWidthMm}mm • {printer.technicalCode}
                   </p>
                 </div>
               </div>
 
               <div
-                className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
+                className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
                   isSelected
-                    ? "border-indigo-500 bg-indigo-600 text-white"
-                    : "border-slate-700 bg-slate-800"
+                    ? "border-[#0071e3] bg-[#0071e3] text-white shadow-md shadow-blue-500/25"
+                    : "border-black/15 dark:border-slate-700 bg-black/5 dark:bg-slate-800"
                 }`}
               >
-                {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
               </div>
             </Card>
           );
@@ -88,7 +88,7 @@ export const StepPrinter: React.FC<StepPrinterProps> = ({
         <button
           type="button"
           onClick={onRequestCustomization}
-          className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-indigo-300 underline underline-offset-4 transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-[#0071e3] dark:text-slate-400 dark:hover:text-indigo-300 underline underline-offset-4 transition-colors cursor-pointer"
         >
           <HelpCircle className="w-3.5 h-3.5" />
           Utiliza outro modelo de impressora térmica? Solicite personalização

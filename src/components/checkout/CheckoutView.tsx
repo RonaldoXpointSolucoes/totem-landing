@@ -316,8 +316,8 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     return (
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-8 animate-in fade-in-50 duration-500">
         {/* Banner de Sucesso */}
-        <Card className="p-6 md:p-8 border-emerald-500/30 bg-gradient-to-b from-emerald-950/40 via-slate-900 to-slate-950 text-center space-y-4">
-          <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center text-emerald-400 shadow-xl shadow-emerald-500/20 animate-in zoom-in-75">
+        <Card className="p-6 md:p-8 border-emerald-500/30 bg-gradient-to-b from-emerald-50 via-white to-slate-50 dark:from-emerald-950/40 dark:via-slate-900 dark:to-slate-950 text-center space-y-4 shadow-sm dark:shadow-xl">
+          <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center text-emerald-500 dark:text-emerald-400 shadow-xl shadow-emerald-500/20 animate-in zoom-in-75">
             <CheckCircle2 className="w-10 h-10" />
           </div>
 
@@ -325,24 +325,24 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
             PAGAMENTO PIX CONFIRMADO ✓
           </Badge>
 
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1d1d1f] dark:text-white tracking-tight">
             Ordem de Fabricação Liberada!
           </h1>
 
-          <p className="text-sm text-slate-300 max-w-lg mx-auto leading-relaxed">
+          <p className="text-sm text-slate-600 dark:text-slate-300 max-w-lg mx-auto leading-relaxed">
             Seu pagamento foi autenticado com sucesso. A ordem de produção já foi enviada à nossa
             fábrica com as medidas milimétricas e cortes técnicos para início imediato na Router CNC.
           </p>
 
-          <div className="pt-2 flex flex-wrap justify-center items-center gap-4 text-xs font-mono text-slate-400">
-            <span className="p-2 rounded-lg bg-slate-950/80 border border-slate-800">
-              Protocolo: <strong className="text-emerald-400">{orderDetails.orderNumber}</strong>
+          <div className="pt-2 flex flex-wrap justify-center items-center gap-4 text-xs font-mono text-slate-600 dark:text-slate-400">
+            <span className="p-2 rounded-lg bg-slate-100 dark:bg-slate-950/80 border border-black/10 dark:border-slate-800">
+              Protocolo: <strong className="text-emerald-600 dark:text-emerald-400">{orderDetails.orderNumber}</strong>
             </span>
-            <span className="p-2 rounded-lg bg-slate-950/80 border border-slate-800">
-              Data: <strong className="text-slate-200">{new Date(orderDetails.payment.paidAt || Date.now()).toLocaleString("pt-BR")}</strong>
+            <span className="p-2 rounded-lg bg-slate-100 dark:bg-slate-950/80 border border-black/10 dark:border-slate-800">
+              Data: <strong className="text-slate-900 dark:text-slate-200">{new Date(orderDetails.payment.paidAt || Date.now()).toLocaleString("pt-BR")}</strong>
             </span>
-            <span className="p-2 rounded-lg bg-slate-950/80 border border-slate-800">
-              Total Pago: <strong className="text-white">{formatBRL(orderDetails.totalCents)}</strong>
+            <span className="p-2 rounded-lg bg-slate-100 dark:bg-slate-950/80 border border-black/10 dark:border-slate-800">
+              Total Pago: <strong className="text-[#0071e3] dark:text-white">{formatBRL(orderDetails.totalCents)}</strong>
             </span>
           </div>
 
@@ -350,15 +350,15 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
             <Button
               variant="secondary"
               onClick={() => window.print()}
-              className="font-semibold text-xs border-slate-700 bg-slate-800/80 hover:bg-slate-700"
+              className="font-semibold text-xs border-black/10 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200"
             >
-              <Printer className="w-4 h-4 mr-2 text-cyan-400" />
+              <Printer className="w-4 h-4 mr-2 text-cyan-600 dark:text-cyan-400" />
               Imprimir Ficha Técnica de Produção
             </Button>
             <Button
               variant="outline"
               onClick={onOrderCompleted}
-              className="font-semibold text-xs border-slate-700 text-slate-300"
+              className="font-semibold text-xs border-black/15 dark:border-slate-700 text-slate-700 dark:text-slate-300"
             >
               Voltar ao Início / Novo Totem
             </Button>
@@ -367,45 +367,45 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
 
         {/* Ficha Técnica de Fabricação para CNC (Print-friendly) */}
         <div id="ficha-tecnica-cnc" className="space-y-6">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="flex items-center justify-between border-b border-black/10 dark:border-slate-800 pb-3">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-400">
+              <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-indigo-600/30 border border-blue-200 dark:border-indigo-500/40 flex items-center justify-center text-[#0071e3] dark:text-indigo-400">
                 <Wrench className="w-4 h-4" />
               </div>
-              <h2 className="text-lg font-bold text-white tracking-tight">
+              <h2 className="text-lg font-bold text-[#1d1d1f] dark:text-white tracking-tight">
                 Ficha Técnica de Engenharia & Usinagem CNC
               </h2>
             </div>
-            <span className="text-xs font-mono text-indigo-400 bg-indigo-950/50 px-2.5 py-1 rounded border border-indigo-800/50">
+            <span className="text-xs font-mono text-[#0071e3] dark:text-indigo-400 bg-blue-50 dark:bg-indigo-950/50 px-2.5 py-1 rounded border border-blue-200 dark:border-indigo-800/50 font-bold">
               STATUS: LIBERADO PARA CORTE
             </span>
           </div>
 
           {/* Dados do Cliente e Local de Entrega */}
-          <Card className="p-5 border-slate-800/80 bg-slate-900/60 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <Card className="p-5 border-black/10 dark:border-slate-800/80 bg-white dark:bg-slate-900/60 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs shadow-sm dark:shadow-xl">
             <div>
               <span className="text-slate-500 uppercase tracking-wider font-bold block mb-1">
                 Destinatário / Empresa
               </span>
-              <p className="font-bold text-white text-sm">{orderDetails.customer.name}</p>
-              <p className="text-slate-400">
+              <p className="font-bold text-[#1d1d1f] dark:text-white text-sm">{orderDetails.customer.name}</p>
+              <p className="text-slate-600 dark:text-slate-400">
                 {orderDetails.customer.personType === "individual" ? "CPF" : "CNPJ"}: {orderDetails.customer.document}
               </p>
-              <p className="text-slate-400">WhatsApp: {orderDetails.customer.whatsapp}</p>
-              <p className="text-slate-400">E-mail: {orderDetails.customer.email}</p>
+              <p className="text-slate-600 dark:text-slate-400">WhatsApp: {orderDetails.customer.whatsapp}</p>
+              <p className="text-slate-600 dark:text-slate-400">E-mail: {orderDetails.customer.email}</p>
             </div>
             <div>
               <span className="text-slate-500 uppercase tracking-wider font-bold block mb-1">
                 Endereço de Expedição
               </span>
-              <p className="font-semibold text-slate-200">
+              <p className="font-semibold text-slate-800 dark:text-slate-200">
                 {orderDetails.deliveryAddress.street}, {orderDetails.deliveryAddress.number}
                 {orderDetails.deliveryAddress.complement ? ` - ${orderDetails.deliveryAddress.complement}` : ""}
               </p>
-              <p className="text-slate-400">
+              <p className="text-slate-600 dark:text-slate-400">
                 {orderDetails.deliveryAddress.neighborhood} — {orderDetails.deliveryAddress.city}/{orderDetails.deliveryAddress.state}
               </p>
-              <p className="text-slate-400">CEP: {orderDetails.deliveryAddress.cep}</p>
+              <p className="text-slate-600 dark:text-slate-400">CEP: {orderDetails.deliveryAddress.cep}</p>
             </div>
           </Card>
 
@@ -414,14 +414,14 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
             {orderDetails.manufacturingSheets.map((sheet) => (
               <Card
                 key={sheet.itemIndex}
-                className="p-5 border-slate-800 bg-slate-950/70 space-y-4"
+                className="p-5 border-black/10 dark:border-slate-800 bg-white dark:bg-slate-950/70 space-y-4 shadow-sm dark:shadow-xl"
               >
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/10 dark:border-slate-800/80 pb-3">
                   <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded bg-indigo-600/30 text-indigo-300 text-xs font-mono font-bold flex items-center justify-center border border-indigo-500/40">
+                    <span className="w-6 h-6 rounded bg-blue-100 dark:bg-indigo-600/30 text-[#0071e3] dark:text-indigo-300 text-xs font-mono font-bold flex items-center justify-center border border-blue-200 dark:border-indigo-500/40">
                       #{sheet.itemIndex}
                     </span>
-                    <h3 className="text-base font-bold text-white">{sheet.cabinetModelName}</h3>
+                    <h3 className="text-base font-bold text-[#1d1d1f] dark:text-white">{sheet.cabinetModelName}</h3>
                   </div>
                   <Badge variant="secondary" className="text-[11px] font-mono">
                     Cor: {sheet.colorName}
@@ -430,12 +430,12 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                   {/* Chassi e Dimensões */}
-                  <div className="p-3 rounded-lg bg-slate-900/60 border border-slate-800/60 space-y-1.5">
-                    <div className="font-bold text-slate-300 flex items-center gap-1.5">
-                      <Cpu className="w-3.5 h-3.5 text-indigo-400" />
+                  <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-black/10 dark:border-slate-800/60 space-y-1.5">
+                    <div className="font-bold text-slate-800 dark:text-slate-300 flex items-center gap-1.5">
+                      <Cpu className="w-3.5 h-3.5 text-[#0071e3] dark:text-indigo-400" />
                       Dimensões Externas do Gabinete:
                     </div>
-                    <p className="text-slate-400 font-mono text-[11px]">
+                    <p className="text-slate-600 dark:text-slate-400 font-mono text-[11px]">
                       Altura: <strong>{sheet.dimensionsMm.heightMm} mm</strong> | Largura: <strong>{sheet.dimensionsMm.widthMm} mm</strong> | Profundidade: <strong>{sheet.dimensionsMm.depthMm} mm</strong>
                     </p>
                     <p className="text-slate-500 text-[11px]">
@@ -444,43 +444,43 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   </div>
 
                   {/* Recorte do Monitor */}
-                  <div className="p-3 rounded-lg bg-slate-900/60 border border-slate-800/60 space-y-1.5">
-                    <div className="font-bold text-slate-300 flex items-center gap-1.5">
-                      <FileText className="w-3.5 h-3.5 text-cyan-400" />
+                  <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-black/10 dark:border-slate-800/60 space-y-1.5">
+                    <div className="font-bold text-slate-800 dark:text-slate-300 flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
                       Recorte da Tela / Berço do Monitor:
                     </div>
-                    <p className="text-slate-200 font-medium">{sheet.screenSpecs.monitorName}</p>
-                    <p className="text-slate-400 font-mono text-[11px]">
+                    <p className="text-slate-800 dark:text-slate-200 font-medium">{sheet.screenSpecs.monitorName}</p>
+                    <p className="text-slate-600 dark:text-slate-400 font-mono text-[11px]">
                       Rasgo: {sheet.screenSpecs.screenCutoutMm}
                     </p>
-                    <p className="text-slate-400 font-mono text-[11px]">
+                    <p className="text-slate-600 dark:text-slate-400 font-mono text-[11px]">
                       Fixação: {sheet.screenSpecs.vesaPattern}
                     </p>
                   </div>
 
                   {/* Recorte da Impressora */}
-                  <div className="p-3 rounded-lg bg-slate-900/60 border border-slate-800/60 space-y-1.5">
-                    <div className="font-bold text-slate-300 flex items-center gap-1.5">
-                      <Printer className="w-3.5 h-3.5 text-amber-400" />
+                  <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-black/10 dark:border-slate-800/60 space-y-1.5">
+                    <div className="font-bold text-slate-800 dark:text-slate-300 flex items-center gap-1.5">
+                      <Printer className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
                       Abertura da Impressora Térmica:
                     </div>
-                    <p className="text-slate-200 font-medium">{sheet.printerSpecs.printerName}</p>
-                    <p className="text-slate-400 font-mono text-[11px]">
+                    <p className="text-slate-800 dark:text-slate-200 font-medium">{sheet.printerSpecs.printerName}</p>
+                    <p className="text-slate-600 dark:text-slate-400 font-mono text-[11px]">
                       Saída: {sheet.printerSpecs.slotOpeningMm}
                     </p>
-                    <p className="text-slate-400 font-mono text-[11px]">
+                    <p className="text-slate-600 dark:text-slate-400 font-mono text-[11px]">
                       Capacidade: {sheet.printerSpecs.rollSize}
                     </p>
                   </div>
 
                   {/* Scanner & Fechamento */}
-                  <div className="p-3 rounded-lg bg-slate-900/60 border border-slate-800/60 space-y-1.5">
-                    <div className="font-bold text-slate-300 flex items-center gap-1.5">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-black/10 dark:border-slate-800/60 space-y-1.5">
+                    <div className="font-bold text-slate-800 dark:text-slate-300 flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                       Leitor Óptico & Segurança:
                     </div>
-                    <p className="text-slate-200 font-medium">{sheet.scannerSpecs.scannerName}</p>
-                    <p className="text-slate-400 font-mono text-[11px]">
+                    <p className="text-slate-800 dark:text-slate-200 font-medium">{sheet.scannerSpecs.scannerName}</p>
+                    <p className="text-slate-600 dark:text-slate-400 font-mono text-[11px]">
                       {sheet.scannerSpecs.windowSpecs}
                     </p>
                     <p className="text-slate-500 text-[11px]">
@@ -489,9 +489,9 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   </div>
                 </div>
 
-                <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800/60 text-[11px] text-slate-400 font-mono flex items-center justify-between">
+                <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-black/10 dark:border-slate-800/60 text-[11px] text-slate-600 dark:text-slate-400 font-mono flex items-center justify-between">
                   <span>Ventilação: {sheet.ventilationSpecs}</span>
-                  <span className="text-emerald-400 font-bold">100% Homologado CNC</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">100% Homologado CNC</span>
                 </div>
               </Card>
             ))}
@@ -524,28 +524,28 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           Voltar e alterar dados
         </Button>
 
-        <Card className="p-6 md:p-8 border-indigo-500/30 bg-slate-900/90 backdrop-blur-xl space-y-6 text-center">
+        <Card className="p-6 md:p-8 border-black/10 dark:border-indigo-500/30 bg-white dark:bg-slate-900/90 backdrop-blur-xl space-y-6 text-center shadow-md dark:shadow-xl">
           {/* Header do Pix */}
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-semibold">
               <Clock className="w-3.5 h-3.5 animate-pulse" />
               Aguardando Pagamento Pix — Expira em: {formatTimer(timeLeftSeconds)}
             </div>
 
-            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-[#1d1d1f] dark:text-white tracking-tight">
               Pague com Pix para Iniciar a Fabricação
             </h1>
-            <p className="text-xs text-slate-400 max-w-md mx-auto">
-              Pedido <strong className="text-indigo-400 font-mono">{orderDetails.orderNumber}</strong> • Escaneie o QR Code abaixo no app do seu banco ou utilize o código Copia e Cola.
+            <p className="text-xs text-slate-600 dark:text-slate-400 max-w-md mx-auto">
+              Pedido <strong className="text-[#0071e3] dark:text-indigo-400 font-mono">{orderDetails.orderNumber}</strong> • Escaneie o QR Code abaixo no app do seu banco ou utilize o código Copia e Cola.
             </p>
           </div>
 
           {/* Valor em Destaque */}
-          <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col items-center justify-center">
+          <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-black/10 dark:border-slate-800 flex flex-col items-center justify-center">
             <span className="text-xs uppercase tracking-wider text-slate-500 font-bold">
               Valor Total do Pix
             </span>
-            <span className="text-3xl sm:text-4xl font-black text-indigo-400 mt-1">
+            <span className="text-3xl sm:text-4xl font-black text-[#0071e3] dark:text-indigo-400 mt-1">
               {formatBRL(orderDetails.totalCents)}
             </span>
             <span className="text-[11px] text-slate-500 mt-1">
@@ -555,7 +555,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
 
           {/* QR Code Gráfico */}
           <div className="flex flex-col items-center justify-center space-y-3">
-            <div className="p-3 bg-white rounded-2xl shadow-xl shadow-indigo-950/50 border-4 border-slate-800 inline-block">
+            <div className="p-3 bg-white rounded-2xl shadow-xl shadow-blue-900/10 dark:shadow-indigo-950/50 border-4 border-slate-200 dark:border-slate-800 inline-block">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={qrCodeUrl}
@@ -565,19 +565,19 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                 className="w-48 h-48 sm:w-56 sm:h-56 block object-contain"
               />
             </div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
               <span>Detecção em Tempo Real Ativa (compensação sem refresh)</span>
             </div>
-            <span className="text-xs text-slate-400 flex items-center gap-1.5">
-              <QrCode className="w-4 h-4 text-cyan-400" />
+            <span className="text-xs text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
+              <QrCode className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
               Aponte a câmera do seu aplicativo bancário
             </span>
           </div>
 
           {/* Pix Copia e Cola */}
           <div className="space-y-2 text-left">
-            <label className="text-xs font-semibold text-slate-300 block">
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
               Código Pix Copia e Cola
             </label>
             <div className="flex items-center gap-2">
@@ -585,7 +585,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                 type="text"
                 readOnly
                 value={orderDetails.payment.pixCode}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-mono text-slate-400 select-all focus:outline-none"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-black/15 dark:border-slate-800 rounded-xl px-3 py-2.5 text-xs font-mono text-slate-800 dark:text-slate-400 select-all focus:outline-none"
               />
               <Button
                 variant={copied ? "primary" : "secondary"}
@@ -594,12 +594,12 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
               >
                 {copied ? (
                   <>
-                    <Check className="w-4 h-4 mr-1.5 text-emerald-400" />
+                    <Check className="w-4 h-4 mr-1.5 text-emerald-500 dark:text-emerald-400" />
                     Copiado!
                   </>
                 ) : (
                   <>
-                    <Copy className="w-4 h-4 mr-1.5 text-cyan-400" />
+                    <Copy className="w-4 h-4 mr-1.5 text-[#0071e3] dark:text-cyan-400" />
                     Copiar
                   </>
                 )}
@@ -608,14 +608,14 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           </div>
 
           {/* Bloco de Simulação / Homologação (MVP 0) */}
-          <div className="p-4 rounded-xl bg-gradient-to-r from-amber-950/30 to-indigo-950/30 border border-amber-500/30 text-left space-y-3">
+          <div className="p-4 rounded-xl bg-amber-50 dark:bg-gradient-to-r dark:from-amber-950/30 dark:to-indigo-950/30 border border-amber-300 dark:border-amber-500/30 text-left space-y-3">
             <div className="flex items-start gap-2.5">
-              <Sparkles className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <Sparkles className="w-5 h-5 text-amber-500 dark:text-amber-400 shrink-0 mt-0.5" />
               <div>
-                <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                <h4 className="text-xs font-bold text-amber-900 dark:text-white uppercase tracking-wider">
                   Ambiente de Simulação de Pagamento (MVP 0)
                 </h4>
-                <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                <p className="text-[11px] text-amber-800 dark:text-slate-300 mt-0.5 leading-relaxed">
                   Para validar o fluxo de ponta a ponta sem efetuar cobrança bancária real nesta fase,
                   clique no botão abaixo para simular a liquidação imediata do Pix e gerar a Ficha Técnica de Fabricação para a Router CNC.
                 </p>
@@ -647,30 +647,30 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           variant="ghost"
           size="sm"
           onClick={onBackToCart}
-          className="text-xs text-slate-400 hover:text-white"
+          className="text-xs text-slate-600 dark:text-slate-400 hover:text-black dark:hover:text-white"
         >
           <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
           Voltar ao Carrinho
         </Button>
 
-        <div className="flex items-center gap-1.5 text-xs text-slate-400">
-          <ShieldCheck className="w-4 h-4 text-emerald-400" />
+        <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
+          <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           <span>Checkout Seguro SSL & Pix Direto</span>
         </div>
       </div>
 
       <div className="space-y-1">
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1d1d1f] dark:text-white tracking-tight">
           Finalização do Pedido
         </h1>
-        <p className="text-xs sm:text-sm text-slate-400">
+        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
           Informe seus dados de faturamento e o endereço de entrega para gerarmos a ordem de fabricação.
         </p>
       </div>
 
       {errorMsg && (
-        <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-3">
-          <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+        <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-500/40 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-3">
+          <AlertCircle className="w-4 h-4 shrink-0 text-rose-500 dark:text-rose-400" />
           <span>{errorMsg}</span>
         </div>
       )}
@@ -679,15 +679,15 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
         {/* Coluna Esquerda: Dados do Cliente e Endereço */}
         <div className="lg:col-span-7 space-y-6">
           {/* Card 1: Tipo de Comprador e Dados */}
-          <Card className="p-5 sm:p-6 border-slate-800 bg-slate-900/60 backdrop-blur-xl space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                <User className="w-4 h-4 text-indigo-400" />
+          <Card className="p-5 sm:p-6 border-black/10 dark:border-slate-800 bg-white dark:bg-slate-900/60 backdrop-blur-xl space-y-5 shadow-sm dark:shadow-xl">
+            <div className="flex items-center justify-between pb-3 border-b border-black/10 dark:border-slate-800">
+              <h2 className="text-sm font-bold text-[#1d1d1f] dark:text-white flex items-center gap-2">
+                <User className="w-4 h-4 text-[#0071e3] dark:text-indigo-400" />
                 1. Dados do Comprador
               </h2>
 
               {/* Seletor PF / PJ */}
-              <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+              <div className="flex items-center bg-slate-100 dark:bg-slate-950 p-0.5 rounded-lg border border-black/10 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => {
@@ -696,8 +696,8 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   }}
                   className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
                     personType === "individual"
-                      ? "bg-indigo-600 text-white shadow"
-                      : "text-slate-400 hover:text-slate-200"
+                      ? "bg-[#0071e3] dark:bg-indigo-600 text-white shadow"
+                      : "text-slate-600 dark:text-slate-400 hover:text-black dark:hover:text-slate-200"
                   }`}
                 >
                   Pessoa Física
@@ -710,8 +710,8 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   }}
                   className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
                     personType === "company"
-                      ? "bg-indigo-600 text-white shadow"
-                      : "text-slate-400 hover:text-slate-200"
+                      ? "bg-[#0071e3] dark:bg-indigo-600 text-white shadow"
+                      : "text-slate-600 dark:text-slate-400 hover:text-black dark:hover:text-slate-200"
                   }`}
                 >
                   Pessoa Jurídica
@@ -721,7 +721,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
 
             <div className="space-y-4 text-xs">
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                   {personType === "individual" ? "Nome Completo" : "Razão Social da Empresa"} *
                 </label>
                 <Input
@@ -735,7 +735,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
+                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                     {personType === "individual" ? "CPF" : "CNPJ"} *
                   </label>
                   <Input
@@ -750,7 +750,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
+                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                     WhatsApp para Acompanhamento *
                   </label>
                   <Input
@@ -764,7 +764,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                   E-mail Corporativo / Faturamento *
                 </label>
                 <Input
@@ -779,21 +779,21 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           </Card>
 
           {/* Card 2: Endereço de Entrega */}
-          <Card className="p-5 sm:p-6 border-slate-800 bg-slate-900/60 backdrop-blur-xl space-y-5">
-            <div className="pb-3 border-b border-slate-800 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                <Truck className="w-4 h-4 text-cyan-400" />
+          <Card className="p-5 sm:p-6 border-black/10 dark:border-slate-800 bg-white dark:bg-slate-900/60 backdrop-blur-xl space-y-5 shadow-sm dark:shadow-xl">
+            <div className="pb-3 border-b border-black/10 dark:border-slate-800 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-[#1d1d1f] dark:text-white flex items-center gap-2">
+                <Truck className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
                 2. Endereço de Entrega da Carga
               </h2>
               {isLoadingCep && (
-                <span className="text-[11px] text-cyan-400 animate-pulse">Buscando CEP...</span>
+                <span className="text-[11px] text-[#0071e3] dark:text-cyan-400 animate-pulse">Buscando CEP...</span>
               )}
             </div>
 
             <div className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">CEP *</label>
+                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">CEP *</label>
                   <Input
                     type="text"
                     placeholder="00000-000"
@@ -803,7 +803,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   />
                 </div>
                 <div className="sm:col-span-2 flex items-end">
-                  <span className="text-[11px] text-slate-400 mb-2">
+                  <span className="text-[11px] text-slate-500 mb-2">
                     Preenchimento automático via ViaCEP ao digitar 8 números.
                   </span>
                 </div>
@@ -811,7 +811,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="sm:col-span-2">
-                  <label className="block text-slate-300 font-semibold mb-1">Logradouro / Rua *</label>
+                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Logradouro / Rua *</label>
                   <Input
                     type="text"
                     placeholder="Ex: Av. Paulista"
@@ -821,7 +821,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Número *</label>
+                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Número *</label>
                   <Input
                     type="text"
                     placeholder="Ex: 1000"
@@ -834,7 +834,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Complemento</label>
+                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Complemento</label>
                   <Input
                     type="text"
                     placeholder="Sala 402, Bloco B"
@@ -843,7 +843,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Bairro *</label>
+                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Bairro *</label>
                   <Input
                     type="text"
                     placeholder="Bela Vista"
@@ -853,7 +853,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Cidade / UF *</label>
+                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Cidade / UF *</label>
                   <div className="flex gap-2">
                     <Input
                       type="text"
@@ -881,9 +881,9 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
 
         {/* Coluna Direita: Resumo do Pedido & Botão de Pagamento */}
         <div className="lg:col-span-5 sticky top-24 space-y-4">
-          <Card className="p-6 border-slate-800 bg-slate-900/80 backdrop-blur-xl space-y-5">
-            <h2 className="text-base font-bold text-white pb-3 border-b border-slate-800 flex items-center gap-2">
-              <CreditCard className="w-4 h-4 text-indigo-400" />
+          <Card className="p-6 border-black/10 dark:border-slate-800 bg-white dark:bg-slate-900/80 backdrop-blur-xl space-y-5 shadow-sm dark:shadow-xl">
+            <h2 className="text-base font-bold text-[#1d1d1f] dark:text-white pb-3 border-b border-black/10 dark:border-slate-800 flex items-center gap-2">
+              <CreditCard className="w-4 h-4 text-[#0071e3] dark:text-indigo-400" />
               Resumo da Compra
             </h2>
 
@@ -892,20 +892,20 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
               {items.map((item, idx) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/80 text-xs"
+                  className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-black/10 dark:border-slate-800/80 text-xs"
                 >
                   <div className="flex items-center gap-2.5 truncate">
-                    <span className="w-5 h-5 rounded bg-slate-800 text-slate-300 text-[10px] font-bold flex items-center justify-center shrink-0">
+                    <span className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-bold flex items-center justify-center shrink-0">
                       {idx + 1}
                     </span>
                     <div className="truncate">
-                      <p className="font-bold text-slate-200 truncate">{item.configuration.model.name}</p>
-                      <p className="text-[10px] text-slate-400">
+                      <p className="font-bold text-slate-900 dark:text-slate-200 truncate">{item.configuration.model.name}</p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
                         {item.configuration.color.name} • Qtd: {item.quantity}
                       </p>
                     </div>
                   </div>
-                  <span className="font-semibold text-indigo-300 shrink-0">
+                  <span className="font-semibold text-[#0071e3] dark:text-indigo-300 shrink-0">
                     {formatBRL(item.subtotalCents)}
                   </span>
                 </div>
@@ -913,26 +913,26 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
             </div>
 
             {/* Valores Financeiros */}
-            <div className="space-y-2 pt-3 border-t border-slate-800 text-xs">
-              <div className="flex justify-between text-slate-400">
+            <div className="space-y-2 pt-3 border-t border-black/10 dark:border-slate-800 text-xs">
+              <div className="flex justify-between text-slate-600 dark:text-slate-400">
                 <span>Subtotal dos Gabinetes:</span>
-                <span className="font-semibold text-slate-200">{formatBRL(totalPriceCents)}</span>
+                <span className="font-semibold text-slate-900 dark:text-slate-200">{formatBRL(totalPriceCents)}</span>
               </div>
-              <div className="flex justify-between text-slate-400">
+              <div className="flex justify-between text-slate-600 dark:text-slate-400">
                 <span>Frete Rodoviário Especial:</span>
-                <span className="text-emerald-400 font-semibold">Grátis (Promocional Brasil)</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Grátis (Promocional Brasil)</span>
               </div>
-              <div className="pt-2 border-t border-slate-800 flex justify-between items-baseline">
-                <span className="text-sm font-bold text-white">Total a Pagar (Pix):</span>
-                <span className="text-2xl font-black text-indigo-400">
+              <div className="pt-2 border-t border-black/10 dark:border-slate-800 flex justify-between items-baseline">
+                <span className="text-sm font-bold text-[#1d1d1f] dark:text-white">Total a Pagar (Pix):</span>
+                <span className="text-2xl font-black text-[#0071e3] dark:text-indigo-400">
                   {formatBRL(totalPriceCents)}
                 </span>
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 text-[11px] text-slate-400 space-y-1">
-              <div className="flex items-center gap-1.5 font-semibold text-slate-300">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-black/10 dark:border-slate-800/80 text-[11px] text-slate-600 dark:text-slate-400 space-y-1">
+              <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-300">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 <span>Garantia de Recálculo Confiável</span>
               </div>
               <p>
@@ -945,7 +945,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
               variant="primary"
               size="lg"
               disabled={isSubmitting || items.length === 0}
-              className="w-full font-bold shadow-indigo-600/30 shadow-lg text-sm"
+              className="w-full font-bold shadow-blue-500/25 shadow-lg text-sm bg-[#0071e3] hover:bg-[#0077ed]"
             >
               {isSubmitting ? (
                 <span className="flex items-center gap-2">

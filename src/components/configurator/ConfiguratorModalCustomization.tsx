@@ -91,16 +91,16 @@ export const ConfiguratorModalCustomization: React.FC<ConfiguratorModalCustomiza
     >
       {submitted && trackingInfo ? (
         <div className="py-6 text-center space-y-4">
-          <div className="w-14 h-14 rounded-full bg-emerald-500/20 text-emerald-400 mx-auto flex items-center justify-center shadow-lg shadow-emerald-500/10">
+          <div className="w-14 h-14 rounded-full bg-emerald-50 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center shadow-lg shadow-emerald-500/10">
             <CheckCircle2 className="w-8 h-8" />
           </div>
           <div>
-            <h4 className="text-lg font-bold text-white">Solicitação Enviada para Análise!</h4>
-            <span className="text-xs font-mono font-bold text-indigo-400 mt-1 block">
+            <h4 className="text-lg font-bold text-[#1d1d1f] dark:text-white">Solicitação Enviada para Análise!</h4>
+            <span className="text-xs font-mono font-bold text-[#0071e3] dark:text-cyan-400 mt-1 block">
               Código: {trackingInfo.orderNumber}
             </span>
           </div>
-          <p className="text-xs text-slate-300 max-w-sm mx-auto leading-relaxed">
+          <p className="text-xs text-slate-600 dark:text-slate-300 max-w-sm mx-auto leading-relaxed">
             Seu pedido entra como <strong>"Aguardando Análise Técnica"</strong>. Um engenheiro avaliará o modelo
             e emitirá o parecer com o orçamento de usinagem caso haja acréscimo.
           </p>
@@ -109,7 +109,7 @@ export const ConfiguratorModalCustomization: React.FC<ConfiguratorModalCustomiza
             <a
               href={trackingInfo.trackingUrl}
               target="_blank"
-              className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 transition-all"
+              className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 transition-all"
             >
               <span>Acompanhar Orçamento</span>
               <ExternalLink className="w-3.5 h-3.5" />
@@ -122,14 +122,14 @@ export const ConfiguratorModalCustomization: React.FC<ConfiguratorModalCustomiza
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4 text-xs sm:text-sm">
           {errorMsg && (
-            <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs">
+            <div className="p-3 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 rounded-xl text-rose-600 dark:text-rose-400 text-xs">
               {errorMsg}
             </div>
           )}
 
           {/* Dados do Cliente */}
-          <div className="space-y-2 p-3 bg-slate-950/70 rounded-xl border border-slate-800/80">
-            <span className="font-bold text-[11px] uppercase tracking-wider text-slate-400 block">
+          <div className="space-y-2 p-3 bg-[#f8f9fa] dark:bg-slate-950/70 rounded-2xl border border-black/10 dark:border-slate-800/80">
+            <span className="font-bold text-[11px] uppercase tracking-wider text-slate-600 dark:text-slate-400 block">
               Seus Dados para Contato da Engenharia
             </span>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -160,7 +160,7 @@ export const ConfiguratorModalCustomization: React.FC<ConfiguratorModalCustomiza
 
           {/* Tipo de Equipamento */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-slate-300">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
               Tipo de Equipamento Especial:
             </label>
             <div className="grid grid-cols-3 gap-2">
@@ -173,10 +173,10 @@ export const ConfiguratorModalCustomization: React.FC<ConfiguratorModalCustomiza
                   type="button"
                   key={t.id}
                   onClick={() => setEquipmentType(t.id as any)}
-                  className={`py-2 px-2 text-xs font-semibold rounded-xl border transition-colors ${
+                  className={`py-2 px-2 text-xs font-semibold rounded-xl border transition-colors cursor-pointer ${
                     equipmentType === t.id
-                      ? "border-indigo-500 bg-indigo-950/40 text-indigo-300"
-                      : "border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700"
+                      ? "border-[#0071e3] bg-blue-50 dark:bg-indigo-950/40 text-[#0071e3] dark:text-indigo-300 font-bold"
+                      : "border-black/10 dark:border-slate-800 bg-[#f8f9fa] dark:bg-slate-900/60 text-slate-600 dark:text-slate-400 hover:border-black/20"
                   }`}
                 >
                   {t.label}
@@ -203,7 +203,7 @@ export const ConfiguratorModalCustomization: React.FC<ConfiguratorModalCustomiza
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-slate-300">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
               Observações Técnicas / Medidas / Abertura:
             </label>
             <textarea
@@ -211,30 +211,38 @@ export const ConfiguratorModalCustomization: React.FC<ConfiguratorModalCustomiza
               placeholder="Descreva detalhes como tamanho de tela, posição de cabos ou necessidades de recorte..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border bg-slate-900/80 border-slate-700/80 text-slate-100 placeholder:text-slate-500 text-xs focus:outline-none focus:border-indigo-500"
+              className="w-full px-3.5 py-2.5 rounded-xl border bg-white dark:bg-slate-900/80 border-black/15 dark:border-slate-700/80 text-[#1d1d1f] dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 text-xs focus:outline-none focus:border-[#0071e3] dark:focus:border-indigo-500 shadow-sm"
             />
           </div>
 
-          <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-400 flex items-start gap-2">
-            <ShieldAlert className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+          <div className="p-3 rounded-2xl bg-[#f8f9fa] dark:bg-slate-950 border border-black/10 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-400 flex items-start gap-2">
+            <ShieldAlert className="w-4 h-4 text-[#0071e3] dark:text-cyan-400 shrink-0 mt-0.5" />
             <span>
-              <strong>Regra de Segurança Comercial:</strong> O cliente nunca digita preços adicionais. O pedido
-              é avaliado pela equipe técnica e retornado com a precificação oficial.
+              Ao enviar, nossa equipe de engenharia validará o arquivo CAD e as dimensões submilimétricas para a usinagem CNC sem custo adicional de projeto.
             </span>
           </div>
 
           <div className="pt-2 flex justify-end gap-2">
-            <Button variant="outline" size="sm" type="button" onClick={onClose} disabled={submitting}>
+            <Button type="button" variant="outline" size="sm" onClick={handleReset}>
               Cancelar
             </Button>
-            <Button variant="primary" size="sm" type="submit" disabled={submitting}>
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              disabled={submitting}
+              className="font-bold shadow-lg shadow-blue-500/25"
+            >
               {submitting ? (
                 <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                  <RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                   Enviando...
                 </>
               ) : (
-                "Enviar para Engenharia"
+                <>
+                  Enviar Solicitação
+                  <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                </>
               )}
             </Button>
           </div>

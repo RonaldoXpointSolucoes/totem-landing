@@ -23,15 +23,15 @@ export const StepColor: React.FC<StepColorProps> = ({
         <Badge variant="accent" className="text-xs">
           Etapa 02 de 06
         </Badge>
-        <h2 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
-          Escolha o padrão em MaDeFibra BP
+        <h2 className="text-xl sm:text-3xl font-black text-[#1d1d1f] dark:text-white tracking-tight">
+          Escolha o acabamento em MaDeFibra BP
         </h2>
-        <p className="text-xs sm:text-sm text-slate-400">
+        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
           Painéis de 15mm usinados em Router CNC com alta durabilidade, resistência a riscos e encaixes perfeitos.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-5">
         {colors.map((color) => {
           const isSelected = selectedColor.id === color.id;
           const hasAdjustment = color.priceAdjustmentCents > 0;
@@ -42,13 +42,13 @@ export const StepColor: React.FC<StepColorProps> = ({
               interactive
               selected={isSelected}
               onClick={() => onSelectColor(color)}
-              className="p-5 flex flex-col justify-between"
+              className="p-5 sm:p-6 flex flex-col justify-between"
             >
               <div>
                 <div className="flex items-center justify-between mb-4">
                   {/* Amostra visual de cor */}
                   <div
-                    className="w-12 h-12 rounded-2xl border-2 border-slate-700 shadow-inner flex items-center justify-center"
+                    className="w-12 h-12 rounded-2xl border-2 border-black/15 dark:border-slate-700 shadow-inner flex items-center justify-center transition-transform group-hover:scale-105"
                     style={{ background: color.hexReference }}
                   >
                     {isSelected && (
@@ -61,18 +61,18 @@ export const StepColor: React.FC<StepColorProps> = ({
                   </div>
 
                   <span
-                    className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                    className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
                       hasAdjustment
-                        ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/30"
-                        : "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                        ? "bg-blue-50 dark:bg-indigo-500/20 text-[#0071e3] dark:text-indigo-300 border-blue-200 dark:border-indigo-500/30"
+                        : "bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30"
                     }`}
                   >
                     {hasAdjustment ? `+ ${formatBRL(color.priceAdjustmentCents)}` : "Sem Acréscimo"}
                   </span>
                 </div>
 
-                <h3 className="text-base font-bold text-white mb-1">{color.name}</h3>
-                <p className="text-xs text-slate-400">
+                <h3 className="text-base font-bold text-[#1d1d1f] dark:text-white mb-1.5">{color.name}</h3>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                   {color.slug === "white"
                     ? "Padrão texturizado Branco TX em MaDeFibra 15mm, ideal para clínicas, saúde e varejo clean."
                     : color.slug === "black"
@@ -81,9 +81,9 @@ export const StepColor: React.FC<StepColorProps> = ({
                 </p>
               </div>
 
-              <div className="mt-5 pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
-                <span className="text-slate-400">Impacto no Preço:</span>
-                <span className="font-semibold text-slate-200">
+              <div className="mt-5 pt-3.5 border-t border-black/10 dark:border-slate-800 flex items-center justify-between text-xs">
+                <span className="text-slate-500 dark:text-slate-400 font-medium">Impacto no Preço:</span>
+                <span className="font-bold text-[#1d1d1f] dark:text-slate-200">
                   {hasAdjustment ? `+ ${formatBRL(color.priceAdjustmentCents)}` : "R$ 0,00"}
                 </span>
               </div>
@@ -93,16 +93,16 @@ export const StepColor: React.FC<StepColorProps> = ({
       </div>
 
       {/* Caixa de Destaque: Personalização em qualquer padrão de MDF */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-indigo-950/30 border border-indigo-500/20 flex flex-col sm:flex-row items-start sm:items-center gap-3.5">
-        <div className="p-2.5 rounded-xl bg-indigo-600/20 text-indigo-400 shrink-0">
+      <div className="p-4 sm:p-5 rounded-2xl bg-blue-50/70 dark:bg-indigo-950/30 border border-blue-200/80 dark:border-indigo-500/20 flex flex-col sm:flex-row items-start sm:items-center gap-3.5 transition-colors">
+        <div className="p-2.5 rounded-xl bg-[#0071e3]/10 dark:bg-indigo-600/20 text-[#0071e3] dark:text-indigo-400 shrink-0">
           <Sparkles className="w-5 h-5" />
         </div>
-        <div className="space-y-1 text-xs">
-          <p className="font-bold text-indigo-200">
-            Precisa de uma cor ou textura personalizada?
+        <div className="space-y-1 text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+          <p className="font-bold text-[#1d1d1f] dark:text-white">
+            Precisa de padrão amadeirado, grafite ou acabamento sob medida da sua marca?
           </p>
-          <p className="text-slate-400 leading-relaxed">
-            Fabricamos seu totem em <span className="text-slate-200 font-semibold">qualquer padrão de MDF existente no mercado</span> (amadeirados, tons pasteis, cores da sua identidade visual). Selecione o modelo base e solicite o padrão desejado no atendimento.
+          <p className="text-slate-600 dark:text-slate-400">
+            Nossa fábrica usina em qualquer padrão Arauco, Duratex ou Guararapes sob encomenda para pedidos em lote.
           </p>
         </div>
       </div>

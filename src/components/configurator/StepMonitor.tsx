@@ -33,14 +33,14 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
           <Badge variant="accent" className="text-xs">
             Etapa 03 de 06
           </Badge>
-          <span className="text-[11px] sm:text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+          <span className="text-[11px] sm:text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-500/20">
             Não altera o preço padrão (+ R$ 0)
           </span>
         </div>
-        <h2 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
+        <h2 className="text-xl sm:text-3xl font-black text-[#1d1d1f] dark:text-white tracking-tight">
           Qual monitor será instalado no Totem?
         </h2>
-        <p className="text-xs sm:text-sm text-slate-400">
+        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
           Essa informação serve para cortarmos a chapa frontal com a furação VESA e a abertura exatas da sua tela.
         </p>
       </div>
@@ -51,7 +51,7 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
           placeholder="Pesquisar por modelo ou fabricante (ex: Elgin, Gertec, 21.5)..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10 h-12 text-sm rounded-xl bg-slate-900/80 border-slate-800 focus:border-indigo-500"
+          className="pl-10 h-12 text-sm rounded-2xl bg-white dark:bg-slate-900/80 border-black/15 dark:border-slate-800 text-[#1d1d1f] dark:text-white placeholder:text-slate-400 shadow-sm"
         />
         <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-4 pointer-events-none" />
       </div>
@@ -66,46 +66,46 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
               interactive
               selected={isSelected}
               onClick={() => onSelectMonitor(mon)}
-              className="p-4 flex items-center justify-between gap-3"
+              className="p-4 sm:p-4.5 flex items-center justify-between gap-3"
             >
-              <div className="flex items-center gap-3.5">
+              <div className="flex items-center gap-3.5 min-w-0">
                 <div
-                  className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${
+                  className={`w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 transition-colors ${
                     isSelected
-                      ? "border-indigo-500 bg-indigo-600/30 text-indigo-300"
-                      : "border-slate-800 bg-slate-950 text-slate-400"
+                      ? "border-[#0071e3] bg-blue-50 dark:bg-indigo-600/30 text-[#0071e3] dark:text-indigo-300"
+                      : "border-black/10 dark:border-slate-800 bg-[#f8f9fa] dark:bg-slate-950 text-slate-500 dark:text-slate-400"
                   }`}
                 >
                   <Tv className="w-5 h-5" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">
+                    <span className="text-xs font-bold text-[#0071e3] dark:text-cyan-400 uppercase tracking-wider">
                       {mon.brand}
                     </span>
                     {mon.sizeInches && (
-                      <span className="text-[11px] text-slate-400 font-medium bg-slate-800 px-2 py-0.2 rounded">
+                      <span className="text-[11px] text-slate-600 dark:text-slate-400 font-semibold bg-black/5 dark:bg-slate-800 px-2 py-0.5 rounded-full">
                         {mon.sizeInches}"
                       </span>
                     )}
                   </div>
-                  <h3 className="text-sm font-semibold text-white">{mon.displayName}</h3>
+                  <h3 className="text-sm font-bold text-[#1d1d1f] dark:text-white truncate mt-0.5">{mon.displayName}</h3>
                   {mon.vesaPattern && (
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      Furação VESA: {mon.vesaPattern} • {mon.technicalCode}
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                      VESA: {mon.vesaPattern} • {mon.technicalCode}
                     </p>
                   )}
                 </div>
               </div>
 
               <div
-                className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
+                className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
                   isSelected
-                    ? "border-indigo-500 bg-indigo-600 text-white"
-                    : "border-slate-700 bg-slate-800"
+                    ? "border-[#0071e3] bg-[#0071e3] text-white shadow-md shadow-blue-500/25"
+                    : "border-black/15 dark:border-slate-700 bg-black/5 dark:bg-slate-800"
                 }`}
               >
-                {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
               </div>
             </Card>
           );
@@ -117,7 +117,7 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
         <button
           type="button"
           onClick={onRequestCustomization}
-          className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-indigo-300 underline underline-offset-4 transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-[#0071e3] dark:text-slate-400 dark:hover:text-indigo-300 underline underline-offset-4 transition-colors cursor-pointer"
         >
           <HelpCircle className="w-3.5 h-3.5" />
           Não encontrou seu monitor? Solicite uma personalização especial

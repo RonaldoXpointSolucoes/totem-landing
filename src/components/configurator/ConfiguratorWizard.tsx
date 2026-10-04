@@ -250,14 +250,14 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     <div className="min-h-screen pb-28 pt-6 sm:pt-10 overflow-x-hidden">
       <div className="max-w-6xl mx-auto px-4">
         {/* Barra Superior de Navegação / Progresso */}
-        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-4 border-b border-slate-800">
+        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-4 border-b border-black/10 dark:border-slate-800 transition-colors">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">
+              <span className="text-xs font-bold text-[#0071e3] dark:text-cyan-400 uppercase tracking-wider">
                 Configurador Pro
               </span>
-              <span className="text-slate-600">•</span>
-              <span className="text-xs text-slate-400">Totem de Autoatendimento</span>
+              <span className="text-slate-300 dark:text-slate-700">•</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Totem de Autoatendimento</span>
               {editingItem && (
                 <Badge variant="warning" className="text-[10px] ml-2">
                   Editando Totem do Carrinho
@@ -265,10 +265,10 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
               )}
             </div>
             <div className="flex items-center justify-between mt-1">
-              <h1 className="text-lg sm:text-2xl font-bold text-white">
+              <h1 className="text-lg sm:text-2xl font-black text-[#1d1d1f] dark:text-white tracking-tight">
                 Personalização Técnica do Gabinete
               </h1>
-              <span className="sm:hidden text-xs font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">
+              <span className="sm:hidden text-xs font-bold text-[#0071e3] bg-blue-50 dark:text-indigo-400 dark:bg-indigo-500/10 px-2.5 py-0.5 rounded-full border border-blue-200 dark:border-indigo-500/20">
                 0{step}/06
               </span>
             </div>
@@ -287,10 +287,10 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                 <div
                   className={`h-2 rounded-full transition-all duration-300 ${
                     s === step
-                      ? "w-8 sm:w-10 bg-indigo-500 shadow-md shadow-indigo-500/40"
+                      ? "w-8 sm:w-10 bg-[#0071e3] shadow-md shadow-blue-500/30"
                       : s < step
-                      ? "w-4 sm:w-5 bg-indigo-900 group-hover:bg-indigo-700"
-                      : "w-4 sm:w-5 bg-slate-800 group-hover:bg-slate-700"
+                      ? "w-4 sm:w-5 bg-[#0071e3]/40 dark:bg-indigo-900 group-hover:bg-[#0071e3]/70"
+                      : "w-4 sm:w-5 bg-black/10 dark:bg-slate-800 group-hover:bg-black/20"
                   }`}
                 />
               </button>
@@ -302,9 +302,9 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Coluna Esquerda: Preview Visual Permanente do Totem */}
           <div className="hidden lg:block lg:col-span-4 sticky top-6">
-            <Card className="p-6 border-slate-800 bg-slate-900/60 backdrop-blur-xl space-y-5">
+            <Card className="p-6 border-black/10 dark:border-slate-800 bg-white/90 dark:bg-slate-900/70 backdrop-blur-xl shadow-lg dark:shadow-2xl rounded-3xl space-y-5 transition-all">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                   Visualização do Totem
                 </span>
                 <Badge variant="accent" className="text-[10px]">
@@ -321,33 +321,33 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
               />
 
               {/* Resumo Dinâmico Lateral */}
-              <div className="space-y-2.5 text-xs border-t border-slate-800/80 pt-4 text-slate-400">
-                <div className="flex justify-between">
+              <div className="space-y-2.5 text-xs border-t border-black/10 dark:border-slate-800/80 pt-4 text-slate-500 dark:text-slate-400">
+                <div className="flex justify-between items-center">
                   <span>Modelo:</span>
-                  <span className="font-semibold text-white">{selectedModel.name}</span>
+                  <span className="font-bold text-[#1d1d1f] dark:text-white">{selectedModel.name}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span>Monitor:</span>
-                  <span className="font-semibold text-white truncate max-w-[150px]">
+                  <span className="font-semibold text-[#1d1d1f] dark:text-white truncate max-w-[150px]">
                     {selectedMonitor?.displayName || "—"}
                   </span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span>Impressora:</span>
-                  <span className="font-semibold text-white truncate max-w-[150px]">
+                  <span className="font-semibold text-[#1d1d1f] dark:text-white truncate max-w-[150px]">
                     {selectedPrinter?.displayName || "—"}
                   </span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span>Leitor:</span>
-                  <span className="font-semibold text-white">
+                  <span className="font-semibold text-[#1d1d1f] dark:text-white">
                     {useReader ? selectedReader?.displayName || "Sim" : "Sem leitor"}
                   </span>
                 </div>
 
-                <div className="pt-3 border-t border-slate-800 flex justify-between items-center text-sm">
-                  <span className="font-bold text-slate-200">Total:</span>
-                  <span className="text-xl font-extrabold text-indigo-400">
+                <div className="pt-3 border-t border-black/10 dark:border-slate-800 flex justify-between items-center text-sm">
+                  <span className="font-bold text-slate-700 dark:text-slate-300">Total:</span>
+                  <span className="text-xl font-black text-[#0071e3] dark:text-cyan-400">
                     {formatBRL(pricing.totalPriceCents)}
                   </span>
                 </div>
@@ -359,13 +359,13 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
           <div className="lg:col-span-8 space-y-6">
             {/* Bloco Mobile de Prévia do Totem (Sincronizado em tempo real com imagem, cor e periféricos) */}
             <div className="lg:hidden">
-              <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-br from-slate-900/90 via-slate-900/70 to-slate-950/90 border border-slate-800 shadow-xl space-y-3">
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-white/95 dark:bg-slate-900/90 border border-black/10 dark:border-slate-800 shadow-md dark:shadow-xl space-y-3 transition-colors">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">
+                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider shrink-0">
                       Gabinete:
                     </span>
-                    <span className="text-xs font-bold text-white truncate">
+                    <span className="text-xs font-bold text-[#1d1d1f] dark:text-white truncate">
                       {selectedModel.name}
                     </span>
                   </div>
@@ -380,23 +380,23 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                         source: "mobile_preview_card",
                       });
                     }}
-                    className="px-2.5 py-1 rounded-xl bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-400/30 text-indigo-300 hover:text-white text-[11px] font-bold flex items-center gap-1.5 active:scale-95 transition-all shadow-sm cursor-pointer shrink-0"
+                    className="px-3 py-1.5 rounded-full bg-blue-50 dark:bg-indigo-600/30 hover:bg-blue-100 dark:hover:bg-indigo-600 border border-blue-200 dark:border-indigo-400/30 text-[#0071e3] dark:text-indigo-300 hover:text-[#0071e3] dark:hover:text-white text-[11px] font-bold flex items-center gap-1.5 active:scale-95 transition-all shadow-sm cursor-pointer shrink-0"
                   >
-                    <Box className="w-3.5 h-3.5 text-cyan-300 animate-pulse" />
+                    <Box className="w-3.5 h-3.5 text-[#0071e3] dark:text-cyan-300" />
                     <span>Ver em 3D (360°)</span>
                   </button>
                 </div>
 
                 {/* Exibição Visual do Totem com Miniatura e Detalhes da Composição */}
-                <div className="flex items-center gap-3.5 bg-slate-950/70 rounded-xl p-2.5 border border-slate-800/80">
-                  <div className="w-20 h-24 rounded-lg bg-slate-900/90 border border-slate-800/80 p-1 flex items-center justify-center shrink-0 relative overflow-hidden">
+                <div className="flex items-center gap-3.5 bg-[#f8f9fa] dark:bg-slate-950/70 rounded-xl p-2.5 border border-black/10 dark:border-slate-800/80">
+                  <div className="w-20 h-24 rounded-lg bg-white dark:bg-slate-900/90 border border-black/10 dark:border-slate-800/80 p-1 flex items-center justify-center shrink-0 relative overflow-hidden">
                     <img
                       src={selectedModel.mainImage}
                       alt={selectedModel.name}
-                      className="h-full w-auto object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]"
+                      className="h-full w-auto object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.15)] dark:drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]"
                     />
                     <div
-                      className="absolute bottom-1 right-1 w-3.5 h-3.5 rounded-full border border-slate-700 shadow-sm"
+                      className="absolute bottom-1 right-1 w-3.5 h-3.5 rounded-full border border-black/20 dark:border-slate-700 shadow-sm"
                       style={{ background: selectedColor.hexReference }}
                       title={`Cor: ${selectedColor.name}`}
                     />
@@ -404,23 +404,23 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
 
                   <div className="flex-1 min-w-0 space-y-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-xs font-bold text-white">
+                      <span className="text-xs font-bold text-[#1d1d1f] dark:text-white">
                         {selectedColor.name}
                       </span>
-                      <span className="text-[10px] text-slate-400 font-medium bg-slate-800/80 px-1.5 py-0.2 rounded">
+                      <span className="text-[10px] text-slate-600 dark:text-slate-400 font-medium bg-black/5 dark:bg-slate-800/80 px-1.5 py-0.5 rounded">
                         15mm BP
                       </span>
                     </div>
 
-                    <p className="text-[11px] text-slate-400 truncate">
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
                       {selectedMonitor ? `Monitor: ${selectedMonitor.displayName}` : "Sem monitor definido"}
                     </p>
 
-                    <div className="flex items-center justify-between pt-1 border-t border-slate-800/60">
-                      <span className="text-[10px] text-slate-400 uppercase font-semibold">
+                    <div className="flex items-center justify-between pt-1 border-t border-black/10 dark:border-slate-800/60">
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold">
                         Total Atual:
                       </span>
-                      <span className="text-sm font-black text-indigo-400">
+                      <span className="text-sm font-black text-[#0071e3] dark:text-cyan-400">
                         {formatBRL(pricing.totalPriceCents)}
                       </span>
                     </div>
@@ -514,17 +514,17 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
         title={editingItem ? "Totem Atualizado com Sucesso!" : "Totem Adicionado ao Carrinho!"}
         description="A configuração foi salva com sucesso e está pronta para compra ou duplicação."
       >
-        <div className="py-2 space-y-3 text-xs sm:text-sm text-slate-300">
-          <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-            <p className="font-bold text-white">{selectedModel.name} ({selectedColor.name})</p>
-            <p className="text-slate-400">
+        <div className="py-2 space-y-3 text-xs sm:text-sm text-slate-600 dark:text-slate-300">
+          <div className="p-3.5 rounded-2xl bg-[#f8f9fa] dark:bg-slate-950 border border-black/10 dark:border-slate-800 space-y-1">
+            <p className="font-bold text-[#1d1d1f] dark:text-white">{selectedModel.name} ({selectedColor.name})</p>
+            <p className="text-slate-500 dark:text-slate-400">
               Monitor: {selectedMonitor?.displayName} • Impressora: {selectedPrinter?.displayName}
             </p>
-            <p className="text-indigo-400 font-extrabold text-base pt-1">
+            <p className="text-[#0071e3] dark:text-cyan-400 font-black text-base pt-1">
               {formatBRL(pricing.totalPriceCents)}
             </p>
           </div>
-          <p className="text-slate-400">
+          <p className="text-slate-600 dark:text-slate-400">
             Você pode montar outro totem com configuração diferente ou ir para o carrinho para duplicar em lote e finalizar via Pix.
           </p>
         </div>
