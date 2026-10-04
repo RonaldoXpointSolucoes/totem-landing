@@ -17,10 +17,18 @@ export const CABINET_MODELS: CabinetModel[] = [
     active: true,
     sortOrder: 1,
     mainImage: "/models/cabinet-floor.svg",
+    weightKg: 36.5,
+    package: {
+      heightCm: 170,
+      widthCm: 52,
+      depthCm: 42,
+      grossWeightKg: 40.0,
+    },
     dimensions: {
       heightMm: 1650,
       widthMm: 480,
       depthMm: 380,
+      weightKg: 36.5,
     },
   },
   {
@@ -33,10 +41,18 @@ export const CABINET_MODELS: CabinetModel[] = [
     active: true,
     sortOrder: 2,
     mainImage: "/models/cabinet-wall.svg",
+    weightKg: 14.5,
+    package: {
+      heightCm: 90,
+      widthCm: 48,
+      depthCm: 25,
+      grossWeightKg: 16.0,
+    },
     dimensions: {
       heightMm: 850,
       widthMm: 440,
       depthMm: 220,
+      weightKg: 14.5,
     },
   },
   {
@@ -49,10 +65,18 @@ export const CABINET_MODELS: CabinetModel[] = [
     active: true,
     sortOrder: 3,
     mainImage: "/models/cabinet-countertop.svg",
+    weightKg: 11.8,
+    package: {
+      heightCm: 68,
+      widthCm: 45,
+      depthCm: 32,
+      grossWeightKg: 13.2,
+    },
     dimensions: {
       heightMm: 620,
       widthMm: 400,
       depthMm: 290,
+      weightKg: 11.8,
     },
   },
 ];

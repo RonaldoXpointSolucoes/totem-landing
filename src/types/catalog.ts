@@ -1,3 +1,10 @@
+export interface PackageDimensions {
+  heightCm: number;
+  widthCm: number;
+  depthCm: number;
+  grossWeightKg: number;
+}
+
 export interface CabinetModel {
   id: string;
   name: string;
@@ -8,6 +15,8 @@ export interface CabinetModel {
   sortOrder: number;
   mainImage: string;
   images?: string[];
+  weightKg?: number;
+  package?: PackageDimensions;
   dimensions?: {
     heightMm: number;
     widthMm: number;
