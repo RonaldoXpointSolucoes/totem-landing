@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { siteConfig } from "@/config/site";
 import { CORREIOS_CONTRACT_METADATA } from "@/modules/shipping/receiptGroundTruth";
 
 export async function GET() {
@@ -6,7 +7,7 @@ export async function GET() {
     {
       status: "healthy",
       service: "totem-landing",
-      version: "0.3.2",
+      version: siteConfig.version,
       subsystems: {
         shipping: {
           status: "healthy",

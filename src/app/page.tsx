@@ -3,7 +3,6 @@
 import React, { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Hero,
   AppleHero,
   AppleBentoSection,
   ModelsSection,
@@ -59,18 +58,11 @@ function HomeContent() {
       <Navbar />
 
       <main className="flex-1">
-        {/* Exibição do Hero Temático: Tema Claro (Apple iMac Fiel) ou Tema Escuro */}
-        {theme === "light" ? (
-          <AppleHero
-            onStartConfigurator={() => handleStartConfigurator("cabinet-floor")}
-            onExploreModels={handleExploreModels}
-          />
-        ) : (
-          <Hero
-            onStartConfigurator={() => handleStartConfigurator("cabinet-floor")}
-            onExploreModels={handleExploreModels}
-          />
-        )}
+        {/* Hero Apple iMac com Animação de Abertura Fan-Out e Suporte Completo Claro/Escuro */}
+        <AppleHero
+          onStartConfigurator={() => handleStartConfigurator("cabinet-floor")}
+          onExploreModels={handleExploreModels}
+        />
 
         {/* Bento Section Apple (Cards arredondados e busca de periféricos) */}
         <AppleBentoSection

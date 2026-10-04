@@ -36,10 +36,18 @@ export const Footer: React.FC = () => {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 mt-8 pt-6 border-t border-black/5 dark:border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-slate-500">
-        <p>© {new Date().getFullYear()} X-Point Soluções. Todos os direitos reservados.</p>
-        <p>Desenvolvido com padrão Mobile-First e Usinagem Router CNC Integrada.</p>
+      <div className="max-w-6xl mx-auto px-4 mt-8 pt-6 border-t border-black/5 dark:border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-slate-500 text-center sm:text-left">
+        <div className="flex flex-col sm:flex-row items-center gap-3">
+          <p>© {new Date().getFullYear()} X-Point Soluções. Todos os direitos reservados.</p>
+          <span className="hidden sm:inline text-slate-300 dark:text-slate-700">•</span>
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-black/[0.04] dark:bg-white/[0.06] border border-black/5 dark:border-white/10 text-[11px] font-mono text-slate-600 dark:text-slate-300">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="font-semibold">v{siteConfig.version}</span>
+          </div>
+        </div>
+        <p className="text-[11px]">Desenvolvido com padrão Mobile-First e Usinagem Router CNC Integrada.</p>
       </div>
     </footer>
   );
 };
+
