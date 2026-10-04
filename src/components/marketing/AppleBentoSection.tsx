@@ -44,14 +44,15 @@ export function AppleBentoSection({ onStartConfigurator }: AppleBentoSectionProp
           <div className="relative rounded-[32px] overflow-hidden p-8 sm:p-10 bg-gradient-to-br from-[#852238] via-[#661829] to-[#400e18] text-white shadow-xl flex flex-col justify-between min-h-[440px] group transition-all duration-300 hover:shadow-2xl">
             <div className="space-y-4 max-w-md z-10">
               <span className="text-xs uppercase font-extrabold tracking-widest text-rose-300/80">
-                Engenharia de Estrutura
+                Matéria-Prima Premium
               </span>
               <h3 className="text-2xl sm:text-3xl font-black tracking-tight leading-snug">
-                Chapa de Aço SAE 1020 1.5mm. Robustez sem concessões.
+                MaDeFibra BP 15mm. Acabamento superior e encaixes firmes.
               </h3>
               <p className="text-sm text-rose-100/90 leading-relaxed font-normal">
-                Usinado em Router CNC com tolerância dimensional precisa. Desenvolvido para suportar o
-                tráfego diário severo do varejo e restaurantes com portas traseiras e fechaduras duplas.
+                Painel revestido em MaDeFibra (MDF) BP feito com composição de fibras selecionadas mais
+                curtas. Proporciona corte limpo sem arrepiamento na Router CNC, fixação superior de parafusos
+                e durabilidade para a rotina do varejo.
               </p>
             </div>
 
@@ -62,20 +63,20 @@ export function AppleBentoSection({ onStartConfigurator }: AppleBentoSectionProp
                   <div className="w-3 h-3 rounded-full bg-rose-400/80" />
                   <div className="w-3 h-3 rounded-full bg-amber-400/80" />
                   <div className="w-3 h-3 rounded-full bg-emerald-400/80" />
-                  <span className="text-[11px] font-mono text-white/70 ml-2">Corte Laser CNC</span>
+                  <span className="text-[11px] font-mono text-white/70 ml-2">Usinagem Router CNC</span>
                 </div>
                 <div className="space-y-2 text-xs text-white/80">
                   <div className="flex justify-between border-b border-white/10 pb-1">
                     <span>Espessura:</span>
-                    <span className="font-mono font-bold">1.5 mm Industrial</span>
+                    <span className="font-mono font-bold">15 mm MaDeFibra BP</span>
                   </div>
                   <div className="flex justify-between border-b border-white/10 pb-1">
-                    <span>Tranca:</span>
-                    <span className="font-mono font-bold">Tubular com Chave Criptografada</span>
+                    <span>Corte CNC:</span>
+                    <span className="font-mono font-bold">Sem Arrepiamento</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Cabeamento:</span>
-                    <span className="font-mono font-bold">Duto Oculto Anti-Vandalismo</span>
+                    <span>Padrões:</span>
+                    <span className="font-mono font-bold">Branco TX, Preto TX ou Sob Medida</span>
                   </div>
                 </div>
               </div>

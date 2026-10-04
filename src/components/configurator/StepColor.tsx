@@ -24,10 +24,10 @@ export const StepColor: React.FC<StepColorProps> = ({
           Etapa 02 de 05
         </Badge>
         <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-          Escolha a cor do seu gabinete
+          Escolha o padrão em MaDeFibra BP
         </h2>
         <p className="text-sm text-slate-400">
-          Pintura eletrostática industrial a pó com tratamento antiferrugem e alta durabilidade.
+          Painéis de 15mm usinados em Router CNC com alta durabilidade, resistência a riscos e encaixes perfeitos.
         </p>
       </div>
 
@@ -74,10 +74,10 @@ export const StepColor: React.FC<StepColorProps> = ({
                 <h3 className="text-base font-bold text-white mb-1">{color.name}</h3>
                 <p className="text-xs text-slate-400">
                   {color.slug === "white"
-                    ? "Acabamento clean ideal para clínicas, saúde e varejo claro."
+                    ? "Padrão texturizado Branco TX em MaDeFibra 15mm, ideal para clínicas, saúde e varejo clean."
                     : color.slug === "black"
-                    ? "Fosco requintado com estética corporativa sóbria e moderna."
-                    : "Combinação bicolor elegante que destaca o chassi e a interface."}
+                    ? "Padrão texturizado Preto TX elegante e resistente, com estética corporativa sóbria e moderna."
+                    : "Combinação bicolor unindo painéis Branco TX e Preto TX com encaixes de alta precisão."}
                 </p>
               </div>
 
@@ -90,6 +90,21 @@ export const StepColor: React.FC<StepColorProps> = ({
             </Card>
           );
         })}
+      </div>
+
+      {/* Caixa de Destaque: Personalização em qualquer padrão de MDF */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-indigo-950/30 border border-indigo-500/20 flex flex-col sm:flex-row items-start sm:items-center gap-3.5">
+        <div className="p-2.5 rounded-xl bg-indigo-600/20 text-indigo-400 shrink-0">
+          <Sparkles className="w-5 h-5" />
+        </div>
+        <div className="space-y-1 text-xs">
+          <p className="font-bold text-indigo-200">
+            Precisa de uma cor ou textura personalizada?
+          </p>
+          <p className="text-slate-400 leading-relaxed">
+            Fabricamos seu totem em <span className="text-slate-200 font-semibold">qualquer padrão de MDF existente no mercado</span> (amadeirados, tons pasteis, cores da sua identidade visual). Selecione o modelo base e solicite o padrão desejado no atendimento.
+          </p>
+        </div>
       </div>
     </div>
   );

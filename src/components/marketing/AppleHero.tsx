@@ -146,8 +146,8 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
           </p>
 
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
-            Escolha o modelo, a cor e selecione seus equipamentos homologados. Nós fabricamos o
-            gabinete em aço industrial com os cortes e encaixes exatos na Router CNC.
+            Escolha o modelo, o padrão e selecione seus equipamentos homologados. Nós fabricamos o
+            gabinete em MaDeFibra BP 15mm de alta densidade com cortes e encaixes exatos na Router CNC.
           </p>
         </div>
 
@@ -174,15 +174,15 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
         <div className="mt-12 pt-8 border-t border-black/5 dark:border-white/10 flex flex-wrap items-center justify-center gap-6 sm:gap-12 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span>Corte CNC Submilimétrico</span>
+            <span>MaDeFibra BP 15mm Premium</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-indigo-500" />
-            <span>Pintura Eletrostática Epóxi</span>
+            <span>Corte Router CNC Sem Arrepiamento</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-cyan-500" />
-            <span>Compatibilidade VESA Universal</span>
+            <span>Branco TX, Preto TX ou Sob Medida</span>
           </div>
         </div>
       </div>

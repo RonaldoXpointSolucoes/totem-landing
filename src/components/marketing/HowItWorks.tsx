@@ -9,7 +9,7 @@ export const HowItWorks: React.FC = () => {
     {
       num: "01",
       title: "Escolha o gabinete",
-      description: "Selecione o formato ideal para seu estabelecimento: Parede, Chão ou Balcão e defina a cor.",
+      description: "Selecione o formato ideal (Parede, Chão ou Balcão) e escolha o padrão em MaDeFibra BP (Branco TX, Preto TX ou sob medida).",
       icon: <Layers className="w-5 h-5 text-indigo-400" />,
     },
     {
@@ -21,13 +21,13 @@ export const HowItWorks: React.FC = () => {
     {
       num: "03",
       title: "Nós preparamos os encaixes",
-      description: "Nossa fábrica CNC corta a chapa de aço a laser com furação VESA e encaixes sob medida para suas marcas.",
+      description: "Nossa Router CNC usina o painel MaDeFibra BP 15mm com corte limpo sem arrepiamento, furação VESA e encaixes firmes.",
       icon: <Scissors className="w-5 h-5 text-indigo-400" />,
     },
     {
       num: "04",
       title: "Receba pronto para instalar",
-      description: "Gabinete entregue com pintura eletrostática, chave de segurança e suporte para montagem rápida.",
+      description: "Gabinete entregue com acabamento melamínico resistente a riscos, chave de segurança e fixações reforçadas.",
       icon: <PackageCheck className="w-5 h-5 text-emerald-400" />,
     },
   ];

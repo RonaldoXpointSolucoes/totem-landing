@@ -34,8 +34,8 @@ export const Hero: React.FC<HeroProps> = ({ onStartConfigurator, onExploreModels
           </h1>
 
           <p className="text-base sm:text-lg text-slate-300 max-w-xl mx-auto lg:mx-0 leading-relaxed font-normal">
-            Escolha o modelo, a cor e informe seus equipamentos homologados. Nós fabricamos o gabinete
-            em aço industrial com os cortes e encaixes exatos para a sua operação.
+            Escolha o modelo, o padrão e informe seus equipamentos homologados. Nós fabricamos o gabinete
+            em MaDeFibra BP 15mm com cortes e encaixes exatos para a sua operação.
           </p>
 
           {/* CTAs de Conversão */}
@@ -64,11 +64,11 @@ export const Hero: React.FC<HeroProps> = ({ onStartConfigurator, onExploreModels
           <div className="pt-6 grid grid-cols-3 gap-3 border-t border-slate-800/80 max-w-md mx-auto lg:mx-0">
             <div>
               <p className="text-xs text-slate-400">Precisão</p>
-              <p className="text-sm font-semibold text-slate-200">Submilimétrica</p>
+              <p className="text-sm font-semibold text-slate-200">Router CNC</p>
             </div>
             <div>
-              <p className="text-xs text-slate-400">Acabamento</p>
-              <p className="text-sm font-semibold text-slate-200">Eletrostático</p>
+              <p className="text-xs text-slate-400">Material</p>
+              <p className="text-sm font-semibold text-slate-200">MaDeFibra 15mm</p>
             </div>
             <div>
               <p className="text-xs text-slate-400">Equipamentos</p>

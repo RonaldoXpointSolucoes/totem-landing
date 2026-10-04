@@ -7,18 +7,18 @@ import { ShieldCheck, Cpu, Paintbrush, Lock, RefreshCw, Sparkles } from "lucide-
 export const Differentials: React.FC = () => {
   const items = [
     {
-      title: "Corte CNC Submilimétrico",
-      desc: "Nenhum rasgo é feito de forma manual. Todo o chassi passa por corte laser computadorizado para ajuste perfeito do display e leitor.",
+      title: "Corte Router CNC Sem Arrepiamento",
+      desc: "Usinagem computadorizada de precisão que preserva o revestimento das bordas, garantindo furação VESA e encaixes milimétricos para monitores e periféricos.",
       icon: <Cpu className="w-5 h-5 text-indigo-400" />,
     },
     {
-      title: "Pintura Eletrostática a Pó",
-      desc: "Camada de acabamento de alta resistência contra riscos, maresia e desgaste diário em ambientes de alto fluxo.",
+      title: "MaDeFibra BP 15mm de Alta Densidade",
+      desc: "Painel estrutural com composição de fibras curtas selecionadas, conferindo alta rigidez, fixação reforçada de parafusos e máxima durabilidade comercial.",
       icon: <Paintbrush className="w-5 h-5 text-cyan-400" />,
     },
     {
       title: "Segurança com Chave Exclusiva",
-      desc: "Fechadura traseira com chave segredo para proteção de computadores, nobreaks e equipamentos contra acessos não autorizados.",
+      desc: "Porta traseira com fechadura de chave segredo para proteção de computadores, nobreaks e equipamentos contra acessos não autorizados.",
       icon: <Lock className="w-5 h-5 text-amber-400" />,
     },
     {
@@ -27,13 +27,13 @@ export const Differentials: React.FC = () => {
       icon: <ShieldCheck className="w-5 h-5 text-emerald-400" />,
     },
     {
-      title: "Ventilação Ativa & Passiva",
-      desc: "Aletas de arrefecimento e pré-disposição para ventoinhas silenciosas, garantindo estabilidade térmica 24/7.",
+      title: "Padrões TX & Personalização Ilimitada",
+      desc: "Disponível em Branco TX, Preto TX, Black & White ou personalização sob consulta em qualquer cor e padrão de MDF do mercado.",
       icon: <RefreshCw className="w-5 h-5 text-indigo-400" />,
     },
     {
-      title: "Canal para Personalizações",
-      desc: "Possui um monitor ou leitor fora da nossa lista? Nossa engenharia avalia e desenvolve o gabarito sob medida.",
+      title: "Canal para Projetos Especiais",
+      desc: "Possui um monitor ou leitor fora da nossa lista? Nossa engenharia desenvolve o gabarito sob medida na Router CNC.",
       icon: <Sparkles className="w-5 h-5 text-cyan-400" />,
     },
   ];

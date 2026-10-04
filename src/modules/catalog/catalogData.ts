@@ -60,7 +60,7 @@ export const CABINET_MODELS: CabinetModel[] = [
 export const COLOR_OPTIONS: ColorOption[] = [
   {
     id: "color-white",
-    name: "Branco Neve Industrial",
+    name: "Branco TX (MaDeFibra BP)",
     slug: "white",
     hexReference: "#f8fafc",
     priceAdjustmentCents: 0, // Sem acréscimo
@@ -68,7 +68,7 @@ export const COLOR_OPTIONS: ColorOption[] = [
   },
   {
     id: "color-black",
-    name: "Preto Fosco Titanium",
+    name: "Preto TX (MaDeFibra BP)",
     slug: "black",
     hexReference: "#0f172a",
     priceAdjustmentCents: 10000, // + R$ 100,00

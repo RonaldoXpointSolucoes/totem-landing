@@ -11,7 +11,7 @@ export const Footer: React.FC = () => {
         <div className="space-y-1 text-center md:text-left">
           <p className="font-bold text-sm text-[#1d1d1f] dark:text-slate-200">{siteConfig.name}</p>
           <p className="text-slate-500 dark:text-slate-400">
-            Fabricação especializada de gabinetes metálicos para totens e terminais de autoatendimento.
+            Fabricação especializada em MaDeFibra (MDF) BP para totens e terminais de autoatendimento.
           </p>
         </div>
 
@@ -29,7 +29,7 @@ export const Footer: React.FC = () => {
 
       <div className="max-w-6xl mx-auto px-4 mt-8 pt-6 border-t border-black/5 dark:border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-slate-500">
         <p>© {new Date().getFullYear()} X-Point Soluções. Todos os direitos reservados.</p>
-        <p>Desenvolvido com padrão Mobile-First e Engenharia CNC Integrada.</p>
+        <p>Desenvolvido com padrão Mobile-First e Usinagem Router CNC Integrada.</p>
       </div>
     </footer>
   );
