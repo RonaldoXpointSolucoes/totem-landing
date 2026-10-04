@@ -518,7 +518,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           variant="ghost"
           size="sm"
           onClick={() => setStep("form")}
-          className="text-xs text-slate-400 hover:text-white"
+          className="text-xs text-slate-600 dark:text-slate-400 hover:text-black dark:hover:text-white"
         >
           <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
           Voltar e alterar dados

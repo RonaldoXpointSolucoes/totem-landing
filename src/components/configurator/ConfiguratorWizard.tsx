@@ -307,7 +307,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                       ? "bg-[#0071e3] text-white shadow-md shadow-blue-500/25 ring-2 ring-[#0071e3]/30"
                       : isCompleted
                       ? "bg-blue-50 dark:bg-indigo-950/40 text-[#0071e3] dark:text-indigo-300 hover:bg-blue-100"
-                      : "text-slate-600 dark:text-slate-400 hover:bg-black/5 hover:text-black dark:hover:text-white"
+                      : "text-slate-700 dark:text-slate-300 hover:bg-black/5 hover:text-black dark:hover:text-white"
                   }`}
                   title={`Passo ${s.id}: ${s.label}`}
                 >
@@ -317,7 +317,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                         ? "bg-white/20 text-white"
                         : isCompleted
                         ? "bg-[#0071e3] text-white"
-                        : "bg-black/10 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                        : "bg-black/5 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-black/10 dark:border-slate-700"
                     }`}
                   >
                     {isCompleted ? <Check className="w-2.5 h-2.5 stroke-[3]" /> : s.id}

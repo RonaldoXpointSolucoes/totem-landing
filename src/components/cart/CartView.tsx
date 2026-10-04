@@ -180,7 +180,7 @@ export const CartView: React.FC<CartViewProps> = ({
                           });
                         }}
                         title="Duplicar configuração para compra em lote"
-                        className="h-8 px-2.5 text-xs text-slate-700 dark:text-slate-300"
+                        className="h-8 px-2.5 text-xs font-semibold"
                       >
                         <Copy className="w-3.5 h-3.5 mr-1 text-cyan-600 dark:text-cyan-400" />
                         Duplicar
@@ -191,7 +191,7 @@ export const CartView: React.FC<CartViewProps> = ({
                         size="sm"
                         onClick={() => onEditItem(id)}
                         title="Editar configurações deste totem"
-                        className="h-8 px-2.5 text-xs"
+                        className="h-8 px-2.5 text-xs font-semibold"
                       >
                         <Edit3 className="w-3.5 h-3.5 mr-1 text-[#0071e3] dark:text-indigo-400" />
                         Editar

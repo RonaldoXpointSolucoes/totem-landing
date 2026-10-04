@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Cpu, ArrowRight, ShoppingCart } from "lucide-react";
+import { Cpu, ArrowRight, ArrowLeft, ShoppingCart } from "lucide-react";
 import { useCart } from "@/modules/cart/CartContext";
 import { Button, ThemeToggle } from "@/components/ui";
 
@@ -118,20 +118,23 @@ export const Navbar: React.FC<NavbarProps> = ({ className = "" }) => {
           {/* Botão Dinâmico de Contexto */}
           {isConfigurator ? (
             <Link href="/">
-              <Button variant="outline" size="sm">
-                Voltar à Página Inicial
+              <Button variant="outline" size="sm" className="font-semibold text-xs gap-1.5 shadow-sm">
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Voltar à Página Inicial</span>
               </Button>
             </Link>
           ) : isCart ? (
             <Link href="/monte-seu-totem">
-              <Button variant="primary" size="sm" className="font-bold text-xs">
-                Montar Outro Totem
+              <Button variant="primary" size="sm" className="font-bold text-xs gap-1.5 shadow-md shadow-blue-500/20">
+                <span>Montar Outro Totem</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </Button>
             </Link>
           ) : isCheckout ? (
             <Link href="/carrinho">
-              <Button variant="outline" size="sm">
-                Voltar ao Carrinho
+              <Button variant="outline" size="sm" className="font-semibold text-xs gap-1.5 shadow-sm">
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Voltar ao Carrinho</span>
               </Button>
             </Link>
           ) : (
