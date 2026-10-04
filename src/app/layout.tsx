@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { siteConfig } from "@/config/site";
 import { ThemeProvider } from "@/lib/theme/ThemeContext";
+import { CartProvider } from "@/modules/cart/CartContext";
 import { MarketingPixels } from "@/components/analytics/MarketingPixels";
 import { FAQ_DATA } from "@/config/faqData";
 import "./globals.css";
@@ -295,7 +296,9 @@ export default function RootLayout({
       <body className="min-h-screen bg-white dark:bg-[#090a0f] text-[#1d1d1f] dark:text-slate-100 antialiased selection:bg-[#0071e3] selection:text-white transition-colors duration-300">
         <MarketingPixels />
         <ThemeProvider>
-          {children}
+          <CartProvider>
+            {children}
+          </CartProvider>
         </ThemeProvider>
       </body>
     </html>

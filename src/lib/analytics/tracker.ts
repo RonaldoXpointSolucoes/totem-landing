@@ -88,6 +88,14 @@ function dispatchToAdPlatforms(
         });
         break;
 
+      case ANALYTICS_EVENTS.VIEW_CART:
+        window.gtag("event", "view_cart", {
+          currency,
+          value: valueNumber,
+          items_count: data.itemsCount,
+        });
+        break;
+
       case ANALYTICS_EVENTS.ADD_TO_CART:
         window.gtag("event", "add_to_cart", {
           currency,
@@ -209,6 +217,12 @@ function dispatchToAdPlatforms(
         });
         break;
 
+      case ANALYTICS_EVENTS.VIEW_CART:
+        window.fbq("trackCustom", "ViewCart", {
+          items_count: data.itemsCount,
+        });
+        break;
+
       case ANALYTICS_EVENTS.ADD_TO_CART:
         window.fbq("track", "AddToCart", {
           content_name: (data.modelName as string) || "Gabinete Totem",
@@ -288,6 +302,12 @@ function dispatchToAdPlatforms(
         window.ttq.track("ViewContent", {
           content_type: "product_3d",
           content_name: String(data.modelName || "Totem 3D Viewer"),
+        });
+        break;
+
+      case ANALYTICS_EVENTS.VIEW_CART:
+        window.ttq.track("ViewContent", {
+          content_type: "cart",
         });
         break;
 

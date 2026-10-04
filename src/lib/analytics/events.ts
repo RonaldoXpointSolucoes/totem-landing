@@ -20,6 +20,7 @@ export const ANALYTICS_EVENTS = {
   INTERACT_3D: "interact_3d",
 
   // Fundo do Funil (Carrinho & Checkout E-commerce)
+  VIEW_CART: "view_cart",
   ADD_TO_CART: "add_to_cart",
   REMOVE_FROM_CART: "remove_from_cart",
   DUPLICATE_ITEM: "duplicate_item",

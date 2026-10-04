@@ -15,6 +15,7 @@ interface CartContextType {
   totalPriceCents: number;
   editingItem: CartItem | null;
   setEditingItem: (item: CartItem | null) => void;
+  isInitialized: boolean;
 }
 
 const CART_STORAGE_KEY = "totem_pro_cart_items_v1";
@@ -159,6 +160,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         totalPriceCents,
         editingItem,
         setEditingItem,
+        isInitialized,
       }}
     >
       {children}

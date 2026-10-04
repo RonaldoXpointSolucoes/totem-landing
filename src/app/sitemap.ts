@@ -19,9 +19,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
       ],
     },
     {
-      url: `${baseUrl}/#modelos`,
+      url: `${baseUrl}/monte-seu-totem`,
       lastModified: now,
-      changeFrequency: "weekly",
+      changeFrequency: "daily",
       priority: 0.95,
       images: [
         `${baseUrl}/models/cabinet-floor.svg`,
@@ -30,22 +30,45 @@ export default function sitemap(): MetadataRoute.Sitemap {
       ],
     },
     {
-      url: `${baseUrl}/#como-funciona`,
+      url: `${baseUrl}/carrinho`,
       lastModified: now,
       changeFrequency: "weekly",
-      priority: 0.85,
+      priority: 0.7,
     },
     {
-      url: `${baseUrl}/#diferenciais`,
+      url: `${baseUrl}/checkout`,
       lastModified: now,
       changeFrequency: "weekly",
-      priority: 0.85,
+      priority: 0.7,
     },
     {
-      url: `${baseUrl}/#faq`,
+      url: `${baseUrl}/modelos`,
       lastModified: now,
       changeFrequency: "weekly",
       priority: 0.9,
+      images: [
+        `${baseUrl}/models/cabinet-floor.svg`,
+        `${baseUrl}/models/cabinet-wall.svg`,
+        `${baseUrl}/models/cabinet-countertop.svg`,
+      ],
+    },
+    {
+      url: `${baseUrl}/como-funciona`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/diferenciais`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/faq`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.85,
     },
   ];
 }

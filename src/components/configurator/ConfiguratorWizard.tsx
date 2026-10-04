@@ -27,12 +27,14 @@ import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 
 interface ConfiguratorWizardProps {
   initialModelId?: string;
+  initialStep?: number;
   onOpenCart?: () => void;
   onBackToHome?: () => void;
 }
 
 export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
   initialModelId,
+  initialStep,
   onOpenCart,
   onBackToHome,
 }) => {
@@ -100,8 +102,23 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
   });
 
   // Passo atual
-  const [step, setStep] = useState<number>(1);
+  const [step, setStep] = useState<number>(() => {
+    if (initialStep && initialStep >= 1 && initialStep <= 6) return initialStep;
+    return 1;
+  });
   const totalSteps = 6;
+
+  // Sincronizar parâmetros de rota na URL sem reload
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (url.pathname.includes("monte-seu-totem") || url.pathname.includes("configurador")) {
+        url.searchParams.set("modelo", selectedModel.id);
+        url.searchParams.set("etapa", step.toString());
+        window.history.replaceState({}, "", url.toString());
+      }
+    }
+  }, [step, selectedModel.id]);
 
   // Modais de apoio
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
