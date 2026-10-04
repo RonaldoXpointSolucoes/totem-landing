@@ -22,7 +22,18 @@ import { StickyBottomBar } from "./StickyBottomBar";
 import { ConfiguratorModalCustomization } from "./ConfiguratorModalCustomization";
 import { TotemViewer3DWrapper } from "./TotemViewer3DWrapper";
 import { Card, Badge, Button, Modal } from "@/components/ui";
-import { ShoppingCart, CheckCircle2, ArrowRight, RotateCcw, Box } from "lucide-react";
+import {
+  ShoppingCart,
+  CheckCircle2,
+  ArrowRight,
+  RotateCcw,
+  Box,
+  Palette,
+  Tv,
+  Printer,
+  QrCode,
+  Check,
+} from "lucide-react";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 
 interface ConfiguratorWizardProps {
@@ -246,108 +257,137 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     setIsCartSuccessModalOpen(false);
   };
 
+  // Passos lógicos estruturados como Cardápio Digital Interativo
+  const CONFIG_STEPS = [
+    { id: 1, label: "Formato", subtitle: "Gabinete", icon: Box },
+    { id: 2, label: "Acabamento", subtitle: "MDF BP", icon: Palette },
+    { id: 3, label: "Monitor", subtitle: "Touch", icon: Tv },
+    { id: 4, label: "Impressora", subtitle: "Térmica", icon: Printer },
+    { id: 5, label: "Leitor", subtitle: "Código 2D", icon: QrCode },
+    { id: 6, label: "Revisão", subtitle: "Ficha CNC", icon: CheckCircle2 },
+  ];
+
   return (
-    <div className="min-h-screen pb-28 pt-6 sm:pt-10 overflow-x-hidden">
-      <div className="max-w-6xl mx-auto px-4">
-        {/* Barra Superior de Navegação / Progresso */}
-        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-4 border-b border-black/10 dark:border-slate-800 transition-colors">
-          <div>
+    <div className="flex-1 flex flex-col justify-between overflow-hidden h-full pb-16 sm:pb-20">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 w-full flex-1 flex flex-col min-h-0 pt-2 sm:pt-3">
+        {/* Topo: Identificação Enxuta + Cardápio Digital dos 6 Passos */}
+        <div className="space-y-2 mb-2 sm:mb-3 shrink-0">
+          <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-[#0071e3] dark:text-cyan-400 uppercase tracking-wider">
+              <span className="text-[11px] font-black text-[#0071e3] uppercase tracking-wider">
                 Configurador Pro
               </span>
               <span className="text-slate-300 dark:text-slate-700">•</span>
-              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Totem de Autoatendimento</span>
+              <span className="text-xs text-slate-500 font-medium">Totem Industrial de Autoatendimento</span>
               {editingItem && (
-                <Badge variant="warning" className="text-[10px] ml-2">
-                  Editando Totem do Carrinho
+                <Badge variant="warning" className="text-[10px]">
+                  Editando Item
                 </Badge>
               )}
             </div>
-            <div className="flex items-center justify-between mt-1">
-              <h1 className="text-lg sm:text-2xl font-black text-[#1d1d1f] dark:text-white tracking-tight">
-                Personalização Técnica do Gabinete
-              </h1>
-              <span className="sm:hidden text-xs font-bold text-[#0071e3] bg-blue-50 dark:text-indigo-400 dark:bg-indigo-500/10 px-2.5 py-0.5 rounded-full border border-blue-200 dark:border-indigo-500/20">
-                0{step}/06
-              </span>
+
+            <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+              <span>Etapa <strong>0{step}</strong> de <strong>06</strong></span>
             </div>
           </div>
 
-          {/* Stepper Visual com Alvo de Toque Ergonômico */}
-          <div className="flex items-center gap-2 py-1">
-            {[1, 2, 3, 4, 5, 6].map((s) => (
-              <button
-                key={s}
-                onClick={() => setStep(s)}
-                className="py-2 px-0.5 group cursor-pointer focus:outline-none"
-                title={`Ir para etapa ${s}`}
-                aria-label={`Ir para etapa ${s}`}
-              >
-                <div
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    s === step
-                      ? "w-8 sm:w-10 bg-[#0071e3] shadow-md shadow-blue-500/30"
-                      : s < step
-                      ? "w-4 sm:w-5 bg-[#0071e3]/40 dark:bg-indigo-900 group-hover:bg-[#0071e3]/70"
-                      : "w-4 sm:w-5 bg-black/10 dark:bg-slate-800 group-hover:bg-black/20"
+          {/* Barra de Categorias / Passos (Estilo Cardápio Digital - Visão Global de 6 Passos) */}
+          <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar p-1 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-black/10 dark:border-slate-800 backdrop-blur-md shadow-sm">
+            {CONFIG_STEPS.map((s) => {
+              const Icon = s.icon;
+              const isActive = s.id === step;
+              const isCompleted = s.id < step;
+
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => setStep(s.id)}
+                  className={`flex items-center gap-2 py-1.5 px-2.5 sm:px-3 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                    isActive
+                      ? "bg-[#0071e3] text-white shadow-md shadow-blue-500/25 ring-2 ring-[#0071e3]/30"
+                      : isCompleted
+                      ? "bg-blue-50 dark:bg-indigo-950/40 text-[#0071e3] dark:text-indigo-300 hover:bg-blue-100"
+                      : "text-slate-600 dark:text-slate-400 hover:bg-black/5 hover:text-black dark:hover:text-white"
                   }`}
-                />
-              </button>
-            ))}
+                  title={`Passo ${s.id}: ${s.label}`}
+                >
+                  <div
+                    className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black shrink-0 ${
+                      isActive
+                        ? "bg-white/20 text-white"
+                        : isCompleted
+                        ? "bg-[#0071e3] text-white"
+                        : "bg-black/10 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                    }`}
+                  >
+                    {isCompleted ? <Check className="w-2.5 h-2.5 stroke-[3]" /> : s.id}
+                  </div>
+                  <Icon className="w-3.5 h-3.5 shrink-0 opacity-90" />
+                  <span className="truncate">{s.label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* Layout Desktop em Duas Colunas (Coluna Esquerda: Render 3D Ready | Coluna Direita: Passos) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Layout Desktop e Notebook em Duas Colunas (Viewport-Fit: sem rolagem externa) */}
+        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-stretch overflow-hidden">
           {/* Coluna Esquerda: Preview Visual Permanente do Totem */}
-          <div className="hidden lg:block lg:col-span-4 sticky top-6">
-            <Card className="p-6 border-black/10 dark:border-slate-800 bg-white/90 dark:bg-slate-900/70 backdrop-blur-xl shadow-lg dark:shadow-2xl rounded-3xl space-y-5 transition-all">
+          <div className="hidden lg:flex lg:col-span-4 flex-col justify-between h-full overflow-hidden">
+            <Card className="p-3.5 border-black/10 dark:border-slate-800 bg-white/95 dark:bg-slate-900/70 backdrop-blur-xl shadow-md rounded-2xl flex flex-col justify-between h-full space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   Visualização do Totem
                 </span>
-                <Badge variant="accent" className="text-[10px]">
+                <Badge variant="accent" className="text-[9px]">
                   3D Ready
                 </Badge>
               </div>
 
-              {/* Visualizador 3D Desacoplado com Alternância 2D/3D */}
-              <TotemViewer3DWrapper
-                selectedModel={selectedModel}
-                selectedColor={selectedColor}
-                hasPrinter={!!selectedPrinter}
-                hasScanner={useReader && !!selectedReader}
-              />
+              {/* Visualizador 2D/3D com Altura Balanceada */}
+              <div className="flex-1 min-h-0 flex items-center justify-center">
+                <TotemViewer3DWrapper
+                  selectedModel={selectedModel}
+                  selectedColor={selectedColor}
+                  hasPrinter={!!selectedPrinter}
+                  hasScanner={useReader && !!selectedReader}
+                />
+              </div>
 
-              {/* Resumo Dinâmico Lateral */}
-              <div className="space-y-2.5 text-xs border-t border-black/10 dark:border-slate-800/80 pt-4 text-slate-500 dark:text-slate-400">
+              {/* Resumo Dinâmico Compacto Lateral */}
+              <div className="space-y-1.5 text-xs border-t border-black/10 dark:border-slate-800/80 pt-2 text-slate-500 dark:text-slate-400">
                 <div className="flex justify-between items-center">
                   <span>Modelo:</span>
-                  <span className="font-bold text-[#1d1d1f] dark:text-white">{selectedModel.name}</span>
+                  <span className="font-bold text-[#1d1d1f] dark:text-white truncate max-w-[140px]">{selectedModel.name}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Acabamento:</span>
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className="w-2.5 h-2.5 rounded-full border border-black/20"
+                      style={{ background: selectedColor.hexReference }}
+                    />
+                    <span className="font-semibold text-[#1d1d1f] dark:text-white truncate max-w-[130px]">
+                      {selectedColor.name}
+                    </span>
+                  </div>
                 </div>
                 <div className="flex justify-between items-center">
                   <span>Monitor:</span>
-                  <span className="font-semibold text-[#1d1d1f] dark:text-white truncate max-w-[150px]">
+                  <span className="font-semibold text-[#1d1d1f] dark:text-white truncate max-w-[140px]">
                     {selectedMonitor?.displayName || "—"}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span>Impressora:</span>
-                  <span className="font-semibold text-[#1d1d1f] dark:text-white truncate max-w-[150px]">
+                  <span className="font-semibold text-[#1d1d1f] dark:text-white truncate max-w-[140px]">
                     {selectedPrinter?.displayName || "—"}
                   </span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span>Leitor:</span>
-                  <span className="font-semibold text-[#1d1d1f] dark:text-white">
-                    {useReader ? selectedReader?.displayName || "Sim" : "Sem leitor"}
-                  </span>
-                </div>
 
-                <div className="pt-3 border-t border-black/10 dark:border-slate-800 flex justify-between items-center text-sm">
-                  <span className="font-bold text-slate-700 dark:text-slate-300">Total:</span>
-                  <span className="text-xl font-black text-[#0071e3] dark:text-cyan-400">
+                <div className="pt-2 border-t border-black/10 dark:border-slate-800 flex justify-between items-center">
+                  <span className="font-bold text-slate-700 dark:text-slate-300">Total Atual:</span>
+                  <span className="text-lg font-black text-[#0071e3] dark:text-cyan-400">
                     {formatBRL(pricing.totalPriceCents)}
                   </span>
                 </div>
@@ -355,8 +395,8 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
             </Card>
           </div>
 
-          {/* Coluna Direita: Área do Passo Ativo */}
-          <div className="lg:col-span-8 space-y-6">
+          {/* Coluna Direita: Área do Passo Ativo (Viewport-Fit com Scroll Interno Limpo) */}
+          <div className="lg:col-span-8 flex flex-col justify-between h-full overflow-y-auto pr-1">
             {/* Bloco Mobile de Prévia do Totem (Sincronizado em tempo real com imagem, cor e periféricos) */}
             <div className="lg:hidden">
               <div className="p-3.5 sm:p-4 rounded-2xl bg-white/95 dark:bg-slate-900/90 border border-black/10 dark:border-slate-800 shadow-md dark:shadow-xl space-y-3 transition-colors">

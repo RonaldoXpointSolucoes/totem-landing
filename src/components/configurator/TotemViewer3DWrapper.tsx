@@ -146,23 +146,23 @@ export const TotemViewer3DWrapper: React.FC<TotemViewer3DWrapperProps> = ({
         )}
       </div>
 
-      {/* Janela de Visualização (2D vs 3D) */}
-      <div className="relative aspect-[3/4] w-full rounded-2xl sm:rounded-3xl bg-gradient-to-b from-[#f8f9fa] to-[#eceef1] dark:from-slate-950/80 dark:to-slate-900/80 border border-black/10 dark:border-slate-800 overflow-hidden shadow-lg dark:shadow-2xl flex flex-col items-center justify-center transition-colors">
+      {/* Janela de Visualização (2D vs 3D) com Altura Contida para Viewport-Fit */}
+      <div className="relative h-[210px] sm:h-[240px] lg:h-[270px] w-full rounded-2xl sm:rounded-3xl bg-gradient-to-b from-[#f8f9fa] to-[#eceef1] dark:from-slate-950/80 dark:to-slate-900/80 border border-black/10 dark:border-slate-800 overflow-hidden shadow-md dark:shadow-xl flex flex-col items-center justify-center transition-colors">
         {mode === "2d" ? (
           /* MODO 2D: Imagem Estática Leve (<50KB) com máxima velocidade */
-          <div className="relative w-full h-full p-6 flex flex-col items-center justify-center animate-in fade-in duration-300">
+          <div className="relative w-full h-full p-4 flex flex-col items-center justify-center animate-in fade-in duration-300">
             <img
               src={selectedModel.mainImage}
               alt={selectedModel.name}
-              className="h-full w-auto object-contain drop-shadow-[0_15px_30px_rgba(0,0,0,0.15)] dark:drop-shadow-[0_15px_30px_rgba(79,70,229,0.25)] transition-all duration-300"
+              className="h-full w-auto object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.15)] dark:drop-shadow-[0_15px_30px_rgba(79,70,229,0.25)] transition-all duration-300"
             />
 
             {/* Botão Convite para Ativar 3D */}
             <button
               onClick={() => setMode("3d")}
-              className="absolute bottom-16 px-4 py-2 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white text-xs font-bold shadow-lg shadow-blue-500/25 flex items-center gap-2 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+              className="absolute bottom-11 px-3.5 py-1.5 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white text-[11px] font-bold shadow-md shadow-blue-500/25 flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 cursor-pointer"
             >
-              <Box className="w-4 h-4" />
+              <Box className="w-3.5 h-3.5" />
               <span>Girar em 3D (360°)</span>
             </button>
           </div>

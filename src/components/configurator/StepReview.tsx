@@ -3,8 +3,8 @@
 import React from "react";
 import { CabinetModel, ColorOption, MonitorOption, PrinterOption, BarcodeReaderOption } from "@/types/catalog";
 import { formatBRL, PriceBreakdown } from "@/modules/pricing/pricingEngine";
-import { Card, Button, Badge } from "@/components/ui";
-import { CheckCircle2, Edit3, ShoppingCart, ShieldAlert } from "lucide-react";
+import { Card, Button } from "@/components/ui";
+import { Edit3, ShoppingCart, ShieldCheck } from "lucide-react";
 
 interface StepReviewProps {
   model: CabinetModel;
@@ -30,177 +30,160 @@ export const StepReview: React.FC<StepReviewProps> = ({
   onAddToCart,
 }) => {
   return (
-    <div className="space-y-5 sm:space-y-6">
-      <div className="text-center sm:text-left space-y-1.5">
-        <Badge variant="success" className="text-xs">
-          Etapa 06 de 06 — Revisão Final
-        </Badge>
-        <h2 className="text-xl sm:text-3xl font-black text-[#1d1d1f] dark:text-white tracking-tight">
+    <div className="space-y-3 sm:space-y-4">
+      <div className="text-center sm:text-left space-y-1">
+        <h2 className="text-lg sm:text-2xl font-black text-[#1d1d1f] dark:text-white tracking-tight">
           Confira as especificações do seu Totem
         </h2>
-        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-          Esta será a ficha técnica exata de cortes e encaixes utilizada na fabricação.
+        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+          Esta será a ficha técnica exata de cortes e encaixes utilizada na Router CNC.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6">
-        {/* Card Visual com Foto do Modelo */}
-        <div className="lg:col-span-1 p-5 sm:p-6 rounded-3xl border border-black/10 dark:border-slate-800 bg-white/90 dark:bg-slate-900/60 backdrop-blur-md shadow-md dark:shadow-xl flex flex-col items-center justify-center text-center transition-colors">
-          <div className="relative aspect-[3/4] w-full max-w-[180px] sm:max-w-[200px] mb-4">
-            <img
-              src={model.mainImage}
-              alt={model.name}
-              className="w-full h-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.15)] dark:drop-shadow-[0_15px_30px_rgba(0,0,0,0.6)]"
-            />
+      {/* Ficha Técnica de Produção Otimizada em 2 Colunas (Sem Imagem Redundante) */}
+      <Card className="p-4 sm:p-5 rounded-2xl space-y-3.5">
+        <div className="flex items-center justify-between pb-2.5 border-b border-black/10 dark:border-slate-800">
+          <h3 className="text-sm sm:text-base font-black text-[#1d1d1f] dark:text-white flex items-center gap-2">
+            <span>Ficha Técnica de Engenharia</span>
+            <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-500/20">
+              100% Homologado CNC
+            </span>
+          </h3>
+          <span className="text-xs font-semibold text-slate-500">
+            {model.dimensions ? `${model.dimensions.heightMm}×${model.dimensions.widthMm}×${model.dimensions.depthMm} mm` : ""}
+          </span>
+        </div>
+
+        {/* Grid de 2 Colunas com as Especificações de Montagem */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+          {/* Modelo */}
+          <div className="py-1.5 flex items-center justify-between gap-2 border-b border-black/5 dark:border-slate-800/60">
+            <span className="text-slate-500 font-medium">Modelo:</span>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <strong className="text-[#1d1d1f] dark:text-white truncate">{model.name}</strong>
+              <button
+                onClick={() => onEditStep(1)}
+                className="p-1 rounded-lg hover:bg-black/5 text-[#0071e3] transition-colors"
+                title="Alterar Modelo"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
-          <Badge variant="primary" className="mb-2">
-            {model.name}
-          </Badge>
-          <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
-            <span
-              className="w-3.5 h-3.5 rounded-full border border-black/20 dark:border-slate-600 inline-block shrink-0"
-              style={{ background: color.hexReference }}
-            />
-            <span className="font-semibold">{color.name}</span>
+
+          {/* Acabamento */}
+          <div className="py-1.5 flex items-center justify-between gap-2 border-b border-black/5 dark:border-slate-800/60">
+            <span className="text-slate-500 font-medium">Acabamento:</span>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span
+                className="w-2.5 h-2.5 rounded-full border border-black/20 shrink-0"
+                style={{ background: color.hexReference }}
+              />
+              <strong className="text-[#1d1d1f] dark:text-white truncate">{color.name} (15mm BP)</strong>
+              <button
+                onClick={() => onEditStep(2)}
+                className="p-1 rounded-lg hover:bg-black/5 text-[#0071e3] transition-colors"
+                title="Alterar Cor"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Monitor */}
+          <div className="py-1.5 flex items-center justify-between gap-2 border-b border-black/5 dark:border-slate-800/60">
+            <span className="text-slate-500 font-medium">Monitor Touch:</span>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <strong className="text-[#1d1d1f] dark:text-white truncate max-w-[140px]">
+                {monitor?.displayName || "—"}
+              </strong>
+              <button
+                onClick={() => onEditStep(3)}
+                className="p-1 rounded-lg hover:bg-black/5 text-[#0071e3] transition-colors"
+                title="Alterar Monitor"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Impressora */}
+          <div className="py-1.5 flex items-center justify-between gap-2 border-b border-black/5 dark:border-slate-800/60">
+            <span className="text-slate-500 font-medium">Impressora:</span>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <strong className="text-[#1d1d1f] dark:text-white truncate max-w-[140px]">
+                {printer?.displayName || "—"}
+              </strong>
+              <button
+                onClick={() => onEditStep(4)}
+                className="p-1 rounded-lg hover:bg-black/5 text-[#0071e3] transition-colors"
+                title="Alterar Impressora"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Leitor */}
+          <div className="py-1.5 flex items-center justify-between gap-2 border-b border-black/5 dark:border-slate-800/60">
+            <span className="text-slate-500 font-medium">Janela de Leitor:</span>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <strong className="text-[#1d1d1f] dark:text-white truncate max-w-[140px]">
+                {useReader ? reader?.displayName || "Sim" : "Sem leitor"}
+              </strong>
+              <button
+                onClick={() => onEditStep(5)}
+                className="p-1 rounded-lg hover:bg-black/5 text-[#0071e3] transition-colors"
+                title="Alterar Leitor"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Encaixes e Furações */}
+          <div className="py-1.5 flex items-center justify-between gap-2 border-b border-black/5 dark:border-slate-800/60">
+            <span className="text-slate-500 font-medium">Furação e Berço:</span>
+            <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Garantido de Fábrica</span>
+            </div>
           </div>
         </div>
 
-        {/* Ficha Técnica Detalhada */}
-        <Card className="lg:col-span-2 p-5 sm:p-6 flex flex-col justify-between">
-          <div className="space-y-4">
-            <h3 className="text-base font-black text-[#1d1d1f] dark:text-white pb-3 border-b border-black/10 dark:border-slate-800">
-              Ficha Técnica de Produção
-            </h3>
-
-            <div className="divide-y divide-black/10 dark:divide-slate-800/80 text-xs sm:text-sm">
-              <div className="py-2.5 flex items-center justify-between gap-3">
-                <span className="text-slate-500 dark:text-slate-400 font-medium">Modelo do Gabinete:</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-[#1d1d1f] dark:text-white">{model.name}</span>
-                  <button
-                    onClick={() => onEditStep(1)}
-                    className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-indigo-500/10 border border-blue-200 dark:border-indigo-500/20 text-[#0071e3] dark:text-indigo-400 hover:bg-blue-100 active:scale-90 flex items-center justify-center cursor-pointer transition-all"
-                    title="Editar Modelo"
-                    aria-label="Editar Modelo"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="py-2.5 flex items-center justify-between gap-3">
-                <span className="text-slate-500 dark:text-slate-400 font-medium">Padrão em MaDeFibra BP:</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-[#1d1d1f] dark:text-white">{color.name}</span>
-                  <button
-                    onClick={() => onEditStep(2)}
-                    className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-indigo-500/10 border border-blue-200 dark:border-indigo-500/20 text-[#0071e3] dark:text-indigo-400 hover:bg-blue-100 active:scale-90 flex items-center justify-center cursor-pointer transition-all"
-                    title="Editar Cor"
-                    aria-label="Editar Cor"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="py-2.5 flex items-center justify-between gap-3">
-                <span className="text-slate-500 dark:text-slate-400 font-medium">Monitor Touchscreen:</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-[#1d1d1f] dark:text-white truncate max-w-[150px] sm:max-w-none">
-                    {monitor?.displayName || "Nenhum monitor definido"}
-                  </span>
-                  <button
-                    onClick={() => onEditStep(3)}
-                    className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-indigo-500/10 border border-blue-200 dark:border-indigo-500/20 text-[#0071e3] dark:text-indigo-400 hover:bg-blue-100 active:scale-90 flex items-center justify-center cursor-pointer transition-all"
-                    title="Editar Monitor"
-                    aria-label="Editar Monitor"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="py-2.5 flex items-center justify-between gap-3">
-                <span className="text-slate-500 dark:text-slate-400 font-medium">Impressora Térmica:</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-[#1d1d1f] dark:text-white truncate max-w-[150px] sm:max-w-none">
-                    {printer?.displayName || "Nenhuma impressora definida"}
-                  </span>
-                  <button
-                    onClick={() => onEditStep(4)}
-                    className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-indigo-500/10 border border-blue-200 dark:border-indigo-500/20 text-[#0071e3] dark:text-indigo-400 hover:bg-blue-100 active:scale-90 flex items-center justify-center cursor-pointer transition-all"
-                    title="Editar Impressora"
-                    aria-label="Editar Impressora"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="py-2.5 flex items-center justify-between gap-3">
-                <span className="text-slate-500 dark:text-slate-400 font-medium">Janela do Leitor de Barras:</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-[#1d1d1f] dark:text-white truncate max-w-[140px] sm:max-w-none">
-                    {useReader ? reader?.displayName || "Sim" : "Sem leitor"}
-                  </span>
-                  <button
-                    onClick={() => onEditStep(5)}
-                    className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-indigo-500/10 border border-blue-200 dark:border-indigo-500/20 text-[#0071e3] dark:text-indigo-400 hover:bg-blue-100 active:scale-90 flex items-center justify-center cursor-pointer transition-all"
-                    title="Editar Leitor"
-                    aria-label="Editar Leitor"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            </div>
+        {/* Linha Financeira e Ações Rápidas */}
+        <div className="pt-2 border-t border-black/10 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-baseline gap-2">
+            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">
+              Total do Totem:
+            </span>
+            <span className="text-xl sm:text-2xl font-black text-[#0071e3] dark:text-cyan-400">
+              {formatBRL(pricing.totalPriceCents)}
+            </span>
           </div>
 
-          {/* Discriminação de Valores */}
-          <div className="mt-6 pt-4 border-t border-black/10 dark:border-slate-800 space-y-3">
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-              <span>Chassi Base ({model.name}):</span>
-              <span className="font-semibold text-[#1d1d1f] dark:text-white">{formatBRL(pricing.basePriceCents)}</span>
-            </div>
-            {pricing.colorAdjustmentCents > 0 && (
-              <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                <span>Acréscimo de Padrão ({color.name}):</span>
-                <span className="font-semibold text-[#1d1d1f] dark:text-white">+{formatBRL(pricing.colorAdjustmentCents)}</span>
-              </div>
-            )}
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-              <span>Ajuste de Furações & Encaixes dos Equipamentos:</span>
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold">Grátis (R$ 0,00)</span>
-            </div>
-
-            <div className="flex items-center justify-between pt-2.5 border-t border-black/10 dark:border-slate-800">
-              <span className="text-sm font-bold text-[#1d1d1f] dark:text-white">Valor Unitário do Totem:</span>
-              <span className="text-2xl font-black text-[#0071e3] dark:text-cyan-400">
-                {formatBRL(pricing.totalPriceCents)}
-              </span>
-            </div>
-
-            <div className="pt-2 flex flex-col sm:flex-row gap-3">
-              <Button
-                variant="outline"
-                onClick={() => onEditStep(1)}
-                className="w-full sm:w-auto font-semibold"
-              >
-                <Edit3 className="w-4 h-4 mr-1.5" />
-                Editar Configuração
-              </Button>
-              <Button
-                variant="primary"
-                onClick={onAddToCart}
-                className="flex-1 font-bold shadow-lg shadow-blue-500/25 active:scale-95 transition-all"
-              >
-                <ShoppingCart className="w-4 h-4 mr-2" />
-                Adicionar ao Carrinho
-              </Button>
-            </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onEditStep(1)}
+              className="text-xs font-semibold flex-1 sm:flex-none"
+            >
+              <Edit3 className="w-3.5 h-3.5 mr-1" />
+              Editar
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={onAddToCart}
+              className="text-xs sm:text-sm font-bold shadow-lg shadow-blue-500/25 flex-1 sm:flex-none"
+            >
+              <ShoppingCart className="w-4 h-4 mr-1.5" />
+              Adicionar ao Carrinho
+            </Button>
           </div>
-        </Card>
-      </div>
+        </div>
+      </Card>
     </div>
   );
 };
