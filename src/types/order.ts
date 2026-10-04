@@ -76,6 +76,15 @@ export interface ManufacturingSpec {
   status: "ready_for_cutting" | "machining" | "assembly" | "quality_check";
 }
 
+export interface OrderShippingInfo {
+  id: string;
+  name: string;
+  carrier: string;
+  priceCents: number;
+  deliveryDaysMin: number;
+  deliveryDaysMax: number;
+}
+
 export interface OrderDetails {
   id: string;
   orderNumber: string;
@@ -85,6 +94,7 @@ export interface OrderDetails {
   items: CartItem[];
   subtotalCents: number;
   shippingCents: number;
+  shippingMethod?: OrderShippingInfo | null;
   totalCents: number;
   status: OrderStatus;
   payment: {

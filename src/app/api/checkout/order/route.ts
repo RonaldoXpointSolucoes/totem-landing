@@ -11,10 +11,13 @@ import { generatePixPayload } from "@/lib/pix";
 import { CustomerInfo, DeliveryAddress, OrderDetails, ManufacturingSpec, CartItem } from "@/types/order";
 import { saveOrderWithSnapshot } from "@/lib/appwrite/server";
 import { createPixCharge } from "@/lib/payments/pixGateway";
+import { calculateShippingQuotes } from "@/modules/shipping";
 
 interface RequestBody {
   customer: CustomerInfo;
   deliveryAddress: DeliveryAddress;
+  shippingOptionId?: string;
+  shippingCents?: number;
   items: {
     id?: string;
     modelId: string;
@@ -30,7 +33,7 @@ interface RequestBody {
 export async function POST(req: Request) {
   try {
     const body: RequestBody = await req.json();
-    const { customer, deliveryAddress, items } = body;
+    const { customer, deliveryAddress, items, shippingOptionId } = body;
 
     // 1. Validações preliminares
     if (!customer || !customer.name || !customer.document || !customer.email || !customer.whatsapp) {
@@ -169,8 +172,37 @@ export async function POST(req: Request) {
     const orderNumber = `TOT-${currentYear}-${randomHex}`;
     const orderId = `ord_${Date.now()}_${randomHex.toLowerCase()}`;
 
-    // 5. Frete (R$ 0,00 promocional / sob medida) e Total
-    const shippingCents = 0; // Promocional
+    // 5. Recálculo Soberano do Frete no Servidor (Prevenção de Adulteração e Garantia de Preço)
+    let shippingCents = 0;
+    let selectedShippingInfo = null;
+
+    if (shippingOptionId) {
+      const shippingCalculation = await calculateShippingQuotes({
+        destinationCep: deliveryAddress.cep,
+        items: items.map((it) => ({
+          modelId: it.modelId,
+          quantity: it.quantity,
+        })),
+      });
+
+      if (shippingCalculation.ok && shippingCalculation.quotes.length > 0) {
+        const found = shippingCalculation.quotes.find(
+          (q) => q.id === shippingOptionId && q.isAvailable
+        );
+        if (found) {
+          shippingCents = found.priceCents;
+          selectedShippingInfo = {
+            id: found.id,
+            name: found.name,
+            carrier: found.carrier,
+            priceCents: found.priceCents,
+            deliveryDaysMin: found.deliveryDaysMin,
+            deliveryDaysMax: found.deliveryDaysMax,
+          };
+        }
+      }
+    }
+
     const totalCents = subtotalCents + shippingCents;
 
     // 6. Geração Dinâmica da Cobrança Pix com QR Code Real pelo Gateway
@@ -225,6 +257,7 @@ export async function POST(req: Request) {
       items: validatedCartItems,
       subtotalCents,
       shippingCents,
+      shippingMethod: selectedShippingInfo,
       totalCents,
       status: "awaiting_payment",
       payment: {
