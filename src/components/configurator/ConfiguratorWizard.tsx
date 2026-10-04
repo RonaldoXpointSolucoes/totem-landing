@@ -286,8 +286,26 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
               )}
             </div>
 
-            <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-              <span>Etapa <strong>0{step}</strong> de <strong>06</strong></span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setIsMobileViewerOpen(true);
+                  trackEvent(ANALYTICS_EVENTS.VIEW_3D_MODEL, {
+                    modelId: selectedModel.id,
+                    modelName: selectedModel.name,
+                    source: "mobile_top_header",
+                  });
+                }}
+                className="lg:hidden px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-indigo-950/40 hover:bg-blue-100 border border-blue-200 dark:border-indigo-800 text-[#0071e3] dark:text-cyan-300 text-[11px] font-bold flex items-center gap-1 active:scale-95 transition-all shadow-sm cursor-pointer"
+                title="Visualizar Totem em 3D 360°"
+              >
+                <Box className="w-3 h-3 text-[#0071e3] dark:text-cyan-300" />
+                <span>Ver 3D</span>
+              </button>
+
+              <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                <span>Etapa <strong>0{step}</strong> de <strong>06</strong></span>
+              </div>
             </div>
           </div>
 
@@ -397,78 +415,6 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
 
           {/* Coluna Direita: Área do Passo Ativo (Viewport-Fit com Scroll Interno Limpo) */}
           <div className="lg:col-span-8 flex flex-col justify-between h-full overflow-y-auto pr-1">
-            {/* Bloco Mobile de Prévia do Totem (Sincronizado em tempo real com imagem, cor e periféricos) */}
-            <div className="lg:hidden">
-              <div className="p-3.5 sm:p-4 rounded-2xl bg-white/95 dark:bg-slate-900/90 border border-black/10 dark:border-slate-800 shadow-md dark:shadow-xl space-y-3 transition-colors">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider shrink-0">
-                      Gabinete:
-                    </span>
-                    <span className="text-xs font-bold text-[#1d1d1f] dark:text-white truncate">
-                      {selectedModel.name}
-                    </span>
-                  </div>
-
-                  {/* Botão de Acesso ao 3D Interativo 360° */}
-                  <button
-                    onClick={() => {
-                      setIsMobileViewerOpen(true);
-                      trackEvent(ANALYTICS_EVENTS.VIEW_3D_MODEL, {
-                        modelId: selectedModel.id,
-                        modelName: selectedModel.name,
-                        source: "mobile_preview_card",
-                      });
-                    }}
-                    className="px-3 py-1.5 rounded-full bg-blue-50 dark:bg-indigo-600/30 hover:bg-blue-100 dark:hover:bg-indigo-600 border border-blue-200 dark:border-indigo-400/30 text-[#0071e3] dark:text-indigo-300 hover:text-[#0071e3] dark:hover:text-white text-[11px] font-bold flex items-center gap-1.5 active:scale-95 transition-all shadow-sm cursor-pointer shrink-0"
-                  >
-                    <Box className="w-3.5 h-3.5 text-[#0071e3] dark:text-cyan-300" />
-                    <span>Ver em 3D (360°)</span>
-                  </button>
-                </div>
-
-                {/* Exibição Visual do Totem com Miniatura e Detalhes da Composição */}
-                <div className="flex items-center gap-3.5 bg-[#f8f9fa] dark:bg-slate-950/70 rounded-xl p-2.5 border border-black/10 dark:border-slate-800/80">
-                  <div className="w-20 h-24 rounded-lg bg-white dark:bg-slate-900/90 border border-black/10 dark:border-slate-800/80 p-1 flex items-center justify-center shrink-0 relative overflow-hidden">
-                    <img
-                      src={selectedModel.mainImage}
-                      alt={selectedModel.name}
-                      className="h-full w-auto object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.15)] dark:drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]"
-                    />
-                    <div
-                      className="absolute bottom-1 right-1 w-3.5 h-3.5 rounded-full border border-black/20 dark:border-slate-700 shadow-sm"
-                      style={{ background: selectedColor.hexReference }}
-                      title={`Cor: ${selectedColor.name}`}
-                    />
-                  </div>
-
-                  <div className="flex-1 min-w-0 space-y-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-xs font-bold text-[#1d1d1f] dark:text-white">
-                        {selectedColor.name}
-                      </span>
-                      <span className="text-[10px] text-slate-600 dark:text-slate-400 font-medium bg-black/5 dark:bg-slate-800/80 px-1.5 py-0.5 rounded">
-                        15mm BP
-                      </span>
-                    </div>
-
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                      {selectedMonitor ? `Monitor: ${selectedMonitor.displayName}` : "Sem monitor definido"}
-                    </p>
-
-                    <div className="flex items-center justify-between pt-1 border-t border-black/10 dark:border-slate-800/60">
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold">
-                        Total Atual:
-                      </span>
-                      <span className="text-sm font-black text-[#0071e3] dark:text-cyan-400">
-                        {formatBRL(pricing.totalPriceCents)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {step === 1 && (
               <StepModel
                 models={catalog.models}
