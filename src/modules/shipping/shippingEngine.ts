@@ -87,15 +87,19 @@ export async function calculateShippingQuotes(
 
   // Fator rodoviário padrão: 300 kg por m³
   const totalCubicWeightKg = Number((totalVolumeM3 * 300).toFixed(2));
+  // Fator oficial Correios: divisor 6000 (equivale a 166.67 kg/m³)
+  const totalCorreiosCubicKg = Number((totalVolumeM3 * 166.667).toFixed(2));
 
-  // 1. Cotação Correios (SEDEX + PAC)
+  // 1. Cotação Correios (SEDEX + PAC com Seguro Postal Oficial)
   const correiosQuotes = await calculateCorreiosQuotes({
     destinationCep: cepClean,
     totalGrossWeightKg,
+    totalCubicWeightKg: totalCorreiosCubicKg,
     maxDimensionCm,
     sumDimensionsCm,
     itemCount: totalItemCount,
     hasOversizedItem,
+    declaredValueCents: totalDeclaredValueCents,
   });
 
   // 2. Cotação Transportadora Rodoviária Especial
