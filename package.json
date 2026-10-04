@@ -1,13 +1,16 @@
 {
   "name": "totem-landing",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "npx tsx scripts/validate-receipts-precision.ts",
+    "test:shipping": "npx tsx scripts/validate-receipts-precision.ts"
   },
+
   "dependencies": {
     "@types/three": "^0.186.0",
     "appwrite": "^28.1.0",

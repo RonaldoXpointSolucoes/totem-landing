@@ -4,12 +4,14 @@ import {
   ShippingCalculationResponse,
   ShippingQuote,
 } from "@/types/shipping";
-import { calculateCorreiosQuotes } from "./correiosService";
+import { assertAndStampQuote, validateShippingInput } from "./antiFailureGuard";
 import { calculateCarrierQuote } from "./carrierService";
+import { calculateCorreiosQuotes } from "./correiosService";
+import { CORREIOS_CONTRACT_METADATA } from "./receiptGroundTruth";
 
-const DEFAULT_ORIGIN_CEP = "01001-000";
+const DEFAULT_ORIGIN_CEP = "06754-000";
 const DEFAULT_PICKUP_ADDRESS =
-  "Av. Industrial, Galpão 04 - X-Point Engenharia, São Paulo - SP";
+  "Av. Industrial, Galpão 04 - X-Point Engenharia, Taboão da Serra - SP";
 
 export async function calculateShippingQuotes(
   request: ShippingCalculationRequest
@@ -85,12 +87,31 @@ export async function calculateShippingQuotes(
     }
   }
 
+  // Validação antifalha de integridade da carga
+  const inputCheck = validateShippingInput({
+    destinationCep: cepClean,
+    totalGrossWeightKg,
+    itemCount: totalItemCount,
+  });
+
+  if (!inputCheck.isValid) {
+    return {
+      ok: false,
+      destination: { cep: destinationCep },
+      originCep: process.env.SHIPPING_ORIGIN_CEP || DEFAULT_ORIGIN_CEP,
+      totalGrossWeightKg: 0,
+      totalCubicWeightKg: 0,
+      quotes: [],
+      error: inputCheck.error || "Dados da carga inconsistentes.",
+    };
+  }
+
   // Fator rodoviário padrão: 300 kg por m³
   const totalCubicWeightKg = Number((totalVolumeM3 * 300).toFixed(2));
   // Fator oficial Correios: divisor 6000 (equivale a 166.67 kg/m³)
   const totalCorreiosCubicKg = Number((totalVolumeM3 * 166.667).toFixed(2));
 
-  // 1. Cotação Correios (SEDEX + PAC com Seguro Postal Oficial)
+  // 1. Cotação Correios (SEDEX + PAC com Seguro Postal Oficial e Antifalha)
   const correiosQuotes = await calculateCorreiosQuotes({
     destinationCep: cepClean,
     totalGrossWeightKg,
@@ -114,7 +135,7 @@ export async function calculateShippingQuotes(
   // 3. Retirada na Fábrica (Gratuita)
   const pickupAddress =
     process.env.SHIPPING_PICKUP_ADDRESS || DEFAULT_PICKUP_ADDRESS;
-  const pickupQuote: ShippingQuote = {
+  const rawPickupQuote: ShippingQuote = {
     id: "retirada_fabrica",
     name: "Retirada na Fábrica",
     carrier: "X-Point Engenharia (SP)",
@@ -125,6 +146,12 @@ export async function calculateShippingQuotes(
     isAvailable: true,
     badge: "Grátis",
   };
+
+  const pickupQuote = assertAndStampQuote(rawPickupQuote, {
+    source: "factory_pickup",
+    sourceLabel: "Retirada Presencial na Fábrica",
+    destinationCep: cepClean,
+  });
 
   const allQuotes: ShippingQuote[] = [
     ...correiosQuotes,
@@ -148,5 +175,13 @@ export async function calculateShippingQuotes(
     totalGrossWeightKg: Number(totalGrossWeightKg.toFixed(2)),
     totalCubicWeightKg,
     quotes: allQuotes,
+    antiFailureStatus: {
+      isActive: true,
+      auditedPrecision: CORREIOS_CONTRACT_METADATA.auditedAveragePrecision,
+      receiptsVerifiedCount: CORREIOS_CONTRACT_METADATA.auditedReceiptsCount,
+      contractNumber: CORREIOS_CONTRACT_METADATA.contractNumber,
+      agency: CORREIOS_CONTRACT_METADATA.agency,
+    },
   };
 }
+

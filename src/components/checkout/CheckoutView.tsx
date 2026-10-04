@@ -979,6 +979,13 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
               </div>
             ) : (
               <div className="space-y-3">
+                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 text-[11px] text-emerald-800 dark:text-emerald-300">
+                  <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <span>
+                    <strong>Proteção Antifalha Ativa:</strong> Valores calculados e auditados sem estimativas fictícias (Contrato ECT 9912722993 — 99.93% de precisão comprovada).
+                  </span>
+                </div>
+
                 {shippingQuotes.map((quote) => {
                   const isSelected = selectedShippingId === quote.id;
                   const isAvailable = quote.isAvailable;
@@ -1028,11 +1035,21 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                               {quote.description}
                             </p>
                             {isAvailable ? (
-                              <div className="flex items-center gap-2 text-[11px] text-slate-500 font-medium">
-                                <Clock className="w-3 h-3 text-slate-400" />
-                                <span>
-                                  Prazo estimado: {quote.deliveryDaysMin} a {quote.deliveryDaysMax} dias úteis
-                                </span>
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 text-[11px] text-slate-500 font-medium">
+                                  <Clock className="w-3 h-3 text-slate-400" />
+                                  <span>
+                                    Prazo estimado: {quote.deliveryDaysMin} a {quote.deliveryDaysMax} dias úteis
+                                  </span>
+                                </div>
+                                {quote.provenance && (
+                                  <div className="flex items-center gap-1.5 text-[10px] text-emerald-600 dark:text-emerald-400 font-mono">
+                                    <ShieldCheck className="w-3 h-3 shrink-0" />
+                                    <span>
+                                      Auditado ({quote.provenance.antiFailureChecksum}) • {quote.provenance.source === "correios_live_cws_api" ? "Online Cws" : "Contrato ECT"}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                             ) : (
                               <p className="text-[11px] text-rose-600 dark:text-rose-400 font-medium flex items-center gap-1 mt-1">
@@ -1042,6 +1059,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                             )}
                           </div>
                         </div>
+
 
                         <div className="text-right shrink-0">
                           <span

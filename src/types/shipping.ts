@@ -4,6 +4,25 @@ export type ShippingOptionId =
   | "transportadora_express"
   | "retirada_fabrica";
 
+export type ShippingProvenanceSource =
+  | "correios_live_cws_api"
+  | "correios_contract_ground_truth"
+  | "carrier_road_freight"
+  | "factory_pickup";
+
+export interface ShippingProvenance {
+  source: ShippingProvenanceSource;
+  sourceLabel: string;
+  verifiedAgainstReceipts: boolean;
+  contractNumber: string;
+  postcardNumber: string;
+  agency: string;
+  auditAccuracy: string;
+  sanityCheckPassed: boolean;
+  calculatedAt: string;
+  antiFailureChecksum: string;
+}
+
 export interface ShippingQuote {
   id: ShippingOptionId;
   name: string;
@@ -15,6 +34,7 @@ export interface ShippingQuote {
   isAvailable: boolean;
   unavailableReason?: string;
   badge?: string;
+  provenance?: ShippingProvenance;
 }
 
 export interface ShippingItemInput {
@@ -38,5 +58,13 @@ export interface ShippingCalculationResponse {
   totalGrossWeightKg: number;
   totalCubicWeightKg: number;
   quotes: ShippingQuote[];
+  antiFailureStatus?: {
+    isActive: boolean;
+    auditedPrecision: string;
+    receiptsVerifiedCount: number;
+    contractNumber: string;
+    agency: string;
+  };
   error?: string;
 }
+

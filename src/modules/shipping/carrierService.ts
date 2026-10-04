@@ -1,4 +1,5 @@
 import { ShippingQuote } from "@/types/shipping";
+import { assertAndStampQuote } from "./antiFailureGuard";
 
 export interface CarrierPackageInput {
   destinationCep: string;
@@ -107,7 +108,7 @@ export function calculateCarrierQuote(input: CarrierPackageInput): ShippingQuote
 
   const totalFreightCents = rate.baseFreightCents + weightFreightCents + insuranceCents;
 
-  return {
+  const rawQuote: ShippingQuote = {
     id: "transportadora_express",
     name: "Transportadora Rodoviária Especial",
     carrier: "X-Point Cargo Industrial",
@@ -118,4 +119,11 @@ export function calculateCarrierQuote(input: CarrierPackageInput): ShippingQuote
     isAvailable: true,
     badge: "Carga Segura",
   };
+
+  return assertAndStampQuote(rawQuote, {
+    source: "carrier_road_freight",
+    sourceLabel: `Tabela Rodoviária Fracionada Especial (${rate.zoneName})`,
+    destinationCep: cepClean,
+  });
 }
+
