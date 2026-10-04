@@ -4,4 +4,5 @@ export * from "./AppleBentoSection";
 export * from "./ModelsSection";
 export * from "./HowItWorks";
 export * from "./Differentials";
+export * from "./FaqSection";
 export * from "./Footer";

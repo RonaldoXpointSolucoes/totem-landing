@@ -3,6 +3,7 @@
 import React from "react";
 import { siteConfig } from "@/config/site";
 import { ShieldCheck, MessageSquare, Phone } from "lucide-react";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 
 export const Footer: React.FC = () => {
   return (
@@ -20,10 +21,18 @@ export const Footer: React.FC = () => {
             <ShieldCheck className="w-4 h-4 text-emerald-500" />
             <span>Garantia Estrutural de Fábrica</span>
           </div>
-          <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+          <a
+            href={siteConfig.links.whatsapp}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() =>
+              trackEvent(ANALYTICS_EVENTS.WHATSAPP_CLICK, { source: "footer_support" })
+            }
+            className="flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:text-[#0071e3] dark:hover:text-cyan-400 transition-colors"
+          >
             <MessageSquare className="w-4 h-4 text-[#0071e3] dark:text-indigo-400" />
             <span>Suporte Técnico Especializado</span>
-          </div>
+          </a>
         </div>
       </div>
 

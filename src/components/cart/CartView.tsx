@@ -200,7 +200,15 @@ export const CartView: React.FC<CartViewProps> = ({
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => removeItem(id)}
+                        onClick={() => {
+                          removeItem(id);
+                          trackEvent(ANALYTICS_EVENTS.REMOVE_FROM_CART, {
+                            itemId: id,
+                            modelId: model.id,
+                            modelName: model.name,
+                            totalPriceCents: subtotalCents,
+                          });
+                        }}
                         title="Remover do carrinho"
                         className="h-8 px-2 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-950/30"
                       >

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="totemGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0071e3"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#0071e3" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#totemGrad)" filter="url(#shadow)"/>
+  <!-- Totem Kiosk Silhouette -->
+  <rect x="186" y="80" width="140" height="280" rx="20" fill="#ffffff" fill-opacity="0.95"/>
+  <rect x="206" y="110" width="100" height="130" rx="10" fill="#090a0f"/>
+  <circle cx="256" cy="175" r="18" fill="#0071e3"/>
+  <rect x="226" y="260" width="60" height="8" rx="4" fill="#64748b"/>
+  <rect x="236" y="285" width="40" height="24" rx="4" fill="#090a0f"/>
+  <rect x="246" y="293" width="20" height="8" rx="2" fill="#22c55e"/>
+  <!-- Pedestal Base -->
+  <path d="M146 360 L366 360 L396 420 L116 420 Z" fill="#ffffff" fill-opacity="0.95"/>
+  <rect x="100" y="420" width="312" height="20" rx="8" fill="#e2e8f0"/>
+</svg>

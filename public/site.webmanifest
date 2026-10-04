@@ -1,0 +1,17 @@
+{
+  "name": "Totem Pro — Gabinetes para Autoatendimento",
+  "short_name": "Totem Pro",
+  "description": "Fabricação e configurador sob medida de Gabinetes para Totem de Autoatendimento com corte Router CNC.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090a0f",
+  "theme_color": "#0071e3",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

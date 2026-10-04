@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
 import { CatalogManager } from "@/components/admin/CatalogManager";
+import { MarketingSettingsManager } from "@/components/admin/MarketingSettingsManager";
 import {
   ShieldCheck,
   Package,
@@ -29,6 +30,7 @@ import {
   TrendingUp,
   Users,
   Target,
+  Share2,
 } from "lucide-react";
 
 interface OrderItem {
@@ -95,7 +97,7 @@ export default function AdminPage() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Navegação do painel
-  const [activeTab, setActiveTab] = useState<"orders" | "catalog" | "analytics" | "logs">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "catalog" | "analytics" | "marketing" | "logs">("orders");
   const [catalogSubTab, setCatalogSubTab] = useState<"models" | "colors" | "peripherals">("models");
 
   // Dados
@@ -491,6 +493,18 @@ export default function AdminPage() {
           >
             <BarChart3 className="w-4 h-4 text-cyan-400" />
             <span>Analytics & Funil</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("marketing")}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all shrink-0 ${
+              activeTab === "marketing"
+                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25"
+                : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+            }`}
+          >
+            <Share2 className="w-4 h-4 text-cyan-400" />
+            <span>SEO & Tráfego Pago</span>
           </button>
 
           <button
@@ -914,6 +928,11 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
+        {/* ======================================================== */}
+        {/* ABA 4: CONFIGURAÇÃO DE SEO, MARKETING & TRÁFEGO PAGO */}
+        {/* ======================================================== */}
+        {activeTab === "marketing" && <MarketingSettingsManager />}
       </main>
 
       {/* ======================================================== */}

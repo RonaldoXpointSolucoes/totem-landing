@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Hero, AppleHero, AppleBentoSection, ModelsSection, HowItWorks, Differentials, Footer } from "@/components/marketing";
+import { Hero, AppleHero, AppleBentoSection, ModelsSection, HowItWorks, Differentials, FaqSection, Footer } from "@/components/marketing";
 import { ConfiguratorWizard } from "@/components/configurator";
 import { CartView } from "@/components/cart";
 import { CheckoutView } from "@/components/checkout";
@@ -102,6 +102,15 @@ function MainAppContent() {
             >
               Diferenciais
             </button>
+            <button
+              onClick={() => {
+                setViewMode("landing");
+                document.getElementById("faq")?.scrollIntoView({ behavior: "smooth" });
+              }}
+              className="hover:text-[#0071e3] dark:hover:text-white transition-colors"
+            >
+              Dúvidas (FAQ)
+            </button>
           </nav>
 
           <div className="flex items-center gap-2.5 sm:gap-3">
@@ -198,6 +207,8 @@ function MainAppContent() {
           <div id="diferenciais">
             <Differentials />
           </div>
+
+          <FaqSection />
 
           {/* CTA Final da Landing Page */}
           <section className="py-16 md:py-24 border-t border-black/5 dark:border-slate-800 bg-gradient-to-b from-transparent to-blue-50/50 dark:to-indigo-950/20 transition-colors">

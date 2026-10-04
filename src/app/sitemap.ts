@@ -11,24 +11,41 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: now,
       changeFrequency: "daily",
       priority: 1.0,
+      images: [
+        `${baseUrl}/images/og-totem.jpg`,
+        `${baseUrl}/models/cabinet-floor.svg`,
+        `${baseUrl}/models/cabinet-wall.svg`,
+        `${baseUrl}/models/cabinet-countertop.svg`,
+      ],
     },
     {
       url: `${baseUrl}/#modelos`,
       lastModified: now,
       changeFrequency: "weekly",
-      priority: 0.9,
+      priority: 0.95,
+      images: [
+        `${baseUrl}/models/cabinet-floor.svg`,
+        `${baseUrl}/models/cabinet-wall.svg`,
+        `${baseUrl}/models/cabinet-countertop.svg`,
+      ],
     },
     {
       url: `${baseUrl}/#como-funciona`,
       lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.8,
+      changeFrequency: "weekly",
+      priority: 0.85,
     },
     {
       url: `${baseUrl}/#diferenciais`,
       lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.7,
+      changeFrequency: "weekly",
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/#faq`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.9,
     },
   ];
 }

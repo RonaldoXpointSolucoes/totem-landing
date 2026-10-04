@@ -120,6 +120,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           trackEvent(ANALYTICS_EVENTS.PURCHASE, {
             orderId: orderDetails.id,
             orderNumber: orderDetails.orderNumber,
+            totalPriceCents: orderDetails.totalCents,
             totalCents: orderDetails.totalCents,
             source: "webhook_polling",
           });
@@ -247,11 +248,23 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
         throw new Error(data.error || "Não foi possível gerar a ordem de pedido.");
       }
 
+      trackEvent(ANALYTICS_EVENTS.LEAD_SUBMITTED, {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        whatsapp: whatsapp.trim(),
+        personType,
+        city: city.trim(),
+        state: state.trim(),
+        totalPriceCents: data.order.totalCents,
+      });
+
       setOrderDetails(data.order);
       trackEvent(ANALYTICS_EVENTS.PIX_GENERATED, {
         orderId: data.order.id,
         orderNumber: data.order.orderNumber,
+        totalPriceCents: data.order.totalCents,
         totalCents: data.order.totalCents,
+        itemCount: data.order.items.length,
         paymentMethod: "pix",
       });
       setStep("awaiting_pix");
@@ -278,6 +291,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     trackEvent(ANALYTICS_EVENTS.PURCHASE, {
       orderId: orderDetails.id,
       orderNumber: orderDetails.orderNumber,
+      totalPriceCents: orderDetails.totalCents,
       totalCents: orderDetails.totalCents,
       source: "manual_simulation",
     });

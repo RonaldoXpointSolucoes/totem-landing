@@ -5,6 +5,7 @@ import { CabinetModel, ColorOption } from "@/types/catalog";
 import { Badge, Button } from "@/components/ui";
 import { Box, Image as ImageIcon, RotateCw, Sparkles, AlertCircle, Wrench, ShieldCheck } from "lucide-react";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 
 interface TotemViewer3DWrapperProps {
   selectedModel: CabinetModel;
@@ -87,6 +88,11 @@ export const TotemViewer3DWrapper: React.FC<TotemViewer3DWrapperProps> = ({
   const handleToggleDoor = () => {
     const next = !isDoorOpen;
     setIsDoorOpen(next);
+    trackEvent(ANALYTICS_EVENTS.INTERACT_3D, {
+      action: next ? "open_door" : "close_door",
+      modelId: selectedModel.id,
+      modelName: selectedModel.name,
+    });
     postToViewer({
       type: "TOGGLE_DOOR",
     });
@@ -110,7 +116,15 @@ export const TotemViewer3DWrapper: React.FC<TotemViewer3DWrapperProps> = ({
           </button>
 
           <button
-            onClick={() => setMode("3d")}
+            onClick={() => {
+              setMode("3d");
+              trackEvent(ANALYTICS_EVENTS.VIEW_3D_MODEL, {
+                modelId: selectedModel.id,
+                modelName: selectedModel.name,
+                color: selectedColor.name,
+                mode: "3d_interactive",
+              });
+            }}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
               mode === "3d"
                 ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
