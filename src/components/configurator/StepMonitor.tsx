@@ -27,33 +27,33 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       <div className="text-center sm:text-left space-y-1.5">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <Badge variant="accent" className="text-xs">
-            Etapa 03 de 05
+            Etapa 03 de 06
           </Badge>
-          <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+          <span className="text-[11px] sm:text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
             Não altera o preço padrão (+ R$ 0)
           </span>
         </div>
-        <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+        <h2 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
           Qual monitor será instalado no Totem?
         </h2>
-        <p className="text-sm text-slate-400">
+        <p className="text-xs sm:text-sm text-slate-400">
           Essa informação serve para cortarmos a chapa frontal com a furação VESA e a abertura exatas da sua tela.
         </p>
       </div>
 
-      {/* Busca Rápida de Monitores */}
+      {/* Busca Rápida de Monitores com altura ergonômica */}
       <div className="relative">
         <Input
           placeholder="Pesquisar por modelo ou fabricante (ex: Elgin, Gertec, 21.5)..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
+          className="pl-10 h-12 text-sm rounded-xl bg-slate-900/80 border-slate-800 focus:border-indigo-500"
         />
-        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
+        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-4 pointer-events-none" />
       </div>
 
       {/* Grid de Monitores Homologados */}

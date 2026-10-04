@@ -18,20 +18,20 @@ export const StepColor: React.FC<StepColorProps> = ({
   onSelectColor,
 }) => {
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       <div className="text-center sm:text-left space-y-1.5">
         <Badge variant="accent" className="text-xs">
-          Etapa 02 de 05
+          Etapa 02 de 06
         </Badge>
-        <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+        <h2 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
           Escolha o padrão em MaDeFibra BP
         </h2>
-        <p className="text-sm text-slate-400">
+        <p className="text-xs sm:text-sm text-slate-400">
           Painéis de 15mm usinados em Router CNC com alta durabilidade, resistência a riscos e encaixes perfeitos.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4">
         {colors.map((color) => {
           const isSelected = selectedColor.id === color.id;
           const hasAdjustment = color.priceAdjustmentCents > 0;

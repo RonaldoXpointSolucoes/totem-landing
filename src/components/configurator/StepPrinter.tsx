@@ -19,20 +19,20 @@ export const StepPrinter: React.FC<StepPrinterProps> = ({
   onRequestCustomization,
 }) => {
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       <div className="text-center sm:text-left space-y-1.5">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <Badge variant="accent" className="text-xs">
-            Etapa 04 de 05
+            Etapa 04 de 06
           </Badge>
-          <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+          <span className="text-[11px] sm:text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
             Não altera o preço padrão (+ R$ 0)
           </span>
         </div>
-        <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+        <h2 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
           Qual impressora será utilizada?
         </h2>
-        <p className="text-sm text-slate-400">
+        <p className="text-xs sm:text-sm text-slate-400">
           O gabinete será usinado com o rasgo de saída de papel e o berço interno específico para sua impressora.
         </p>
       </div>

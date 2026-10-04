@@ -30,23 +30,23 @@ export const StepReview: React.FC<StepReviewProps> = ({
   onAddToCart,
 }) => {
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       <div className="text-center sm:text-left space-y-1.5">
         <Badge variant="success" className="text-xs">
-          Revisão Final da Configuração
+          Etapa 06 de 06 — Revisão Final
         </Badge>
-        <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+        <h2 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
           Confira as especificações do seu Totem
         </h2>
-        <p className="text-sm text-slate-400">
+        <p className="text-xs sm:text-sm text-slate-400">
           Esta será a ficha técnica exata de cortes e encaixes utilizada na fabricação.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6">
         {/* Card Visual com Foto do Modelo */}
-        <div className="lg:col-span-1 p-6 rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur-md flex flex-col items-center justify-center text-center">
-          <div className="relative aspect-[3/4] w-full max-w-[200px] mb-4">
+        <div className="lg:col-span-1 p-5 sm:p-6 rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur-md flex flex-col items-center justify-center text-center">
+          <div className="relative aspect-[3/4] w-full max-w-[180px] sm:max-w-[200px] mb-4">
             <img
               src={model.mainImage}
               alt={model.name}
@@ -58,7 +58,7 @@ export const StepReview: React.FC<StepReviewProps> = ({
           </Badge>
           <div className="flex items-center gap-2 text-xs text-slate-300">
             <span
-              className="w-3.5 h-3.5 rounded-full border border-slate-600 inline-block"
+              className="w-3.5 h-3.5 rounded-full border border-slate-600 inline-block shrink-0"
               style={{ background: color.hexReference }}
             />
             <span>{color.name}</span>
@@ -66,83 +66,88 @@ export const StepReview: React.FC<StepReviewProps> = ({
         </div>
 
         {/* Ficha Técnica Detalhada */}
-        <Card className="lg:col-span-2 p-6 flex flex-col justify-between">
+        <Card className="lg:col-span-2 p-5 sm:p-6 flex flex-col justify-between">
           <div className="space-y-4">
             <h3 className="text-base font-bold text-white pb-3 border-b border-slate-800">
               Ficha Técnica de Produção
             </h3>
 
             <div className="divide-y divide-slate-800/80 text-xs sm:text-sm">
-              <div className="py-2.5 flex items-center justify-between">
+              <div className="py-2.5 flex items-center justify-between gap-3">
                 <span className="text-slate-400">Modelo do Gabinete:</span>
                 <div className="flex items-center gap-2">
                   <span className="font-semibold text-white">{model.name}</span>
                   <button
                     onClick={() => onEditStep(1)}
-                    className="text-indigo-400 hover:text-indigo-300"
+                    className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20 active:scale-90 flex items-center justify-center cursor-pointer transition-all"
                     title="Editar Modelo"
+                    aria-label="Editar Modelo"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
 
-              <div className="py-2.5 flex items-center justify-between">
-                <span className="text-slate-400">Pintura e Acabamento:</span>
+              <div className="py-2.5 flex items-center justify-between gap-3">
+                <span className="text-slate-400">Padrão em MaDeFibra BP:</span>
                 <div className="flex items-center gap-2">
                   <span className="font-semibold text-white">{color.name}</span>
                   <button
                     onClick={() => onEditStep(2)}
-                    className="text-indigo-400 hover:text-indigo-300"
+                    className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20 active:scale-90 flex items-center justify-center cursor-pointer transition-all"
                     title="Editar Cor"
+                    aria-label="Editar Cor"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
 
-              <div className="py-2.5 flex items-center justify-between">
+              <div className="py-2.5 flex items-center justify-between gap-3">
                 <span className="text-slate-400">Encaixe do Monitor:</span>
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-white">
+                  <span className="font-semibold text-white truncate max-w-[140px] sm:max-w-none">
                     {monitor?.displayName || "Nenhum selecionado"}
                   </span>
                   <button
                     onClick={() => onEditStep(3)}
-                    className="text-indigo-400 hover:text-indigo-300"
+                    className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20 active:scale-90 flex items-center justify-center cursor-pointer transition-all"
                     title="Editar Monitor"
+                    aria-label="Editar Monitor"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
 
-              <div className="py-2.5 flex items-center justify-between">
+              <div className="py-2.5 flex items-center justify-between gap-3">
                 <span className="text-slate-400">Compartimento da Impressora:</span>
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-white">
+                  <span className="font-semibold text-white truncate max-w-[140px] sm:max-w-none">
                     {printer?.displayName || "Nenhum selecionado"}
                   </span>
                   <button
                     onClick={() => onEditStep(4)}
-                    className="text-indigo-400 hover:text-indigo-300"
+                    className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20 active:scale-90 flex items-center justify-center cursor-pointer transition-all"
                     title="Editar Impressora"
+                    aria-label="Editar Impressora"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
 
-              <div className="py-2.5 flex items-center justify-between">
+              <div className="py-2.5 flex items-center justify-between gap-3">
                 <span className="text-slate-400">Janela do Leitor de Barras:</span>
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-white">
-                    {useReader ? reader?.displayName || "Sim (Modelo Homologado)" : "Sem leitor"}
+                  <span className="font-semibold text-white truncate max-w-[140px] sm:max-w-none">
+                    {useReader ? reader?.displayName || "Sim" : "Sem leitor"}
                   </span>
                   <button
                     onClick={() => onEditStep(5)}
-                    className="text-indigo-400 hover:text-indigo-300"
+                    className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20 active:scale-90 flex items-center justify-center cursor-pointer transition-all"
                     title="Editar Leitor"
+                    aria-label="Editar Leitor"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                   </button>

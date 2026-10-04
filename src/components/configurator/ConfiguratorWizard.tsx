@@ -230,10 +230,10 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
   };
 
   return (
-    <div className="min-h-screen pb-28 pt-6 sm:pt-10">
+    <div className="min-h-screen pb-28 pt-6 sm:pt-10 overflow-x-hidden">
       <div className="max-w-6xl mx-auto px-4">
         {/* Barra Superior de Navegação / Progresso */}
-        <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-4 border-b border-slate-800">
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">
@@ -247,26 +247,36 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                 </Badge>
               )}
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-white mt-1">
-              Personalização Técnica do Gabinete
-            </h1>
+            <div className="flex items-center justify-between mt-1">
+              <h1 className="text-lg sm:text-2xl font-bold text-white">
+                Personalização Técnica do Gabinete
+              </h1>
+              <span className="sm:hidden text-xs font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">
+                0{step}/06
+              </span>
+            </div>
           </div>
 
-          {/* Stepper Visual */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Stepper Visual com Alvo de Toque Ergonômico */}
+          <div className="flex items-center gap-2 py-1">
             {[1, 2, 3, 4, 5, 6].map((s) => (
-              <div
+              <button
                 key={s}
                 onClick={() => setStep(s)}
-                className={`h-2 rounded-full cursor-pointer transition-all ${
-                  s === step
-                    ? "w-8 bg-indigo-500 shadow-md shadow-indigo-500/30"
-                    : s < step
-                    ? "w-4 bg-indigo-900 hover:bg-indigo-700"
-                    : "w-4 bg-slate-800 hover:bg-slate-700"
-                }`}
+                className="py-2 px-0.5 group cursor-pointer focus:outline-none"
                 title={`Ir para etapa ${s}`}
-              />
+                aria-label={`Ir para etapa ${s}`}
+              >
+                <div
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    s === step
+                      ? "w-8 sm:w-10 bg-indigo-500 shadow-md shadow-indigo-500/40"
+                      : s < step
+                      ? "w-4 sm:w-5 bg-indigo-900 group-hover:bg-indigo-700"
+                      : "w-4 sm:w-5 bg-slate-800 group-hover:bg-slate-700"
+                  }`}
+                />
+              </button>
             ))}
           </div>
         </div>
@@ -330,29 +340,76 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
 
           {/* Coluna Direita: Área do Passo Ativo */}
           <div className="lg:col-span-8 space-y-6">
-            {/* Banner Mobile para Visualização 3D On-Demand */}
+            {/* Bloco Mobile de Prévia do Totem (Sincronizado em tempo real com imagem, cor e periféricos) */}
             <div className="lg:hidden">
-              <button
-                onClick={() => setIsMobileViewerOpen(true)}
-                className="w-full p-3.5 rounded-2xl bg-gradient-to-r from-indigo-950/60 via-slate-900 to-slate-950 border border-indigo-500/30 flex items-center justify-between text-left shadow-lg active:scale-[0.98] transition-all"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-600/20 border border-indigo-400/30 flex items-center justify-center text-cyan-300">
-                    <Box className="w-5 h-5 animate-pulse" />
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-br from-slate-900/90 via-slate-900/70 to-slate-950/90 border border-slate-800 shadow-xl space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">
+                      Gabinete:
+                    </span>
+                    <span className="text-xs font-bold text-white truncate">
+                      {selectedModel.name}
+                    </span>
                   </div>
-                  <div>
-                    <span className="text-xs font-bold text-white block">
-                      Visualizar Gabinete em 3D (360°)
-                    </span>
-                    <span className="text-[11px] text-slate-400">
-                      Girar modelo, inspecionar portas e aberturas CNC
-                    </span>
+
+                  {/* Botão de Acesso ao 3D Interativo 360° */}
+                  <button
+                    onClick={() => {
+                      setIsMobileViewerOpen(true);
+                      trackEvent(ANALYTICS_EVENTS.VIEW_3D_MODEL, {
+                        modelId: selectedModel.id,
+                        modelName: selectedModel.name,
+                        source: "mobile_preview_card",
+                      });
+                    }}
+                    className="px-2.5 py-1 rounded-xl bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-400/30 text-indigo-300 hover:text-white text-[11px] font-bold flex items-center gap-1.5 active:scale-95 transition-all shadow-sm cursor-pointer shrink-0"
+                  >
+                    <Box className="w-3.5 h-3.5 text-cyan-300 animate-pulse" />
+                    <span>Ver em 3D (360°)</span>
+                  </button>
+                </div>
+
+                {/* Exibição Visual do Totem com Miniatura e Detalhes da Composição */}
+                <div className="flex items-center gap-3.5 bg-slate-950/70 rounded-xl p-2.5 border border-slate-800/80">
+                  <div className="w-20 h-24 rounded-lg bg-slate-900/90 border border-slate-800/80 p-1 flex items-center justify-center shrink-0 relative overflow-hidden">
+                    <img
+                      src={selectedModel.mainImage}
+                      alt={selectedModel.name}
+                      className="h-full w-auto object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]"
+                    />
+                    <div
+                      className="absolute bottom-1 right-1 w-3.5 h-3.5 rounded-full border border-slate-700 shadow-sm"
+                      style={{ background: selectedColor.hexReference }}
+                      title={`Cor: ${selectedColor.name}`}
+                    />
+                  </div>
+
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-xs font-bold text-white">
+                        {selectedColor.name}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-medium bg-slate-800/80 px-1.5 py-0.2 rounded">
+                        15mm BP
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-slate-400 truncate">
+                      {selectedMonitor ? `Monitor: ${selectedMonitor.displayName}` : "Sem monitor definido"}
+                    </p>
+
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-800/60">
+                      <span className="text-[10px] text-slate-400 uppercase font-semibold">
+                        Total Atual:
+                      </span>
+                      <span className="text-sm font-black text-indigo-400">
+                        {formatBRL(pricing.totalPriceCents)}
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <Badge variant="accent" className="text-[10px]">
-                  3D Live
-                </Badge>
-              </button>
+              </div>
             </div>
 
             {step === 1 && (
@@ -483,9 +540,9 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
         onClose={() => setIsMobileViewerOpen(false)}
         title="Visualizador 3D — Totem Pro"
         description="Gire o modelo em 360° com o dedo, inspecione a furação CNC e abra a porta técnica."
-        className="max-w-xl"
+        className="max-w-2xl sm:max-w-2xl p-4 sm:p-6"
       >
-        <div className="py-2">
+        <div className="py-1">
           <TotemViewer3DWrapper
             selectedModel={selectedModel}
             selectedColor={selectedColor}
