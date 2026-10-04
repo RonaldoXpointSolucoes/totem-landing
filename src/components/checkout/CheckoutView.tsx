@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useCart } from "@/modules/cart/CartContext";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
 import { CustomerInfo, DeliveryAddress, OrderDetails, ManufacturingSpec } from "@/types/order";
+import { ShippingQuote, ShippingOptionId } from "@/types/shipping";
 import { Card, Button, Input, Badge } from "@/components/ui";
 import {
   ArrowLeft,
@@ -22,7 +23,9 @@ import {
   Cpu,
   FileText,
   Wrench,
-  Check
+  Check,
+  MapPin,
+  Package,
 } from "lucide-react";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 
@@ -99,6 +102,12 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   const [copied, setCopied] = useState(false);
   const [timeLeftSeconds, setTimeLeftSeconds] = useState(1800); // 30 minutos
 
+  // Estados de Frete & Entrega
+  const [shippingQuotes, setShippingQuotes] = useState<ShippingQuote[]>([]);
+  const [selectedShippingId, setSelectedShippingId] = useState<ShippingOptionId | null>(null);
+  const [isLoadingShipping, setIsLoadingShipping] = useState(false);
+  const [shippingError, setShippingError] = useState<string | null>(null);
+
   // Timer decrescente para a tela de Pix
   useEffect(() => {
     if (step !== "awaiting_pix") return;
@@ -156,6 +165,59 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
+  // Cotação unificada de frete (Correios, Transportadora e Retirada)
+  const fetchShippingQuotes = async (targetCep: string) => {
+    const cleanCep = targetCep.replace(/\D/g, "");
+    if (cleanCep.length !== 8 || items.length === 0) return;
+
+    setIsLoadingShipping(true);
+    setShippingError(null);
+    try {
+      const res = await fetch("/api/shipping/quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          destinationCep: cleanCep,
+          items: items.map((i) => ({
+            modelId: i.configuration.model.id,
+            quantity: i.quantity,
+          })),
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.ok && Array.isArray(data.quotes)) {
+        setShippingQuotes(data.quotes);
+        setSelectedShippingId((prev) => {
+          const currentValid = data.quotes.find((q: ShippingQuote) => q.id === prev && q.isAvailable);
+          if (currentValid) return prev;
+          const firstAvailable = data.quotes.find((q: ShippingQuote) => q.isAvailable);
+          return firstAvailable ? firstAvailable.id : null;
+        });
+      } else {
+        setShippingError(data.error || "Não foi possível obter opções de frete.");
+      }
+    } catch (err: any) {
+      console.error("Erro ao cotar frete:", err);
+      setShippingError("Erro de comunicação ao calcular frete.");
+    } finally {
+      setIsLoadingShipping(false);
+    }
+  };
+
+  // Recota automaticamente se itens do carrinho forem modificados e já houver CEP
+  useEffect(() => {
+    const cleanCep = cep.replace(/\D/g, "");
+    if (cleanCep.length === 8 && items.length > 0) {
+      fetchShippingQuotes(cleanCep);
+    }
+  }, [items]);
+
+  const selectedShippingQuote =
+    shippingQuotes.find((q) => q.id === selectedShippingId && q.isAvailable) || null;
+  const shippingCents = selectedShippingQuote ? selectedShippingQuote.priceCents : 0;
+  const finalTotalCents = totalPriceCents + shippingCents;
+
   // Busca automática de CEP via ViaCEP
   const handleCepChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawVal = e.target.value;
@@ -166,6 +228,9 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     if (cleanCep.length === 8) {
       setIsLoadingCep(true);
       setErrorMsg(null);
+      // Dispara cotação de frete em paralelo
+      fetchShippingQuotes(cleanCep);
+
       try {
         const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
         const data = await res.json();
@@ -200,8 +265,8 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     if (!cep.trim() || !street.trim() || !number.trim() || !city.trim()) {
       return setErrorMsg("Por favor, preencha o endereço de entrega completo.");
     }
-    if (items.length === 0) {
-      return setErrorMsg("O carrinho está vazio.");
+    if (shippingQuotes.some((q) => q.isAvailable) && !selectedShippingId) {
+      return setErrorMsg("Por favor, selecione uma modalidade de frete ou retirada na fábrica.");
     }
 
     setIsSubmitting(true);
@@ -224,6 +289,8 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           city: city.trim(),
           state: state.trim(),
         },
+        shippingOptionId: selectedShippingId,
+        shippingCents,
         items: items.map((i) => ({
           id: i.id,
           modelId: i.configuration.model.id,
@@ -877,6 +944,128 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
               </div>
             </div>
           </Card>
+
+          {/* Card 3: Opções de Frete e Retirada */}
+          <Card className="p-5 sm:p-6 border-black/10 dark:border-slate-800 bg-white dark:bg-slate-900/60 backdrop-blur-xl space-y-4 shadow-sm dark:shadow-xl">
+            <div className="pb-3 border-b border-black/10 dark:border-slate-800 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-[#1d1d1f] dark:text-white flex items-center gap-2">
+                <Truck className="w-4 h-4 text-[#0071e3] dark:text-indigo-400" />
+                3. Modalidade de Envio & Frete
+              </h2>
+              {isLoadingShipping && (
+                <span className="text-[11px] text-[#0071e3] dark:text-indigo-400 font-semibold animate-pulse flex items-center gap-1.5">
+                  <span className="w-3 h-3 border-2 border-[#0071e3] border-t-transparent rounded-full animate-spin" />
+                  Calculando cotações...
+                </span>
+              )}
+            </div>
+
+            {shippingError && (
+              <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-600/40 text-amber-800 dark:text-amber-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <span>{shippingError}</span>
+              </div>
+            )}
+
+            {cep.replace(/\D/g, "").length !== 8 && shippingQuotes.length === 0 ? (
+              <div className="p-5 rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-dashed border-black/15 dark:border-slate-800 text-center text-xs text-slate-500">
+                <Truck className="w-8 h-8 mx-auto mb-2 text-slate-400 stroke-[1.5]" />
+                <p className="font-semibold text-slate-700 dark:text-slate-300">
+                  Informe o CEP de entrega no campo acima
+                </p>
+                <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
+                  O sistema calculará automaticamente os prazos e taxas oficiais para Correios (SEDEX / PAC com contrato), Transportadora Rodoviária Especial e Retirada Grátis.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {shippingQuotes.map((quote) => {
+                  const isSelected = selectedShippingId === quote.id;
+                  const isAvailable = quote.isAvailable;
+
+                  return (
+                    <div
+                      key={quote.id}
+                      onClick={() => {
+                        if (isAvailable) {
+                          setSelectedShippingId(quote.id);
+                        }
+                      }}
+                      className={`p-3.5 rounded-xl border transition-all select-none ${
+                        !isAvailable
+                          ? "opacity-60 bg-slate-50/60 dark:bg-slate-950/40 border-black/10 dark:border-slate-800/60 cursor-not-allowed"
+                          : isSelected
+                          ? "border-[#0071e3] bg-blue-50/60 dark:bg-blue-950/20 shadow-sm ring-1 ring-[#0071e3] cursor-pointer"
+                          : "border-black/10 dark:border-slate-800 hover:border-black/20 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3">
+                          <div
+                            className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
+                              !isAvailable
+                                ? "border-slate-300 dark:border-slate-700 bg-slate-200 dark:bg-slate-800 text-slate-400"
+                                : isSelected
+                                ? "border-[#0071e3] bg-[#0071e3] text-white"
+                                : "border-black/20 dark:border-slate-600 bg-white dark:bg-slate-800"
+                            }`}
+                          >
+                            {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                          </div>
+
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-bold text-xs sm:text-sm text-[#1d1d1f] dark:text-white">
+                                {quote.name}
+                              </span>
+                              {quote.badge && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-[#0071e3] dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                  {quote.badge}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                              {quote.description}
+                            </p>
+                            {isAvailable ? (
+                              <div className="flex items-center gap-2 text-[11px] text-slate-500 font-medium">
+                                <Clock className="w-3 h-3 text-slate-400" />
+                                <span>
+                                  Prazo estimado: {quote.deliveryDaysMin} a {quote.deliveryDaysMax} dias úteis
+                                </span>
+                              </div>
+                            ) : (
+                              <p className="text-[11px] text-rose-600 dark:text-rose-400 font-medium flex items-center gap-1 mt-1">
+                                <AlertCircle className="w-3 h-3 shrink-0" />
+                                {quote.unavailableReason}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <span
+                            className={`text-sm sm:text-base font-extrabold ${
+                              quote.priceCents === 0
+                                ? "text-emerald-600 dark:text-emerald-400"
+                                : isSelected
+                                ? "text-[#0071e3] dark:text-indigo-400"
+                                : "text-[#1d1d1f] dark:text-white"
+                            }`}
+                          >
+                            {quote.priceCents === 0 ? "Grátis" : formatBRL(quote.priceCents)}
+                          </span>
+                          <span className="block text-[10px] text-slate-400 uppercase font-mono">
+                            {quote.carrier}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
         </div>
 
         {/* Coluna Direita: Resumo do Pedido & Botão de Pagamento */}
@@ -918,14 +1107,27 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                 <span>Subtotal dos Gabinetes:</span>
                 <span className="font-semibold text-slate-900 dark:text-slate-200">{formatBRL(totalPriceCents)}</span>
               </div>
-              <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                <span>Frete Rodoviário Especial:</span>
-                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Grátis (Promocional Brasil)</span>
+              <div className="flex justify-between text-slate-600 dark:text-slate-400 items-center">
+                <span>Frete / Entrega:</span>
+                <span className="font-semibold">
+                  {selectedShippingQuote ? (
+                    selectedShippingQuote.priceCents === 0 ? (
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">Grátis (Retirada)</span>
+                    ) : (
+                      <span className="text-slate-900 dark:text-slate-200">
+                        {formatBRL(selectedShippingQuote.priceCents)}{" "}
+                        <span className="text-[10px] text-slate-500 font-normal">({selectedShippingQuote.carrier})</span>
+                      </span>
+                    )
+                  ) : (
+                    <span className="text-amber-600 dark:text-amber-400 text-[11px]">Informe o CEP</span>
+                  )}
+                </span>
               </div>
               <div className="pt-2 border-t border-black/10 dark:border-slate-800 flex justify-between items-baseline">
                 <span className="text-sm font-bold text-[#1d1d1f] dark:text-white">Total a Pagar (Pix):</span>
                 <span className="text-2xl font-black text-[#0071e3] dark:text-indigo-400">
-                  {formatBRL(totalPriceCents)}
+                  {formatBRL(finalTotalCents)}
                 </span>
               </div>
             </div>
