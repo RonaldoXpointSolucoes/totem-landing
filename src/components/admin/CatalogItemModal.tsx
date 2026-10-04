@@ -14,6 +14,10 @@ import {
   AlertCircle,
   Eye,
   Check,
+  Monitor,
+  Package,
+  Cpu,
+  Tv,
 } from "lucide-react";
 
 interface CatalogItemModalProps {
@@ -80,6 +84,12 @@ export function CatalogItemModal({
 
       setGalleryImages(Array.from(new Set(existingGallery)));
 
+      const loadedMaterial =
+        parsedDimensions.material ||
+        (parsedDimensions.steelGauge && !parsedDimensions.steelGauge.includes("SAE 1020")
+          ? parsedDimensions.steelGauge
+          : "MaDeFibra (MDF) BP 15mm");
+
       setFormData({
         name: initialItem.name || initialItem.display_name || "",
         slug: initialItem.slug || "",
@@ -92,6 +102,7 @@ export function CatalogItemModal({
         hex_reference: initialItem.hex_reference || "#0f172a",
         brand: initialItem.brand || "",
         model: initialItem.model || "",
+        sizeInches: initialItem.sizeInches || initialItem.size || initialItem.size_inches || 21.5,
         display_name: initialItem.display_name || initialItem.name || "",
         technical_code: initialItem.technical_code || "",
         notes: initialItem.notes || "",
@@ -102,8 +113,16 @@ export function CatalogItemModal({
         heightMm: parsedDimensions.heightMm || 1650,
         widthMm: parsedDimensions.widthMm || 480,
         depthMm: parsedDimensions.depthMm || 380,
-        steelGauge: parsedDimensions.steelGauge || "Chapa de Aço SAE 1020 1.5mm",
-        weightKg: parsedDimensions.weightKg || 25,
+        material: loadedMaterial,
+        steelGauge: loadedMaterial,
+        weightKg: parsedDimensions.weightKg || initialItem.weightKg || 25,
+        packageHeightCm: parsedDimensions.package?.heightCm || 90,
+        packageWidthCm: parsedDimensions.package?.widthCm || 48,
+        packageDepthCm: parsedDimensions.package?.depthCm || 25,
+        packageGrossWeightKg: parsedDimensions.package?.grossWeightKg || 16,
+        supportedScreenSizes: parsedDimensions.supportedScreenSizes || "15.6\" a 23.8\"",
+        printerSlot: parsedDimensions.printerSlot || "80mm / 58mm",
+        readerSlot: parsedDimensions.readerSlot || "2D / QR Code",
       });
     } else {
       // Padrões para novo item
@@ -121,8 +140,9 @@ export function CatalogItemModal({
             ? "/models/cabinet-floor.svg"
             : "",
         hex_reference: "#0f172a",
-        brand: "Totem Pro",
+        brand: collectionType === "monitors" ? "Elgin" : "Totem Pro",
         model: "",
+        sizeInches: 21.5,
         display_name: "",
         technical_code: "TP-" + Math.floor(1000 + Math.random() * 9000),
         notes: "Usinagem CNC homologada e furação padronizada.",
@@ -132,8 +152,16 @@ export function CatalogItemModal({
         heightMm: 1650,
         widthMm: 480,
         depthMm: 380,
-        steelGauge: "Chapa de Aço SAE 1020 1.5mm",
+        material: "MaDeFibra (MDF) BP 15mm",
+        steelGauge: "MaDeFibra (MDF) BP 15mm",
         weightKg: 25,
+        packageHeightCm: 90,
+        packageWidthCm: 48,
+        packageDepthCm: 25,
+        packageGrossWeightKg: 16,
+        supportedScreenSizes: "15.6\" a 23.8\"",
+        printerSlot: "80mm / 58mm",
+        readerSlot: "2D / QR Code",
       });
     }
 
@@ -201,13 +229,24 @@ export function CatalogItemModal({
         if (!formData.name) throw new Error("O nome do modelo de gabinete é obrigatório.");
         if (!formData.slug) generateSlug();
 
+        const materialValue = formData.material || "MaDeFibra (MDF) BP 15mm";
         const dimensionsObj = {
           heightMm: Number(formData.heightMm) || 0,
           widthMm: Number(formData.widthMm) || 0,
           depthMm: Number(formData.depthMm) || 0,
-          steelGauge: formData.steelGauge || "Chapa de Aço SAE 1020 1.5mm",
+          material: materialValue,
+          steelGauge: materialValue,
           weightKg: Number(formData.weightKg) || 0,
           vesaPattern: formData.vesa_pattern || "100x100",
+          supportedScreenSizes: formData.supportedScreenSizes || "15.6\" a 23.8\"",
+          printerSlot: formData.printerSlot || "80mm / 58mm",
+          readerSlot: formData.readerSlot || "2D / QR Code",
+          package: {
+            heightCm: Number(formData.packageHeightCm) || 90,
+            widthCm: Number(formData.packageWidthCm) || 48,
+            depthCm: Number(formData.packageDepthCm) || 25,
+            grossWeightKg: Number(formData.packageGrossWeightKg) || 16,
+          },
           images: galleryImages.length > 0 ? galleryImages : [formData.main_image || "/models/cabinet-floor.svg"],
         };
 
@@ -232,12 +271,21 @@ export function CatalogItemModal({
           image: formData.main_image || "",
         };
       } else if (collectionType === "monitors") {
+        const brand = formData.brand || "Elgin";
+        const model = formData.model || formData.name || "";
+        const sizeInches = Number(formData.sizeInches) || Number(formData.size) || 21.5;
+        const displayName = formData.display_name || `${brand} ${model} ${sizeInches}"`;
+
         payload = {
-          brand: formData.brand || "Generico",
-          model: formData.model || formData.name,
-          display_name: formData.display_name || formData.name,
+          brand,
+          model,
+          display_name: displayName,
+          size: sizeInches,
+          size_inches: sizeInches,
           vesa_pattern: formData.vesa_pattern || "100x100",
-          technical_code: formData.technical_code || "",
+          technical_code:
+            formData.technical_code ||
+            `${brand.substring(0, 3).toUpperCase()}-${model.replace(/[^a-zA-Z0-9]/g, "").substring(0, 5).toUpperCase() || "MON"}-V100`,
           notes: formData.description || formData.notes || "",
           active: Boolean(formData.active),
           image: formData.main_image || "",
@@ -528,6 +576,224 @@ export function CatalogItemModal({
                 </div>
               </div>
 
+              {/* ======================================================== */}
+              {/* CAMPOS ESPECÍFICOS: MONITORES HOMOLOGADOS */}
+              {/* ======================================================== */}
+              {collectionType === "monitors" && (
+                <div className="p-4 bg-slate-950/90 rounded-2xl border border-indigo-500/40 space-y-4 shadow-inner">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center shadow-sm">
+                        <Monitor className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-white uppercase tracking-wider block">
+                          Especificações Técnicas do Display (Usinagem CNC)
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          Medidas e furação VESA para o rasgo milimétrico na Router CNC
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                      Furação Homologada (+ R$ 0)
+                    </span>
+                  </div>
+
+                  {/* Marca e Modelo */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                        Marca do Fabricante *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.brand || ""}
+                        onChange={(e) =>
+                          setFormData({ ...formData, brand: e.target.value })
+                        }
+                        placeholder="Ex: Elgin, Gertec, Bematech, Prolan, Samsung, LG..."
+                        className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs focus:border-indigo-500 focus:outline-none"
+                      />
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {["Elgin", "Gertec", "Bematech", "Prolan", "Samsung", "LG", "AOC", "Dell"].map((b) => (
+                          <button
+                            key={b}
+                            type="button"
+                            onClick={() => setFormData({ ...formData, brand: b })}
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border transition-all ${
+                              formData.brand === b
+                                ? "bg-indigo-600/30 text-indigo-300 border-indigo-500"
+                                : "bg-slate-900 text-slate-400 hover:text-white border-slate-800"
+                            }`}
+                          >
+                            {b}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                        Modelo do Display *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.model || ""}
+                        onChange={(e) =>
+                          setFormData({ ...formData, model: e.target.value })
+                        }
+                        placeholder="Ex: Aytek AIO-T5214, TS-150, Flatron..."
+                        className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs focus:border-indigo-500 focus:outline-none"
+                      />
+                      <span className="text-[10px] text-slate-500 mt-1 block">
+                        Modelo comercial completo do aparelho
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Polegadas e Padrão VESA */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                        Tamanho da Tela (Polegadas) *
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        required
+                        value={formData.sizeInches || 21.5}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            sizeInches: parseFloat(e.target.value || "21.5"),
+                          })
+                        }
+                        className="w-full px-3.5 py-2.5 bg-slate-900 border border-indigo-500/50 rounded-xl text-indigo-300 font-extrabold text-sm focus:border-indigo-400 focus:outline-none"
+                      />
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {[15.6, 18.5, 21.5, 23.8, 27.0, 32.0].map((sz) => (
+                          <button
+                            key={sz}
+                            type="button"
+                            onClick={() => setFormData({ ...formData, sizeInches: sz })}
+                            className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold border transition-all ${
+                              formData.sizeInches === sz
+                                ? "bg-indigo-600/30 text-indigo-300 border-indigo-500"
+                                : "bg-slate-900 text-slate-400 hover:text-white border-slate-800"
+                            }`}
+                          >
+                            {sz}"
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                        Padrão VESA (Furação) *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.vesa_pattern || "100x100"}
+                        onChange={(e) =>
+                          setFormData({ ...formData, vesa_pattern: e.target.value })
+                        }
+                        placeholder="Ex: 75x75, 100x100..."
+                        className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-xs focus:border-indigo-500 focus:outline-none"
+                      />
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {["75x75", "100x100", "200x100", "200x200"].map((v) => (
+                          <button
+                            key={v}
+                            type="button"
+                            onClick={() => setFormData({ ...formData, vesa_pattern: v })}
+                            className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold border transition-all ${
+                              formData.vesa_pattern === v
+                                ? "bg-indigo-600/30 text-indigo-300 border-indigo-500"
+                                : "bg-slate-900 text-slate-400 hover:text-white border-slate-800"
+                            }`}
+                          >
+                            {v}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                        Código Técnico CNC
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.technical_code || ""}
+                        onChange={(e) =>
+                          setFormData({ ...formData, technical_code: e.target.value })
+                        }
+                        placeholder="Ex: ELG-M215-V100"
+                        className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-xs focus:border-indigo-500 focus:outline-none"
+                      />
+                      <span className="text-[10px] text-slate-500 mt-1 block">
+                        Identificador da furação CNC
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* CAMPOS ESPECÍFICOS: IMPRESSORAS */}
+              {collectionType === "printers" && (
+                <div className="p-4 bg-slate-950/90 rounded-2xl border border-emerald-500/30 space-y-4">
+                  <span className="text-xs font-bold text-white uppercase tracking-wider block">
+                    Especificações da Impressora Térmica
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                        Marca
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.brand || ""}
+                        onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                        placeholder="Ex: EPSON, Elgin, Bematech..."
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                        Largura da Bobina (mm)
+                      </label>
+                      <select
+                        value={formData.paper_width_mm || 80}
+                        onChange={(e) =>
+                          setFormData({ ...formData, paper_width_mm: Number(e.target.value) })
+                        }
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs"
+                      >
+                        <option value={80}>80mm (Padrão Guilhotina)</option>
+                        <option value={58}>58mm (Compacta)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                        Código Técnico CNC
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.technical_code || ""}
+                        onChange={(e) => setFormData({ ...formData, technical_code: e.target.value })}
+                        placeholder="Ex: EPS-T20X-CUT80"
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Seletor de Cores Hexadecimal (Para Cores) */}
               {collectionType === "colors" && (
                 <div className="p-4 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-3">
@@ -747,9 +1013,59 @@ export function CatalogItemModal({
           {/* ======================================================== */}
           {activeTab === "engineering" && collectionType === "models" && (
             <div className="space-y-4">
+              {/* Material Estrutural */}
+              <div className="p-4 bg-slate-950/80 rounded-2xl border border-indigo-500/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-white uppercase tracking-wider block">
+                    Material Estrutural do Gabinete (CNC Router)
+                  </span>
+                  <span className="text-[10px] text-indigo-400 font-bold bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
+                    Sustentável & Leve
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] text-slate-400 block mb-1">
+                      Material Base de Usinagem
+                    </label>
+                    <select
+                      value={formData.material || "MaDeFibra (MDF) BP 15mm"}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          material: e.target.value,
+                          steelGauge: e.target.value,
+                        })
+                      }
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs font-semibold focus:border-indigo-500 focus:outline-none"
+                    >
+                      <option value="MaDeFibra (MDF) BP 15mm">MaDeFibra (MDF) BP 15mm (Padrão de Fábrica)</option>
+                      <option value="MDF Ultra Hidrófugo 15mm">MDF Ultra Hidrófugo 15mm (Anti-umidade)</option>
+                      <option value="Compensado Naval 15mm">Compensado Naval Calibrado 15mm</option>
+                      <option value="Aço Carbono / Inox Especial">Aço Carbono / Inox Especial</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-400 block mb-1">
+                      Peso Líquido do Totem (kg)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={formData.weightKg || 14.5}
+                      onChange={(e) =>
+                        setFormData({ ...formData, weightKg: Number(e.target.value) })
+                      }
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-sm focus:border-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Cotas Milimétricas CNC */}
               <div className="p-4 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-3">
                 <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
-                  Cotas Milimétricas de Fabricação (Corte a Laser CNC)
+                  Cotas Milimétricas de Fabricação (Router CNC de Precisão)
                 </span>
 
                 <div className="grid grid-cols-3 gap-3">
@@ -757,7 +1073,7 @@ export function CatalogItemModal({
                     <label className="text-[11px] text-slate-400 block mb-1">Altura (mm)</label>
                     <input
                       type="number"
-                      value={formData.heightMm || 1650}
+                      value={formData.heightMm || 900}
                       onChange={(e) =>
                         setFormData({ ...formData, heightMm: Number(e.target.value) })
                       }
@@ -768,7 +1084,7 @@ export function CatalogItemModal({
                     <label className="text-[11px] text-slate-400 block mb-1">Largura (mm)</label>
                     <input
                       type="number"
-                      value={formData.widthMm || 480}
+                      value={formData.widthMm || 420}
                       onChange={(e) =>
                         setFormData({ ...formData, widthMm: Number(e.target.value) })
                       }
@@ -779,7 +1095,7 @@ export function CatalogItemModal({
                     <label className="text-[11px] text-slate-400 block mb-1">Profundidade (mm)</label>
                     <input
                       type="number"
-                      value={formData.depthMm || 380}
+                      value={formData.depthMm || 210}
                       onChange={(e) =>
                         setFormData({ ...formData, depthMm: Number(e.target.value) })
                       }
@@ -789,51 +1105,130 @@ export function CatalogItemModal({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-                    Especificação do Aço
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.steelGauge || "Chapa de Aço SAE 1020 1.5mm"}
-                    onChange={(e) =>
-                      setFormData({ ...formData, steelGauge: e.target.value })
-                    }
-                    placeholder="Chapa de Aço SAE 1020 1.5mm"
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:border-indigo-500 focus:outline-none"
-                  />
+              {/* Embalagem & Logística para Frete */}
+              <div className="p-4 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Package className="w-4 h-4 text-amber-400" />
+                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                    Embalagem & Logística (Cálculo Autoritativo de Frete Correios / Transportadora)
+                  </span>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-                    Peso Estimado (kg)
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.weightKg || 25}
-                    onChange={(e) =>
-                      setFormData({ ...formData, weightKg: Number(e.target.value) })
-                    }
-                    placeholder="25"
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono text-xs focus:border-indigo-500 focus:outline-none"
-                  />
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">Alt. Caixa (cm)</label>
+                    <input
+                      type="number"
+                      value={formData.packageHeightCm || 90}
+                      onChange={(e) =>
+                        setFormData({ ...formData, packageHeightCm: Number(e.target.value) })
+                      }
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-xs focus:border-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">Larg. Caixa (cm)</label>
+                    <input
+                      type="number"
+                      value={formData.packageWidthCm || 48}
+                      onChange={(e) =>
+                        setFormData({ ...formData, packageWidthCm: Number(e.target.value) })
+                      }
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-xs focus:border-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">Prof. Caixa (cm)</label>
+                    <input
+                      type="number"
+                      value={formData.packageDepthCm || 25}
+                      onChange={(e) =>
+                        setFormData({ ...formData, packageDepthCm: Number(e.target.value) })
+                      }
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-xs focus:border-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">Peso Bruto (kg)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={formData.packageGrossWeightKg || 16.0}
+                      onChange={(e) =>
+                        setFormData({ ...formData, packageGrossWeightKg: Number(e.target.value) })
+                      }
+                      className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-xl text-amber-300 font-mono text-xs focus:border-amber-400 focus:outline-none"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-                  Furação Padrão VESA Suportada
-                </label>
-                <input
-                  type="text"
-                  value={formData.vesa_pattern || "75x75 e 100x100"}
-                  onChange={(e) =>
-                    setFormData({ ...formData, vesa_pattern: e.target.value })
-                  }
-                  placeholder="75x75 e 100x100"
-                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono text-xs focus:border-indigo-500 focus:outline-none"
-                />
+              {/* Compatibilidade de Periféricos & Furação */}
+              <div className="p-4 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-3">
+                <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                  Compatibilidade de Periféricos & Furação VESA
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                      Telas Suportadas
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.supportedScreenSizes || "15.6\" a 23.8\""}
+                      onChange={(e) =>
+                        setFormData({ ...formData, supportedScreenSizes: e.target.value })
+                      }
+                      placeholder="15.6 a 23.8"
+                      className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs focus:border-indigo-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                      Furação Padrão VESA
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.vesa_pattern || "75x75 e 100x100"}
+                      onChange={(e) =>
+                        setFormData({ ...formData, vesa_pattern: e.target.value })
+                      }
+                      placeholder="75x75 e 100x100"
+                      className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-xs focus:border-indigo-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                      Gaveta de Impressora Térmica
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.printerSlot || "80mm / 58mm com guilhotina"}
+                      onChange={(e) =>
+                        setFormData({ ...formData, printerSlot: e.target.value })
+                      }
+                      placeholder="80mm / 58mm"
+                      className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs focus:border-indigo-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                      Berço de Leitor 2D / QR Code
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.readerSlot || "2D / QR Code / Boletos"}
+                      onChange={(e) =>
+                        setFormData({ ...formData, readerSlot: e.target.value })
+                      }
+                      placeholder="2D / QR Code"
+                      className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs focus:border-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           )}

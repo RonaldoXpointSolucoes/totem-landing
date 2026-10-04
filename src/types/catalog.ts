@@ -21,11 +21,16 @@ export interface CabinetModel {
     heightMm: number;
     widthMm: number;
     depthMm: number;
+    material?: string;
     steelGauge?: string;
     vesaPattern?: string;
     weightKg?: number;
     notes?: string;
     images?: string[];
+    package?: PackageDimensions;
+    supportedScreenSizes?: string;
+    printerSlot?: string;
+    readerSlot?: string;
   };
 }
 
@@ -53,6 +58,7 @@ export interface EquipmentOption {
 export interface MonitorOption extends EquipmentOption {
   sizeInches?: number;
   vesaPattern?: string;
+  isCustom?: boolean;
 }
 
 export interface PrinterOption extends EquipmentOption {

@@ -2,8 +2,19 @@
 
 import React, { useState } from "react";
 import { MonitorOption } from "@/types/catalog";
-import { Card, Input } from "@/components/ui";
-import { Check, Search, Tv, HelpCircle } from "lucide-react";
+import { Card, Input, Button } from "@/components/ui";
+import {
+  Check,
+  Search,
+  Tv,
+  HelpCircle,
+  Edit3,
+  Plus,
+  Sparkles,
+  X,
+  Sliders,
+  CheckCircle2,
+} from "lucide-react";
 
 interface StepMonitorProps {
   monitors: MonitorOption[];
@@ -12,6 +23,21 @@ interface StepMonitorProps {
   onRequestCustomization: () => void;
 }
 
+const COMMON_BRANDS = [
+  "Elgin",
+  "Gertec",
+  "Bematech",
+  "Prolan",
+  "Samsung",
+  "LG",
+  "AOC",
+  "Dell",
+  "Positivo",
+];
+
+const COMMON_SIZES = [15.6, 18.5, 21.5, 23.8, 27.0, 32.0];
+const COMMON_VESA = ["75x75", "100x100", "200x100"];
+
 export const StepMonitor: React.FC<StepMonitorProps> = ({
   monitors,
   selectedMonitor,
@@ -19,6 +45,13 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
   onRequestCustomization,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+
+  // Estados locais do editor de marca, modelo e polegadas
+  const [brandInput, setBrandInput] = useState(selectedMonitor?.brand || "Samsung");
+  const [modelInput, setModelInput] = useState(selectedMonitor?.model || "Display Pro Touch");
+  const [inchesInput, setInchesInput] = useState<number>(selectedMonitor?.sizeInches || 21.5);
+  const [vesaInput, setVesaInput] = useState(selectedMonitor?.vesaPattern || "100x100");
 
   const filteredMonitors = monitors.filter((m) =>
     `${m.brand} ${m.model} ${m.displayName}`
@@ -26,8 +59,44 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
       .includes(searchTerm.toLowerCase())
   );
 
+  // Abrir editor com os dados atuais do monitor selecionado
+  const handleOpenEditor = (targetMon?: MonitorOption) => {
+    const base = targetMon || selectedMonitor;
+    setBrandInput(base?.brand || "Samsung");
+    setModelInput(base?.model || "Monitor Touch");
+    setInchesInput(base?.sizeInches || 21.5);
+    setVesaInput(base?.vesaPattern || "100x100");
+    setIsEditorOpen(true);
+  };
+
+  // Salvar monitor personalizado ou editado
+  const handleApplyCustomMonitor = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanBrand = brandInput.trim() || "Genérico";
+    const cleanModel = modelInput.trim() || "Monitor Personalizado";
+    const size = inchesInput || 21.5;
+    const vesa = vesaInput.trim() || "100x100";
+
+    const customMon: MonitorOption = {
+      id: `custom-mon-${Date.now()}`,
+      brand: cleanBrand,
+      model: cleanModel,
+      displayName: `${cleanBrand} ${cleanModel} ${size}"`,
+      sizeInches: size,
+      vesaPattern: vesa,
+      technicalCode: `${cleanBrand.substring(0, 3).toUpperCase()}-${cleanModel.substring(0, 4).toUpperCase()}-V100`,
+      notes: `Usinagem CNC programada sob medida para display ${cleanBrand} de ${size}" com padrão VESA ${vesa}.`,
+      active: true,
+      isCustom: true,
+    };
+
+    onSelectMonitor(customMon);
+    setIsEditorOpen(false);
+  };
+
   return (
     <div className="space-y-3 sm:space-y-4">
+      {/* Cabeçalho */}
       <div className="text-center sm:text-left space-y-1">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg sm:text-2xl font-black text-[#1d1d1f] dark:text-white tracking-tight">
@@ -38,23 +107,258 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
           </span>
         </div>
         <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-          Usinamos o rasgo frontal e furação VESA na medida exata do seu display.
+          Selecione um monitor homologado ou personalize a marca, modelo e polegadas exatas do seu display.
         </p>
       </div>
 
-      {/* Busca Rápida Compacta */}
-      <div className="relative">
-        <Input
-          placeholder="Pesquisar modelo ou marca (ex: Elgin, Gertec, 21.5)..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-9 h-10 text-xs rounded-xl bg-white dark:bg-slate-900/80 border-black/15 dark:border-slate-800 text-[#1d1d1f] dark:text-white placeholder:text-slate-400 shadow-sm"
-        />
-        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3.5 pointer-events-none" />
+      {/* Busca Rápida & Botão de Personalizar Medidas */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Input
+            placeholder="Pesquisar modelo ou marca (ex: Elgin, Gertec, 21.5)..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 h-10 text-xs rounded-xl bg-white dark:bg-slate-900/80 border-black/15 dark:border-slate-800 text-[#1d1d1f] dark:text-white placeholder:text-slate-400 shadow-sm"
+          />
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3.5 pointer-events-none" />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => handleOpenEditor()}
+          className="px-3.5 h-10 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-600/20 dark:hover:bg-indigo-600/30 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 shadow-sm"
+          title="Editar Marca, Modelo e Polegadas"
+        >
+          <Edit3 className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Personalizar Medidas</span>
+          <span className="sm:hidden">Editar</span>
+        </button>
       </div>
+
+      {/* PAINEL INLINE EXPANSÍVEL: EDITAR MARCA, MODELO E POLEGADAS */}
+      {isEditorOpen && (
+        <form
+          onSubmit={handleApplyCustomMonitor}
+          className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50/80 to-blue-50/50 dark:from-slate-900 dark:to-indigo-950/40 border border-indigo-200 dark:border-indigo-500/40 shadow-xl space-y-4 animate-in fade-in zoom-in-95 duration-200"
+        >
+          <div className="flex items-center justify-between pb-2 border-b border-indigo-100 dark:border-slate-800">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/20">
+                <Sliders className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-xs sm:text-sm font-black text-[#1d1d1f] dark:text-white tracking-tight">
+                  Definir Marca, Modelo e Polegadas do Monitor
+                </h3>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                  Usinamos a moldura frontal na Router CNC na medida exata do seu display
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsEditorOpen(false)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-black/5 dark:hover:bg-slate-800 transition-all"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Marca e Modelo */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
+                Marca do Fabricante *
+              </label>
+              <input
+                type="text"
+                required
+                value={brandInput}
+                onChange={(e) => setBrandInput(e.target.value)}
+                placeholder="Ex: Samsung, LG, AOC, Elgin..."
+                className="w-full h-9 px-3 text-xs rounded-xl bg-white dark:bg-slate-950 border border-black/15 dark:border-slate-800 text-[#1d1d1f] dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                {COMMON_BRANDS.map((b) => (
+                  <button
+                    key={b}
+                    type="button"
+                    onClick={() => setBrandInput(b)}
+                    className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border transition-all ${
+                      brandInput.toLowerCase() === b.toLowerCase()
+                        ? "bg-indigo-600 text-white border-indigo-600"
+                        : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-black/10 dark:border-slate-800 hover:border-indigo-400"
+                    }`}
+                  >
+                    {b}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
+                Modelo do Monitor *
+              </label>
+              <input
+                type="text"
+                required
+                value={modelInput}
+                onChange={(e) => setModelInput(e.target.value)}
+                placeholder="Ex: T350, Flatron, Touch Pro..."
+                className="w-full h-9 px-3 text-xs rounded-xl bg-white dark:bg-slate-950 border border-black/15 dark:border-slate-800 text-[#1d1d1f] dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <span className="text-[10px] text-slate-500 mt-1 block">
+                Modelo ou código comercial do display
+              </span>
+            </div>
+          </div>
+
+          {/* Polegadas e VESA */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
+                Tamanho da Tela (Polegadas) *
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                min="10"
+                max="65"
+                required
+                value={inchesInput}
+                onChange={(e) => setInchesInput(parseFloat(e.target.value || "21.5"))}
+                className="w-full h-9 px-3 text-xs font-black text-indigo-600 dark:text-indigo-400 rounded-xl bg-white dark:bg-slate-950 border border-indigo-300 dark:border-indigo-500/50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                {COMMON_SIZES.map((sz) => (
+                  <button
+                    key={sz}
+                    type="button"
+                    onClick={() => setInchesInput(sz)}
+                    className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border transition-all ${
+                      inchesInput === sz
+                        ? "bg-indigo-600 text-white border-indigo-600"
+                        : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-black/10 dark:border-slate-800 hover:border-indigo-400"
+                    }`}
+                  >
+                    {sz}"
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
+                Padrão de Furação VESA *
+              </label>
+              <input
+                type="text"
+                required
+                value={vesaInput}
+                onChange={(e) => setVesaInput(e.target.value)}
+                placeholder="Ex: 75x75, 100x100..."
+                className="w-full h-9 px-3 text-xs rounded-xl bg-white dark:bg-slate-950 border border-black/15 dark:border-slate-800 text-[#1d1d1f] dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                {COMMON_VESA.map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setVesaInput(v)}
+                    className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border transition-all ${
+                      vesaInput === v
+                        ? "bg-indigo-600 text-white border-indigo-600"
+                        : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-black/10 dark:border-slate-800 hover:border-indigo-400"
+                    }`}
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Resumo Live & Botões */}
+          <div className="pt-2 border-t border-indigo-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+            <div className="text-[11px] text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+              <span>
+                Configuração: <strong className="text-indigo-600 dark:text-indigo-400">{brandInput} {modelInput} {inchesInput}"</strong> (VESA {vesaInput})
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => setIsEditorOpen(false)}
+                className="flex-1 sm:flex-none px-3 py-1.5 text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all font-semibold"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="flex-1 sm:flex-none px-4 py-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/30 transition-all active:scale-95"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Confirmar Medidas (+ R$ 0)</span>
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
 
       {/* Grid com Scroll Interno Seguro para Manter Viewport sem Estouro */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[220px] lg:max-h-[250px] overflow-y-auto pr-1">
+        {/* Card Especial para Personalizar / Outro Monitor */}
+        <Card
+          interactive
+          selected={selectedMonitor?.isCustom}
+          onClick={() => handleOpenEditor()}
+          className={`p-3 sm:p-3.5 rounded-xl flex items-center justify-between gap-2.5 border-dashed transition-all ${
+            selectedMonitor?.isCustom
+              ? "border-[#0071e3] bg-blue-50/80 dark:bg-indigo-600/20"
+              : "border-indigo-300 dark:border-indigo-500/40 bg-indigo-50/30 dark:bg-slate-950 hover:border-indigo-500"
+          }`}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl border border-indigo-400/40 bg-indigo-100 dark:bg-indigo-600/30 text-indigo-600 dark:text-indigo-300 flex items-center justify-center shrink-0">
+              {selectedMonitor?.isCustom ? <Edit3 className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+                  {selectedMonitor?.isCustom ? selectedMonitor.brand : "Outro Monitor"}
+                </span>
+                <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-1 py-0.2 rounded">
+                  Sob Medida
+                </span>
+              </div>
+              <h3 className="text-xs font-bold text-[#1d1d1f] dark:text-white truncate">
+                {selectedMonitor?.isCustom
+                  ? selectedMonitor.displayName
+                  : "Definir Marca, Modelo e Polegadas"}
+              </h3>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                {selectedMonitor?.isCustom
+                  ? `VESA: ${selectedMonitor.vesaPattern} • Clique para editar`
+                  : "Usinagem CNC personalizada para qualquer tela"}
+              </p>
+            </div>
+          </div>
+
+          <div
+            className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+              selectedMonitor?.isCustom
+                ? "border-[#0071e3] bg-[#0071e3] text-white shadow-sm"
+                : "border-indigo-400/40 bg-white dark:bg-slate-900 text-indigo-500"
+            }`}
+          >
+            {selectedMonitor?.isCustom ? <Check className="w-3 h-3 stroke-[3]" /> : <Edit3 className="w-2.5 h-2.5" />}
+          </div>
+        </Card>
+
+        {/* Monitores Homologados */}
         {filteredMonitors.map((mon) => {
           const isSelected = selectedMonitor?.id === mon.id;
           return (
@@ -86,7 +390,9 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
                       </span>
                     )}
                   </div>
-                  <h3 className="text-xs font-bold text-[#1d1d1f] dark:text-white truncate">{mon.displayName}</h3>
+                  <h3 className="text-xs font-bold text-[#1d1d1f] dark:text-white truncate">
+                    {mon.displayName}
+                  </h3>
                   {mon.vesaPattern && (
                     <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
                       VESA: {mon.vesaPattern}
@@ -95,21 +401,36 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
                 </div>
               </div>
 
-              <div
-                className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
-                  isSelected
-                    ? "border-[#0071e3] bg-[#0071e3] text-white shadow-sm"
-                    : "border-black/15 dark:border-slate-700 bg-black/5 dark:bg-slate-800"
-                }`}
-              >
-                {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+              <div className="flex items-center gap-1.5 shrink-0">
+                {isSelected && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenEditor(mon);
+                    }}
+                    title="Ajustar medidas deste display"
+                    className="p-1 rounded-lg text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-black/5 dark:hover:bg-slate-800 transition-all"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <div
+                  className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+                    isSelected
+                      ? "border-[#0071e3] bg-[#0071e3] text-white shadow-sm"
+                      : "border-black/15 dark:border-slate-700 bg-black/5 dark:bg-slate-800"
+                  }`}
+                >
+                  {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                </div>
               </div>
             </Card>
           );
         })}
       </div>
 
-      {/* Link Discreto para Personalização Especial */}
+      {/* Link Discreto para Personalização Especial de Engenharia */}
       <div className="pt-1 text-center">
         <button
           type="button"
@@ -117,7 +438,7 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
           className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-[#0071e3] dark:text-slate-400 dark:hover:text-indigo-300 underline underline-offset-4 transition-colors cursor-pointer"
         >
           <HelpCircle className="w-3 h-3" />
-          Não encontrou seu monitor? Solicite furação sob medida
+          Não encontrou seu monitor? Solicite furação sob medida com nossa engenharia
         </button>
       </div>
     </div>

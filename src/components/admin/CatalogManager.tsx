@@ -22,6 +22,11 @@ import {
   QrCode,
   Tag,
   Maximize2,
+  Copy,
+  Package,
+  Box,
+  Wrench,
+  Tv,
 } from "lucide-react";
 import { CatalogItemModal } from "./CatalogItemModal";
 import { CatalogPhotoLightbox } from "./CatalogPhotoLightbox";
@@ -190,6 +195,57 @@ export function CatalogManager({
     } catch (err: any) {
       alert("Erro ao excluir: " + err.message);
       return false;
+    }
+  };
+
+  // Duplicar Modelo de Gabinete
+  const handleDuplicateModel = async (model: any) => {
+    try {
+      const copyPayload = {
+        name: `${model.name} (Cópia)`,
+        slug: `${model.slug}-copia-${Date.now().toString().slice(-4)}`,
+        description: model.description || "",
+        base_price_cents: model.base_price_cents || 99000,
+        active: false,
+        sort_order: (model.sort_order ?? 1) + 1,
+        main_image: model.main_image || "/models/cabinet-floor.svg",
+        dimensions_json:
+          model.dimensions_json ||
+          JSON.stringify({
+            heightMm: 900,
+            widthMm: 420,
+            depthMm: 210,
+            material: "MaDeFibra (MDF) BP 15mm",
+            steelGauge: "MaDeFibra (MDF) BP 15mm",
+            weightKg: 14.5,
+            vesaPattern: "100x100",
+            supportedScreenSizes: "15.6\" a 23.8\"",
+            printerSlot: "80mm / 58mm",
+            readerSlot: "2D / QR Code",
+            package: { heightCm: 90, widthCm: 48, depthCm: 25, grossWeightKg: 16.0 },
+          }),
+      };
+
+      const res = await fetch("/api/admin/catalog", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          collectionType: "models",
+          data: copyPayload,
+        }),
+      });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || "Falha ao duplicar modelo");
+
+      addAuditLog(
+        "Duplicação de Modelo",
+        `MODELS #${json.data?.$id || "novo"}`,
+        `Modelo duplicado a partir de "${model.name}"`
+      );
+      onShowNotification("Modelo duplicado com sucesso! Ajuste os detalhes conforme desejado.");
+      onReload();
+    } catch (err: any) {
+      alert("Erro ao duplicar modelo: " + err.message);
     }
   };
 
@@ -611,22 +667,43 @@ export function CatalogManager({
                       </div>
 
                       {/* Especificações de Engenharia CNC */}
-                      <div className="p-3 bg-slate-950/70 rounded-2xl border border-slate-800/80 text-[11px] grid grid-cols-2 gap-2 text-slate-300">
-                        <div>
-                          <span className="text-slate-500 block text-[9px] uppercase font-bold tracking-wider">
-                            Dimensões CNC
-                          </span>
-                          <span className="font-mono font-semibold">
-                            {dimensions.heightMm || 1650}x{dimensions.widthMm || 480}x
-                            {dimensions.depthMm || 380} mm
-                          </span>
+                      <div className="p-3 bg-slate-950/70 rounded-2xl border border-slate-800/80 text-[11px] space-y-2 text-slate-300">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <span className="text-slate-500 block text-[9px] uppercase font-bold tracking-wider">
+                              Dimensões CNC
+                            </span>
+                            <span className="font-mono font-bold text-white">
+                              {dimensions.heightMm || (model.slug === "wall" ? 900 : model.slug === "countertop" ? 620 : 1650)}x
+                              {dimensions.widthMm || (model.slug === "wall" ? 420 : model.slug === "countertop" ? 400 : 480)}x
+                              {dimensions.depthMm || (model.slug === "wall" ? 210 : model.slug === "countertop" ? 290 : 380)} mm
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block text-[9px] uppercase font-bold tracking-wider">
+                              Material Base CNC
+                            </span>
+                            <span className="font-bold truncate block text-indigo-300">
+                              {dimensions.material && !dimensions.material.includes("SAE 1020")
+                                ? dimensions.material
+                                : "MaDeFibra BP 15mm"}
+                            </span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-slate-500 block text-[9px] uppercase font-bold tracking-wider">
-                            Chapa de Aço
+
+                        {/* Badges de Compatibilidade & Slots */}
+                        <div className="pt-1.5 border-t border-slate-800/60 flex flex-wrap gap-1.5 text-[10px]">
+                          <span className="px-2 py-0.5 rounded-md bg-slate-900 text-cyan-400 font-semibold border border-slate-800">
+                            🖥️ Telas {dimensions.supportedScreenSizes || "15.6\" a 23.8\""}
                           </span>
-                          <span className="font-semibold truncate block">
-                            {dimensions.steelGauge || "SAE 1020 1.5mm"}
+                          <span className="px-2 py-0.5 rounded-md bg-slate-900 text-indigo-400 font-mono font-semibold border border-slate-800">
+                            VESA {dimensions.vesaPattern || "75/100"}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-md bg-slate-900 text-emerald-400 font-semibold border border-slate-800">
+                            🖨️ {dimensions.printerSlot || "Impressora 80mm"}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-md bg-slate-900 text-amber-400 font-semibold border border-slate-800">
+                            📦 Caixa {dimensions.package?.heightCm || (model.slug === "wall" ? 90 : model.slug === "countertop" ? 65 : 170)}x{dimensions.package?.widthCm || (model.slug === "wall" ? 48 : model.slug === "countertop" ? 45 : 52)}x{dimensions.package?.depthCm || (model.slug === "wall" ? 25 : model.slug === "countertop" ? 32 : 42)}cm
                           </span>
                         </div>
                       </div>
@@ -698,7 +775,15 @@ export function CatalogManager({
                         className="flex-1 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-indigo-600/20 active:scale-95"
                       >
                         <Sliders className="w-3.5 h-3.5" />
-                        <span>Editar Detalhes & Fotos</span>
+                        <span>Configurações & Fotos</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleDuplicateModel(model)}
+                        className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-all active:scale-95"
+                        title="Duplicar Modelo"
+                      >
+                        <Copy className="w-3.5 h-3.5 text-indigo-400" />
                       </button>
 
                       <button
@@ -875,31 +960,45 @@ export function CatalogManager({
                   {filteredMonitors.map((m: any) => (
                     <div
                       key={m.$id}
-                      className="p-4 bg-slate-950 border border-slate-800/80 rounded-2xl text-xs space-y-2 flex flex-col justify-between"
+                      className="p-4 bg-slate-950 border border-slate-800/80 rounded-2xl text-xs space-y-3 flex flex-col justify-between hover:border-slate-700 transition-all shadow-md"
                     >
-                      <div className="space-y-1">
-                        <div className="flex justify-between items-center">
-                          <span className="font-black text-white text-sm">{m.display_name}</span>
-                          <span className="text-[10px] text-indigo-400 font-mono bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
-                            VESA {m.vesa_pattern}
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-start gap-2">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-black text-white text-sm">
+                                {m.display_name || `${m.brand} ${m.model}`}
+                              </span>
+                              <span className="text-[10px] text-cyan-300 font-extrabold bg-cyan-500/10 px-2 py-0.5 rounded-md border border-cyan-500/20">
+                                {m.size || m.size_inches || 21.5}"
+                              </span>
+                            </div>
+                            <span className="text-[11px] text-slate-400 font-medium block mt-0.5">
+                              Marca: <strong className="text-white">{m.brand || "Elgin"}</strong> • Modelo: <strong className="text-white">{m.model || m.display_name}</strong>
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-indigo-400 font-mono font-bold bg-indigo-500/10 px-2.5 py-1 rounded-lg border border-indigo-500/20 shrink-0">
+                            VESA {m.vesa_pattern || "100x100"}
                           </span>
                         </div>
                         <p className="text-slate-400 text-xs leading-relaxed">{m.notes}</p>
                         <span className="text-[10px] text-slate-500 font-mono block">
-                          Cód Técnico: {m.technical_code}
+                          Cód Técnico CNC: {m.technical_code}
                         </span>
                       </div>
 
                       <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-900">
                         <button
                           onClick={() => handleEditItem("monitors", m)}
-                          className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[11px] font-bold"
+                          className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all active:scale-95"
                         >
-                          Editar
+                          <Edit2 className="w-3 h-3 text-cyan-400" />
+                          <span>Editar Marca, Modelo & Polegadas</span>
                         </button>
                         <button
                           onClick={() => handleDeleteItem("monitors", m.$id)}
-                          className="p-1 rounded-lg text-rose-400 hover:bg-rose-500/20"
+                          className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/20 transition-all"
+                          title="Excluir Monitor"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
