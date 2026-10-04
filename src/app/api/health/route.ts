@@ -6,7 +6,7 @@ export async function GET() {
     {
       status: "healthy",
       service: "totem-landing",
-      version: "0.3.0",
+      version: "0.3.2",
       subsystems: {
         shipping: {
           status: "healthy",
