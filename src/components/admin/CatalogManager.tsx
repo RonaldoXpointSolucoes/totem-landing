@@ -964,19 +964,44 @@ export function CatalogManager({
                     >
                       <div className="space-y-2">
                         <div className="flex justify-between items-start gap-2">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-black text-white text-sm">
-                                {m.display_name || `${m.brand} ${m.model}`}
-                              </span>
-                              <span className="text-[10px] text-cyan-300 font-extrabold bg-cyan-500/10 px-2 py-0.5 rounded-md border border-cyan-500/20">
-                                {m.size || m.size_inches || 21.5}"
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            {m.image ? (
+                              <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-800 overflow-hidden shrink-0 flex items-center justify-center p-1">
+                                <img
+                                  src={m.image}
+                                  alt={m.display_name}
+                                  className="max-w-full max-h-full object-contain"
+                                  onError={(e) => {
+                                    (e.target as any).style.display = "none";
+                                  }}
+                                />
+                              </div>
+                            ) : (
+                              <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 shrink-0 flex items-center justify-center">
+                                <Monitor className="w-5 h-5" />
+                              </div>
+                            )}
+
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-black text-white text-sm truncate">
+                                  {m.display_name || `${m.brand} ${m.model}`}
+                                </span>
+                                <span className="text-[10px] text-cyan-300 font-extrabold bg-cyan-500/10 px-2 py-0.5 rounded-md border border-cyan-500/20">
+                                  {m.size || m.size_inches || 21.5}"
+                                </span>
+                                {m.slug && (
+                                  <span className="text-[10px] text-slate-400 font-mono bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
+                                    {m.slug}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[11px] text-slate-400 font-medium block mt-0.5">
+                                Marca: <strong className="text-white">{m.brand || "Elgin"}</strong> • Modelo: <strong className="text-white">{m.model || m.display_name}</strong>
                               </span>
                             </div>
-                            <span className="text-[11px] text-slate-400 font-medium block mt-0.5">
-                              Marca: <strong className="text-white">{m.brand || "Elgin"}</strong> • Modelo: <strong className="text-white">{m.model || m.display_name}</strong>
-                            </span>
                           </div>
+
                           <span className="text-[10px] text-indigo-400 font-mono font-bold bg-indigo-500/10 px-2.5 py-1 rounded-lg border border-indigo-500/20 shrink-0">
                             VESA {m.vesa_pattern || "100x100"}
                           </span>
@@ -993,7 +1018,7 @@ export function CatalogManager({
                           className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all active:scale-95"
                         >
                           <Edit2 className="w-3 h-3 text-cyan-400" />
-                          <span>Editar Marca, Modelo & Polegadas</span>
+                          <span>Editar Monitor</span>
                         </button>
                         <button
                           onClick={() => handleDeleteItem("monitors", m.$id)}
@@ -1031,9 +1056,39 @@ export function CatalogManager({
                       className="p-4 bg-slate-950 border border-slate-800/80 rounded-2xl text-xs space-y-2 flex flex-col justify-between"
                     >
                       <div className="space-y-1">
-                        <div className="flex justify-between items-center">
-                          <span className="font-black text-white text-sm">{p.display_name}</span>
-                          <span className="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            {p.image ? (
+                              <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 overflow-hidden shrink-0 flex items-center justify-center p-1">
+                                <img
+                                  src={p.image}
+                                  alt={p.display_name}
+                                  className="max-w-full max-h-full object-contain"
+                                  onError={(e) => {
+                                    (e.target as any).style.display = "none";
+                                  }}
+                                />
+                              </div>
+                            ) : (
+                              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 shrink-0 flex items-center justify-center">
+                                <Printer className="w-4 h-4" />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-black text-white text-sm">{p.display_name}</span>
+                                {p.slug && (
+                                  <span className="text-[10px] text-slate-400 font-mono bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
+                                    {p.slug}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[11px] text-slate-400 block">
+                                Marca: <strong className="text-white">{p.brand}</strong> • Modelo: <strong className="text-white">{p.model}</strong>
+                              </span>
+                            </div>
+                          </div>
+                          <span className="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 shrink-0">
                             {p.paper_width_mm}mm
                           </span>
                         </div>
@@ -1085,10 +1140,40 @@ export function CatalogManager({
                       className="p-4 bg-slate-950 border border-slate-800/80 rounded-2xl text-xs space-y-2 flex flex-col justify-between"
                     >
                       <div className="space-y-1">
-                        <div className="flex justify-between items-center">
-                          <span className="font-black text-white text-sm">{r.display_name}</span>
-                          <span className="text-[10px] text-indigo-400 font-bold bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
-                            {r.is_2d ? "1D / 2D QR Code" : "1D Linear"}
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            {r.image ? (
+                              <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 overflow-hidden shrink-0 flex items-center justify-center p-1">
+                                <img
+                                  src={r.image}
+                                  alt={r.display_name}
+                                  className="max-w-full max-h-full object-contain"
+                                  onError={(e) => {
+                                    (e.target as any).style.display = "none";
+                                  }}
+                                />
+                              </div>
+                            ) : (
+                              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shrink-0 flex items-center justify-center">
+                                <QrCode className="w-4 h-4" />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-black text-white text-sm">{r.display_name}</span>
+                                {r.slug && (
+                                  <span className="text-[10px] text-slate-400 font-mono bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
+                                    {r.slug}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[11px] text-slate-400 block">
+                                Marca: <strong className="text-white">{r.brand}</strong> • Modelo: <strong className="text-white">{r.model}</strong>
+                              </span>
+                            </div>
+                          </div>
+                          <span className="text-[10px] text-indigo-400 font-bold bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20 shrink-0">
+                            {r.is_2d ? "2D / QR Code" : "1D Linear"}
                           </span>
                         </div>
                         <p className="text-slate-400 text-xs leading-relaxed">{r.notes}</p>

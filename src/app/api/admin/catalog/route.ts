@@ -52,6 +52,8 @@ const SCHEMA_ATTRIBUTES: Record<string, string[]> = {
     "price_adjustment_cents",
     "active",
     "image",
+    "sort_order",
+    "description",
   ],
   monitors: [
     "brand",
@@ -63,6 +65,8 @@ const SCHEMA_ATTRIBUTES: Record<string, string[]> = {
     "notes",
     "active",
     "image",
+    "slug",
+    "sort_order",
   ],
   printers: [
     "brand",
@@ -73,6 +77,8 @@ const SCHEMA_ATTRIBUTES: Record<string, string[]> = {
     "notes",
     "active",
     "image",
+    "slug",
+    "sort_order",
   ],
   readers: [
     "brand",
@@ -83,6 +89,8 @@ const SCHEMA_ATTRIBUTES: Record<string, string[]> = {
     "notes",
     "active",
     "image",
+    "slug",
+    "sort_order",
   ],
 };
 
@@ -91,6 +99,30 @@ function sanitizeAttributes(collectionType: string, input: Record<string, any>):
   if (!allowed) return input;
 
   const sanitized: Record<string, any> = {};
+
+  // Tolerâncias de Imagem
+  if (input.main_image && !input.image) {
+    input.image = input.main_image;
+  }
+  if (input.image && !input.main_image) {
+    input.main_image = input.image;
+  }
+
+  // Tolerâncias de Descrição / Notes
+  if (input.description && !input.notes) {
+    input.notes = input.description;
+  }
+  if (input.notes && !input.description) {
+    input.description = input.notes;
+  }
+
+  // Tolerâncias de Display Name / Name
+  if (input.name && !input.display_name) {
+    input.display_name = input.name;
+  }
+  if (input.display_name && !input.name) {
+    input.name = input.display_name;
+  }
 
   // Mapeamentos de tolerância para monitores
   if (collectionType === "monitors") {
@@ -101,6 +133,35 @@ function sanitizeAttributes(collectionType: string, input: Record<string, any>):
     } else if (input.size !== undefined) {
       input.size = String(input.size);
     }
+  }
+
+  // Sanitização de Tipos
+  if (input.sort_order !== undefined) {
+    input.sort_order = parseInt(String(input.sort_order), 10) || 1;
+  }
+  if (input.base_price_cents !== undefined) {
+    input.base_price_cents = Math.round(Number(input.base_price_cents)) || 0;
+  }
+  if (input.price_adjustment_cents !== undefined) {
+    input.price_adjustment_cents = Math.round(Number(input.price_adjustment_cents)) || 0;
+  }
+  if (input.paper_width_mm !== undefined) {
+    input.paper_width_mm = parseInt(String(input.paper_width_mm), 10) || 80;
+  }
+  if (input.is_2d !== undefined) {
+    input.is_2d = Boolean(input.is_2d);
+  }
+  if (input.active !== undefined) {
+    input.active = Boolean(input.active);
+  }
+  if (input.slug !== undefined && input.slug !== null) {
+    input.slug = String(input.slug)
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9_-]/g, "-")
+      .replace(/^-+|-+$/g, "");
   }
 
   for (const key of allowed) {

@@ -77,10 +77,22 @@ export function CatalogItemModal({
         parsedDimensions = {};
       }
 
-      const existingGallery =
-        parsedDimensions.images ||
-        parsedDimensions.galleryImages ||
-        (initialItem.main_image ? [initialItem.main_image] : []);
+      // Imagem primária unificada (verifica tanto main_image quanto image)
+      const primaryImage =
+        initialItem.main_image ||
+        initialItem.image ||
+        (Array.isArray(parsedDimensions.images) && parsedDimensions.images[0]) ||
+        "";
+
+      // Galeria unificada
+      let existingGallery: string[] = [];
+      if (Array.isArray(parsedDimensions.images) && parsedDimensions.images.length > 0) {
+        existingGallery = parsedDimensions.images;
+      } else if (Array.isArray(parsedDimensions.galleryImages) && parsedDimensions.galleryImages.length > 0) {
+        existingGallery = parsedDimensions.galleryImages;
+      } else if (primaryImage) {
+        existingGallery = [primaryImage];
+      }
 
       setGalleryImages(Array.from(new Set(existingGallery)));
 
@@ -90,22 +102,28 @@ export function CatalogItemModal({
           ? parsedDimensions.steelGauge
           : "MaDeFibra (MDF) BP 15mm");
 
+      const loadedSizeInches =
+        initialItem.sizeInches ||
+        (initialItem.size ? parseFloat(initialItem.size) : 21.5);
+
       setFormData({
         name: initialItem.name || initialItem.display_name || "",
+        display_name: initialItem.display_name || initialItem.name || "",
         slug: initialItem.slug || "",
         description: initialItem.description || initialItem.notes || "",
+        notes: initialItem.notes || initialItem.description || "",
         base_price_cents: initialItem.base_price_cents ?? 0,
         price_adjustment_cents: initialItem.price_adjustment_cents ?? 0,
         active: initialItem.active ?? true,
         sort_order: initialItem.sort_order ?? 1,
-        main_image: initialItem.main_image || initialItem.image || "",
+        main_image: primaryImage,
+        image: primaryImage,
         hex_reference: initialItem.hex_reference || "#0f172a",
         brand: initialItem.brand || "",
         model: initialItem.model || "",
-        sizeInches: initialItem.sizeInches || initialItem.size || initialItem.size_inches || 21.5,
-        display_name: initialItem.display_name || initialItem.name || "",
+        sizeInches: loadedSizeInches,
+        size: initialItem.size || String(loadedSizeInches),
         technical_code: initialItem.technical_code || "",
-        notes: initialItem.notes || "",
         vesa_pattern: initialItem.vesa_pattern || "100x100",
         paper_width_mm: initialItem.paper_width_mm || 80,
         is_2d: initialItem.is_2d ?? true,
@@ -126,26 +144,29 @@ export function CatalogItemModal({
       });
     } else {
       // Padrões para novo item
-      setGalleryImages([]);
+      const defaultImg =
+        collectionType === "models"
+          ? "/models/cabinet-floor.svg"
+          : "";
+      setGalleryImages(defaultImg ? [defaultImg] : []);
       setFormData({
         name: "",
+        display_name: "",
         slug: "",
         description: "",
+        notes: "",
         base_price_cents: collectionType === "models" ? 129000 : 0,
         price_adjustment_cents: 0,
         active: true,
-        sort_order: 10,
-        main_image:
-          collectionType === "models"
-            ? "/models/cabinet-floor.svg"
-            : "",
+        sort_order: 1,
+        main_image: defaultImg,
+        image: defaultImg,
         hex_reference: "#0f172a",
         brand: collectionType === "monitors" ? "Elgin" : "Totem Pro",
         model: "",
         sizeInches: 21.5,
-        display_name: "",
+        size: "21.5",
         technical_code: "TP-" + Math.floor(1000 + Math.random() * 9000),
-        notes: "Usinagem CNC homologada e furação padronizada.",
         vesa_pattern: "100x100",
         paper_width_mm: 80,
         is_2d: true,
@@ -175,44 +196,53 @@ export function CatalogItemModal({
 
   // Auto-gerar slug a partir do nome
   const generateSlug = () => {
-    const text = formData.name || formData.display_name || "";
-    const clean = text
+    const raw =
+      formData.slug ||
+      formData.name ||
+      formData.display_name ||
+      (formData.brand && formData.model ? `${formData.brand}-${formData.model}` : "") ||
+      "";
+    const clean = raw
       .toLowerCase()
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]/g, "-")
-      .replace(/-+/g, "-")
-      .replace(/^-|-$/g, "");
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
     setFormData((prev) => ({ ...prev, slug: clean }));
+    return clean;
   };
 
   // Adicionar imagem à galeria
   const handleAddImage = () => {
-    if (!newImageUrl.trim()) return;
     const url = newImageUrl.trim();
+    if (!url) return;
     if (!galleryImages.includes(url)) {
       const updated = [...galleryImages, url];
       setGalleryImages(updated);
-      // Se não havia imagem principal, define essa como principal
-      if (!formData.main_image) {
-        setFormData((prev) => ({ ...prev, main_image: url }));
-      }
+      setFormData((prev) => ({
+        ...prev,
+        main_image: prev.main_image || url,
+        image: prev.image || url,
+      }));
     }
     setNewImageUrl("");
   };
 
   // Remover foto da galeria
   const handleRemoveImage = (indexToRemove: number) => {
+    const removedUrl = galleryImages[indexToRemove];
     const updated = galleryImages.filter((_, idx) => idx !== indexToRemove);
     setGalleryImages(updated);
-    if (galleryImages[indexToRemove] === formData.main_image) {
-      setFormData((prev) => ({ ...prev, main_image: updated[0] || "" }));
+    if (removedUrl === formData.main_image || removedUrl === formData.image) {
+      const nextImg = updated[0] || "";
+      setFormData((prev) => ({ ...prev, main_image: nextImg, image: nextImg }));
     }
   };
 
   // Definir foto como Capa Principal
   const handleSetAsMainImage = (url: string) => {
-    setFormData((prev) => ({ ...prev, main_image: url }));
+    setGalleryImages((prev) => [url, ...prev.filter((u) => u !== url)]);
+    setFormData((prev) => ({ ...prev, main_image: url, image: url }));
   };
 
   // Salvar Item
@@ -222,12 +252,28 @@ export function CatalogItemModal({
     setErrorMessage("");
 
     try {
+      // Se o usuário digitou uma URL no campo de nova foto mas não clicou em 'Adicionar' antes de salvar:
+      let finalGallery = [...galleryImages];
+      if (newImageUrl.trim() && !finalGallery.includes(newImageUrl.trim())) {
+        finalGallery.push(newImageUrl.trim());
+      }
+
+      const primaryImg =
+        formData.main_image ||
+        formData.image ||
+        finalGallery[0] ||
+        "";
+
+      const effectiveSlug =
+        formData.slug?.trim() ||
+        generateSlug() ||
+        `${collectionType}-${Date.now()}`;
+
       // Monta payload de acordo com a coleção
       let payload: Record<string, any> = {};
 
       if (collectionType === "models") {
         if (!formData.name) throw new Error("O nome do modelo de gabinete é obrigatório.");
-        if (!formData.slug) generateSlug();
 
         const materialValue = formData.material || "MaDeFibra (MDF) BP 15mm";
         const dimensionsObj = {
@@ -247,39 +293,42 @@ export function CatalogItemModal({
             depthCm: Number(formData.packageDepthCm) || 25,
             grossWeightKg: Number(formData.packageGrossWeightKg) || 16,
           },
-          images: galleryImages.length > 0 ? galleryImages : [formData.main_image || "/models/cabinet-floor.svg"],
+          images: finalGallery.length > 0 ? finalGallery : [primaryImg || "/models/cabinet-floor.svg"],
         };
 
         payload = {
           name: formData.name,
-          slug: formData.slug || "modelo-" + Date.now(),
-          description: formData.description || "",
+          slug: effectiveSlug,
+          description: formData.description || formData.notes || "",
           base_price_cents: Number(formData.base_price_cents) || 0,
           active: Boolean(formData.active),
           sort_order: Number(formData.sort_order) || 1,
-          main_image: formData.main_image || galleryImages[0] || "/models/cabinet-floor.svg",
+          main_image: primaryImg || "/models/cabinet-floor.svg",
           dimensions_json: JSON.stringify(dimensionsObj),
         };
       } else if (collectionType === "colors") {
         if (!formData.name) throw new Error("O nome do acabamento/cor é obrigatório.");
         payload = {
           name: formData.name,
-          slug: formData.slug || "cor-" + Date.now(),
+          slug: effectiveSlug,
           hex_reference: formData.hex_reference || "#0f172a",
           price_adjustment_cents: Number(formData.price_adjustment_cents) || 0,
           active: Boolean(formData.active),
-          image: formData.main_image || "",
+          sort_order: Number(formData.sort_order) || 1,
+          description: formData.description || formData.notes || "",
+          image: primaryImg || "",
         };
       } else if (collectionType === "monitors") {
-        const brand = formData.brand || "Elgin";
-        const model = formData.model || formData.name || "";
+        const brand = formData.brand || "Generico";
+        const model = formData.model || formData.name || "Display Padrão";
         const sizeInches = Number(formData.sizeInches) || Number(formData.size) || 21.5;
-        const displayName = formData.display_name || `${brand} ${model} ${sizeInches}"`;
+        const displayName = formData.display_name || formData.name || `${brand} ${model} ${sizeInches}"`;
 
         payload = {
           brand,
           model,
           display_name: displayName,
+          slug: effectiveSlug,
           size: String(sizeInches),
           vesa_pattern: formData.vesa_pattern || "100x100",
           technical_code:
@@ -287,29 +336,42 @@ export function CatalogItemModal({
             `${brand.substring(0, 3).toUpperCase()}-${model.replace(/[^a-zA-Z0-9]/g, "").substring(0, 5).toUpperCase() || "MON"}-V100`,
           notes: formData.description || formData.notes || "",
           active: Boolean(formData.active),
-          image: formData.main_image || "",
+          sort_order: Number(formData.sort_order) || 1,
+          image: primaryImg || "",
         };
       } else if (collectionType === "printers") {
+        const brand = formData.brand || "Generico";
+        const model = formData.model || formData.name || "Térmica Padrão";
+        const displayName = formData.display_name || formData.name || `${brand} ${model}`;
+
         payload = {
-          brand: formData.brand || "Generico",
-          model: formData.model || formData.name,
-          display_name: formData.display_name || formData.name,
+          brand,
+          model,
+          display_name: displayName,
+          slug: effectiveSlug,
           paper_width_mm: Number(formData.paper_width_mm) || 80,
           technical_code: formData.technical_code || "",
           notes: formData.description || formData.notes || "",
           active: Boolean(formData.active),
-          image: formData.main_image || "",
+          sort_order: Number(formData.sort_order) || 1,
+          image: primaryImg || "",
         };
       } else if (collectionType === "readers") {
+        const brand = formData.brand || "Generico";
+        const model = formData.model || formData.name || "Leitor 2D";
+        const displayName = formData.display_name || formData.name || `${brand} ${model}`;
+
         payload = {
-          brand: formData.brand || "Generico",
-          model: formData.model || formData.name,
-          display_name: formData.display_name || formData.name,
+          brand,
+          model,
+          display_name: displayName,
+          slug: effectiveSlug,
           is_2d: Boolean(formData.is_2d),
           technical_code: formData.technical_code || "",
           notes: formData.description || formData.notes || "",
           active: Boolean(formData.active),
-          image: formData.main_image || "",
+          sort_order: Number(formData.sort_order) || 1,
+          image: primaryImg || "",
         };
       }
 
@@ -949,7 +1011,10 @@ export function CatalogItemModal({
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {galleryImages.map((url, idx) => {
-                      const isMain = url === formData.main_image;
+                      const isMain =
+                        url === formData.main_image ||
+                        url === formData.image ||
+                        (!formData.main_image && !formData.image && idx === 0);
                       return (
                         <div
                           key={idx}
