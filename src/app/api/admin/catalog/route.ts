@@ -34,6 +34,84 @@ export async function GET() {
   }
 }
 
+const SCHEMA_ATTRIBUTES: Record<string, string[]> = {
+  models: [
+    "name",
+    "slug",
+    "description",
+    "base_price_cents",
+    "active",
+    "sort_order",
+    "main_image",
+    "dimensions_json",
+  ],
+  colors: [
+    "name",
+    "slug",
+    "hex_reference",
+    "price_adjustment_cents",
+    "active",
+    "image",
+  ],
+  monitors: [
+    "brand",
+    "model",
+    "display_name",
+    "size",
+    "vesa_pattern",
+    "technical_code",
+    "notes",
+    "active",
+    "image",
+  ],
+  printers: [
+    "brand",
+    "model",
+    "display_name",
+    "paper_width_mm",
+    "technical_code",
+    "notes",
+    "active",
+    "image",
+  ],
+  readers: [
+    "brand",
+    "model",
+    "display_name",
+    "is_2d",
+    "technical_code",
+    "notes",
+    "active",
+    "image",
+  ],
+};
+
+function sanitizeAttributes(collectionType: string, input: Record<string, any>): Record<string, any> {
+  const allowed = SCHEMA_ATTRIBUTES[collectionType];
+  if (!allowed) return input;
+
+  const sanitized: Record<string, any> = {};
+
+  // Mapeamentos de tolerância para monitores
+  if (collectionType === "monitors") {
+    if (input.size_inches && !input.size) {
+      input.size = String(input.size_inches);
+    } else if (input.sizeInches && !input.size) {
+      input.size = String(input.sizeInches);
+    } else if (input.size !== undefined) {
+      input.size = String(input.size);
+    }
+  }
+
+  for (const key of allowed) {
+    if (input[key] !== undefined) {
+      sanitized[key] = input[key];
+    }
+  }
+
+  return sanitized;
+}
+
 export async function PATCH(req: Request) {
   const isAuth = await verifyAuth();
   if (!isAuth) {
@@ -63,7 +141,8 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ ok: false, error: "Coleção inválida." }, { status: 400 });
     }
 
-    const updatedDoc = await updateCatalogItemAdmin(targetCollection, documentId, updates);
+    const cleanUpdates = sanitizeAttributes(collectionType, updates);
+    const updatedDoc = await updateCatalogItemAdmin(targetCollection, documentId, cleanUpdates);
 
     return NextResponse.json({
       ok: true,
@@ -101,7 +180,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "Dados ou coleção inválidos." }, { status: 400 });
     }
 
-    const newDoc = await createCatalogItemAdmin(targetCollection, data);
+    const cleanData = sanitizeAttributes(collectionType, data);
+    const newDoc = await createCatalogItemAdmin(targetCollection, cleanData);
 
     return NextResponse.json({
       ok: true,

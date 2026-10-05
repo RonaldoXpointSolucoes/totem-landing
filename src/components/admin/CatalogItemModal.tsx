@@ -280,8 +280,7 @@ export function CatalogItemModal({
           brand,
           model,
           display_name: displayName,
-          size: sizeInches,
-          size_inches: sizeInches,
+          size: String(sizeInches),
           vesa_pattern: formData.vesa_pattern || "100x100",
           technical_code:
             formData.technical_code ||
