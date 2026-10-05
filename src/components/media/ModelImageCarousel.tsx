@@ -123,11 +123,11 @@ export function ModelImageCarousel({
         preloadSingleImage(cleanImages[subsequentIdx]);
       }
 
-      // Encerra estado de transição após 550ms (duração da animação CSS)
+      // Encerra estado de transição após 920ms (acompanha os 0.9s da animação suave)
       transitionTimerRef.current = setTimeout(() => {
         setIsTransitioning(false);
         setOutgoingIndex(null);
-      }, 550);
+      }, 920);
     },
     [currentIndex, total, cleanImages, onImageChange]
   );
@@ -246,16 +246,16 @@ export function ModelImageCarousel({
         </div>
       )}
 
-      {/* Contêiner de Visualização com Animação de Slide Direcional Fluido */}
+      {/* Contêiner de Visualização com Animação Suave e Elegante de Dissolve */}
       <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
-        {/* Slide Saindo (Outgoing) durante a transição */}
+        {/* Slide Saindo (Outgoing) durante a transição com fade out e sutil drift */}
         {outgoingSrc && isTransitioning && (
           <div
             key={`outgoing-${outgoingSrc}-${outgoingIndex}`}
-            className={`absolute inset-0 w-full h-full flex items-center justify-center pointer-events-none transition-all duration-500 ease-out transform-gpu ${
+            className={`absolute inset-0 w-full h-full flex items-center justify-center pointer-events-none transform-gpu ${
               direction === "next"
-                ? "-translate-x-full opacity-0 scale-95"
-                : "translate-x-full opacity-0 scale-95"
+                ? "animate-totem-outgoing-next"
+                : "animate-totem-outgoing-prev"
             }`}
             style={{ willChange: "transform, opacity" }}
           >
@@ -271,14 +271,14 @@ export function ModelImageCarousel({
           </div>
         )}
 
-        {/* Slide Entrando / Ativo (Incoming / Active) */}
+        {/* Slide Entrando / Ativo (Incoming / Active) com fade in e sutil aproximação */}
         <div
           key={`current-${currentSrc}-${currentIndex}`}
-          className={`absolute inset-0 w-full h-full flex items-center justify-center pointer-events-auto transition-all duration-500 ease-out transform-gpu ${
+          className={`absolute inset-0 w-full h-full flex items-center justify-center pointer-events-auto transform-gpu ${
             isTransitioning
               ? direction === "next"
-                ? "animate-totem-slide-in-right"
-                : "animate-totem-slide-in-left"
+                ? "animate-totem-incoming-next"
+                : "animate-totem-incoming-prev"
               : "translate-x-0 opacity-100 scale-100"
           }`}
           style={{ willChange: "transform, opacity" }}
