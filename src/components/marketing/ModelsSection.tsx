@@ -6,7 +6,7 @@ import { CabinetModel } from "@/types/catalog";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
 import { Card, Button, Badge } from "@/components/ui";
 import { ArrowRight, Maximize2, Shield, Wrench, Play } from "lucide-react";
-import { InstagramVideoModal, InstagramGlyph } from "@/components/media";
+import { InstagramVideoModal, InstagramGlyph, ModelImageCarousel } from "@/components/media";
 
 interface ModelsSectionProps {
   onSelectModelToConfigure: (modelId: string) => void;
@@ -127,16 +127,24 @@ export const ModelsSection: React.FC<ModelsSectionProps> = ({
                 className="flex flex-col justify-between p-6 rounded-[28px] border border-black/5 dark:border-slate-800 bg-white dark:bg-slate-900/70 shadow-lg dark:shadow-2xl transition-all hover:shadow-xl dark:hover:border-slate-700"
               >
                 <div>
-                  {/* Imagem do Modelo com Botão de Vídeo Instagram */}
-                  <div className="relative aspect-[3/4] w-full rounded-2xl bg-[#f5f5f7] dark:bg-slate-950/70 border border-black/5 dark:border-slate-800/80 p-6 flex items-center justify-center mb-6 overflow-hidden group">
-                    <img
-                      src={model.mainImage}
+                  {/* Imagem do Modelo com Carrossel de Fotos Reais */}
+                  <div className="relative aspect-[3/4] w-full rounded-2xl bg-[#f5f5f7] dark:bg-slate-950/70 border border-black/5 dark:border-slate-800/80 p-3 sm:p-5 flex items-center justify-center mb-6 overflow-hidden group">
+                    <ModelImageCarousel
+                      images={
+                        Array.isArray(model.images) && model.images.length > 0
+                          ? model.images
+                          : [model.mainImage]
+                      }
                       alt={model.name}
-                      className="h-full w-auto object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.15)] dark:drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)] transition-transform duration-300 group-hover:scale-105"
+                      intervalMs={10000}
+                      className="h-full w-full"
+                      showDots={true}
+                      showArrows={true}
+                      showCounter={true}
                     />
 
                     <div className="absolute top-3 right-3 z-10">
-                      <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 bg-white/90 dark:bg-slate-900/90 border border-black/5 dark:border-slate-800 px-2.5 py-0.5 rounded-full shadow-sm">
+                      <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 bg-white/90 dark:bg-slate-900/90 border border-black/5 dark:border-slate-800 px-2.5 py-0.5 rounded-full shadow-sm backdrop-blur-sm">
                         {model.slug === "floor" ? "Mais Popular" : "Sob Medida"}
                       </span>
                     </div>

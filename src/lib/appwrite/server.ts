@@ -193,7 +193,19 @@ export async function getAppwriteCatalog() {
         if (doc.dimensions_json) dims = JSON.parse(doc.dimensions_json);
       } catch (e) {}
 
-      const galleryImages = Array.isArray(dims?.images) ? dims.images : [doc.main_image];
+      let galleryImages = Array.isArray(dims?.images) ? dims.images : [doc.main_image];
+      const nonSvgImages = galleryImages.filter(
+        (img: string) => typeof img === "string" && !img.endsWith(".svg")
+      );
+      if (nonSvgImages.length > 0) {
+        galleryImages = nonSvgImages;
+      }
+
+      const effectiveMainImage =
+        doc.main_image && !doc.main_image.endsWith(".svg")
+          ? doc.main_image
+          : galleryImages[0] || doc.main_image;
+
       const videoList = Array.isArray(dims?.videoUrls)
         ? dims.videoUrls
         : Array.isArray(dims?.instagramVideos)
@@ -208,7 +220,7 @@ export async function getAppwriteCatalog() {
         basePriceCents: doc.base_price_cents,
         active: doc.active,
         sortOrder: doc.sort_order,
-        mainImage: doc.main_image,
+        mainImage: effectiveMainImage,
         images: galleryImages,
         videoUrls: videoList,
         instagramVideos: videoList,

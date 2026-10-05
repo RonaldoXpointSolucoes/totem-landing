@@ -12,6 +12,14 @@ interface StepModelProps {
   onSelectModel: (model: CabinetModel) => void;
 }
 
+const getModelThumbnail = (model: CabinetModel): string => {
+  const images = [model.mainImage, ...(model.images || []), ...(model.dimensions?.images || [])].filter(Boolean);
+  const realPhoto = images.find(
+    (img) => !img.toLowerCase().endsWith(".svg") && !img.includes("data:image/svg")
+  );
+  return realPhoto || model.mainImage || "/images/totems/wall/wall-white-1.png";
+};
+
 export const StepModel: React.FC<StepModelProps> = ({
   models,
   selectedModel,
@@ -47,7 +55,7 @@ export const StepModel: React.FC<StepModelProps> = ({
               <div className="w-20 h-24 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-black/10 dark:border-slate-800 p-2 flex items-center justify-center shrink-0 self-start shadow-inner">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={model.mainImage}
+                  src={getModelThumbnail(model)}
                   alt={model.name}
                   className="h-full w-auto object-contain drop-shadow-md"
                 />
@@ -124,7 +132,7 @@ export const StepModel: React.FC<StepModelProps> = ({
                 <div className="relative h-28 lg:h-32 w-full rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-black/10 dark:border-slate-800 p-2 flex items-center justify-center mb-3 transition-colors">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={model.mainImage}
+                    src={getModelThumbnail(model)}
                     alt={model.name}
                     className="h-full w-auto object-contain drop-shadow-md transition-transform duration-300 group-hover:scale-105"
                   />

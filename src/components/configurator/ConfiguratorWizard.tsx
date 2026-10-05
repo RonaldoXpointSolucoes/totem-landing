@@ -28,6 +28,7 @@ import {
   ArrowRight,
   RotateCcw,
   Box,
+  Image as ImageIcon,
   Palette,
   Tv,
   Printer,
@@ -297,10 +298,10 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                   });
                 }}
                 className="lg:hidden px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-indigo-950/40 hover:bg-blue-100 border border-blue-200 dark:border-indigo-800 text-[#0071e3] dark:text-cyan-300 text-[11px] font-bold flex items-center gap-1 active:scale-95 transition-all shadow-sm cursor-pointer"
-                title="Visualizar Totem em 3D 360°"
+                title="Ver Fotos e Vídeos do Totem"
               >
-                <Box className="w-3 h-3 text-[#0071e3] dark:text-cyan-300" />
-                <span>Ver 3D</span>
+                <ImageIcon className="w-3 h-3 text-[#0071e3] dark:text-cyan-300" />
+                <span>Ver Fotos</span>
               </button>
 
               <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500 font-medium">
@@ -357,12 +358,12 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                 <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   Visualização do Totem
                 </span>
-                <Badge variant="accent" className="text-[9px]">
-                  3D Ready
+                <Badge variant="secondary" className="text-[9px]">
+                  Fotos Reais
                 </Badge>
               </div>
 
-              {/* Visualizador 2D/3D com Altura Balanceada */}
+              {/* Visualizador de Fotos e Vídeos com Carrossel Automático de 10s */}
               <div className="flex-1 min-h-0 flex items-center justify-center">
                 <TotemViewer3DWrapper
                   selectedModel={selectedModel}
@@ -537,12 +538,12 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
         </div>
       </Modal>
 
-      {/* Modal de Visualização 3D Mobile */}
+      {/* Modal de Visualização de Fotos e Vídeos Mobile */}
       <Modal
         isOpen={isMobileViewerOpen}
         onClose={() => setIsMobileViewerOpen(false)}
-        title="Visualizador 3D — Totem Pro"
-        description="Gire o modelo em 360° com o dedo, inspecione a furação CNC e abra a porta técnica."
+        title={`Galeria Oficial — ${selectedModel.name}`}
+        description="Carrossel automático a cada 10 segundos com controle manual e fotos industriais em alta resolução."
         className="max-w-2xl sm:max-w-2xl p-4 sm:p-6"
       >
         <div className="py-1">
