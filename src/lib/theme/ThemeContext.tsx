@@ -13,46 +13,30 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("light");
-  const [mounted, setMounted] = useState(false);
+  const [theme] = useState<Theme>("light");
 
   useEffect(() => {
-    // Carrega tema salvo ou padrão light (tema Apple)
-    const savedTheme = localStorage.getItem("totem_pro_theme") as Theme | null;
-    if (savedTheme === "light" || savedTheme === "dark") {
-      setThemeState(savedTheme);
-      applyTheme(savedTheme);
-    } else {
-      // Padrão: light (estilo Apple iMac solicitado)
-      setThemeState("light");
-      applyTheme("light");
+    // Força tema claro uniforme em todo o site
+    try {
+      localStorage.removeItem("totem_pro_theme");
+      const root = document.documentElement;
+      root.classList.remove("dark");
+      root.classList.add("light");
+    } catch (e) {
+      // Ignora erro em ambientes restritos de storage
     }
-    setMounted(true);
   }, []);
 
-  const applyTheme = (t: Theme) => {
-    const root = document.documentElement;
-    if (t === "dark") {
-      root.classList.add("dark");
-      root.classList.remove("light");
-    } else {
-      root.classList.add("light");
-      root.classList.remove("dark");
-    }
-  };
-
-  const setTheme = (newTheme: Theme) => {
-    setThemeState(newTheme);
-    localStorage.setItem("totem_pro_theme", newTheme);
-    applyTheme(newTheme);
+  const setTheme = () => {
+    // Modo claro permanente
   };
 
   const toggleTheme = () => {
-    setTheme(theme === "light" ? "dark" : "light");
+    // Modo claro permanente
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme: "light", setTheme, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );

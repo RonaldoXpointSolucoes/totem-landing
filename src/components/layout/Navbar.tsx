@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Cpu, ArrowRight, ArrowLeft, ShoppingCart } from "lucide-react";
 import { useCart } from "@/modules/cart/CartContext";
-import { Button, ThemeToggle } from "@/components/ui";
+import { Button } from "@/components/ui";
 
 interface NavbarProps {
   className?: string;
@@ -93,9 +93,6 @@ export const Navbar: React.FC<NavbarProps> = ({ className = "" }) => {
 
         {/* Ações / Utilitários do Header */}
         <div className="flex items-center gap-2.5 sm:gap-3">
-          {/* Alternador de Tema Claro (Apple) / Escuro */}
-          <ThemeToggle />
-
           {/* Botão de Carrinho com Badge Reativo */}
           <Link
             href="/carrinho"

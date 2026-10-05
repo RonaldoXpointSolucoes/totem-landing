@@ -26,6 +26,7 @@ import {
   Check,
   MapPin,
   Package,
+  Loader2,
 } from "lucide-react";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 
@@ -97,6 +98,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [isLoadingCep, setIsLoadingCep] = useState(false);
+  const [cepSuccess, setCepSuccess] = useState(false);
 
   // Estados Pix
   const [copied, setCopied] = useState(false);
@@ -218,32 +220,77 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   const shippingCents = selectedShippingQuote ? selectedShippingQuote.priceCents : 0;
   const finalTotalCents = totalPriceCents + shippingCents;
 
-  // Busca automática de CEP via ViaCEP
+  // Busca automática de CEP com alta resiliência (Timeout ViaCEP + Fallback BrasilAPI)
   const handleCepChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawVal = e.target.value;
     const masked = maskCEP(rawVal);
     setCep(masked);
+    setCepSuccess(false);
 
     const cleanCep = rawVal.replace(/\D/g, "");
     if (cleanCep.length === 8) {
       setIsLoadingCep(true);
       setErrorMsg(null);
+
       // Dispara cotação de frete em paralelo
       fetchShippingQuotes(cleanCep);
 
       try {
-        const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
-        const data = await res.json();
-        if (data.erro) {
-          setErrorMsg("CEP não encontrado. Por favor, preencha o endereço manualmente.");
+        let foundData: { logradouro?: string; bairro?: string; localidade?: string; uf?: string } | null = null;
+
+        // 1. Tentativa ViaCEP com timeout de 2.5s via AbortController
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+        try {
+          const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`, {
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+          if (res.ok) {
+            const data = await res.json();
+            if (!data.erro) {
+              foundData = {
+                logradouro: data.logradouro || "",
+                bairro: data.bairro || "",
+                localidade: data.localidade || "",
+                uf: data.uf || "",
+              };
+            }
+          }
+        } catch {
+          clearTimeout(timeoutId);
+        }
+
+        // 2. Fallback imediato: BrasilAPI se o ViaCEP demorar ou falhar
+        if (!foundData) {
+          try {
+            const resFallback = await fetch(`https://brasilapi.com.br/api/cep/v1/${cleanCep}`);
+            if (resFallback.ok) {
+              const dataFallback = await resFallback.json();
+              foundData = {
+                logradouro: dataFallback.street || "",
+                bairro: dataFallback.neighborhood || "",
+                localidade: dataFallback.city || "",
+                uf: dataFallback.state || "",
+              };
+            }
+          } catch {
+            // Falha silenciosa no fallback
+          }
+        }
+
+        if (foundData) {
+          setStreet(foundData.logradouro || "");
+          setNeighborhood(foundData.bairro || "");
+          setCity(foundData.localidade || "");
+          setState(foundData.uf || "");
+          setCepSuccess(true);
         } else {
-          setStreet(data.logradouro || "");
-          setNeighborhood(data.bairro || "");
-          setCity(data.localidade || "");
-          setState(data.uf || "");
+          setErrorMsg("CEP não encontrado nas bases oficiais. Por favor, preencha o endereço manualmente.");
         }
       } catch (err) {
-        console.error("Erro ao consultar ViaCEP:", err);
+        console.error("Erro na consulta de CEP:", err);
       } finally {
         setIsLoadingCep(false);
       }
@@ -847,27 +894,48 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
 
           {/* Card 2: Endereço de Entrega */}
           <Card className="p-5 sm:p-6 border-black/10 dark:border-slate-800 bg-white dark:bg-slate-900/60 backdrop-blur-xl space-y-5 shadow-sm dark:shadow-xl">
-            <div className="pb-3 border-b border-black/10 dark:border-slate-800 flex items-center justify-between">
+            <div className="pb-3 border-b border-black/10 dark:border-slate-800 flex items-center justify-between flex-wrap gap-2">
               <h2 className="text-sm font-bold text-[#1d1d1f] dark:text-white flex items-center gap-2">
                 <Truck className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
                 2. Endereço de Entrega da Carga
               </h2>
-              {isLoadingCep && (
-                <span className="text-[11px] text-[#0071e3] dark:text-cyan-400 animate-pulse">Buscando CEP...</span>
-              )}
+              {isLoadingCep ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-[#0071e3] text-xs font-semibold animate-pulse">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Consultando CEP...</span>
+                </span>
+              ) : cepSuccess ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold animate-in fade-in">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Endereço preenchido</span>
+                </span>
+              ) : null}
             </div>
 
             <div className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">CEP *</label>
-                  <Input
-                    type="text"
-                    placeholder="00000-000"
-                    value={cep}
-                    onChange={handleCepChange}
-                    required
-                  />
+                  <div className="relative">
+                    <Input
+                      type="text"
+                      placeholder="00000-000"
+                      value={cep}
+                      onChange={handleCepChange}
+                      required
+                      className={isLoadingCep ? "pr-9 border-[#0071e3] ring-1 ring-[#0071e3]/20" : ""}
+                    />
+                    {isLoadingCep && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <Loader2 className="w-4 h-4 text-[#0071e3] animate-spin" />
+                      </div>
+                    )}
+                    {!isLoadingCep && cepSuccess && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in zoom-in" />
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="sm:col-span-2 flex items-end">
                   <span className="text-[11px] text-slate-500 mb-2">
@@ -881,10 +949,11 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Logradouro / Rua *</label>
                   <Input
                     type="text"
-                    placeholder="Ex: Av. Paulista"
+                    placeholder={isLoadingCep ? "Buscando logradouro..." : "Ex: Av. Paulista"}
                     value={street}
                     onChange={(e) => setStreet(e.target.value)}
                     required
+                    className={isLoadingCep ? "animate-pulse bg-blue-50/30" : ""}
                   />
                 </div>
                 <div>
@@ -913,10 +982,11 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Bairro *</label>
                   <Input
                     type="text"
-                    placeholder="Bela Vista"
+                    placeholder={isLoadingCep ? "Buscando bairro..." : "Bela Vista"}
                     value={neighborhood}
                     onChange={(e) => setNeighborhood(e.target.value)}
                     required
+                    className={isLoadingCep ? "animate-pulse bg-blue-50/30" : ""}
                   />
                 </div>
                 <div>
@@ -924,11 +994,11 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   <div className="flex gap-2">
                     <Input
                       type="text"
-                      placeholder="São Paulo"
+                      placeholder={isLoadingCep ? "Buscando cidade..." : "São Paulo"}
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
                       required
-                      className="flex-1"
+                      className={`flex-1 ${isLoadingCep ? "animate-pulse bg-blue-50/30" : ""}`}
                     />
                     <Input
                       type="text"
@@ -947,15 +1017,15 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
 
           {/* Card 3: Opções de Frete e Retirada */}
           <Card className="p-5 sm:p-6 border-black/10 dark:border-slate-800 bg-white dark:bg-slate-900/60 backdrop-blur-xl space-y-4 shadow-sm dark:shadow-xl">
-            <div className="pb-3 border-b border-black/10 dark:border-slate-800 flex items-center justify-between">
+            <div className="pb-3 border-b border-black/10 dark:border-slate-800 flex items-center justify-between flex-wrap gap-2">
               <h2 className="text-sm font-bold text-[#1d1d1f] dark:text-white flex items-center gap-2">
                 <Truck className="w-4 h-4 text-[#0071e3] dark:text-indigo-400" />
                 3. Modalidade de Envio & Frete
               </h2>
               {isLoadingShipping && (
-                <span className="text-[11px] text-[#0071e3] dark:text-indigo-400 font-semibold animate-pulse flex items-center gap-1.5">
-                  <span className="w-3 h-3 border-2 border-[#0071e3] border-t-transparent rounded-full animate-spin" />
-                  Calculando cotações...
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-[#0071e3] text-xs font-semibold animate-pulse">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Calculando opções oficiais...</span>
                 </span>
               )}
             </div>
@@ -967,7 +1037,8 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
               </div>
             )}
 
-            {cep.replace(/\D/g, "").length !== 8 && shippingQuotes.length === 0 ? (
+            {/* Estado 1: Nenhum CEP digitado ainda */}
+            {cep.replace(/\D/g, "").length !== 8 && shippingQuotes.length === 0 && !isLoadingShipping ? (
               <div className="p-5 rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-dashed border-black/15 dark:border-slate-800 text-center text-xs text-slate-500">
                 <Truck className="w-8 h-8 mx-auto mb-2 text-slate-400 stroke-[1.5]" />
                 <p className="font-semibold text-slate-700 dark:text-slate-300">
@@ -977,8 +1048,53 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   O sistema calculará automaticamente os prazos e taxas oficiais para Correios (SEDEX / PAC com contrato), Transportadora Rodoviária Especial e Retirada Grátis.
                 </p>
               </div>
+            ) : isLoadingShipping && shippingQuotes.length === 0 ? (
+              /* Estado 2: Loading Inicial com Skeletons Dinâmicos */
+              <div className="space-y-3 animate-in fade-in duration-300">
+                <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-[#0071e3] text-white flex items-center justify-center shrink-0 shadow-sm">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-[#1d1d1f]">Calculando Melhores Opções de Envio</span>
+                      <span className="text-[10px] font-semibold text-[#0071e3] bg-white px-2 py-0.5 rounded-full border border-blue-200">
+                        Auditando ECT
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Consultando tabelas dos Correios (SEDEX / PAC) e rotas industriais para o CEP {cep}...
+                    </p>
+                  </div>
+                </div>
+
+                {/* Skeletons animados das opções */}
+                {[1, 2, 3].map((idx) => (
+                  <div
+                    key={idx}
+                    className="p-3.5 rounded-xl border border-black/10 bg-slate-50/50 space-y-2 animate-pulse"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded-full bg-slate-200" />
+                        <div className="h-4 bg-slate-200 rounded w-36" />
+                      </div>
+                      <div className="h-4 bg-blue-100 rounded w-20" />
+                    </div>
+                    <div className="h-3 bg-slate-100 rounded w-48 ml-6" />
+                  </div>
+                ))}
+              </div>
             ) : (
+              /* Estado 3: Cotações Carregadas com Sucesso */
               <div className="space-y-3">
+                {isLoadingShipping && shippingQuotes.length > 0 && (
+                  <div className="p-2 rounded-lg bg-blue-50 border border-blue-200 text-[#0071e3] text-xs font-semibold flex items-center gap-2 animate-pulse">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Recalculando cotações com base no novo endereço...</span>
+                  </div>
+                )}
+
                 <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 text-[11px] text-emerald-800 dark:text-emerald-300">
                   <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                   <span>
@@ -1128,7 +1244,12 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
               <div className="flex justify-between text-slate-600 dark:text-slate-400 items-center">
                 <span>Frete / Entrega:</span>
                 <span className="font-semibold">
-                  {selectedShippingQuote ? (
+                  {isLoadingShipping ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs text-[#0071e3] font-semibold animate-pulse">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Calculando...
+                    </span>
+                  ) : selectedShippingQuote ? (
                     selectedShippingQuote.priceCents === 0 ? (
                       <span className="text-emerald-600 dark:text-emerald-400 font-bold">Grátis (Retirada)</span>
                     ) : (
@@ -1168,9 +1289,9 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
               className="w-full font-bold shadow-blue-500/25 shadow-lg text-sm bg-[#0071e3] hover:bg-[#0077ed]"
             >
               {isSubmitting ? (
-                <span className="flex items-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Processando Pedido...
+                <span className="flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  <span>Processando Pedido e Gerando Pix...</span>
                 </span>
               ) : (
                 <>
