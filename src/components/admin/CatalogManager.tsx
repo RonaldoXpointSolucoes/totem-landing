@@ -27,9 +27,11 @@ import {
   Box,
   Wrench,
   Tv,
+  Film,
 } from "lucide-react";
 import { CatalogItemModal } from "./CatalogItemModal";
 import { CatalogPhotoLightbox } from "./CatalogPhotoLightbox";
+import { InstagramVideoModal, InstagramGlyph } from "@/components/media";
 
 interface CatalogManagerProps {
   catalogData: any;
@@ -62,6 +64,11 @@ export function CatalogManager({
   const [lightboxTitle, setLightboxTitle] = useState("");
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
 
+  // Modal de Vídeos do Instagram
+  const [videoModalOpen, setVideoModalOpen] = useState(false);
+  const [videoModalUrl, setVideoModalUrl] = useState("");
+  const [videoModalTitle, setVideoModalTitle] = useState("");
+
   // Edição rápida de preço in-line
   const [inlineEditingId, setInlineEditingId] = useState<string | null>(null);
   const [inlinePriceCents, setInlinePriceCents] = useState<number>(0);
@@ -90,6 +97,28 @@ export function CatalogManager({
     setLightboxTitle(title);
     setLightboxImages(images);
     setLightboxOpen(true);
+  };
+
+  // Helper para extrair vídeos do modelo
+  const getModelVideos = (model: any): string[] => {
+    let list: string[] = [];
+    try {
+      if (model.dimensions_json) {
+        const parsed = JSON.parse(model.dimensions_json);
+        if (Array.isArray(parsed.videoUrls)) list = [...list, ...parsed.videoUrls];
+        else if (Array.isArray(parsed.instagramVideos)) list = [...list, ...parsed.instagramVideos];
+      }
+    } catch (e) {}
+    if (Array.isArray(model.videoUrls)) list = [...list, ...model.videoUrls];
+    if (Array.isArray(model.instagramVideos)) list = [...list, ...model.instagramVideos];
+    return Array.from(new Set(list.filter(Boolean)));
+  };
+
+  // Abrir Modal de Vídeo
+  const handleOpenVideoModal = (title: string, url: string) => {
+    setVideoModalTitle(title);
+    setVideoModalUrl(url);
+    setVideoModalOpen(true);
   };
 
   // Abrir Modal para Criar Novo
@@ -546,6 +575,7 @@ export function CatalogManager({
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {filteredModels.map((model: any) => {
                 const images = getModelImages(model);
+                const videos = getModelVideos(model);
                 const isInlineEditing = inlineEditingId === model.$id;
 
                 let dimensions: any = {};
@@ -615,11 +645,23 @@ export function CatalogManager({
                         {images.length > 0 && (
                           <button
                             onClick={() => handleOpenLightbox(model.name, images)}
-                            className="absolute bottom-3 right-3 px-2.5 py-1 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 text-[10px] font-bold flex items-center gap-1.5 shadow-md backdrop-blur-md transition-all active:scale-95"
+                            className="absolute bottom-3 right-3 px-2.5 py-1 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 text-[10px] font-bold flex items-center gap-1.5 shadow-md backdrop-blur-md transition-all active:scale-95 z-10"
                           >
                             <ImageIcon className="w-3 h-3 text-indigo-400" />
                             <span>📷 {images.length} fotos</span>
                             <Maximize2 className="w-2.5 h-2.5 opacity-60 ml-0.5" />
+                          </button>
+                        )}
+
+                        {/* Botão de Ver Vídeo do Instagram */}
+                        {videos.length > 0 && (
+                          <button
+                            onClick={() => handleOpenVideoModal(model.name, videos[0])}
+                            className="absolute bottom-3 left-3 px-2.5 py-1 rounded-xl bg-gradient-to-r from-amber-500/90 via-rose-500/90 to-purple-600/90 hover:brightness-110 text-white border border-rose-400/40 text-[10px] font-bold flex items-center gap-1.5 shadow-lg shadow-rose-500/20 backdrop-blur-md transition-all active:scale-95 cursor-pointer z-10"
+                            title="Assistir Vídeo do Instagram"
+                          >
+                            <InstagramGlyph className="w-3 h-3 text-white" />
+                            <span>🎬 {videos.length} vídeo{videos.length > 1 ? "s" : ""}</span>
                           </button>
                         )}
                       </div>
@@ -1225,6 +1267,16 @@ export function CatalogManager({
         onClose={() => setLightboxOpen(false)}
         title={lightboxTitle}
         images={lightboxImages}
+      />
+
+      {/* ======================================================== */}
+      {/* MODAL DE VÍDEO DO INSTAGRAM */}
+      {/* ======================================================== */}
+      <InstagramVideoModal
+        isOpen={videoModalOpen}
+        onClose={() => setVideoModalOpen(false)}
+        videoUrl={videoModalUrl}
+        productName={videoModalTitle}
       />
     </div>
   );

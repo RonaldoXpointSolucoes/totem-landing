@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Sparkles, ArrowRight, ChevronRight, Check } from "lucide-react";
+import { InstagramVideoModal, InstagramGlyph } from "@/components/media";
 
 interface AppleHeroProps {
   onStartConfigurator: () => void;
@@ -23,6 +24,7 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeStick, setActiveStick] = useState<number | null>(null);
   const [hoveredTotem, setHoveredTotem] = useState<number | null>(null);
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
 
   useEffect(() => {
     // Gatilho imediato pós-hidratação com easing cinemático Apple
@@ -263,19 +265,27 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
           </p>
         </div>
 
-        {/* Botão Pill Azul Apple & Link Secundário */}
+        {/* Botão Pill Azul Apple, Ver Vídeos no Instagram & Link Secundário */}
         <div
-          className={`mt-8 flex flex-col sm:flex-row items-center justify-center gap-4 transition-all duration-800 ease-out ${
+          className={`mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 transition-all duration-800 ease-out ${
             isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
           }`}
           style={{ transitionDelay: isLoaded ? "540ms" : "0ms" }}
         >
           <button
             onClick={onStartConfigurator}
-            className="w-full sm:w-auto px-8 py-3.5 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white font-semibold text-sm sm:text-base transition-all duration-200 shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/35 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full sm:w-auto px-7 py-3.5 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white font-semibold text-sm sm:text-base transition-all duration-200 shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/35 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
           >
             <span>Configurar meu Totem</span>
             <ArrowRight className="w-4 h-4" />
+          </button>
+
+          <button
+            onClick={() => setIsVideoModalOpen(true)}
+            className="w-full sm:w-auto px-5 py-3 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-900/90 dark:hover:bg-slate-800 text-[#1d1d1f] dark:text-white border border-rose-500/30 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
+          >
+            <InstagramGlyph className="w-4 h-4 text-rose-500" />
+            <span>Vídeos dos Totens</span>
           </button>
 
           <button
@@ -308,6 +318,15 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
           </div>
         </div>
       </div>
+
+      {/* Modal de Vídeo dos Totens no Instagram */}
+      <InstagramVideoModal
+        isOpen={isVideoModalOpen}
+        onClose={() => setIsVideoModalOpen(false)}
+        videoUrl="https://www.instagram.com/reel/C3floorDemo789/"
+        productName="Totem Pro Industrial"
+        title="Demonstração Real de Operação"
+      />
     </section>
   );
 }

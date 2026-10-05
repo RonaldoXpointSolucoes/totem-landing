@@ -15,6 +15,8 @@ export interface CabinetModel {
   sortOrder: number;
   mainImage: string;
   images?: string[];
+  videoUrls?: string[];
+  instagramVideos?: string[];
   weightKg?: number;
   package?: PackageDimensions;
   dimensions?: {
@@ -27,6 +29,8 @@ export interface CabinetModel {
     weightKg?: number;
     notes?: string;
     images?: string[];
+    videoUrls?: string[];
+    instagramVideos?: string[];
     package?: PackageDimensions;
     supportedScreenSizes?: string;
     printerSlot?: string;

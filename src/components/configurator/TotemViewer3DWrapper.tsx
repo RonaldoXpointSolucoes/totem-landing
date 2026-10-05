@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { CabinetModel, ColorOption } from "@/types/catalog";
 import { Badge, Button } from "@/components/ui";
-import { Box, Image as ImageIcon, RotateCw, Sparkles, AlertCircle, Wrench, ShieldCheck } from "lucide-react";
+import { Box, Image as ImageIcon, RotateCw, Sparkles, AlertCircle, Wrench, ShieldCheck, Film } from "lucide-react";
+import { InstagramVideoPlayer, InstagramGlyph } from "@/components/media";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 
@@ -20,8 +21,19 @@ export const TotemViewer3DWrapper: React.FC<TotemViewer3DWrapperProps> = ({
   hasPrinter = true,
   hasScanner = true,
 }) => {
-  // Modo de visualização: "2d" (estático) ou "3d" (interativo Three.js)
-  const [mode, setMode] = useState<"2d" | "3d">("2d");
+  // Lista de vídeos do Instagram extraídos do modelo
+  const modelVideos: string[] = useMemo(() => {
+    let list: string[] = [];
+    if (Array.isArray(selectedModel.videoUrls)) list = [...list, ...selectedModel.videoUrls];
+    if (Array.isArray(selectedModel.instagramVideos)) list = [...list, ...selectedModel.instagramVideos];
+    if (Array.isArray(selectedModel.dimensions?.videoUrls)) list = [...list, ...selectedModel.dimensions.videoUrls];
+    if (Array.isArray(selectedModel.dimensions?.instagramVideos)) list = [...list, ...selectedModel.dimensions.instagramVideos];
+    return Array.from(new Set(list.filter(Boolean)));
+  }, [selectedModel]);
+
+  // Modo de visualização: "2d" (estático), "3d" (interativo Three.js) ou "video" (Instagram Reels)
+  const [mode, setMode] = useState<"2d" | "3d" | "video">("2d");
+  const [activeVideoIndex, setActiveVideoIndex] = useState<number>(0);
   const [is3DLoaded, setIs3DLoaded] = useState<boolean>(false);
   const [isDoorOpen, setIsDoorOpen] = useState<boolean>(false);
   const [activeHotspotMessage, setActiveHotspotMessage] = useState<string | null>(null);
@@ -97,9 +109,11 @@ export const TotemViewer3DWrapper: React.FC<TotemViewer3DWrapperProps> = ({
     });
   };
 
+  const currentVideoUrl = modelVideos[activeVideoIndex] || modelVideos[0] || "";
+
   return (
     <div className="space-y-4">
-      {/* Barra de Alternância 2D / 3D */}
+      {/* Barra de Alternância 2D / 3D / Vídeo Instagram */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-[#f5f5f7] dark:bg-slate-900 border border-black/10 dark:border-slate-800 transition-colors">
           <button
@@ -133,11 +147,36 @@ export const TotemViewer3DWrapper: React.FC<TotemViewer3DWrapperProps> = ({
             <Box className="w-3.5 h-3.5" />
             <span>3D Interativo 360°</span>
           </button>
+
+          {modelVideos.length > 0 && (
+            <button
+              onClick={() => {
+                setMode("video");
+                trackEvent(ANALYTICS_EVENTS.INTERACT_3D, {
+                  action: "watch_instagram_video",
+                  modelId: selectedModel.id,
+                  modelName: selectedModel.name,
+                });
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                mode === "video"
+                  ? "bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 text-white shadow-md shadow-rose-500/25"
+                  : "text-slate-600 dark:text-slate-400 hover:text-rose-500 dark:hover:text-rose-400"
+              }`}
+            >
+              <InstagramGlyph className="w-3.5 h-3.5" />
+              <span>Vídeo (Instagram)</span>
+            </button>
+          )}
         </div>
 
         {mode === "3d" ? (
           <Badge variant="accent" className="text-[10px] animate-pulse">
             WebGL Live
+          </Badge>
+        ) : mode === "video" ? (
+          <Badge variant="accent" className="text-[10px] bg-gradient-to-r from-amber-500/20 to-rose-500/20 text-rose-500 border border-rose-500/30">
+            Reels Oficial
           </Badge>
         ) : (
           <Badge variant="secondary" className="text-[10px]">
@@ -146,7 +185,7 @@ export const TotemViewer3DWrapper: React.FC<TotemViewer3DWrapperProps> = ({
         )}
       </div>
 
-      {/* Janela de Visualização (2D vs 3D) com Altura Contida para Viewport-Fit */}
+      {/* Janela de Visualização (2D vs 3D vs Vídeo) */}
       <div className="relative h-[210px] sm:h-[240px] lg:h-[270px] w-full rounded-2xl sm:rounded-3xl bg-gradient-to-b from-[#f8f9fa] to-[#eceef1] dark:from-slate-950/80 dark:to-slate-900/80 border border-black/10 dark:border-slate-800 overflow-hidden shadow-md dark:shadow-xl flex flex-col items-center justify-center transition-colors">
         {mode === "2d" ? (
           /* MODO 2D: Imagem Estática Leve (<50KB) com máxima velocidade */
@@ -157,14 +196,58 @@ export const TotemViewer3DWrapper: React.FC<TotemViewer3DWrapperProps> = ({
               className="h-full w-auto object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.15)] dark:drop-shadow-[0_15px_30px_rgba(79,70,229,0.25)] transition-all duration-300"
             />
 
-            {/* Botão Convite para Ativar 3D */}
-            <button
-              onClick={() => setMode("3d")}
-              className="absolute bottom-11 px-3.5 py-1.5 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white text-[11px] font-bold shadow-md shadow-blue-500/25 flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 cursor-pointer"
-            >
-              <Box className="w-3.5 h-3.5" />
-              <span>Girar em 3D (360°)</span>
-            </button>
+            {/* Botões Convite para Ativar 3D ou Vídeo */}
+            <div className="absolute bottom-11 flex items-center gap-2 z-10">
+              <button
+                onClick={() => setMode("3d")}
+                className="px-3.5 py-1.5 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white text-[11px] font-bold shadow-md shadow-blue-500/25 flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+              >
+                <Box className="w-3.5 h-3.5" />
+                <span>Girar em 3D</span>
+              </button>
+
+              {modelVideos.length > 0 && (
+                <button
+                  onClick={() => setMode("video")}
+                  className="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 hover:brightness-110 text-white text-[11px] font-bold shadow-md shadow-rose-500/25 flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                  title="Assistir Reels do Instagram"
+                >
+                  <InstagramGlyph className="w-3.5 h-3.5" />
+                  <span>Ver Vídeo</span>
+                </button>
+              )}
+            </div>
+          </div>
+        ) : mode === "video" && currentVideoUrl ? (
+          /* MODO VÍDEO DO INSTAGRAM */
+          <div className="relative w-full h-full animate-in fade-in duration-300 bg-black flex flex-col items-center justify-center">
+            <InstagramVideoPlayer
+              url={currentVideoUrl}
+              title={`${selectedModel.name} no Instagram`}
+              showDirectButton={true}
+              className="w-full h-full"
+            />
+
+            {/* Alternador de Múltiplos Vídeos se houver */}
+            {modelVideos.length > 1 && (
+              <div className="absolute bottom-14 left-3 right-3 flex items-center justify-center gap-1.5 z-20 pointer-events-none">
+                <div className="pointer-events-auto flex items-center gap-1 p-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-slate-700 shadow-lg">
+                  {modelVideos.map((_, vIdx) => (
+                    <button
+                      key={vIdx}
+                      onClick={() => setActiveVideoIndex(vIdx)}
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all ${
+                        activeVideoIndex === vIdx
+                          ? "bg-rose-500 text-white"
+                          : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      Vídeo {vIdx + 1}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           /* MODO 3D: Iframe isolado em sandbox de alta performance */
@@ -198,7 +281,7 @@ export const TotemViewer3DWrapper: React.FC<TotemViewer3DWrapperProps> = ({
         )}
 
         {/* Indicador Inferior Permanente de Cor Selecionada */}
-        <div className="absolute bottom-3 left-3 right-3 p-2.5 rounded-2xl bg-white/90 dark:bg-slate-900/90 border border-black/10 dark:border-slate-800 flex items-center justify-between text-xs backdrop-blur-md shadow-sm">
+        <div className="absolute bottom-3 left-3 right-3 p-2.5 rounded-2xl bg-white/90 dark:bg-slate-900/90 border border-black/10 dark:border-slate-800 flex items-center justify-between text-xs backdrop-blur-md shadow-sm z-10">
           <div className="flex items-center gap-2">
             <span
               className="w-3.5 h-3.5 rounded-full border border-black/20 dark:border-slate-600 shadow-inner"

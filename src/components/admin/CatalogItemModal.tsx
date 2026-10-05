@@ -18,7 +18,12 @@ import {
   Package,
   Cpu,
   Tv,
+  Film,
+  ExternalLink,
+  Video,
 } from "lucide-react";
+import { InstagramVideoPlayer, InstagramGlyph } from "@/components/media";
+import { parseInstagramUrl, isValidVideoUrl } from "@/lib/media/videoUtils";
 
 interface CatalogItemModalProps {
   isOpen: boolean;
@@ -56,6 +61,9 @@ export function CatalogItemModal({
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [newImageUrl, setNewImageUrl] = useState("");
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
+  const [newVideoUrl, setNewVideoUrl] = useState("");
+  const [instagramVideos, setInstagramVideos] = useState<string[]>([]);
+  const [videoInputError, setVideoInputError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -95,6 +103,19 @@ export function CatalogItemModal({
       }
 
       setGalleryImages(Array.from(new Set(existingGallery)));
+
+      // Vídeos do Instagram unificados
+      let existingVideos: string[] = [];
+      if (Array.isArray(parsedDimensions.videoUrls) && parsedDimensions.videoUrls.length > 0) {
+        existingVideos = parsedDimensions.videoUrls;
+      } else if (Array.isArray(parsedDimensions.instagramVideos) && parsedDimensions.instagramVideos.length > 0) {
+        existingVideos = parsedDimensions.instagramVideos;
+      } else if (Array.isArray(initialItem.videoUrls) && initialItem.videoUrls.length > 0) {
+        existingVideos = initialItem.videoUrls;
+      } else if (Array.isArray(initialItem.instagramVideos) && initialItem.instagramVideos.length > 0) {
+        existingVideos = initialItem.instagramVideos;
+      }
+      setInstagramVideos(Array.from(new Set(existingVideos)));
 
       const loadedMaterial =
         parsedDimensions.material ||
@@ -149,6 +170,7 @@ export function CatalogItemModal({
           ? "/models/cabinet-floor.svg"
           : "";
       setGalleryImages(defaultImg ? [defaultImg] : []);
+      setInstagramVideos([]);
       setFormData({
         name: "",
         display_name: "",
@@ -190,6 +212,8 @@ export function CatalogItemModal({
     setErrorMessage("");
     setActiveTab("general");
     setNewImageUrl("");
+    setNewVideoUrl("");
+    setVideoInputError("");
   }, [isOpen, initialItem, collectionType]);
 
   if (!isOpen) return null;
@@ -245,6 +269,28 @@ export function CatalogItemModal({
     setFormData((prev) => ({ ...prev, main_image: url, image: url }));
   };
 
+  // Adicionar Vídeo do Instagram
+  const handleAddInstagramVideo = () => {
+    const url = newVideoUrl.trim();
+    if (!url) return;
+    setVideoInputError("");
+
+    if (!isValidVideoUrl(url)) {
+      setVideoInputError("Insira um link válido do Instagram (Reels ou Post) ou link de arquivo de vídeo.");
+      return;
+    }
+
+    if (!instagramVideos.includes(url)) {
+      setInstagramVideos((prev) => [...prev, url]);
+    }
+    setNewVideoUrl("");
+  };
+
+  // Remover Vídeo do Instagram
+  const handleRemoveInstagramVideo = (indexToRemove: number) => {
+    setInstagramVideos((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
   // Salvar Item
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -256,6 +302,12 @@ export function CatalogItemModal({
       let finalGallery = [...galleryImages];
       if (newImageUrl.trim() && !finalGallery.includes(newImageUrl.trim())) {
         finalGallery.push(newImageUrl.trim());
+      }
+
+      // Se o usuário digitou uma URL de vídeo mas não clicou em 'Adicionar':
+      let finalVideos = [...instagramVideos];
+      if (newVideoUrl.trim() && isValidVideoUrl(newVideoUrl.trim()) && !finalVideos.includes(newVideoUrl.trim())) {
+        finalVideos.push(newVideoUrl.trim());
       }
 
       const primaryImg =
@@ -294,6 +346,8 @@ export function CatalogItemModal({
             grossWeightKg: Number(formData.packageGrossWeightKg) || 16,
           },
           images: finalGallery.length > 0 ? finalGallery : [primaryImg || "/models/cabinet-floor.svg"],
+          videoUrls: finalVideos,
+          instagramVideos: finalVideos,
         };
 
         payload = {
@@ -472,9 +526,16 @@ export function CatalogItemModal({
           >
             <ImageIcon className="w-3.5 h-3.5" />
             <span>Fotos & Mídia</span>
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/40 text-slate-200">
-              {galleryImages.length}
-            </span>
+            <div className="flex items-center gap-1">
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/40 text-slate-200" title="Fotos">
+                📷 {galleryImages.length}
+              </span>
+              {instagramVideos.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-gradient-to-r from-amber-500 to-rose-500 text-white font-bold" title="Vídeos Instagram">
+                  🎬 {instagramVideos.length}
+                </span>
+              )}
+            </div>
           </button>
 
           {collectionType === "models" && (
@@ -1068,6 +1129,160 @@ export function CatalogItemModal({
                     })}
                   </div>
                 )}
+              </div>
+
+              {/* ======================================================== */}
+              {/* SEÇÃO EXCLUSIVA: VÍDEOS DO INSTAGRAM & DEMONSTRAÇÕES */}
+              {/* ======================================================== */}
+              <div className="pt-4 border-t border-slate-800/80 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 flex items-center justify-center shadow-md shadow-rose-500/20 text-white">
+                      <InstagramGlyph className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-white uppercase tracking-wider block">
+                        Vídeos do Instagram & Demonstrações Reais
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        Carregue e reproduza Reels ou publicações diretamente no site ou com redirecionamento ao app
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold text-rose-400 bg-rose-500/10 px-2.5 py-1 rounded-lg border border-rose-500/20">
+                    Instagram Reels
+                  </span>
+                </div>
+
+                {/* Campo de Inclusão de Vídeo */}
+                <div className="p-4 bg-slate-950/80 rounded-2xl border border-rose-500/30 space-y-3 shadow-inner">
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                    Adicionar Link de Vídeo do Instagram (Reels, Post ou Vídeo)
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={newVideoUrl}
+                      onChange={(e) => {
+                        setNewVideoUrl(e.target.value);
+                        if (videoInputError) setVideoInputError("");
+                      }}
+                      placeholder="https://www.instagram.com/reel/C-exemplo/ ou link do post"
+                      className="flex-1 px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs focus:border-rose-500 focus:outline-none font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddInstagramVideo}
+                      className="px-4 py-2.5 bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 hover:brightness-110 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-rose-500/20 shrink-0 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Adicionar Vídeo</span>
+                    </button>
+                  </div>
+
+                  {videoInputError && (
+                    <div className="text-rose-400 text-xs flex items-center gap-1.5 pt-1">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      <span>{videoInputError}</span>
+                    </div>
+                  )}
+
+                  {/* Sugestões Rápidas de Vídeo */}
+                  <div className="flex flex-wrap gap-2 pt-1 text-[11px] text-slate-400 items-center">
+                    <span className="font-semibold text-slate-300">Sugestões de teste:</span>
+                    <button
+                      type="button"
+                      onClick={() => setNewVideoUrl("https://www.instagram.com/reel/C3wallDemo123/")}
+                      className="hover:text-rose-400 underline"
+                    >
+                      Demo Totem Parede
+                    </button>
+                    <span>•</span>
+                    <button
+                      type="button"
+                      onClick={() => setNewVideoUrl("https://www.instagram.com/reel/C3floorDemo789/")}
+                      className="hover:text-rose-400 underline"
+                    >
+                      Demo Totem Pedestal
+                    </button>
+                  </div>
+                </div>
+
+                {/* Grid de Vídeos do Instagram Cadastrados */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                      Vídeos Vinculados ({instagramVideos.length})
+                    </span>
+                    <span className="text-[11px] text-slate-500">
+                      Disponíveis no visualizador do configurador e na vitrine
+                    </span>
+                  </div>
+
+                  {instagramVideos.length === 0 ? (
+                    <div className="py-8 border-2 border-dashed border-slate-800 rounded-2xl flex flex-col items-center justify-center text-slate-500 gap-2">
+                      <Film className="w-7 h-7 opacity-40 text-rose-400" />
+                      <span className="text-xs">Nenhum vídeo do Instagram vinculado a este modelo ainda.</span>
+                      <span className="text-[10px] text-slate-600">Adicione links de Reels acima para exibir vídeos em alta conversão.</span>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {instagramVideos.map((videoUrl, vIdx) => {
+                        const parsed = parseInstagramUrl(videoUrl);
+                        return (
+                          <div
+                            key={vIdx}
+                            className="bg-slate-950 rounded-2xl border border-slate-800 hover:border-slate-700 p-3 flex flex-col justify-between space-y-3 transition-all shadow-md group"
+                          >
+                            <div className="h-44 w-full rounded-xl overflow-hidden bg-slate-900 border border-slate-800/80">
+                              <InstagramVideoPlayer
+                                url={videoUrl}
+                                compact={true}
+                                showDirectButton={false}
+                                className="h-full w-full"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="font-bold text-white flex items-center gap-1.5">
+                                  <InstagramGlyph className="w-3.5 h-3.5 text-rose-400" />
+                                  <span>Vídeo #{vIdx + 1}</span>
+                                </span>
+                                <span className="text-[10px] font-mono text-slate-400 bg-slate-900 px-2 py-0.5 rounded-md border border-slate-800">
+                                  {parsed.shortcode ? `ID: ${parsed.shortcode}` : "Vídeo Externo"}
+                                </span>
+                              </div>
+                              <p className="text-[11px] font-mono text-slate-500 truncate" title={videoUrl}>
+                                {videoUrl}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-1">
+                              <a
+                                href={parsed.canonicalUrl || videoUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex-1 py-1.5 px-2 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-all"
+                              >
+                                <span>Testar no Instagram</span>
+                                <ExternalLink className="w-3 h-3 opacity-70" />
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveInstagramVideo(vIdx)}
+                                className="py-1.5 px-3 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span>Remover</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}

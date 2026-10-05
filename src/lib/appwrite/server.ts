@@ -187,17 +187,34 @@ export async function getAppwriteCatalog() {
     ]);
 
   return {
-    cabinetModels: modelsRes.documents.map((doc: any) => ({
-      id: doc.$id,
-      name: doc.name,
-      slug: doc.slug,
-      description: doc.description,
-      basePriceCents: doc.base_price_cents,
-      active: doc.active,
-      sortOrder: doc.sort_order,
-      mainImage: doc.main_image,
-      dimensions: doc.dimensions_json ? JSON.parse(doc.dimensions_json) : undefined,
-    })),
+    cabinetModels: modelsRes.documents.map((doc: any) => {
+      let dims: any = undefined;
+      try {
+        if (doc.dimensions_json) dims = JSON.parse(doc.dimensions_json);
+      } catch (e) {}
+
+      const galleryImages = Array.isArray(dims?.images) ? dims.images : [doc.main_image];
+      const videoList = Array.isArray(dims?.videoUrls)
+        ? dims.videoUrls
+        : Array.isArray(dims?.instagramVideos)
+        ? dims.instagramVideos
+        : [];
+
+      return {
+        id: doc.$id,
+        name: doc.name,
+        slug: doc.slug,
+        description: doc.description,
+        basePriceCents: doc.base_price_cents,
+        active: doc.active,
+        sortOrder: doc.sort_order,
+        mainImage: doc.main_image,
+        images: galleryImages,
+        videoUrls: videoList,
+        instagramVideos: videoList,
+        dimensions: dims,
+      };
+    }),
     colors: colorsRes.documents.map((doc: any) => ({
       id: doc.$id,
       name: doc.name,

@@ -17,6 +17,9 @@ export const CABINET_MODELS: CabinetModel[] = [
     active: true,
     sortOrder: 1,
     mainImage: "/models/cabinet-wall.svg",
+    images: ["/models/cabinet-wall.svg"],
+    videoUrls: ["https://www.instagram.com/reel/C3wallDemo123/"],
+    instagramVideos: ["https://www.instagram.com/reel/C3wallDemo123/"],
     weightKg: 14.5,
     package: {
       heightCm: 90,
@@ -29,6 +32,8 @@ export const CABINET_MODELS: CabinetModel[] = [
       widthMm: 440,
       depthMm: 220,
       weightKg: 14.5,
+      videoUrls: ["https://www.instagram.com/reel/C3wallDemo123/"],
+      instagramVideos: ["https://www.instagram.com/reel/C3wallDemo123/"],
     },
   },
   {
@@ -41,6 +46,9 @@ export const CABINET_MODELS: CabinetModel[] = [
     active: true,
     sortOrder: 2,
     mainImage: "/models/cabinet-countertop.svg",
+    images: ["/models/cabinet-countertop.svg"],
+    videoUrls: ["https://www.instagram.com/reel/C3counterDemo456/"],
+    instagramVideos: ["https://www.instagram.com/reel/C3counterDemo456/"],
     weightKg: 11.0,
     package: {
       heightCm: 65,
@@ -53,6 +61,8 @@ export const CABINET_MODELS: CabinetModel[] = [
       widthMm: 400,
       depthMm: 290,
       weightKg: 11.0,
+      videoUrls: ["https://www.instagram.com/reel/C3counterDemo456/"],
+      instagramVideos: ["https://www.instagram.com/reel/C3counterDemo456/"],
     },
   },
   {
@@ -65,6 +75,9 @@ export const CABINET_MODELS: CabinetModel[] = [
     active: true,
     sortOrder: 3,
     mainImage: "/models/cabinet-floor.svg",
+    images: ["/models/cabinet-floor.svg"],
+    videoUrls: ["https://www.instagram.com/reel/C3floorDemo789/"],
+    instagramVideos: ["https://www.instagram.com/reel/C3floorDemo789/"],
     weightKg: 36.5,
     package: {
       heightCm: 170,
@@ -77,6 +90,8 @@ export const CABINET_MODELS: CabinetModel[] = [
       widthMm: 480,
       depthMm: 380,
       weightKg: 36.5,
+      videoUrls: ["https://www.instagram.com/reel/C3floorDemo789/"],
+      instagramVideos: ["https://www.instagram.com/reel/C3floorDemo789/"],
     },
   },
 ];
