@@ -85,9 +85,9 @@ export const Hero: React.FC<HeroProps> = ({ onStartConfigurator, onExploreModels
 
             <div className="relative w-full h-full flex flex-col items-center justify-center">
               <img
-                src="/models/cabinet-floor.svg"
+                src="/images/totems/floor/floor-white-1.png"
                 alt="Gabinete de Chão para Totem de Autoatendimento"
-                className="w-full h-full object-contain drop-shadow-[0_20px_40px_rgba(79,70,229,0.35)] transition-transform duration-500 group-hover:scale-105"
+                className="w-full h-full object-cover rounded-2xl drop-shadow-[0_20px_40px_rgba(79,70,229,0.35)] transition-transform duration-500 group-hover:scale-105"
               />
 
               {/* Tag Flutuante de Produto */}

@@ -16,8 +16,13 @@ export const CABINET_MODELS: CabinetModel[] = [
     basePriceCents: 99000, // R$ 990,00
     active: true,
     sortOrder: 1,
-    mainImage: "/models/cabinet-wall.svg",
-    images: ["/models/cabinet-wall.svg"],
+    mainImage: "/images/totems/wall/wall-white-1.png",
+    images: [
+      "/images/totems/wall/wall-white-1.png",
+      "/images/totems/wall/wall-black-18.png",
+      "/images/totems/wall/wall-black-white-39.png",
+      "/images/totems/wall/wall-white-2.png",
+    ],
     videoUrls: ["https://www.instagram.com/reel/C3wallDemo123/"],
     instagramVideos: ["https://www.instagram.com/reel/C3wallDemo123/"],
     weightKg: 14.5,
@@ -45,8 +50,13 @@ export const CABINET_MODELS: CabinetModel[] = [
     basePriceCents: 95000, // R$ 950,00
     active: true,
     sortOrder: 2,
-    mainImage: "/models/cabinet-countertop.svg",
-    images: ["/models/cabinet-countertop.svg"],
+    mainImage: "/images/totems/countertop/countertop-white-1.png",
+    images: [
+      "/images/totems/countertop/countertop-white-1.png",
+      "/images/totems/countertop/countertop-black-13.png",
+      "/images/totems/countertop/countertop-white-2.png",
+      "/images/totems/countertop/countertop-black-14.png",
+    ],
     videoUrls: ["https://www.instagram.com/reel/C3counterDemo456/"],
     instagramVideos: ["https://www.instagram.com/reel/C3counterDemo456/"],
     weightKg: 11.0,
@@ -74,8 +84,13 @@ export const CABINET_MODELS: CabinetModel[] = [
     basePriceCents: 149000, // R$ 1.490,00
     active: true,
     sortOrder: 3,
-    mainImage: "/models/cabinet-floor.svg",
-    images: ["/models/cabinet-floor.svg"],
+    mainImage: "/images/totems/floor/floor-white-1.png",
+    images: [
+      "/images/totems/floor/floor-white-1.png",
+      "/images/totems/floor/floor-black-31.png",
+      "/images/totems/led/led-white-1.png",
+      "/images/totems/floor/floor-white-2.png",
+    ],
     videoUrls: ["https://www.instagram.com/reel/C3floorDemo789/"],
     instagramVideos: ["https://www.instagram.com/reel/C3floorDemo789/"],
     weightKg: 36.5,
