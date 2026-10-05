@@ -61,8 +61,8 @@ export function InstagramVideoModal({
         </div>
 
         {/* Corpo com o Player de Vídeo */}
-        <div className="p-4 sm:p-5 flex-1 flex flex-col items-center justify-center overflow-y-auto">
-          <div className="w-full h-[480px] sm:h-[540px] max-h-[70vh]">
+        <div className="p-3 sm:p-5 flex-1 flex flex-col items-center justify-center overflow-y-auto">
+          <div className="w-full h-[520px] sm:h-[580px] max-h-[76vh]">
             <InstagramVideoPlayer
               url={videoUrl}
               title={title}

@@ -26,6 +26,11 @@ export function InstagramVideoPlayer({
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [iframeError, setIframeError] = useState(false);
 
+  React.useEffect(() => {
+    setIframeLoaded(false);
+    setIframeError(false);
+  }, [url]);
+
   const parsed = parseInstagramUrl(url);
 
   // Aspect ratio classes
@@ -113,6 +118,7 @@ export function InstagramVideoPlayer({
           className={`w-full h-full border-0 transition-opacity duration-300 ${
             iframeLoaded ? "opacity-100" : "opacity-0"
           }`}
+          scrolling="no"
           loading="lazy"
           allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
           allowFullScreen

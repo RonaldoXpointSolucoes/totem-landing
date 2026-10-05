@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { CABINET_MODELS } from "@/modules/catalog/catalogData";
+import { CabinetModel } from "@/types/catalog";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
 import { Card, Button, Badge } from "@/components/ui";
 import { ArrowRight, Maximize2, Shield, Wrench, Play } from "lucide-react";
@@ -14,9 +15,78 @@ interface ModelsSectionProps {
 export const ModelsSection: React.FC<ModelsSectionProps> = ({
   onSelectModelToConfigure,
 }) => {
+  const [models, setModels] = useState<CabinetModel[]>(CABINET_MODELS);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [currentVideoUrl, setCurrentVideoUrl] = useState("");
   const [currentModelName, setCurrentModelName] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadDynamicCatalog() {
+      try {
+        const res = await fetch("/api/catalog");
+        const json = await res.json();
+        if (
+          isMounted &&
+          json.ok &&
+          Array.isArray(json.data?.cabinetModels) &&
+          json.data.cabinetModels.length > 0
+        ) {
+          setModels((prevModels) =>
+            json.data.cabinetModels.map((serverModel: CabinetModel) => {
+              const localModel = prevModels.find(
+                (m) => m.id === serverModel.id || m.slug === serverModel.slug
+              );
+              if (!localModel) return serverModel;
+
+              // Extrai os vídeos do servidor (Appwrite) ou mantém os locais
+              const serverVideos =
+                (Array.isArray(serverModel.videoUrls) && serverModel.videoUrls.length > 0
+                  ? serverModel.videoUrls
+                  : Array.isArray(serverModel.instagramVideos) && serverModel.instagramVideos.length > 0
+                  ? serverModel.instagramVideos
+                  : Array.isArray(serverModel.dimensions?.videoUrls) && serverModel.dimensions.videoUrls.length > 0
+                  ? serverModel.dimensions.videoUrls
+                  : Array.isArray(serverModel.dimensions?.instagramVideos) && serverModel.dimensions.instagramVideos.length > 0
+                  ? serverModel.dimensions.instagramVideos
+                  : null);
+
+              const localVideos =
+                localModel.videoUrls && localModel.videoUrls.length > 0
+                  ? localModel.videoUrls
+                  : localModel.instagramVideos || [];
+
+              const effectiveVideos = serverVideos && serverVideos.length > 0 ? serverVideos : localVideos;
+
+              return {
+                ...localModel,
+                ...serverModel,
+                // Preserva fotos reais em alta resolução se o servidor tiver apenas SVG provisório
+                mainImage:
+                  serverModel.mainImage && !serverModel.mainImage.endsWith(".svg")
+                    ? serverModel.mainImage
+                    : localModel.mainImage || serverModel.mainImage,
+                images:
+                  Array.isArray(serverModel.images) &&
+                  serverModel.images.length > 0 &&
+                  !serverModel.images[0].endsWith(".svg")
+                    ? serverModel.images
+                    : localModel.images || serverModel.images,
+                videoUrls: effectiveVideos,
+                instagramVideos: effectiveVideos,
+              };
+            })
+          );
+        }
+      } catch (err) {
+        console.warn("Falha ao carregar catálogo dinâmico em ModelsSection:", err);
+      }
+    }
+    loadDynamicCatalog();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleOpenVideo = (name: string, url: string) => {
     setCurrentModelName(name);
@@ -42,7 +112,7 @@ export const ModelsSection: React.FC<ModelsSectionProps> = ({
 
         {/* Grid dos Modelos */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {CABINET_MODELS.map((model) => {
+          {models.map((model) => {
             const videoUrl =
               model.videoUrls?.[0] ||
               model.instagramVideos?.[0] ||

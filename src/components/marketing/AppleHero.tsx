@@ -323,7 +323,7 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
       <InstagramVideoModal
         isOpen={isVideoModalOpen}
         onClose={() => setIsVideoModalOpen(false)}
-        videoUrl="https://www.instagram.com/reel/C3floorDemo789/"
+        videoUrl="https://www.instagram.com/p/Dct5wckmKlZ/"
         productName="Totem Pro Industrial"
         title="Demonstração Real de Operação"
       />

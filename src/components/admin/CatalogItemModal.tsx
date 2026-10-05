@@ -1189,21 +1189,13 @@ export function CatalogItemModal({
 
                   {/* Sugestões Rápidas de Vídeo */}
                   <div className="flex flex-wrap gap-2 pt-1 text-[11px] text-slate-400 items-center">
-                    <span className="font-semibold text-slate-300">Sugestões de teste:</span>
+                    <span className="font-semibold text-slate-300">Sugestão de Reels Oficial:</span>
                     <button
                       type="button"
-                      onClick={() => setNewVideoUrl("https://www.instagram.com/reel/C3wallDemo123/")}
-                      className="hover:text-rose-400 underline"
+                      onClick={() => setNewVideoUrl("https://www.instagram.com/p/Dct5wckmKlZ/")}
+                      className="hover:text-rose-400 underline font-medium text-rose-300/90"
                     >
-                      Demo Totem Parede
-                    </button>
-                    <span>•</span>
-                    <button
-                      type="button"
-                      onClick={() => setNewVideoUrl("https://www.instagram.com/reel/C3floorDemo789/")}
-                      className="hover:text-rose-400 underline"
-                    >
-                      Demo Totem Pedestal
+                      Totem X-Point Oficial (Reels)
                     </button>
                   </div>
                 </div>

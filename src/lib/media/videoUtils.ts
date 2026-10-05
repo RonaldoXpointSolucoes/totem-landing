@@ -41,8 +41,8 @@ export function parseInstagramUrl(inputUrl: string): ParsedVideoInfo {
   }
 
   // Expressão regular robusta para extrair links do Instagram:
-  // Suporta instagram.com/reel/{code}, instagram.com/p/{code}, instagram.com/tv/{code}, instagr.am/...
-  const instagramRegex = /(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)\/(reel|reels|p|tv)\/([a-zA-Z0-9_-]+)/i;
+  // Suporta instagram.com/reel/{code}, instagram.com/p/{code}, instagram.com/tv/{code}, instagr.am/..., incluindo links com /share/
+  const instagramRegex = /(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)\/(?:share\/)?(reel|reels|p|tv)\/([a-zA-Z0-9_-]+)/i;
   const match = url.match(instagramRegex);
 
   if (match) {
