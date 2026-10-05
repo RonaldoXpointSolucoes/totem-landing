@@ -175,8 +175,8 @@ async function main() {
   await addIntegerAttribute('cabinet_models', 'base_price_cents', true);
   await addBooleanAttribute('cabinet_models', 'active', false, true);
   await addIntegerAttribute('cabinet_models', 'sort_order', false, 1);
-  await addStringAttribute('cabinet_models', 'main_image', 500, false);
-  await addStringAttribute('cabinet_models', 'dimensions_json', 1000, false);
+  await addStringAttribute('cabinet_models', 'main_image', 2000, false);
+  await addStringAttribute('cabinet_models', 'dimensions_json', 65535, false);
 
   // 2. colors
   await createCollection('colors', 'Cores e Acabamentos', publicReadPerms);
