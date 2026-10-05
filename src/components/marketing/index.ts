@@ -6,3 +6,4 @@ export * from "./HowItWorks";
 export * from "./Differentials";
 export * from "./FaqSection";
 export * from "./Footer";
+export * from "./FloatingWhatsAppButton";

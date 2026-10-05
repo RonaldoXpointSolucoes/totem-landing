@@ -3,6 +3,7 @@ import { siteConfig } from "@/config/site";
 import { ThemeProvider } from "@/lib/theme/ThemeContext";
 import { CartProvider } from "@/modules/cart/CartContext";
 import { MarketingPixels } from "@/components/analytics/MarketingPixels";
+import { FloatingWhatsAppButton } from "@/components/marketing/FloatingWhatsAppButton";
 import { FAQ_DATA } from "@/config/faqData";
 import "./globals.css";
 
@@ -131,7 +132,7 @@ const schemaOrgJsonLd = {
       },
       contactPoint: {
         "@type": "ContactPoint",
-        telephone: "+55-11-99999-9999",
+        telephone: "+55-11-99164-9959",
         contactType: "customer service",
         areaServed: "BR",
         availableLanguage: ["Portuguese"],
@@ -298,6 +299,7 @@ export default function RootLayout({
         <ThemeProvider>
           <CartProvider>
             {children}
+            <FloatingWhatsAppButton />
           </CartProvider>
         </ThemeProvider>
       </body>

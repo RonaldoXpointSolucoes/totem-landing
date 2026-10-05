@@ -103,10 +103,13 @@ export const FaqSection: React.FC = () => {
             onClick={() =>
               trackEvent(ANALYTICS_EVENTS.WHATSAPP_CLICK, { source: "faq_bottom_cta" })
             }
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs sm:text-sm shadow-md shadow-emerald-600/20 active:scale-95 transition-all"
+            className="inline-flex items-center flex-wrap justify-center gap-2 px-6 py-3 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs sm:text-sm shadow-lg shadow-emerald-600/25 active:scale-95 transition-all group"
           >
-            <MessageSquare className="w-4 h-4" />
+            <MessageSquare className="w-4 h-4 text-emerald-100 group-hover:scale-110 transition-transform" />
             <span>Falar com Engenheiro no WhatsApp</span>
+            <span className="font-mono text-xs px-2 py-0.5 rounded-full bg-emerald-700/60 border border-emerald-400/30 text-emerald-50 font-bold">
+              {siteConfig.links.whatsappDisplay}
+            </span>
           </a>
         </div>
       </div>

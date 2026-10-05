@@ -28,10 +28,15 @@ export const Footer: React.FC = () => {
             onClick={() =>
               trackEvent(ANALYTICS_EVENTS.WHATSAPP_CLICK, { source: "footer_support" })
             }
-            className="flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:text-[#0071e3] dark:hover:text-cyan-400 transition-colors"
+            className="flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
           >
-            <MessageSquare className="w-4 h-4 text-[#0071e3] dark:text-indigo-400" />
-            <span>Suporte Técnico Especializado</span>
+            <MessageSquare className="w-4 h-4 text-emerald-500" />
+            <span>
+              WhatsApp Engenharia:{" "}
+              <strong className="font-semibold text-[#1d1d1f] dark:text-white">
+                {siteConfig.links.whatsappDisplay}
+              </strong>
+            </span>
           </a>
         </div>
       </div>

@@ -81,3 +81,43 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #3f3f46;
 }
+
+/* Animações fluidas de Transição do Carrossel de Fotos Totem */
+@keyframes totemSlideInRight {
+  0% {
+    transform: translate3d(100%, 0, 0) scale(0.97);
+    opacity: 0;
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes totemSlideInLeft {
+  0% {
+    transform: translate3d(-100%, 0, 0) scale(0.97);
+    opacity: 0;
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes totemCarouselProgress {
+  0% {
+    transform: scaleX(0);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+.animate-totem-slide-in-right {
+  animation: totemSlideInRight 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.animate-totem-slide-in-left {
+  animation: totemSlideInLeft 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
