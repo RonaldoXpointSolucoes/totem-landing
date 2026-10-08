@@ -21,9 +21,23 @@ import {
   Film,
   ExternalLink,
   Video,
+  Boxes,
+  Printer as PrinterIcon,
+  QrCode,
+  Cable,
+  DollarSign,
+  PackageCheck,
 } from "lucide-react";
 import { InstagramVideoPlayer, InstagramGlyph } from "@/components/media";
 import { parseInstagramUrl, isValidVideoUrl } from "@/lib/media/videoUtils";
+import { KitSubItem } from "@/types/catalog";
+import {
+  DEFAULT_KIT_SUB_ITEMS,
+  isItemKit,
+  getEffectiveKitItems,
+  calculateKitTotalCents,
+} from "@/modules/catalog/kitDefaults";
+import { formatBRL } from "@/modules/pricing/pricingEngine";
 
 interface CatalogItemModalProps {
   isOpen: boolean;
@@ -55,7 +69,7 @@ export function CatalogItemModal({
   const isEditing = Boolean(initialItem?.$id);
 
   // Abas internas do Modal
-  const [activeTab, setActiveTab] = useState<"general" | "media" | "engineering">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "media" | "engineering" | "kitItems">("general");
 
   // Estados dos Campos
   const [formData, setFormData] = useState<Record<string, any>>({});
@@ -68,6 +82,10 @@ export function CatalogItemModal({
   const [isDeleting, setIsDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+
+  // Estados dos Sub-Itens do Kit de Montagem
+  const [isKitEnabled, setIsKitEnabled] = useState(false);
+  const [kitSubItems, setKitSubItems] = useState<KitSubItem[]>([]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -163,6 +181,25 @@ export function CatalogItemModal({
         printerSlot: parsedDimensions.printerSlot || "80mm / 58mm",
         readerSlot: parsedDimensions.readerSlot || "2D / QR Code",
       });
+
+      // Inicialização de Sub-Itens do Kit para Monitores
+      const isKitCandidate =
+        collectionType === "monitors" &&
+        (Boolean(initialItem.$id === "6ac6dbf90032d4f8586e") ||
+          isItemKit(initialItem) ||
+          (initialItem.slug || "").toLowerCase().includes("kit") ||
+          (initialItem.model || "").toLowerCase().includes("kit") ||
+          (initialItem.display_name || initialItem.name || "").toLowerCase().includes("kit") ||
+          (Boolean(initialItem.notes && typeof initialItem.notes === "string" && initialItem.notes.includes("kitItems"))));
+
+      setIsKitEnabled(isKitCandidate);
+
+      if (isKitCandidate) {
+        const loadedSubItems = getEffectiveKitItems(initialItem);
+        setKitSubItems(loadedSubItems);
+      } else {
+        setKitSubItems([]);
+      }
     } else {
       // Padrões para novo item
       const defaultImg =
@@ -171,6 +208,8 @@ export function CatalogItemModal({
           : "";
       setGalleryImages(defaultImg ? [defaultImg] : []);
       setInstagramVideos([]);
+      setIsKitEnabled(false);
+      setKitSubItems([]);
       setFormData({
         name: "",
         display_name: "",
@@ -291,6 +330,35 @@ export function CatalogItemModal({
     setInstagramVideos((prev) => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
+  // Gerenciamento de Sub-Itens do Kit de Montagem
+  const handleAddKitItem = () => {
+    const nextId = `kit-item-${Date.now()}`;
+    const newItem: KitSubItem = {
+      id: nextId,
+      name: "Novo Componente",
+      category: "accessory",
+      description: "Descrição técnica e comercial do componente.",
+      image: "",
+      priceCents: 0,
+      selected: true,
+    };
+    setKitSubItems((prev) => [...prev, newItem]);
+  };
+
+  const handleUpdateKitItem = (index: number, updates: Partial<KitSubItem>) => {
+    setKitSubItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, ...updates } : item))
+    );
+  };
+
+  const handleRemoveKitItem = (index: number) => {
+    setKitSubItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleResetKitDefaults = () => {
+    setKitSubItems(DEFAULT_KIT_SUB_ITEMS.map((item) => ({ ...item })));
+  };
+
   // Salvar Item
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -378,6 +446,17 @@ export function CatalogItemModal({
         const sizeInches = Number(formData.sizeInches) || Number(formData.size) || 21.5;
         const displayName = formData.display_name || formData.name || `${brand} ${model} ${sizeInches}"`;
 
+        let notesValue = formData.description || formData.notes || "";
+        if (isKitEnabled || kitSubItems.length > 0) {
+          const kitTotal = kitSubItems.reduce((acc, it) => acc + (it.priceCents || 0), 0);
+          notesValue = JSON.stringify({
+            isKit: true,
+            kitItems: kitSubItems,
+            kitTotalCents: kitTotal,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+
         payload = {
           brand,
           model,
@@ -388,7 +467,7 @@ export function CatalogItemModal({
           technical_code:
             formData.technical_code ||
             `${brand.substring(0, 3).toUpperCase()}-${model.replace(/[^a-zA-Z0-9]/g, "").substring(0, 5).toUpperCase() || "MON"}-V100`,
-          notes: formData.description || formData.notes || "",
+          notes: notesValue,
           active: Boolean(formData.active),
           sort_order: Number(formData.sort_order) || 1,
           image: primaryImg || "",
@@ -550,6 +629,31 @@ export function CatalogItemModal({
             >
               <Wrench className="w-3.5 h-3.5" />
               <span>Engenharia CNC & Dimensões</span>
+            </button>
+          )}
+
+          {collectionType === "monitors" && (
+            <button
+              type="button"
+              onClick={() => setActiveTab("kitItems")}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
+                activeTab === "kitItems"
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                  : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+              }`}
+            >
+              <Boxes className="w-3.5 h-3.5" />
+              <span>Sub-Itens do Kit</span>
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  isKitEnabled
+                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                    : "bg-black/40 text-slate-300"
+                }`}
+                title="Componentes inclusos no Kit de Montagem"
+              >
+                📦 {kitSubItems.length}
+              </span>
             </button>
           )}
         </div>
@@ -862,6 +966,80 @@ export function CatalogItemModal({
                         Identificador da furação CNC
                       </span>
                     </div>
+                  </div>
+
+                  {/* CONFIGURADOR DE KIT / COMBO DE HARDWARE */}
+                  <div className="p-4 bg-gradient-to-br from-indigo-950/40 via-slate-900 to-slate-950 rounded-2xl border border-indigo-500/40 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center border border-indigo-500/30">
+                          <Boxes className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="text-xs font-extrabold text-white tracking-wide block">
+                            Modo Combo / Kit de Hardware Completo
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            Habilita personalização de sub-itens no configurador com recálculo em tempo real
+                          </span>
+                        </div>
+                      </div>
+
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isKitEnabled}
+                          onChange={(e) => {
+                            const val = e.target.checked;
+                            setIsKitEnabled(val);
+                            if (val && kitSubItems.length === 0) {
+                              setKitSubItems(DEFAULT_KIT_SUB_ITEMS.map((item) => ({ ...item })));
+                            }
+                          }}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600 relative"></div>
+                      </label>
+                    </div>
+
+                    {isKitEnabled && (
+                      <div className="pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex -space-x-2 overflow-hidden py-1">
+                            {kitSubItems.slice(0, 4).map((sub, i) => (
+                              <div
+                                key={i}
+                                className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-700 overflow-hidden flex items-center justify-center p-0.5"
+                                title={sub.name}
+                              >
+                                {sub.image ? (
+                                  <img src={sub.image} alt={sub.name} className="w-full h-full object-contain" />
+                                ) : (
+                                  <Package className="w-3.5 h-3.5 text-indigo-400" />
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                          <div>
+                            <span className="text-xs font-bold text-white block">
+                              {kitSubItems.length} componente{kitSubItems.length !== 1 ? "s" : ""} vinculado{kitSubItems.length !== 1 ? "s" : ""}
+                            </span>
+                            <span className="text-[11px] text-emerald-400 font-extrabold">
+                              Total do Kit: {formatBRL(kitSubItems.reduce((acc, it) => acc + (it.priceCents || 0), 0))}
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab("kitItems")}
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/30"
+                        >
+                          <Boxes className="w-3.5 h-3.5" />
+                          <span>Gerenciar Sub-Itens ({kitSubItems.length})</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1500,6 +1678,381 @@ export function CatalogItemModal({
                     />
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* ======================================================== */}
+          {/* ABA 4: SUB-ITENS DO KIT DE MONTAGEM */}
+          {/* ======================================================== */}
+          {activeTab === "kitItems" && collectionType === "monitors" && (
+            <div className="space-y-5">
+              {/* Cabeçalho da Aba de Sub-Itens */}
+              <div className="p-4 sm:p-5 bg-gradient-to-br from-indigo-950/60 via-slate-900 to-slate-950 rounded-3xl border border-indigo-500/40 shadow-xl space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-indigo-600/30 shrink-0">
+                      <Boxes className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-white tracking-tight flex items-center gap-2">
+                        <span>Componentes e Sub-Itens do Kit de Montagem</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-mono border border-indigo-500/30">
+                          COMBO HARDWARE
+                        </span>
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Adicione, edite fotos, descrições e valores individuais de cada equipamento integrante do kit.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end sm:self-center">
+                    <label className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 cursor-pointer hover:border-slate-600 transition-all text-xs font-bold text-white">
+                      <input
+                        type="checkbox"
+                        checked={isKitEnabled}
+                        onChange={(e) => {
+                          const val = e.target.checked;
+                          setIsKitEnabled(val);
+                          if (val && kitSubItems.length === 0) {
+                            setKitSubItems(DEFAULT_KIT_SUB_ITEMS.map((it) => ({ ...it })));
+                          }
+                        }}
+                        className="w-4 h-4 text-indigo-600 rounded bg-slate-950 border-slate-700 focus:ring-indigo-500"
+                      />
+                      <span>Modo Kit Ativo</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Métricas e Botões de Ação */}
+                <div className="pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center gap-2 text-xs">
+                      <Package className="w-3.5 h-3.5 text-indigo-400" />
+                      <span className="text-slate-400">Total:</span>
+                      <strong className="text-white font-mono">{kitSubItems.length} itens</strong>
+                    </div>
+
+                    <div className="px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center gap-2 text-xs">
+                      <PackageCheck className="w-3.5 h-3.5 text-cyan-400" />
+                      <span className="text-slate-400">Inclusos:</span>
+                      <strong className="text-white font-mono">
+                        {kitSubItems.filter((i) => i.selected).length} ativos
+                      </strong>
+                    </div>
+
+                    <div className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-2 text-xs">
+                      <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                      <span className="text-emerald-300">Valor Total do Kit:</span>
+                      <strong className="text-emerald-400 font-extrabold text-sm font-mono">
+                        {formatBRL(kitSubItems.reduce((acc, it) => acc + (it.priceCents || 0), 0))}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <button
+                      type="button"
+                      onClick={handleResetKitDefaults}
+                      className="flex-1 sm:flex-none px-3 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
+                      title="Restaurar lista com os 4 componentes industriais padrão"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Restaurar Padrões</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleAddKitItem}
+                      className="flex-1 sm:flex-none px-4 py-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-indigo-600/30 active:scale-95"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Adicionar Componente</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lista dos Sub-Itens Cadastrados */}
+              <div className="space-y-4">
+                {kitSubItems.length === 0 ? (
+                  <div className="py-12 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center text-center p-6 space-y-3 bg-slate-950/40">
+                    <div className="w-14 h-14 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center shadow-lg">
+                      <Boxes className="w-7 h-7" />
+                    </div>
+                    <div className="max-w-md">
+                      <h4 className="text-sm font-bold text-white">Nenhum componente vinculado a este kit</h4>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Você pode carregar automaticamente os 4 componentes homologados da fábrica ou adicionar itens personalizados com foto e valor.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={handleResetKitDefaults}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/30"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Carregar Componentes Padrão</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAddKitItem}
+                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Criar Item Vazio</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  kitSubItems.map((subItem, sIdx) => {
+                    // Badge e ícone de acordo com a categoria
+                    const catMeta =
+                      subItem.category === "monitor"
+                        ? { label: "Display Touchscreen", color: "text-cyan-400 bg-cyan-500/10 border-cyan-500/30", icon: Monitor }
+                        : subItem.category === "printer"
+                        ? { label: "Impressora Térmica", color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30", icon: PrinterIcon }
+                        : subItem.category === "reader"
+                        ? { label: "Leitor 2D / QR Code", color: "text-amber-400 bg-amber-500/10 border-amber-500/30", icon: QrCode }
+                        : subItem.category === "pc"
+                        ? { label: "Mini PC / Computador", color: "text-purple-400 bg-purple-500/10 border-purple-500/30", icon: Cpu }
+                        : subItem.category === "accessory"
+                        ? { label: "Conexões & Elétrica", color: "text-indigo-400 bg-indigo-500/10 border-indigo-500/30", icon: Cable }
+                        : { label: "Componente Geral", color: "text-slate-400 bg-slate-800/80 border-slate-700", icon: Package };
+
+                    const CatIcon = catMeta.icon;
+
+                    return (
+                      <div
+                        key={subItem.id || sIdx}
+                        className="p-4 sm:p-5 bg-slate-950/85 border border-slate-800 hover:border-slate-700/80 rounded-3xl space-y-4 shadow-xl backdrop-blur-sm transition-all group"
+                      >
+                        {/* Topo do Card de Sub-Item */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-900">
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-lg bg-slate-900 border border-slate-800 text-[11px] font-mono font-bold text-slate-300 flex items-center justify-center">
+                              #{sIdx + 1}
+                            </span>
+                            <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold border flex items-center gap-1 ${catMeta.color}`}>
+                              <CatIcon className="w-3 h-3" />
+                              <span>{catMeta.label}</span>
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            {/* Checkbox Incluso por Padrão */}
+                            <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-300 hover:text-white transition-all">
+                              <input
+                                type="checkbox"
+                                checked={subItem.selected}
+                                onChange={(e) =>
+                                  handleUpdateKitItem(sIdx, { selected: e.target.checked })
+                                }
+                                className="w-4 h-4 rounded text-indigo-600 bg-slate-900 border-slate-700 focus:ring-indigo-500"
+                              />
+                              <span>Incluso por padrão</span>
+                            </label>
+
+                            {/* Preço Formatado */}
+                            <span className="text-xs font-mono font-extrabold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-xl border border-emerald-500/20">
+                              {formatBRL(subItem.priceCents || 0)}
+                            </span>
+
+                            {/* Botão de Excluir Sub-Item */}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveKitItem(sIdx)}
+                              className="p-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-all hover:scale-105 active:scale-95"
+                              title="Remover este componente do kit"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Corpo com Grid: Foto à esquerda e Campos à direita */}
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                          {/* Coluna da Imagem / Preview */}
+                          <div className="md:col-span-3 flex flex-col items-center gap-2">
+                            <div className="w-full aspect-square max-w-[140px] rounded-2xl bg-slate-900/90 border border-slate-800 p-2 overflow-hidden flex items-center justify-center relative shadow-inner group-hover:border-slate-700 transition-all">
+                              {subItem.image ? (
+                                <img
+                                  src={subItem.image}
+                                  alt={subItem.name || "Foto"}
+                                  className="w-full h-full object-contain"
+                                  onError={(e) => {
+                                    (e.target as any).style.display = "none";
+                                  }}
+                                />
+                              ) : (
+                                <div className="flex flex-col items-center justify-center text-slate-600 gap-1.5">
+                                  <CatIcon className="w-8 h-8 opacity-40 text-indigo-400" />
+                                  <span className="text-[10px] font-medium text-slate-500">Sem foto</span>
+                                </div>
+                              )}
+                            </div>
+
+                            <span className="text-[10px] text-slate-500 text-center font-medium">
+                              Preview da Foto do Cliente
+                            </span>
+                          </div>
+
+                          {/* Coluna dos Campos Técnicos e Comerciais */}
+                          <div className="md:col-span-9 space-y-3">
+                            {/* Nome e Categoria */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
+                                  Nome do Componente *
+                                </label>
+                                <input
+                                  type="text"
+                                  required
+                                  value={subItem.name || ""}
+                                  onChange={(e) =>
+                                    handleUpdateKitItem(sIdx, { name: e.target.value })
+                                  }
+                                  placeholder='Ex: Computador All-in-One Touch 23.8" Core i5'
+                                  className="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs font-semibold focus:border-indigo-500 focus:outline-none"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
+                                  Categoria do Equipamento *
+                                </label>
+                                <select
+                                  value={subItem.category || "accessory"}
+                                  onChange={(e) =>
+                                    handleUpdateKitItem(sIdx, {
+                                      category: e.target.value as any,
+                                    })
+                                  }
+                                  className="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs font-semibold focus:border-indigo-500 focus:outline-none"
+                                >
+                                  <option value="monitor">🖥️ Display Touchscreen / All-in-One</option>
+                                  <option value="printer">🖨️ Impressora Térmica Homologada</option>
+                                  <option value="reader">📷 Leitor de Código 2D / QR Code</option>
+                                  <option value="accessory">⚡ Conexões, Cabos & Filtro de Linha</option>
+                                  <option value="pc">💻 Mini PC / Computador Industrial</option>
+                                  <option value="other">📦 Outro Periférico / Acessório</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            {/* Valor Comercial (R$) e ID do Sub-Item */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
+                                  Valor Individual (R$) *
+                                </label>
+                                <div className="relative">
+                                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-indigo-400">
+                                    R$
+                                  </span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    required
+                                    value={((subItem.priceCents || 0) / 100).toFixed(2)}
+                                    onChange={(e) => {
+                                      const parsed = parseFloat(e.target.value || "0");
+                                      handleUpdateKitItem(sIdx, {
+                                        priceCents: Math.round(parsed * 100),
+                                      });
+                                    }}
+                                    className="w-full pl-10 pr-3.5 py-2 bg-slate-900 border border-indigo-500/50 rounded-xl text-indigo-300 font-extrabold font-mono text-xs focus:border-indigo-400 focus:outline-none"
+                                  />
+                                </div>
+                                <span className="text-[10px] text-slate-500 mt-1 block">
+                                  Valor que soma ao total quando o cliente mantiver este item ativo
+                                </span>
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
+                                  Identificador Técnico (ID)
+                                </label>
+                                <input
+                                  type="text"
+                                  value={subItem.id || ""}
+                                  onChange={(e) =>
+                                    handleUpdateKitItem(sIdx, { id: e.target.value })
+                                  }
+                                  placeholder="Ex: kit-monitor-touch"
+                                  className="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-xs focus:border-indigo-500 focus:outline-none"
+                                />
+                                <span className="text-[10px] text-slate-500 mt-1 block">
+                                  Chave de identificação no payload do pedido
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* URL da Foto do Componente */}
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">
+                                  URL da Foto / Imagem do Componente
+                                </label>
+                                {subItem.image && (
+                                  <a
+                                    href={subItem.image}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1"
+                                  >
+                                    <span>Abrir Imagem</span>
+                                    <ExternalLink className="w-2.5 h-2.5" />
+                                  </a>
+                                )}
+                              </div>
+                              <input
+                                type="text"
+                                value={subItem.image || ""}
+                                onChange={(e) =>
+                                  handleUpdateKitItem(sIdx, { image: e.target.value })
+                                }
+                                placeholder="https://exemplo.com/foto-componente.png ou /images/totems/..."
+                                className="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-xs focus:border-indigo-500 focus:outline-none"
+                              />
+                            </div>
+
+                            {/* Descrição Comercial & Técnica */}
+                            <div>
+                              <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
+                                Descrição Comercial & Técnica *
+                              </label>
+                              <textarea
+                                rows={2}
+                                required
+                                value={subItem.description || ""}
+                                onChange={(e) =>
+                                  handleUpdateKitItem(sIdx, { description: e.target.value })
+                                }
+                                placeholder="Descreva as especificações do equipamento apresentadas ao cliente na modal..."
+                                className="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs leading-relaxed focus:border-indigo-500 focus:outline-none resize-none"
+                              />
+                              <span className="text-[10px] text-slate-500 mt-0.5 block">
+                                Visível na janela de personalização dos itens do kit no configurador
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Box Informativo / Lembrete */}
+              <div className="p-4 bg-indigo-950/30 border border-indigo-500/20 rounded-2xl flex items-start gap-3 text-xs text-indigo-300">
+                <Sparkles className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+                <p className="leading-relaxed">
+                  <strong>Integração em Tempo Real:</strong> Ao clicar em <em>Salvar no Appwrite</em>, toda esta estrutura de sub-itens é gravada no banco de dados e refletida imediatamente no configurador público do cliente (<code>/monte-seu-totem</code>), com suporte à seleção e exclusão dinâmica de cada componente.
+                </p>
               </div>
             </div>
           )}

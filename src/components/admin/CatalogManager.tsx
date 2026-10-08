@@ -28,6 +28,7 @@ import {
   Wrench,
   Tv,
   Film,
+  Boxes,
 } from "lucide-react";
 import { CatalogItemModal } from "./CatalogItemModal";
 import { CatalogPhotoLightbox } from "./CatalogPhotoLightbox";
@@ -1037,6 +1038,14 @@ export function CatalogManager({
                                     {m.slug}
                                   </span>
                                 )}
+                                {(m.$id === "6ac6dbf90032d4f8586e" ||
+                                  (m.slug || "").includes("kit") ||
+                                  (m.notes && typeof m.notes === "string" && m.notes.includes("kitItems"))) && (
+                                  <span className="text-[10px] text-indigo-300 font-extrabold bg-indigo-500/20 px-2 py-0.5 rounded-md border border-indigo-500/30 flex items-center gap-1 shadow-sm">
+                                    <Boxes className="w-3 h-3 text-indigo-400" />
+                                    <span>COMBO HARDWARE</span>
+                                  </span>
+                                )}
                               </div>
                               <span className="text-[11px] text-slate-400 font-medium block mt-0.5">
                                 Marca: <strong className="text-white">{m.brand || "Elgin"}</strong> • Modelo: <strong className="text-white">{m.model || m.display_name}</strong>
@@ -1048,7 +1057,42 @@ export function CatalogManager({
                             VESA {m.vesa_pattern || "100x100"}
                           </span>
                         </div>
-                        <p className="text-slate-400 text-xs leading-relaxed">{m.notes}</p>
+                        {(() => {
+                          let displayNotes = m.notes || "Furação VESA homologada sem custo adicional.";
+                          let kitInfo = null;
+                          if (typeof m.notes === "string" && m.notes.includes("kitItems")) {
+                            try {
+                              const parsed = JSON.parse(m.notes);
+                              if (Array.isArray(parsed.kitItems)) {
+                                displayNotes = `Kit com ${parsed.kitItems.length} componentes inclusos (Display, Impressora, Leitor, Cabos).`;
+                                kitInfo = parsed;
+                              }
+                            } catch (e) {}
+                          }
+                          return (
+                            <div className="space-y-1.5">
+                              <p className="text-slate-400 text-xs leading-relaxed">{displayNotes}</p>
+                              {kitInfo && Array.isArray(kitInfo.kitItems) && kitInfo.kitItems.length > 0 && (
+                                <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                                  {kitInfo.kitItems.slice(0, 4).map((ki: any, kIdx: number) => (
+                                    <span
+                                      key={kIdx}
+                                      className="text-[9px] px-2 py-0.5 rounded-md bg-slate-900 text-slate-300 border border-slate-800"
+                                      title={ki.description || ki.name}
+                                    >
+                                      ✓ {ki.name}
+                                    </span>
+                                  ))}
+                                  {kitInfo.kitItems.length > 4 && (
+                                    <span className="text-[9px] text-slate-500">
+                                      +{kitInfo.kitItems.length - 4} mais
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                         <span className="text-[10px] text-slate-500 font-mono block">
                           Cód Técnico CNC: {m.technical_code}
                         </span>

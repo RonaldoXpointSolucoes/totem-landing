@@ -236,18 +236,45 @@ export async function getAppwriteCatalog() {
       active: doc.active,
       image: doc.image || "",
     })),
-    monitors: monitorsRes.documents.map((doc: any) => ({
-      id: doc.$id,
-      brand: doc.brand,
-      model: doc.model,
-      displayName: doc.display_name,
-      sizeInches: doc.size ? parseFloat(doc.size) : undefined,
-      vesaPattern: doc.vesa_pattern,
-      technicalCode: doc.technical_code,
-      notes: doc.notes,
-      active: doc.active,
-      image: doc.image,
-    })),
+    monitors: monitorsRes.documents.map((doc: any) => {
+      let isKit = false;
+      let kitItems = undefined;
+      let priceAdjustmentCents = undefined;
+
+      const name = (doc.display_name || doc.model || "").toLowerCase();
+      if (doc.$id === "6ac6dbf90032d4f8586e" || name.includes("kit")) {
+        isKit = true;
+      }
+
+      if (doc.notes && typeof doc.notes === "string" && doc.notes.includes("kitItems")) {
+        try {
+          const parsed = JSON.parse(doc.notes);
+          if (Array.isArray(parsed.kitItems)) {
+            kitItems = parsed.kitItems;
+            isKit = true;
+            priceAdjustmentCents = parsed.kitItems
+              .filter((i: any) => i.selected)
+              .reduce((acc: number, i: any) => acc + (i.priceCents || 0), 0);
+          }
+        } catch (e) {}
+      }
+
+      return {
+        id: doc.$id,
+        brand: doc.brand,
+        model: doc.model,
+        displayName: doc.display_name,
+        sizeInches: doc.size ? parseFloat(doc.size) : undefined,
+        vesaPattern: doc.vesa_pattern,
+        technicalCode: doc.technical_code,
+        notes: doc.notes,
+        active: doc.active,
+        image: doc.image,
+        isKit,
+        kitItems,
+        priceAdjustmentCents,
+      };
+    }),
     printers: printersRes.documents.map((doc: any) => ({
       id: doc.$id,
       brand: doc.brand,
