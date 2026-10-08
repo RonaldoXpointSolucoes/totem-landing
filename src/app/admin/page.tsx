@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
+import { siteConfig } from "@/config/site";
 import { CatalogManager } from "@/components/admin/CatalogManager";
 import { MarketingSettingsManager } from "@/components/admin/MarketingSettingsManager";
 import {
@@ -384,10 +385,12 @@ export default function AdminPage() {
             </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-slate-800/80 text-center">
-            <p className="text-[11px] text-slate-500">
-              Ambiente protegido por Sessão Criptografada HTTP-Only e Appwrite Database.
-            </p>
+          <div className="mt-6 pt-6 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500">
+            <span>Ambiente seguro Appwrite Database</span>
+            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-800/80 border border-slate-700/60 font-mono text-[10px] text-slate-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>v{siteConfig.version}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -410,6 +413,10 @@ export default function AdminPage() {
                 <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
                   Painel Admin
                 </span>
+                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-mono text-emerald-400 font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>v{siteConfig.version}</span>
+                </div>
               </div>
               <div className="flex items-center gap-2 text-[11px] text-slate-400">
                 <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />

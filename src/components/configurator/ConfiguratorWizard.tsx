@@ -102,7 +102,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
 
   const [selectedPrinter, setSelectedPrinter] = useState<PrinterOption | null>(() => {
     if (editingItem) return editingItem.configuration.printer || null;
-    return HOMOLOGATED_PRINTERS[0];
+    return null;
   });
 
   const [useReader, setUseReader] = useState<boolean>(() => {
@@ -112,7 +112,11 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
 
   const [selectedReader, setSelectedReader] = useState<BarcodeReaderOption | null>(() => {
     if (editingItem) return editingItem.configuration.barcodeReader || null;
-    return HOMOLOGATED_READERS[0];
+    return null;
+  });
+
+  const [readerConfigured, setReaderConfigured] = useState<boolean>(() => {
+    return !!editingItem;
   });
 
   // Passo atual
@@ -164,11 +168,20 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     });
   }, [selectedModel, selectedColor, selectedMonitor, selectedPrinter, useReader, selectedReader, isKitSelected, kitAdjustmentCents]);
 
-  const isNextDisabled = step === 3 && !selectedMonitor;
+  const isNextDisabled =
+    (step === 3 && !selectedMonitor) ||
+    (step === 4 && !isKitSelected && !selectedPrinter) ||
+    (step === 5 && !isKitSelected && useReader && !selectedReader);
 
   // Navegação para Frente: Pula etapas 4 e 5 se o Kit foi selecionado
   const handleNext = () => {
     if (step === 3 && !selectedMonitor) {
+      return;
+    }
+    if (step === 4 && !isKitSelected && !selectedPrinter) {
+      return;
+    }
+    if (step === 5 && !isKitSelected && useReader && !selectedReader) {
       return;
     }
     if (step === 3 && isKitSelected) {
@@ -233,6 +246,8 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
 
   const handleSelectReader = (reader: BarcodeReaderOption | null) => {
     setSelectedReader(reader);
+    setUseReader(true);
+    setReaderConfigured(true);
     trackEvent(ANALYTICS_EVENTS.SELECT_BARCODE_READER, {
       readerId: reader?.id || null,
       readerName: reader?.displayName || "Nenhum",
@@ -242,6 +257,10 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
 
   const handleToggleReader = (use: boolean) => {
     setUseReader(use);
+    setReaderConfigured(true);
+    if (!use) {
+      setSelectedReader(null);
+    }
     trackEvent(ANALYTICS_EVENTS.SELECT_BARCODE_READER, {
       enabled: use,
       readerId: use ? selectedReader?.id || null : null,
@@ -281,9 +300,10 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     setSelectedModel(CABINET_MODELS.find((m) => m.id === "cabinet-wall") || CABINET_MODELS[0]);
     setSelectedColor(COLOR_OPTIONS[0]);
     setSelectedMonitor(null);
-    setSelectedPrinter(HOMOLOGATED_PRINTERS[0]);
+    setSelectedPrinter(null);
     setUseReader(true);
-    setSelectedReader(HOMOLOGATED_READERS[0]);
+    setSelectedReader(null);
+    setReaderConfigured(false);
     setStep(1);
     setIsCartSuccessModalOpen(false);
   };
@@ -358,6 +378,14 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                     }
                     if (s.id > 3 && !selectedMonitor) {
                       setStep(3);
+                      return;
+                    }
+                    if (s.id > 4 && !isKitSelected && !selectedPrinter) {
+                      setStep(4);
+                      return;
+                    }
+                    if (s.id > 5 && !isKitSelected && (!readerConfigured || (useReader && !selectedReader))) {
+                      setStep(5);
                       return;
                     }
                     setStep(s.id);
@@ -458,37 +486,46 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                     </span>
                   </div>
                 </div>
-                <div className="flex justify-between items-center gap-2">
-                  <span className="shrink-0 font-medium">Monitor:</span>
-                  {selectedMonitor ? (
+                {selectedMonitor ? (
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="shrink-0 font-medium">Monitor:</span>
                     <span className="font-semibold text-[#1d1d1f] dark:text-white text-right leading-tight">
                       {isKitSelected
                         ? `Kit de Montagem (${activeKitItems.filter((i) => i.selected).length} itens)`
                         : selectedMonitor.displayName}
                     </span>
-                  ) : (
+                  </div>
+                ) : step === 3 ? (
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="shrink-0 font-medium">Monitor:</span>
                     <span className="font-bold text-amber-600 dark:text-amber-400 text-right leading-tight flex items-center gap-1 justify-end">
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                       Seleção Obrigatória
                     </span>
-                  )}
-                </div>
-                <div className="flex justify-between items-center gap-2">
-                  <span className="shrink-0 font-medium">Impressora:</span>
-                  <span className="font-semibold text-[#1d1d1f] dark:text-white text-right leading-tight">
-                    {isKitSelected
-                      ? (activeKitItems.find((i) => i.category === "printer")?.selected ? "Inclusa no Kit" : "Removida do Kit")
-                      : selectedPrinter?.displayName || "—"}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center gap-2">
-                  <span className="shrink-0 font-medium">Leitor 2D:</span>
-                  <span className="font-semibold text-[#1d1d1f] dark:text-white text-right leading-tight">
-                    {isKitSelected
-                      ? (activeKitItems.find((i) => i.category === "reader")?.selected ? "Incluso no Kit" : "Removido do Kit")
-                      : (useReader && selectedReader ? selectedReader.displayName : "Sem leitor")}
-                  </span>
-                </div>
+                  </div>
+                ) : null}
+
+                {(isKitSelected || selectedPrinter) && (
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="shrink-0 font-medium">Impressora:</span>
+                    <span className="font-semibold text-[#1d1d1f] dark:text-white text-right leading-tight">
+                      {isKitSelected
+                        ? (activeKitItems.find((i) => i.category === "printer")?.selected ? "Inclusa no Kit" : "Removida do Kit")
+                        : selectedPrinter?.displayName}
+                    </span>
+                  </div>
+                )}
+
+                {(isKitSelected || (readerConfigured && (!useReader || selectedReader))) && (
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="shrink-0 font-medium">Leitor 2D:</span>
+                    <span className="font-semibold text-[#1d1d1f] dark:text-white text-right leading-tight">
+                      {isKitSelected
+                        ? (activeKitItems.find((i) => i.category === "reader")?.selected ? "Incluso no Kit" : "Removido do Kit")
+                        : (useReader && selectedReader ? selectedReader.displayName : "Sem leitor (Gabinete liso)")}
+                    </span>
+                  </div>
+                )}
 
                 <div className="pt-2 border-t border-black/10 dark:border-slate-800 flex justify-between items-center">
                   <span className="font-bold text-slate-700 dark:text-slate-300">Total Atual:</span>
@@ -578,6 +615,10 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
             ? "Selecione o Monitor"
             : step === 3 && isKitSelected
             ? "Avançar para Revisão"
+            : step === 4 && !isKitSelected && !selectedPrinter
+            ? "Selecione a Impressora"
+            : step === 5 && !isKitSelected && useReader && !selectedReader
+            ? "Selecione o Leitor"
             : undefined
         }
       />

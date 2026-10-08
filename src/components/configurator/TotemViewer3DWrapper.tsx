@@ -110,16 +110,30 @@ export const TotemViewer3DWrapper: React.FC<TotemViewer3DWrapperProps> = ({
       };
     }
     if (currentStep === 4) {
+      if (!selectedPrinter) {
+        return {
+          type: "printer" as const,
+          title: "Impressora a Definir",
+          tabLabel: "Impressora",
+          icon: Printer,
+          name: "Aguardando Seleção",
+          brand: "Obrigatório",
+          badge: "Selecione a Impressora",
+          image: undefined,
+          notes: "Escolha uma impressora homologada ou solicite berço sob medida.",
+          isCustom: false,
+        };
+      }
       return {
         type: "printer" as const,
         title: "Impressora Selecionada",
         tabLabel: "Foto da Impressora",
         icon: Printer,
-        name: selectedPrinter?.displayName || "Impressora Térmica",
-        brand: selectedPrinter?.brand || "EPSON",
-        badge: selectedPrinter?.paperWidthMm ? `Bobina ${selectedPrinter.paperWidthMm}mm` : "Térmica 80mm",
-        image: selectedPrinter?.image,
-        notes: selectedPrinter?.notes || "Berço interno com rasgo de saída de papel usinado sob medida.",
+        name: selectedPrinter.displayName,
+        brand: selectedPrinter.brand,
+        badge: selectedPrinter.paperWidthMm ? `Bobina ${selectedPrinter.paperWidthMm}mm` : "Térmica 80mm",
+        image: selectedPrinter.image,
+        notes: selectedPrinter.notes || "Berço interno com rasgo de saída de papel usinado sob medida.",
         isCustom: false,
       };
     }
@@ -138,16 +152,30 @@ export const TotemViewer3DWrapper: React.FC<TotemViewer3DWrapperProps> = ({
           isCustom: false,
         };
       }
+      if (!selectedReader) {
+        return {
+          type: "reader" as const,
+          title: "Leitor a Definir",
+          tabLabel: "Leitor",
+          icon: QrCode,
+          name: "Aguardando Seleção",
+          brand: "Opcional",
+          badge: "Selecione o Leitor",
+          image: undefined,
+          notes: "Escolha um leitor óptico homologado ou opte por gabinete liso sem leitor.",
+          isCustom: false,
+        };
+      }
       return {
         type: "reader" as const,
         title: "Leitor Selecionado",
         tabLabel: "Foto do Leitor",
         icon: QrCode,
-        name: selectedReader?.displayName || "Leitor de Código de Barras",
-        brand: selectedReader?.brand || "Bematech",
-        badge: selectedReader?.is2D ? "1D / 2D / QR Code" : "Leitor Óptico",
-        image: selectedReader?.image,
-        notes: selectedReader?.notes || "Janela frontal angular homologada para leitura ágil de tickets e smartphones.",
+        name: selectedReader.displayName,
+        brand: selectedReader.brand,
+        badge: selectedReader.is2D ? "1D / 2D / QR Code" : "Leitor Óptico",
+        image: selectedReader.image,
+        notes: selectedReader.notes || "Janela frontal angular homologada para leitura ágil de tickets e smartphones.",
         isCustom: false,
       };
     }
@@ -281,7 +309,13 @@ export const TotemViewer3DWrapper: React.FC<TotemViewer3DWrapperProps> = ({
             {/* Rodapé Informativo Elegante do Equipamento */}
             <div className="w-full mt-2 px-2.5 py-1.5 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-black/10 dark:border-slate-800 backdrop-blur-md flex items-center justify-between text-xs shadow-sm shrink-0">
               <div className="flex items-center gap-1.5 min-w-0">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 ${
+                    currentEquipment.image || (!useReader && currentStep === 5)
+                      ? "bg-emerald-500"
+                      : "bg-amber-500 animate-pulse"
+                  }`}
+                />
                 <span className="font-bold text-[#1d1d1f] dark:text-white truncate">
                   {currentEquipment.name}
                 </span>
