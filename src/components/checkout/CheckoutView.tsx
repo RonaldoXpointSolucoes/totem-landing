@@ -214,12 +214,14 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
         const errMsg = data?.error || "Serviço dos Correios temporariamente indisponível.";
         setShippingError(errMsg);
         setIsCorreiosDown(true);
+        setShippingQuotes([]);
         setShippingCooldown((prev) => (prev > 0 ? prev : 20));
       }
     } catch (err: any) {
       console.error("Erro ao cotar frete:", err);
       setShippingError("Erro de comunicação com a API dos Correios.");
       setIsCorreiosDown(true);
+      setShippingQuotes([]);
       setShippingCooldown((prev) => (prev > 0 ? prev : 20));
     } finally {
       setIsLoadingShipping(false);
@@ -1114,7 +1116,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
               )}
             </div>
 
-            {shippingError && (
+            {shippingError && !isCorreiosDown && (
               <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-600/40 text-amber-800 dark:text-amber-300 text-xs flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
                 <span>{shippingError}</span>
@@ -1179,7 +1181,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   </div>
                 ))}
               </div>
-            ) : isCorreiosDown && shippingQuotes.length === 0 ? (
+            ) : isCorreiosDown ? (
               /* Estado 3: Tela Amigável de Instabilidade / Manutenção dos Correios com Auto-polling (5s) e Botão (20s) */
               <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-amber-50/90 via-orange-50/50 to-slate-50 dark:from-slate-900 dark:via-amber-950/30 dark:to-slate-950 border border-amber-300/80 dark:border-amber-600/40 shadow-lg space-y-4 animate-in fade-in zoom-in-95 duration-200">
                 <div className="flex items-start gap-3">
