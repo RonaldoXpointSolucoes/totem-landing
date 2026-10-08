@@ -72,7 +72,7 @@ async function testHotspotsAndInteractiveFeatures() {
   const viewerCode = fs.readFileSync(path.resolve(__dirname, "../src/app/viewer3d/page.tsx"), "utf8");
 
   // Os 3 modelos industriais procedurais
-  await assert(viewerCode.includes("cabinet-floor"), "Suporte ao modelo Totem Slim Chão");
+  await assert(viewerCode.includes("cabinet-floor"), "Suporte ao modelo Totem Slim Piso");
   await assert(viewerCode.includes("cabinet-wall"), "Suporte ao modelo Totem Parede Compact");
   await assert(viewerCode.includes("cabinet-countertop"), "Suporte ao modelo Totem Balcão Express");
 

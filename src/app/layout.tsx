@@ -10,17 +10,17 @@ import "./globals.css";
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
   title: {
-    default: "Totem Pro | Gabinete para Totem de Autoatendimento, Chão, Parede e Balcão",
+    default: "Totem Pro | Gabinete para Totem de Autoatendimento, Piso, Parede e Balcão",
     template: `%s | ${siteConfig.name}`,
   },
   description:
-    "Fabricante industrial de Gabinete para Totem de Autoatendimento. Modelos Gabinete Totem de Chão, Totem de Parede e Totem de Balcão com usinagem Router CNC sob medida para seus monitores e impressoras. Compre direto da fábrica.",
+    "Fabricante industrial de Gabinete para Totem de Autoatendimento. Modelos Gabinete Totem de Piso, Totem de Parede e Totem de Balcão com usinagem Router CNC sob medida para seus monitores e impressoras. Compre direto da fábrica.",
   keywords: [
     "totem",
     "gabinete para totem",
     "gabinete para totem de autoatendimento",
     "totem de autoatendimento",
-    "gabinete totem de chão",
+    "gabinete totem de piso",
     "gabinete totem de parede",
     "gabinete totem de balcão",
     "fabricante de totem",
@@ -53,7 +53,7 @@ export const metadata: Metadata = {
     locale: "pt_BR",
     url: siteConfig.url,
     siteName: "Totem Pro — X-Point Soluções",
-    title: "Gabinete para Totem de Autoatendimento | Chão, Parede e Balcão",
+    title: "Gabinete para Totem de Autoatendimento | Piso, Parede e Balcão",
     description:
       "Configure e adquira seu Gabinete de Totem de Autoatendimento sob medida. Usinagem Router CNC milimétrica para monitores touchscreen, impressoras térmicas e leitores de código de barras.",
     images: [
@@ -69,7 +69,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Gabinete para Totem de Autoatendimento | Chão, Parede e Balcão",
+    title: "Gabinete para Totem de Autoatendimento | Piso, Parede e Balcão",
     description:
       "Configurador industrial sob medida de Gabinetes para Totem de Autoatendimento com usinagem Router CNC milimétrica.",
     images: [`${siteConfig.url}/images/og-totem.jpg`],
@@ -160,7 +160,7 @@ const schemaOrgJsonLd = {
       "@id": `${siteConfig.url}/#product-cabinet`,
       name: "Gabinete para Totem de Autoatendimento",
       description:
-        "Gabinete industrial sob medida para totens de autoatendimento. Modelos Gabinete Totem de Chão, Gabinete Totem de Parede e Gabinete Totem de Balcão com usinagem Router CNC milimétrica para monitores touchscreen, impressoras térmicas e leitores de código de barras.",
+        "Gabinete industrial sob medida para totens de autoatendimento. Modelos Gabinete Totem de Piso, Gabinete Totem de Parede e Gabinete Totem de Balcão com usinagem Router CNC milimétrica para monitores touchscreen, impressoras térmicas e leitores de código de barras.",
       brand: {
         "@type": "Brand",
         name: "Totem Pro / X-Point Soluções",
@@ -214,16 +214,16 @@ const schemaOrgJsonLd = {
       "@type": "ItemList",
       "@id": `${siteConfig.url}/#modelos-list`,
       name: "Modelos de Gabinete para Totem de Autoatendimento",
-      description: "Linha de gabinetes industriais de chão, parede e balcão usinados em Router CNC.",
+      description: "Linha de gabinetes industriais de piso, parede e balcão usinados em Router CNC.",
       numberOfItems: 3,
       itemListElement: [
         {
           "@type": "ListItem",
           position: 1,
-          name: "Gabinete Totem de Chão Pedestal Pro",
+          name: "Gabinete Totem de Piso Pedestal Pro",
           url: `${siteConfig.url}/#modelos`,
           image: `${siteConfig.url}/models/cabinet-floor.svg`,
-          description: "Gabinete de chão auto-sustentável para grandes fluxos, self-checkout e controle de acesso.",
+          description: "Gabinete de piso auto-sustentável para grandes fluxos, self-checkout e controle de acesso.",
         },
         {
           "@type": "ListItem",

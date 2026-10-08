@@ -159,7 +159,7 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
               </div>
             </div>
 
-            {/* 3. Gabinete Central de Chão (Hero Principal - Azul Cobalto Oficial) */}
+            {/* 3. Gabinete Central de Piso (Hero Principal - Azul Cobalto Oficial) */}
             <div
               onMouseEnter={() => setHoveredTotem(2)}
               onMouseLeave={() => setHoveredTotem(null)}
@@ -181,11 +181,11 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
                 </div>
                 <img
                   src="/models/cabinet-floor.svg"
-                  alt="Totem de Chão Premium Azul Cobalto"
+                  alt="Totem de Piso Premium Azul Cobalto"
                   className="w-full h-auto object-contain transition-transform duration-500"
                 />
                 <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 block mt-1.5">
-                  Chão Pedestal Pro
+                  Piso Pedestal Pro
                 </span>
               </div>
             </div>

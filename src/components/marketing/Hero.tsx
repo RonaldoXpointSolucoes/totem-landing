@@ -86,7 +86,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartConfigurator, onExploreModels
             <div className="relative w-full h-full flex flex-col items-center justify-center">
               <img
                 src="/images/totems/floor/floor-white-1.png"
-                alt="Gabinete de Chão para Totem de Autoatendimento"
+                alt="Gabinete de Piso para Totem de Autoatendimento"
                 className="w-full h-full object-cover rounded-2xl drop-shadow-[0_20px_40px_rgba(79,70,229,0.35)] transition-transform duration-500 group-hover:scale-105"
               />
 
@@ -94,7 +94,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartConfigurator, onExploreModels
               <div className="absolute bottom-4 left-4 right-4 p-3 rounded-xl bg-slate-900/90 border border-slate-700/80 backdrop-blur-md flex items-center justify-between shadow-lg">
                 <div>
                   <p className="text-[11px] text-slate-400">Gabinete em Destaque</p>
-                  <p className="text-xs font-bold text-white">Totem de Chão Premium</p>
+                  <p className="text-xs font-bold text-white">Totem de Piso Premium</p>
                 </div>
                 <span className="text-xs font-bold text-indigo-400">A partir de R$ 1.490</span>
               </div>

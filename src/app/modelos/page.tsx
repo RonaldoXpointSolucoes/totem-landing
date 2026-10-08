@@ -24,7 +24,7 @@ export default function ModelosPage() {
             Modelos de Gabinete para Totem
           </h1>
           <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 max-w-2xl mx-auto leading-relaxed">
-            Gabinetes de chão, balcão e parede projetados para estabilidade mecânica, usinagem CNC milimétrica e facilidade de acesso técnico.
+            Gabinetes de piso, balcão e parede projetados para estabilidade mecânica, usinagem CNC milimétrica e facilidade de acesso técnico.
           </p>
         </div>
 

@@ -22,7 +22,7 @@ async function testAnalyticsTracking() {
   const events = [
     { eventName: "view_home", metadata: { source: "test_runner" } },
     { eventName: "start_configurator", metadata: { modelId: "cabinet-floor" } },
-    { eventName: "select_cabinet_model", metadata: { modelId: "cabinet-floor", modelName: "Totem Slim Chão" } },
+    { eventName: "select_cabinet_model", metadata: { modelId: "cabinet-floor", modelName: "Totem Slim Piso" } },
     { eventName: "select_color", metadata: { colorId: "color-black", colorName: "Preto Fosco Industrial" } },
     { eventName: "select_monitor", metadata: { monitorId: "mon-15-touch", monitorName: "Monitor 15.6\" Touch" } },
     { eventName: "select_printer", metadata: { printerId: "print-80", printerName: "Impressora Térmica 80mm" } },

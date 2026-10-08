@@ -85,7 +85,7 @@ export default function Viewer3DPage() {
       ];
     }
 
-    // Default: Totem de Chão (cabinet-floor)
+    // Default: Totem de Piso (cabinet-floor)
     return [
       {
         id: "monitor",
@@ -161,8 +161,8 @@ export default function Viewer3DPage() {
       });
 
       if (type === "cabinet-floor") {
-        // --- TOTEM DE CHÃO ---
-        // 1. Base Estabilizadora de Chão (Pés de Aço)
+        // --- TOTEM DE PISO ---
+        // 1. Base Estabilizadora de Piso (Pés de Aço)
         const baseGeom = new THREE.BoxGeometry(1.4, 0.08, 1.2);
         const baseMesh = new THREE.Mesh(baseGeom, darkTrimMaterial);
         baseMesh.position.y = -1.96;
@@ -395,12 +395,12 @@ export default function Viewer3DPage() {
     rimLight.position.set(0, 5, -6);
     scene.add(rimLight);
 
-    // Chão com Grid Sutil de Engenharia
+    // Piso com Grid Sutil de Engenharia
     const gridHelper = new THREE.GridHelper(10, 20, 0x312e81, 0x1e293b);
     gridHelper.position.y = -2.0;
     scene.add(gridHelper);
 
-    // Sombra de Chão Suave
+    // Sombra de Piso Suave
     const groundGeom = new THREE.PlaneGeometry(10, 10);
     const groundMat = new THREE.ShadowMaterial({ opacity: 0.4 });
     const groundMesh = new THREE.Mesh(groundGeom, groundMat);
@@ -606,7 +606,7 @@ export default function Viewer3DPage() {
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
           <span className="text-[11px] font-bold text-slate-200">
             {modelType === "cabinet-floor"
-              ? "Totem Slim Chão"
+              ? "Totem Slim Piso"
               : modelType === "cabinet-wall"
               ? "Totem Parede Compact"
               : "Totem Balcão Express"}

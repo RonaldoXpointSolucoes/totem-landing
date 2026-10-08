@@ -77,7 +77,7 @@ export const CABINET_MODELS: CabinetModel[] = [
   },
   {
     id: "cabinet-floor",
-    name: "Gabinete de Chão",
+    name: "Gabinete de Piso",
     slug: "floor",
     description:
       "Design imponente e estruturado com base de alta estabilidade, fechaduras traseiras duplas e compartimento interno dedicado para CPU, nobreak e guilhotina.",

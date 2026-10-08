@@ -18,9 +18,9 @@ export const FAQ_DATA: FaqItem[] = [
   },
   {
     category: "Produto",
-    question: "Qual a diferença entre os modelos de Chão, Parede e Balcão?",
+    question: "Qual a diferença entre os modelos de Piso, Parede e Balcão?",
     answer:
-      "O Totem de Chão (Pedestal Pro) é auto-sustentável, ideal para entradas de lojas, self-checkout e controle de fluxo. O Totem de Parede (Slim) é instalado direto na parede, ideal para corredores e ambientes com pouco espaço de circulação. O Totem de Balcão (Expresso) é compacto e fica sobre mesas e balcões de atendimento ou pagamento rápido.",
+      "O Totem de Piso (Pedestal Pro) é auto-sustentável, ideal para entradas de lojas, self-checkout e controle de fluxo. O Totem de Parede (Slim) é instalado direto na parede, ideal para corredores e ambientes com pouco espaço de circulação. O Totem de Balcão (Expresso) é compacto e fica sobre mesas e balcões de atendimento ou pagamento rápido.",
   },
   {
     category: "Compatibilidade",

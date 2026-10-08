@@ -9,7 +9,7 @@ export const HowItWorks: React.FC = () => {
     {
       num: "01",
       title: "Escolha o gabinete",
-      description: "Selecione o formato ideal (Parede, Chão ou Balcão) e escolha o padrão em MaDeFibra BP (Branco TX, Preto TX ou sob medida).",
+      description: "Selecione o formato ideal (Parede, Piso ou Balcão) e escolha o padrão em MaDeFibra BP (Branco TX, Preto TX ou sob medida).",
       icon: <Layers className="w-5 h-5 text-indigo-400" />,
     },
     {

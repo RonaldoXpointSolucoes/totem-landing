@@ -208,7 +208,7 @@ export async function calculateCorreiosQuotes(
   let unavailableReason = "";
   if (hasOversizedItem) {
     unavailableReason =
-      "O Gabinete de Chão (170cm) excede o limite máximo permitido pelos Correios (100cm). Envio disponível via Transportadora Especial ou Retirada na Fábrica.";
+      "O Gabinete de Piso (170cm) excede o limite máximo permitido pelos Correios (100cm). Envio disponível via Transportadora Especial ou Retirada na Fábrica.";
   } else if (exceedsWeight) {
     unavailableReason = `Carga de ${billableWeightKg.toFixed(1)}kg excede o limite máximo dos Correios (30kg). Utilize Transportadora Rodoviária ou Retirada.`;
   } else if (exceedsDimension) {

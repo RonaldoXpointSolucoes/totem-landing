@@ -92,7 +92,7 @@ async function runTest() {
   console.log('\n5. Verificando se a alteração refletiu de imediato na loja pública (/api/catalog)...');
   const publicCatRes = await request({ path: '/api/catalog', method: 'GET' });
   const floorModel = publicCatRes.data?.data?.cabinetModels?.find((m) => m.id === 'cabinet-floor' || m.slug === 'floor');
-  console.log(`  ✓ Preço do Gabinete de Chão na loja pública: R$ ${((floorModel?.basePriceCents || 0) / 100).toFixed(2)} (Esperado R$ 1550.00)`);
+  console.log(`  ✓ Preço do Gabinete de Piso na loja pública: R$ ${((floorModel?.basePriceCents || 0) / 100).toFixed(2)} (Esperado R$ 1550.00)`);
 
   // Retornando para o valor de catálogo original R$ 1.490
   await request(

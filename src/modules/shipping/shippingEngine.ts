@@ -81,7 +81,7 @@ export async function calculateShippingQuotes(
 
     sumDimensionsCm += (pkg.heightCm + pkg.widthCm + pkg.depthCm) * qty;
 
-    // Gabinete de chão (170cm de embalagem) ou qualquer item com dimensão > 100cm
+    // Gabinete de piso (170cm de embalagem) ou qualquer item com dimensão > 100cm
     if (model.id === "cabinet-floor" || pkg.heightCm > 100 || pkg.grossWeightKg > 30) {
       hasOversizedItem = true;
     }

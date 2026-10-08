@@ -19,7 +19,7 @@
     </filter>
   </defs>
 
-  <!-- Base de sustentação no chão -->
+  <!-- Base de sustentação no piso -->
   <path d="M 80 540 L 320 540 L 340 570 L 60 570 Z" fill="#0f172a" stroke="#334155" stroke-width="2"/>
   <rect x="70" y="565" width="260" height="6" rx="3" fill="#475569"/>
 

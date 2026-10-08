@@ -35,9 +35,9 @@ async function runTests() {
   }
   console.log("✅ TESTE 1 PASSOU COM SUCESSO!\n");
 
-  // Teste 2: Gabinete de Chão (40kg, 170cm) para Rio de Janeiro (20040-002)
+  // Teste 2: Gabinete de Piso (40kg, 170cm) para Rio de Janeiro (20040-002)
   console.log("------------------------------------------------------------------");
-  console.log("TESTE 2: Gabinete de Chão (40kg / 170cm) -> Rio de Janeiro (20040-002)");
+  console.log("TESTE 2: Gabinete de Piso (40kg / 170cm) -> Rio de Janeiro (20040-002)");
   const res2 = await calculateShippingQuotes({
     destinationCep: "20040-002",
     items: [{ modelId: "cabinet-floor", quantity: 1 }],
@@ -54,10 +54,10 @@ async function runTests() {
   const retirada2 = res2.quotes.find(q => q.id === "retirada_fabrica");
 
   if (pac2?.isAvailable || sedex2?.isAvailable) {
-    throw new Error("Teste 2 falhou: Correios PAC/SEDEX NÃO devem estar disponíveis para o gabinete de chão.");
+    throw new Error("Teste 2 falhou: Correios PAC/SEDEX NÃO devem estar disponíveis para o gabinete de piso.");
   }
   if (!carrier2?.isAvailable) {
-    throw new Error("Teste 2 falhou: Transportadora deve estar disponível para o gabinete de chão.");
+    throw new Error("Teste 2 falhou: Transportadora deve estar disponível para o gabinete de piso.");
   }
   if (!retirada2?.isAvailable) {
     throw new Error("Teste 2 falhou: Retirada na fábrica deve estar disponível.");
