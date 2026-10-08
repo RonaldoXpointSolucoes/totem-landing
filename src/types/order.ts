@@ -35,7 +35,7 @@ export type PaymentStatus = "pending" | "paid" | "expired" | "cancelled" | "fail
 export interface CustomerInfo {
   personType: "individual" | "company";
   name: string;
-  document: string; // CPF ou CNPJ formatado
+  document?: string; // CNPJ para empresa ou CPF opcional
   email: string;
   whatsapp: string;
 }

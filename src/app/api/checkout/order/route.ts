@@ -36,9 +36,16 @@ export async function POST(req: Request) {
     const { customer, deliveryAddress, items, shippingOptionId } = body;
 
     // 1. Validações preliminares
-    if (!customer || !customer.name || !customer.document || !customer.email || !customer.whatsapp) {
+    if (!customer || !customer.name || !customer.email || !customer.whatsapp) {
       return NextResponse.json(
-        { error: "Dados cadastrais incompletos. Informe nome, CPF/CNPJ, e-mail e WhatsApp." },
+        { error: "Dados cadastrais incompletos. Informe nome, e-mail e WhatsApp." },
+        { status: 400 }
+      );
+    }
+
+    if (customer.personType === "company" && !customer.document) {
+      return NextResponse.json(
+        { error: "Para compras como Pessoa Jurídica, o CNPJ é obrigatório." },
         { status: 400 }
       );
     }
