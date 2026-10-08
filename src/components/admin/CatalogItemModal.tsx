@@ -31,6 +31,7 @@ import {
 import { InstagramVideoPlayer, InstagramGlyph } from "@/components/media";
 import { parseInstagramUrl, isValidVideoUrl } from "@/lib/media/videoUtils";
 import { KitSubItem } from "@/types/catalog";
+import { KitSubItemCard, KitSubItemWithUid } from "./KitSubItemCard";
 import {
   DEFAULT_KIT_SUB_ITEMS,
   isItemKit,
@@ -85,7 +86,15 @@ export function CatalogItemModal({
 
   // Estados dos Sub-Itens do Kit de Montagem
   const [isKitEnabled, setIsKitEnabled] = useState(false);
-  const [kitSubItems, setKitSubItems] = useState<KitSubItem[]>([]);
+  const [kitSubItems, setKitSubItems] = useState<KitSubItemWithUid[]>([]);
+
+  // Garante que cada item tenha uma chave interna _uid imutável que nunca se perde na edição de inputs
+  const ensureKitUid = (items: KitSubItem[]): KitSubItemWithUid[] => {
+    return items.map((it, idx) => ({
+      ...it,
+      _uid: (it as any)._uid || `kit-uid-${idx}-${it.id || "item"}-${Math.random().toString(36).slice(2, 9)}`,
+    }));
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -205,7 +214,7 @@ export function CatalogItemModal({
 
       if (isKitCandidate) {
         const loadedSubItems = getEffectiveKitItems(initialItem);
-        setKitSubItems(loadedSubItems);
+        setKitSubItems(ensureKitUid(loadedSubItems));
       } else {
         setKitSubItems([]);
       }
@@ -342,7 +351,8 @@ export function CatalogItemModal({
   // Gerenciamento de Sub-Itens do Kit de Montagem
   const handleAddKitItem = () => {
     const nextId = `kit-item-${Date.now()}`;
-    const newItem: KitSubItem = {
+    const newItem: KitSubItemWithUid = {
+      _uid: `kit-uid-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       id: nextId,
       name: "Novo Componente",
       category: "accessory",
@@ -364,8 +374,46 @@ export function CatalogItemModal({
     setKitSubItems((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleMoveUpKitItem = (index: number) => {
+    if (index <= 0) return;
+    setKitSubItems((prev) => {
+      const next = [...prev];
+      const temp = next[index - 1];
+      next[index - 1] = next[index];
+      next[index] = temp;
+      return next;
+    });
+  };
+
+  const handleMoveDownKitItem = (index: number) => {
+    setKitSubItems((prev) => {
+      if (index >= prev.length - 1) return prev;
+      const next = [...prev];
+      const temp = next[index + 1];
+      next[index + 1] = next[index];
+      next[index] = temp;
+      return next;
+    });
+  };
+
+  const handleDuplicateKitItem = (index: number) => {
+    setKitSubItems((prev) => {
+      const target = prev[index];
+      if (!target) return prev;
+      const dup: KitSubItemWithUid = {
+        ...target,
+        _uid: `kit-uid-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        id: `${target.id}-copia`,
+        name: `${target.name} (Cópia)`,
+      };
+      const next = [...prev];
+      next.splice(index + 1, 0, dup);
+      return next;
+    });
+  };
+
   const handleResetKitDefaults = () => {
-    setKitSubItems(DEFAULT_KIT_SUB_ITEMS.map((item) => ({ ...item })));
+    setKitSubItems(ensureKitUid(DEFAULT_KIT_SUB_ITEMS));
   };
 
   // Salvar Item
@@ -458,9 +506,10 @@ export function CatalogItemModal({
         let notesValue = formData.description || formData.notes || "";
         if (isKitEnabled || kitSubItems.length > 0) {
           const kitTotal = kitSubItems.reduce((acc, it) => acc + (it.priceCents || 0), 0);
+          const cleanKitItems = kitSubItems.map(({ _uid, ...rest }) => rest);
           notesValue = JSON.stringify({
             isKit: true,
-            kitItems: kitSubItems,
+            kitItems: cleanKitItems,
             kitTotalCents: kitTotal,
             updatedAt: new Date().toISOString(),
           });
@@ -1002,7 +1051,7 @@ export function CatalogItemModal({
                             const val = e.target.checked;
                             setIsKitEnabled(val);
                             if (val && kitSubItems.length === 0) {
-                              setKitSubItems(DEFAULT_KIT_SUB_ITEMS.map((item) => ({ ...item })));
+                              setKitSubItems(ensureKitUid(DEFAULT_KIT_SUB_ITEMS));
                             }
                           }}
                           className="sr-only peer"
@@ -1725,7 +1774,7 @@ export function CatalogItemModal({
                           const val = e.target.checked;
                           setIsKitEnabled(val);
                           if (val && kitSubItems.length === 0) {
-                            setKitSubItems(DEFAULT_KIT_SUB_ITEMS.map((it) => ({ ...it })));
+                            setKitSubItems(ensureKitUid(DEFAULT_KIT_SUB_ITEMS));
                           }
                         }}
                         className="w-4 h-4 text-indigo-600 rounded bg-slate-950 border-slate-700 focus:ring-indigo-500"
@@ -1817,242 +1866,19 @@ export function CatalogItemModal({
                     </div>
                   </div>
                 ) : (
-                  kitSubItems.map((subItem, sIdx) => {
-                    // Badge e ícone de acordo com a categoria
-                    const catMeta =
-                      subItem.category === "monitor"
-                        ? { label: "Display Touchscreen", color: "text-cyan-400 bg-cyan-500/10 border-cyan-500/30", icon: Monitor }
-                        : subItem.category === "printer"
-                        ? { label: "Impressora Térmica", color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30", icon: PrinterIcon }
-                        : subItem.category === "reader"
-                        ? { label: "Leitor 2D / QR Code", color: "text-amber-400 bg-amber-500/10 border-amber-500/30", icon: QrCode }
-                        : subItem.category === "pc"
-                        ? { label: "Mini PC / Computador", color: "text-purple-400 bg-purple-500/10 border-purple-500/30", icon: Cpu }
-                        : subItem.category === "accessory"
-                        ? { label: "Conexões & Elétrica", color: "text-indigo-400 bg-indigo-500/10 border-indigo-500/30", icon: Cable }
-                        : { label: "Componente Geral", color: "text-slate-400 bg-slate-800/80 border-slate-700", icon: Package };
-
-                    const CatIcon = catMeta.icon;
-
-                    return (
-                      <div
-                        key={subItem.id || sIdx}
-                        className="p-4 sm:p-5 bg-slate-950/85 border border-slate-800 hover:border-slate-700/80 rounded-3xl space-y-4 shadow-xl backdrop-blur-sm transition-all group"
-                      >
-                        {/* Topo do Card de Sub-Item */}
-                        <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-900">
-                          <div className="flex items-center gap-2">
-                            <span className="w-6 h-6 rounded-lg bg-slate-900 border border-slate-800 text-[11px] font-mono font-bold text-slate-300 flex items-center justify-center">
-                              #{sIdx + 1}
-                            </span>
-                            <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold border flex items-center gap-1 ${catMeta.color}`}>
-                              <CatIcon className="w-3 h-3" />
-                              <span>{catMeta.label}</span>
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-3">
-                            {/* Checkbox Incluso por Padrão */}
-                            <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-300 hover:text-white transition-all">
-                              <input
-                                type="checkbox"
-                                checked={subItem.selected}
-                                onChange={(e) =>
-                                  handleUpdateKitItem(sIdx, { selected: e.target.checked })
-                                }
-                                className="w-4 h-4 rounded text-indigo-600 bg-slate-900 border-slate-700 focus:ring-indigo-500"
-                              />
-                              <span>Incluso por padrão</span>
-                            </label>
-
-                            {/* Preço Formatado */}
-                            <span className="text-xs font-mono font-extrabold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-xl border border-emerald-500/20">
-                              {formatBRL(subItem.priceCents || 0)}
-                            </span>
-
-                            {/* Botão de Excluir Sub-Item */}
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveKitItem(sIdx)}
-                              className="p-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-all hover:scale-105 active:scale-95"
-                              title="Remover este componente do kit"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Corpo com Grid: Foto à esquerda e Campos à direita */}
-                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                          {/* Coluna da Imagem / Preview */}
-                          <div className="md:col-span-3 flex flex-col items-center gap-2">
-                            <div className="w-full aspect-square max-w-[140px] rounded-2xl bg-slate-900/90 border border-slate-800 p-2 overflow-hidden flex items-center justify-center relative shadow-inner group-hover:border-slate-700 transition-all">
-                              {subItem.image ? (
-                                <img
-                                  src={subItem.image}
-                                  alt={subItem.name || "Foto"}
-                                  className="w-full h-full object-contain"
-                                  onError={(e) => {
-                                    (e.target as any).style.display = "none";
-                                  }}
-                                />
-                              ) : (
-                                <div className="flex flex-col items-center justify-center text-slate-600 gap-1.5">
-                                  <CatIcon className="w-8 h-8 opacity-40 text-indigo-400" />
-                                  <span className="text-[10px] font-medium text-slate-500">Sem foto</span>
-                                </div>
-                              )}
-                            </div>
-
-                            <span className="text-[10px] text-slate-500 text-center font-medium">
-                              Preview da Foto do Cliente
-                            </span>
-                          </div>
-
-                          {/* Coluna dos Campos Técnicos e Comerciais */}
-                          <div className="md:col-span-9 space-y-3">
-                            {/* Nome e Categoria */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <div>
-                                <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
-                                  Nome do Componente *
-                                </label>
-                                <input
-                                  type="text"
-                                  required
-                                  value={subItem.name || ""}
-                                  onChange={(e) =>
-                                    handleUpdateKitItem(sIdx, { name: e.target.value })
-                                  }
-                                  placeholder='Ex: Computador All-in-One Touch 23.8" Core i5'
-                                  className="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs font-semibold focus:border-indigo-500 focus:outline-none"
-                                />
-                              </div>
-
-                              <div>
-                                <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
-                                  Categoria do Equipamento *
-                                </label>
-                                <select
-                                  value={subItem.category || "accessory"}
-                                  onChange={(e) =>
-                                    handleUpdateKitItem(sIdx, {
-                                      category: e.target.value as any,
-                                    })
-                                  }
-                                  className="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs font-semibold focus:border-indigo-500 focus:outline-none"
-                                >
-                                  <option value="monitor">🖥️ Display Touchscreen / All-in-One</option>
-                                  <option value="printer">🖨️ Impressora Térmica Homologada</option>
-                                  <option value="reader">📷 Leitor de Código 2D / QR Code</option>
-                                  <option value="accessory">⚡ Conexões, Cabos & Filtro de Linha</option>
-                                  <option value="pc">💻 Mini PC / Computador Industrial</option>
-                                  <option value="other">📦 Outro Periférico / Acessório</option>
-                                </select>
-                              </div>
-                            </div>
-
-                            {/* Valor Comercial (R$) e ID do Sub-Item */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <div>
-                                <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
-                                  Valor Individual (R$) *
-                                </label>
-                                <div className="relative">
-                                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-indigo-400">
-                                    R$
-                                  </span>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    required
-                                    value={((subItem.priceCents || 0) / 100).toFixed(2)}
-                                    onChange={(e) => {
-                                      const parsed = parseFloat(e.target.value || "0");
-                                      handleUpdateKitItem(sIdx, {
-                                        priceCents: Math.round(parsed * 100),
-                                      });
-                                    }}
-                                    className="w-full pl-10 pr-3.5 py-2 bg-slate-900 border border-indigo-500/50 rounded-xl text-indigo-300 font-extrabold font-mono text-xs focus:border-indigo-400 focus:outline-none"
-                                  />
-                                </div>
-                                <span className="text-[10px] text-slate-500 mt-1 block">
-                                  Valor que soma ao total quando o cliente mantiver este item ativo
-                                </span>
-                              </div>
-
-                              <div>
-                                <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
-                                  Identificador Técnico (ID)
-                                </label>
-                                <input
-                                  type="text"
-                                  value={subItem.id || ""}
-                                  onChange={(e) =>
-                                    handleUpdateKitItem(sIdx, { id: e.target.value })
-                                  }
-                                  placeholder="Ex: kit-monitor-touch"
-                                  className="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-xs focus:border-indigo-500 focus:outline-none"
-                                />
-                                <span className="text-[10px] text-slate-500 mt-1 block">
-                                  Chave de identificação no payload do pedido
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* URL da Foto do Componente */}
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">
-                                  URL da Foto / Imagem do Componente
-                                </label>
-                                {subItem.image && (
-                                  <a
-                                    href={subItem.image}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1"
-                                  >
-                                    <span>Abrir Imagem</span>
-                                    <ExternalLink className="w-2.5 h-2.5" />
-                                  </a>
-                                )}
-                              </div>
-                              <input
-                                type="text"
-                                value={subItem.image || ""}
-                                onChange={(e) =>
-                                  handleUpdateKitItem(sIdx, { image: e.target.value })
-                                }
-                                placeholder="https://exemplo.com/foto-componente.png ou /images/totems/..."
-                                className="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-xs focus:border-indigo-500 focus:outline-none"
-                              />
-                            </div>
-
-                            {/* Descrição Comercial & Técnica */}
-                            <div>
-                              <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
-                                Descrição Comercial & Técnica *
-                              </label>
-                              <textarea
-                                rows={2}
-                                required
-                                value={subItem.description || ""}
-                                onChange={(e) =>
-                                  handleUpdateKitItem(sIdx, { description: e.target.value })
-                                }
-                                placeholder="Descreva as especificações do equipamento apresentadas ao cliente na modal..."
-                                className="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs leading-relaxed focus:border-indigo-500 focus:outline-none resize-none"
-                              />
-                              <span className="text-[10px] text-slate-500 mt-0.5 block">
-                                Visível na janela de personalização dos itens do kit no configurador
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
+                  kitSubItems.map((subItem, sIdx) => (
+                    <KitSubItemCard
+                      key={subItem._uid}
+                      subItem={subItem}
+                      index={sIdx}
+                      totalCount={kitSubItems.length}
+                      onUpdate={handleUpdateKitItem}
+                      onRemove={handleRemoveKitItem}
+                      onMoveUp={handleMoveUpKitItem}
+                      onMoveDown={handleMoveDownKitItem}
+                      onDuplicate={handleDuplicateKitItem}
+                    />
+                  ))
                 )}
               </div>
 
