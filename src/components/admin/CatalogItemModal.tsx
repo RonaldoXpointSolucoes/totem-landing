@@ -145,12 +145,21 @@ export function CatalogItemModal({
         initialItem.sizeInches ||
         (initialItem.size ? parseFloat(initialItem.size) : 21.5);
 
+      let initialNotes = initialItem.notes || "";
+      let initialDescription = initialItem.description || "";
+      if (typeof initialNotes === "string" && (initialNotes.includes("kitItems") || initialNotes.trim().startsWith("{"))) {
+        initialNotes = "";
+      }
+      if (typeof initialDescription === "string" && (initialDescription.includes("kitItems") || initialDescription.trim().startsWith("{"))) {
+        initialDescription = "";
+      }
+
       setFormData({
         name: initialItem.name || initialItem.display_name || "",
         display_name: initialItem.display_name || initialItem.name || "",
         slug: initialItem.slug || "",
-        description: initialItem.description || initialItem.notes || "",
-        notes: initialItem.notes || initialItem.description || "",
+        description: initialDescription || initialNotes || "",
+        notes: initialNotes || initialDescription || "",
         base_price_cents: initialItem.base_price_cents ?? 0,
         price_adjustment_cents: initialItem.price_adjustment_cents ?? 0,
         active: initialItem.active ?? true,
