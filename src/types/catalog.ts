@@ -45,6 +45,7 @@ export interface ColorOption {
   hexReference: string;
   priceAdjustmentCents: number;
   active: boolean;
+  sortOrder?: number;
   image?: string;
 }
 
@@ -68,6 +69,7 @@ export interface EquipmentOption {
   technicalCode?: string;
   notes?: string;
   active: boolean;
+  sortOrder?: number;
   isKit?: boolean;
   kitItems?: KitSubItem[];
   priceAdjustmentCents?: number;

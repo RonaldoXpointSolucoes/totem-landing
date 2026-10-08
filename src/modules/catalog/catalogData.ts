@@ -141,6 +141,21 @@ export const COLOR_OPTIONS: ColorOption[] = [
 
 export const HOMOLOGATED_MONITORS: MonitorOption[] = [
   {
+    id: "6ac6dbf90032d4f8586e",
+    brand: "Geral",
+    model: "kit",
+    displayName: "Kit de Montagem",
+    sizeInches: 23.8,
+    vesaPattern: "100x100",
+    technicalCode: "TP-9556",
+    notes: "Pacote completo com Computador All-in-One Touch 23.8, Impressora Térmica 80mm, Leitor 2D e Cabos blindados.",
+    active: true,
+    sortOrder: 1,
+    isKit: true,
+    priceAdjustmentCents: 395000,
+    image: "https://http2.mlstatic.com/D_NQ_NP_2X_657397-MLB91414180451_092025-F-computador-allinone-238-touch-screen-intel-core-i5-3320.webp",
+  },
+  {
     id: "mon-elgin-215",
     brand: "Elgin",
     model: "Touch Pro 21.5\"",
@@ -150,6 +165,7 @@ export const HOMOLOGATED_MONITORS: MonitorOption[] = [
     technicalCode: "ELG-M215-V100",
     notes: "Moldura standard com furação VESA 100 e vedação perimetral.",
     active: true,
+    sortOrder: 2,
     image: "https://http2.mlstatic.com/D_NQ_NP_2X_657397-MLB91414180451_092025-F-computador-allinone-238-touch-screen-intel-core-i5-3320.webp",
   },
   {
@@ -162,6 +178,7 @@ export const HOMOLOGATED_MONITORS: MonitorOption[] = [
     technicalCode: "GER-TS150-V75",
     notes: "Abertura compacta para totem de parede e balcão.",
     active: true,
+    sortOrder: 3,
     image: "https://http2.mlstatic.com/D_NQ_NP_699420-MLA108910647788_032026-F.webp",
   },
   {
@@ -174,21 +191,8 @@ export const HOMOLOGATED_MONITORS: MonitorOption[] = [
     technicalCode: "BEM-RC185-V100",
     notes: "Padrão de corte horizontal com presilhas traseiras de pressão.",
     active: true,
+    sortOrder: 4,
     image: "https://http2.mlstatic.com/D_NQ_NP_2X_930791-MLA91934371119_092025-F.webp",
-  },
-  {
-    id: "6ac6dbf90032d4f8586e",
-    brand: "Geral",
-    model: "kit",
-    displayName: "Kit de Montagem",
-    sizeInches: 23.8,
-    vesaPattern: "100x100",
-    technicalCode: "TP-9556",
-    notes: "Pacote completo com Computador All-in-One Touch 23.8, Impressora Térmica 80mm, Leitor 2D e Cabos blindados.",
-    active: true,
-    isKit: true,
-    priceAdjustmentCents: 395000,
-    image: "https://http2.mlstatic.com/D_NQ_NP_2X_657397-MLB91414180451_092025-F-computador-allinone-238-touch-screen-intel-core-i5-3320.webp",
   },
 ];
 

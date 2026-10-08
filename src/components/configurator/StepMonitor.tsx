@@ -61,11 +61,21 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
   const [inchesInput, setInchesInput] = useState<number>(selectedMonitor?.sizeInches || 21.5);
   const [vesaInput, setVesaInput] = useState(selectedMonitor?.vesaPattern || "100x100");
 
-  const filteredMonitors = monitors.filter((m) =>
-    `${m.brand} ${m.model} ${m.displayName}`
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase())
-  );
+  const sortedMonitors = React.useMemo(() => {
+    return [...monitors].sort((a, b) => {
+      const orderA = typeof a.sortOrder === "number" ? a.sortOrder : 999;
+      const orderB = typeof b.sortOrder === "number" ? b.sortOrder : 999;
+      return orderA - orderB;
+    });
+  }, [monitors]);
+
+  const filteredMonitors = React.useMemo(() => {
+    return sortedMonitors.filter((m) =>
+      `${m.brand} ${m.model} ${m.displayName}`
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase())
+    );
+  }, [sortedMonitors, searchTerm]);
 
   // Abrir editor com os dados atuais do monitor selecionado
   const handleOpenEditor = (targetMon?: MonitorOption) => {
@@ -360,56 +370,18 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
         </form>
       )}
 
+      {/* Alerta de Seleção Obrigatória */}
+      {!selectedMonitor && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs animate-in fade-in duration-200">
+          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+          <span className="font-semibold">
+            Seleção obrigatória: escolha uma das opções abaixo para habilitar o avanço de etapa.
+          </span>
+        </div>
+      )}
+
       {/* Grid com Scroll Interno Seguro para Manter Viewport sem Estouro */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[260px] lg:max-h-[290px] overflow-y-auto pr-1">
-        {/* Card Especial para Personalizar / Outro Monitor */}
-        <Card
-          interactive
-          selected={selectedMonitor?.isCustom}
-          onClick={() => handleOpenEditor()}
-          className={`p-3 sm:p-3.5 rounded-xl flex items-center justify-between gap-2.5 border-dashed transition-all ${
-            selectedMonitor?.isCustom
-              ? "border-[#0071e3] bg-blue-50/80 dark:bg-indigo-600/20"
-              : "border-indigo-300 dark:border-indigo-500/40 bg-indigo-50/30 dark:bg-slate-950 hover:border-indigo-500"
-          }`}
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl border border-indigo-400/40 bg-indigo-100 dark:bg-indigo-600/30 text-indigo-600 dark:text-indigo-300 flex items-center justify-center shrink-0">
-              {selectedMonitor?.isCustom ? <Edit3 className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
-                  {selectedMonitor?.isCustom ? selectedMonitor.brand : "Outro Monitor"}
-                </span>
-                <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-1 py-0.2 rounded">
-                  Sob Medida
-                </span>
-              </div>
-              <h3 className="text-xs font-bold text-[#1d1d1f] dark:text-white truncate">
-                {selectedMonitor?.isCustom
-                  ? selectedMonitor.displayName
-                  : "Definir Marca, Modelo e Polegadas"}
-              </h3>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
-                {selectedMonitor?.isCustom
-                  ? `VESA: ${selectedMonitor.vesaPattern} • Clique para editar`
-                  : "Usinagem CNC personalizada para qualquer tela"}
-              </p>
-            </div>
-          </div>
-
-          <div
-            className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
-              selectedMonitor?.isCustom
-                ? "border-[#0071e3] bg-[#0071e3] text-white shadow-sm"
-                : "border-indigo-400/40 bg-white dark:bg-slate-900 text-indigo-500"
-            }`}
-          >
-            {selectedMonitor?.isCustom ? <Check className="w-3 h-3 stroke-[3]" /> : <Edit3 className="w-2.5 h-2.5" />}
-          </div>
-        </Card>
-
         {/* Monitores Homologados & Kit de Montagem */}
         {filteredMonitors.map((mon) => {
           const isSelected = selectedMonitor?.id === mon.id;
@@ -581,6 +553,56 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
             </Card>
           );
         })}
+
+        {/* Card Especial para Personalizar / Outro Monitor (Exibido por último por ser sob medida) */}
+        {(!searchTerm || "outro monitor sob medida personalizada medidas display".includes(searchTerm.toLowerCase())) && (
+          <Card
+            interactive
+            selected={selectedMonitor?.isCustom}
+            onClick={() => handleOpenEditor()}
+            className={`p-3 sm:p-3.5 rounded-xl flex items-center justify-between gap-2.5 border-dashed transition-all ${
+              selectedMonitor?.isCustom
+                ? "border-[#0071e3] bg-blue-50/80 dark:bg-indigo-600/20"
+                : "border-indigo-300 dark:border-indigo-500/40 bg-indigo-50/30 dark:bg-slate-950 hover:border-indigo-500"
+            }`}
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-9 h-9 rounded-xl border border-indigo-400/40 bg-indigo-100 dark:bg-indigo-600/30 text-indigo-600 dark:text-indigo-300 flex items-center justify-center shrink-0">
+                {selectedMonitor?.isCustom ? <Edit3 className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+                    {selectedMonitor?.isCustom ? selectedMonitor.brand : "Outro Monitor"}
+                  </span>
+                  <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-1 py-0.2 rounded">
+                    Sob Medida
+                  </span>
+                </div>
+                <h3 className="text-xs font-bold text-[#1d1d1f] dark:text-white truncate">
+                  {selectedMonitor?.isCustom
+                    ? selectedMonitor.displayName
+                    : "Definir Marca, Modelo e Polegadas"}
+                </h3>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                  {selectedMonitor?.isCustom
+                    ? `VESA: ${selectedMonitor.vesaPattern} • Clique para editar`
+                    : "Usinagem CNC personalizada para qualquer tela"}
+                </p>
+              </div>
+            </div>
+
+            <div
+              className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+                selectedMonitor?.isCustom
+                  ? "border-[#0071e3] bg-[#0071e3] text-white shadow-sm"
+                  : "border-indigo-400/40 bg-white dark:bg-slate-900 text-indigo-500"
+              }`}
+            >
+              {selectedMonitor?.isCustom ? <Check className="w-3 h-3 stroke-[3]" /> : <Edit3 className="w-2.5 h-2.5" />}
+            </div>
+          </Card>
+        )}
       </div>
 
       {/* Link Discreto para Personalização Especial de Engenharia */}

@@ -234,8 +234,9 @@ export async function getAppwriteCatalog() {
       hexReference: doc.hex_reference,
       priceAdjustmentCents: doc.price_adjustment_cents || 0,
       active: doc.active,
+      sortOrder: typeof doc.sort_order === "number" ? doc.sort_order : (parseInt(doc.sort_order, 10) || 999),
       image: doc.image || "",
-    })),
+    })).sort((a: any, b: any) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999)),
     monitors: monitorsRes.documents.map((doc: any) => {
       let isKit = false;
       let kitItems = undefined;
@@ -259,6 +260,8 @@ export async function getAppwriteCatalog() {
         } catch (e) {}
       }
 
+      const sortOrderNum = typeof doc.sort_order === "number" ? doc.sort_order : (parseInt(doc.sort_order, 10) || 999);
+
       return {
         id: doc.$id,
         brand: doc.brand,
@@ -270,11 +273,12 @@ export async function getAppwriteCatalog() {
         notes: doc.notes,
         active: doc.active,
         image: doc.image,
+        sortOrder: sortOrderNum,
         isKit,
         kitItems,
         priceAdjustmentCents,
       };
-    }),
+    }).sort((a: any, b: any) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999)),
     printers: printersRes.documents.map((doc: any) => ({
       id: doc.$id,
       brand: doc.brand,
@@ -284,8 +288,9 @@ export async function getAppwriteCatalog() {
       technicalCode: doc.technical_code,
       notes: doc.notes,
       active: doc.active,
+      sortOrder: typeof doc.sort_order === "number" ? doc.sort_order : (parseInt(doc.sort_order, 10) || 999),
       image: doc.image,
-    })),
+    })).sort((a: any, b: any) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999)),
     barcodeReaders: readersRes.documents.map((doc: any) => ({
       id: doc.$id,
       brand: doc.brand,
@@ -295,8 +300,9 @@ export async function getAppwriteCatalog() {
       technicalCode: doc.technical_code,
       notes: doc.notes,
       active: doc.active,
+      sortOrder: typeof doc.sort_order === "number" ? doc.sort_order : (parseInt(doc.sort_order, 10) || 999),
       image: doc.image,
-    })),
+    })).sort((a: any, b: any) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999)),
   };
 }
 

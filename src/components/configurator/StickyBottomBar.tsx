@@ -13,6 +13,7 @@ interface StickyBottomBarProps {
   onBack: () => void;
   isLastStep?: boolean;
   nextButtonLabel?: string;
+  isNextDisabled?: boolean;
 }
 
 export const StickyBottomBar: React.FC<StickyBottomBarProps> = ({
@@ -23,6 +24,7 @@ export const StickyBottomBar: React.FC<StickyBottomBarProps> = ({
   onBack,
   isLastStep = false,
   nextButtonLabel,
+  isNextDisabled = false,
 }) => {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-950/95 border-t border-black/10 dark:border-slate-800/90 backdrop-blur-2xl px-4 py-2.5 pb-[max(0.65rem,env(safe-area-inset-bottom))] shadow-[0_-8px_30px_rgba(0,0,0,0.08)] dark:shadow-[0_-10px_30px_rgba(0,0,0,0.6)] transition-colors duration-300">
@@ -59,7 +61,12 @@ export const StickyBottomBar: React.FC<StickyBottomBarProps> = ({
             variant="primary"
             size="md"
             onClick={onNext}
-            className="min-h-[44px] px-5 sm:px-7 font-bold shadow-md shadow-blue-500/25 active:scale-95 text-xs sm:text-sm group transition-all"
+            disabled={isNextDisabled}
+            className={`min-h-[44px] px-5 sm:px-7 font-bold shadow-md shadow-blue-500/25 active:scale-95 text-xs sm:text-sm group transition-all ${
+              isNextDisabled
+                ? "opacity-50 cursor-not-allowed pointer-events-none saturate-50 shadow-none"
+                : ""
+            }`}
           >
             {isLastStep ? (
               <>

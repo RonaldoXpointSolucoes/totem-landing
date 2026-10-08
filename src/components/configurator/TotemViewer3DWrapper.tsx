@@ -63,6 +63,20 @@ export const TotemViewer3DWrapper: React.FC<TotemViewer3DWrapperProps> = ({
 
   const currentEquipment = useMemo(() => {
     if (currentStep === 3) {
+      if (!selectedMonitor) {
+        return {
+          type: "monitor" as const,
+          title: "Monitor a Definir",
+          tabLabel: "Monitor",
+          icon: Tv,
+          name: "Aguardando Seleção",
+          brand: "Obrigatório",
+          badge: "Selecione o Display",
+          image: undefined,
+          notes: "Escolha um monitor homologado, o Kit de Montagem ou personalize sob medida.",
+          isCustom: false,
+        };
+      }
       const isKit = isItemKit(selectedMonitor);
       if (isKit) {
         return {

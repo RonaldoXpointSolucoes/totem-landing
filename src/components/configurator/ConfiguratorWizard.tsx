@@ -97,7 +97,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
 
   const [selectedMonitor, setSelectedMonitor] = useState<MonitorOption | null>(() => {
     if (editingItem) return editingItem.configuration.monitor || null;
-    return HOMOLOGATED_MONITORS[0];
+    return null;
   });
 
   const [selectedPrinter, setSelectedPrinter] = useState<PrinterOption | null>(() => {
@@ -164,8 +164,13 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     });
   }, [selectedModel, selectedColor, selectedMonitor, selectedPrinter, useReader, selectedReader, isKitSelected, kitAdjustmentCents]);
 
+  const isNextDisabled = step === 3 && !selectedMonitor;
+
   // Navegação para Frente: Pula etapas 4 e 5 se o Kit foi selecionado
   const handleNext = () => {
+    if (step === 3 && !selectedMonitor) {
+      return;
+    }
     if (step === 3 && isKitSelected) {
       // Se selecionou o Kit de Montagem, pula Impressora (4) e Leitor (5) indo direto para Revisão (6)
       setStep(6);
@@ -275,7 +280,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     setEditingItem(null);
     setSelectedModel(CABINET_MODELS.find((m) => m.id === "cabinet-wall") || CABINET_MODELS[0]);
     setSelectedColor(COLOR_OPTIONS[0]);
-    setSelectedMonitor(HOMOLOGATED_MONITORS[0]);
+    setSelectedMonitor(null);
     setSelectedPrinter(HOMOLOGATED_PRINTERS[0]);
     setUseReader(true);
     setSelectedReader(HOMOLOGATED_READERS[0]);
@@ -349,6 +354,10 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                   onClick={() => {
                     if (isSkippedByKit) {
                       setStep(3); // Redireciona para o kit
+                      return;
+                    }
+                    if (s.id > 3 && !selectedMonitor) {
+                      setStep(3);
                       return;
                     }
                     setStep(s.id);
@@ -451,11 +460,18 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                 </div>
                 <div className="flex justify-between items-center gap-2">
                   <span className="shrink-0 font-medium">Monitor:</span>
-                  <span className="font-semibold text-[#1d1d1f] dark:text-white text-right leading-tight">
-                    {isKitSelected
-                      ? `Kit de Montagem (${activeKitItems.filter((i) => i.selected).length} itens)`
-                      : selectedMonitor?.displayName || "—"}
-                  </span>
+                  {selectedMonitor ? (
+                    <span className="font-semibold text-[#1d1d1f] dark:text-white text-right leading-tight">
+                      {isKitSelected
+                        ? `Kit de Montagem (${activeKitItems.filter((i) => i.selected).length} itens)`
+                        : selectedMonitor.displayName}
+                    </span>
+                  ) : (
+                    <span className="font-bold text-amber-600 dark:text-amber-400 text-right leading-tight flex items-center gap-1 justify-end">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                      Seleção Obrigatória
+                    </span>
+                  )}
                 </div>
                 <div className="flex justify-between items-center gap-2">
                   <span className="shrink-0 font-medium">Impressora:</span>
@@ -556,7 +572,14 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
         onNext={handleNext}
         onBack={handleBack}
         isLastStep={step === totalSteps}
-        nextButtonLabel={step === 3 && isKitSelected ? "Avançar para Revisão" : undefined}
+        isNextDisabled={isNextDisabled}
+        nextButtonLabel={
+          step === 3 && !selectedMonitor
+            ? "Selecione o Monitor"
+            : step === 3 && isKitSelected
+            ? "Avançar para Revisão"
+            : undefined
+        }
       />
 
       {/* Modal de Personalização Especial */}
@@ -576,7 +599,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
           <div className="p-3.5 rounded-2xl bg-[#f8f9fa] dark:bg-slate-950 border border-black/10 dark:border-slate-800 space-y-1">
             <p className="font-bold text-[#1d1d1f] dark:text-white">{selectedModel.name} ({selectedColor.name})</p>
             <p className="text-slate-500 dark:text-slate-400">
-              Monitor: {selectedMonitor?.displayName} • Impressora: {selectedPrinter?.displayName}
+              Monitor: {selectedMonitor?.displayName || "Sob Medida"} • Impressora: {selectedPrinter?.displayName}
             </p>
             <p className="text-[#0071e3] dark:text-cyan-400 font-black text-base pt-1">
               {formatBRL(pricing.totalPriceCents)}
