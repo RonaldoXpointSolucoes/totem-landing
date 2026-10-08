@@ -1,16 +1,21 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { CabinetModel, ColorOption } from "@/types/catalog";
+import React, { useState, useMemo, useEffect } from "react";
+import { CabinetModel, ColorOption, MonitorOption, PrinterOption, BarcodeReaderOption } from "@/types/catalog";
 import { Badge } from "@/components/ui";
-import { Image as ImageIcon } from "lucide-react";
+import { Image as ImageIcon, Tv, Printer, QrCode, Ban, Sparkles, Boxes } from "lucide-react";
 import { InstagramVideoPlayer, InstagramGlyph, ModelImageCarousel } from "@/components/media";
-import { formatBRL } from "@/modules/pricing/pricingEngine";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
+import { isItemKit } from "@/modules/catalog/kitDefaults";
 
 interface TotemViewer3DWrapperProps {
   selectedModel: CabinetModel;
   selectedColor: ColorOption;
+  selectedMonitor?: MonitorOption | null;
+  selectedPrinter?: PrinterOption | null;
+  selectedReader?: BarcodeReaderOption | null;
+  useReader?: boolean;
+  currentStep?: number;
   hasPrinter?: boolean;
   hasScanner?: boolean;
 }
@@ -18,6 +23,11 @@ interface TotemViewer3DWrapperProps {
 export const TotemViewer3DWrapper: React.FC<TotemViewer3DWrapperProps> = ({
   selectedModel,
   selectedColor,
+  selectedMonitor,
+  selectedPrinter,
+  selectedReader,
+  useReader = true,
+  currentStep = 1,
 }) => {
   // Lista de fotos reais do modelo selecionado (filtrando SVGs se houver fotos reais)
   const modelImages = useMemo(() => {
@@ -48,29 +58,139 @@ export const TotemViewer3DWrapper: React.FC<TotemViewer3DWrapperProps> = ({
     return Array.from(new Set(list.filter(Boolean)));
   }, [selectedModel]);
 
-  // Modo de visualização: "photos" (carrossel automático de 10s e manual) ou "video" (Instagram Reels)
-  const [mode, setMode] = useState<"photos" | "video">("photos");
+  // Detecção de equipamento selecionado nas etapas 3, 4 e 5
+  const isEquipmentStep = currentStep === 3 || currentStep === 4 || currentStep === 5;
+
+  const currentEquipment = useMemo(() => {
+    if (currentStep === 3) {
+      const isKit = isItemKit(selectedMonitor);
+      if (isKit) {
+        return {
+          type: "monitor" as const,
+          title: "Pacote de Montagem",
+          tabLabel: "Foto do Kit",
+          icon: Boxes,
+          name: selectedMonitor?.displayName || "Kit de Montagem Completo",
+          brand: "Combo Hardware",
+          badge: "AIO Touch + Impressora + Leitor",
+          image: selectedMonitor?.image,
+          notes: "Pacote industrial de componentes com encaixe e furação CNC calibrados de fábrica.",
+          isCustom: false,
+        };
+      }
+      return {
+        type: "monitor" as const,
+        title: "Monitor Selecionado",
+        tabLabel: "Foto do Monitor",
+        icon: Tv,
+        name: selectedMonitor?.displayName || "Monitor Padrão",
+        brand: selectedMonitor?.brand || "Elgin",
+        badge: selectedMonitor?.sizeInches
+          ? `${selectedMonitor.sizeInches}" • VESA ${selectedMonitor.vesaPattern || "100x100"}`
+          : selectedMonitor?.vesaPattern
+          ? `VESA ${selectedMonitor.vesaPattern}`
+          : "Furação VESA",
+        image: selectedMonitor?.image,
+        notes: selectedMonitor?.notes || "Usinagem CNC milimétrica para encaixe e furação VESA.",
+        isCustom: !!selectedMonitor?.isCustom,
+      };
+    }
+    if (currentStep === 4) {
+      return {
+        type: "printer" as const,
+        title: "Impressora Selecionada",
+        tabLabel: "Foto da Impressora",
+        icon: Printer,
+        name: selectedPrinter?.displayName || "Impressora Térmica",
+        brand: selectedPrinter?.brand || "EPSON",
+        badge: selectedPrinter?.paperWidthMm ? `Bobina ${selectedPrinter.paperWidthMm}mm` : "Térmica 80mm",
+        image: selectedPrinter?.image,
+        notes: selectedPrinter?.notes || "Berço interno com rasgo de saída de papel usinado sob medida.",
+        isCustom: false,
+      };
+    }
+    if (currentStep === 5) {
+      if (!useReader) {
+        return {
+          type: "reader" as const,
+          title: "Leitor Óptico",
+          tabLabel: "Gabinete Liso",
+          icon: Ban,
+          name: "Sem Leitor Óptico",
+          brand: "Chassi Liso",
+          badge: "Frente Fechada",
+          image: undefined,
+          notes: "Gabinete usinado liso sem rasgo ou janela para scanner frontal.",
+          isCustom: false,
+        };
+      }
+      return {
+        type: "reader" as const,
+        title: "Leitor Selecionado",
+        tabLabel: "Foto do Leitor",
+        icon: QrCode,
+        name: selectedReader?.displayName || "Leitor de Código de Barras",
+        brand: selectedReader?.brand || "Bematech",
+        badge: selectedReader?.is2D ? "1D / 2D / QR Code" : "Leitor Óptico",
+        image: selectedReader?.image,
+        notes: selectedReader?.notes || "Janela frontal angular homologada para leitura ágil de tickets e smartphones.",
+        isCustom: false,
+      };
+    }
+    return null;
+  }, [currentStep, selectedMonitor, selectedPrinter, selectedReader, useReader]);
+
+  // Modo de visualização: "equipment", "photos" ou "video"
+  const [mode, setMode] = useState<"equipment" | "photos" | "video">(() =>
+    isEquipmentStep ? "equipment" : "photos"
+  );
   const [activeVideoIndex, setActiveVideoIndex] = useState<number>(0);
+
+  // Sincroniza a aba ativa quando a etapa muda
+  useEffect(() => {
+    if (isEquipmentStep) {
+      setMode("equipment");
+    } else {
+      setMode("photos");
+    }
+  }, [currentStep, isEquipmentStep]);
 
   const currentVideoUrl = modelVideos[activeVideoIndex] || modelVideos[0] || "";
 
   return (
-    <div className="space-y-3 w-full">
-      {/* Barra Superior de Navegação (Carrossel de Fotos vs Vídeo do Instagram) */}
+    <div className="space-y-2.5 w-full">
+      {/* Barra Superior de Navegação Dinâmica */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-[#f5f5f7] dark:bg-slate-900 border border-black/10 dark:border-slate-800 transition-colors">
+          {/* Aba do Equipamento Selecionado nas etapas 3, 4 e 5 */}
+          {isEquipmentStep && currentEquipment && (
+            <button
+              onClick={() => setMode("equipment")}
+              className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                mode === "equipment"
+                  ? "bg-white dark:bg-slate-800 text-[#0071e3] dark:text-cyan-400 shadow-sm"
+                  : "text-slate-600 dark:text-slate-400 hover:text-black dark:hover:text-white"
+              }`}
+            >
+              <currentEquipment.icon className="w-3.5 h-3.5 text-[#0071e3] dark:text-cyan-400" />
+              <span>{currentEquipment.tabLabel}</span>
+            </button>
+          )}
+
+          {/* Aba do Totem */}
           <button
             onClick={() => setMode("photos")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+            className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
               mode === "photos"
                 ? "bg-white dark:bg-slate-800 text-[#1d1d1f] dark:text-white shadow-sm"
                 : "text-slate-600 dark:text-slate-400 hover:text-black dark:hover:text-white"
             }`}
           >
             <ImageIcon className="w-3.5 h-3.5 text-[#0071e3]" />
-            <span>Fotos ({modelImages.length})</span>
+            <span>Totem ({modelImages.length})</span>
           </button>
 
+          {/* Aba de Vídeo Instagram */}
           {modelVideos.length > 0 && (
             <button
               onClick={() => {
@@ -81,19 +201,26 @@ export const TotemViewer3DWrapper: React.FC<TotemViewer3DWrapperProps> = ({
                   modelName: selectedModel.name,
                 });
               }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                 mode === "video"
                   ? "bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 text-white shadow-md shadow-rose-500/25"
                   : "text-slate-600 dark:text-slate-400 hover:text-rose-500 dark:hover:text-rose-400"
               }`}
             >
               <InstagramGlyph className="w-3.5 h-3.5" />
-              <span>Vídeo (Instagram)</span>
+              <span>Vídeo</span>
             </button>
           )}
         </div>
 
-        {mode === "video" ? (
+        {mode === "equipment" && currentEquipment ? (
+          <Badge
+            variant="accent"
+            className="text-[10px] bg-blue-50 dark:bg-indigo-950/60 text-[#0071e3] dark:text-cyan-400 border border-blue-200/60 dark:border-indigo-800/60 font-semibold"
+          >
+            {currentEquipment.badge}
+          </Badge>
+        ) : mode === "video" ? (
           <Badge
             variant="accent"
             className="text-[10px] bg-gradient-to-r from-amber-500/20 to-rose-500/20 text-rose-500 border border-rose-500/30"
@@ -110,11 +237,49 @@ export const TotemViewer3DWrapper: React.FC<TotemViewer3DWrapperProps> = ({
         )}
       </div>
 
-      {/* Janela de Visualização (Carrossel vs Vídeo) */}
-      <div className="relative h-[230px] sm:h-[260px] lg:h-[290px] w-full rounded-2xl sm:rounded-3xl bg-gradient-to-b from-[#f8f9fa] to-[#eceef1] dark:from-slate-950/80 dark:to-slate-900/80 border border-black/10 dark:border-slate-800 overflow-hidden shadow-md dark:shadow-xl flex flex-col items-center justify-center transition-colors">
-        {mode === "photos" ? (
-          /* MODO CARROSSEL: Rotação a cada 10s e Controle Manual (Setas, Dots, Swipe) */
-          <div className="relative w-full h-full pb-10">
+      {/* Janela de Visualização (Equipamento vs Totem vs Vídeo) */}
+      <div className="relative h-[200px] sm:h-[220px] lg:h-[235px] xl:h-[255px] w-full rounded-2xl sm:rounded-3xl bg-gradient-to-b from-[#f8f9fa] to-[#eceef1] dark:from-slate-950/80 dark:to-slate-900/80 border border-black/10 dark:border-slate-800 overflow-hidden shadow-md dark:shadow-xl flex flex-col items-center justify-center transition-colors">
+        {mode === "equipment" && currentEquipment ? (
+          /* MODO EQUIPAMENTO SELECIONADO (MONITOR / IMPRESSORA / LEITOR) */
+          <div className="relative w-full h-full p-3 sm:p-4 flex flex-col items-center justify-between animate-in fade-in duration-300">
+            {currentEquipment.image ? (
+              <div className="relative w-full flex-1 min-h-0 flex items-center justify-center group">
+                <img
+                  src={currentEquipment.image}
+                  alt={currentEquipment.name}
+                  className="max-h-full max-w-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.18)] dark:drop-shadow-[0_15px_30px_rgba(0,113,227,0.3)] transition-transform duration-300 group-hover:scale-105"
+                />
+              </div>
+            ) : (
+              <div className="relative w-full flex-1 min-h-0 flex flex-col items-center justify-center text-center p-3">
+                <div className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-900 border border-black/10 dark:border-slate-800 flex items-center justify-center text-[#0071e3] dark:text-cyan-400 shadow-sm mb-2">
+                  <currentEquipment.icon className="w-7 h-7" />
+                </div>
+                <h4 className="text-xs font-bold text-[#1d1d1f] dark:text-white">
+                  {currentEquipment.name}
+                </h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-[220px] mt-0.5 line-clamp-2">
+                  {currentEquipment.notes}
+                </p>
+              </div>
+            )}
+
+            {/* Rodapé Informativo Elegante do Equipamento */}
+            <div className="w-full mt-2 px-2.5 py-1.5 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-black/10 dark:border-slate-800 backdrop-blur-md flex items-center justify-between text-xs shadow-sm shrink-0">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                <span className="font-bold text-[#1d1d1f] dark:text-white truncate">
+                  {currentEquipment.name}
+                </span>
+              </div>
+              <span className="text-[10px] font-bold text-[#0071e3] dark:text-cyan-400 bg-blue-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-lg border border-blue-200/50 dark:border-indigo-800/50 shrink-0 ml-1">
+                {currentEquipment.badge}
+              </span>
+            </div>
+          </div>
+        ) : mode === "photos" ? (
+          /* MODO CARROSSEL DE FOTOS DO TOTEM */
+          <div className="relative w-full h-full">
             <ModelImageCarousel
               images={modelImages}
               alt={selectedModel.name}
@@ -159,22 +324,6 @@ export const TotemViewer3DWrapper: React.FC<TotemViewer3DWrapperProps> = ({
             )}
           </div>
         ) : null}
-
-        {/* Indicador Inferior Permanente de Cor Selecionada */}
-        <div className="absolute bottom-2.5 left-3 right-3 p-2 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-black/10 dark:border-slate-800 flex items-center justify-between text-xs backdrop-blur-md shadow-sm z-10 pointer-events-none">
-          <div className="flex items-center gap-2">
-            <span
-              className="w-3.5 h-3.5 rounded-full border border-black/20 dark:border-slate-600 shadow-inner"
-              style={{ background: selectedColor.hexReference }}
-            />
-            <span className="font-bold text-[#1d1d1f] dark:text-slate-200">{selectedColor.name}</span>
-          </div>
-          {selectedColor.priceAdjustmentCents > 0 && (
-            <span className="text-[#0071e3] dark:text-cyan-400 font-bold">
-              +{formatBRL(selectedColor.priceAdjustmentCents)}
-            </span>
-          )}
-        </div>
       </div>
     </div>
   );

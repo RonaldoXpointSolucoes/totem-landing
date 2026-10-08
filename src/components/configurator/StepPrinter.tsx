@@ -47,13 +47,22 @@ export const StepPrinter: React.FC<StepPrinterProps> = ({
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <div
-                  className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 transition-colors ${
+                  className={`w-11 h-11 rounded-xl border p-1 flex items-center justify-center shrink-0 overflow-hidden transition-all ${
                     isSelected
-                      ? "border-[#0071e3] bg-blue-50 dark:bg-indigo-600/30 text-[#0071e3] dark:text-indigo-300"
-                      : "border-black/10 dark:border-slate-800 bg-[#f8f9fa] dark:bg-slate-950 text-slate-500 dark:text-slate-400"
+                      ? "border-[#0071e3] bg-white dark:bg-slate-900 shadow-sm ring-2 ring-[#0071e3]/30"
+                      : "border-black/10 dark:border-slate-800 bg-white dark:bg-slate-950"
                   }`}
                 >
-                  <Printer className="w-4 h-4" />
+                  {printer.image ? (
+                    <img
+                      src={printer.image}
+                      alt={printer.displayName}
+                      className="w-full h-full object-contain drop-shadow-sm transition-transform duration-200 group-hover:scale-105"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <Printer className="w-5 h-5 text-slate-400" />
+                  )}
                 </div>
                 <div className="min-w-0">
                   <span className="text-[10px] font-bold text-[#0071e3] dark:text-cyan-400 uppercase tracking-wider">

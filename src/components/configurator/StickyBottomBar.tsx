@@ -12,6 +12,7 @@ interface StickyBottomBarProps {
   onNext: () => void;
   onBack: () => void;
   isLastStep?: boolean;
+  nextButtonLabel?: string;
 }
 
 export const StickyBottomBar: React.FC<StickyBottomBarProps> = ({
@@ -21,6 +22,7 @@ export const StickyBottomBar: React.FC<StickyBottomBarProps> = ({
   onNext,
   onBack,
   isLastStep = false,
+  nextButtonLabel,
 }) => {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-950/95 border-t border-black/10 dark:border-slate-800/90 backdrop-blur-2xl px-4 py-2.5 pb-[max(0.65rem,env(safe-area-inset-bottom))] shadow-[0_-8px_30px_rgba(0,0,0,0.08)] dark:shadow-[0_-10px_30px_rgba(0,0,0,0.6)] transition-colors duration-300">
@@ -66,7 +68,7 @@ export const StickyBottomBar: React.FC<StickyBottomBarProps> = ({
               </>
             ) : (
               <>
-                Continuar
+                {nextButtonLabel || "Continuar"}
                 <ArrowRight className="w-4 h-4 ml-1.5 transition-transform group-hover:translate-x-1" />
               </>
             )}

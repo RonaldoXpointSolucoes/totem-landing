@@ -150,6 +150,7 @@ export const HOMOLOGATED_MONITORS: MonitorOption[] = [
     technicalCode: "ELG-M215-V100",
     notes: "Moldura standard com furação VESA 100 e vedação perimetral.",
     active: true,
+    image: "https://http2.mlstatic.com/D_NQ_NP_2X_657397-MLB91414180451_092025-F-computador-allinone-238-touch-screen-intel-core-i5-3320.webp",
   },
   {
     id: "mon-gertec-156",
@@ -161,6 +162,7 @@ export const HOMOLOGATED_MONITORS: MonitorOption[] = [
     technicalCode: "GER-TS150-V75",
     notes: "Abertura compacta para totem de parede e balcão.",
     active: true,
+    image: "https://http2.mlstatic.com/D_NQ_NP_699420-MLA108910647788_032026-F.webp",
   },
   {
     id: "mon-bematech-185",
@@ -172,17 +174,21 @@ export const HOMOLOGATED_MONITORS: MonitorOption[] = [
     technicalCode: "BEM-RC185-V100",
     notes: "Padrão de corte horizontal com presilhas traseiras de pressão.",
     active: true,
+    image: "https://http2.mlstatic.com/D_NQ_NP_2X_930791-MLA91934371119_092025-F.webp",
   },
   {
-    id: "mon-prolan-24",
-    brand: "Prolan",
-    model: "Industrial Pro 23.8\"",
-    displayName: "Prolan Industrial 23.8\" Frameless",
+    id: "6ac6dbf90032d4f8586e",
+    brand: "Geral",
+    model: "kit",
+    displayName: "Kit de Montagem",
     sizeInches: 23.8,
     vesaPattern: "100x100",
-    technicalCode: "PRO-IND24-V100",
-    notes: "Furação reforçada para uso intensivo de 24 horas.",
+    technicalCode: "TP-9556",
+    notes: "Pacote completo com Computador All-in-One Touch 23.8, Impressora Térmica 80mm, Leitor 2D e Cabos blindados.",
     active: true,
+    isKit: true,
+    priceAdjustmentCents: 395000,
+    image: "https://http2.mlstatic.com/D_NQ_NP_2X_657397-MLB91414180451_092025-F-computador-allinone-238-touch-screen-intel-core-i5-3320.webp",
   },
 ];
 
@@ -196,6 +202,7 @@ export const HOMOLOGATED_PRINTERS: PrinterOption[] = [
     technicalCode: "EPS-T20X-CUT80",
     notes: "Gaveta com suporte para bobina de 80mm e rasgo para guilhotina frontal.",
     active: true,
+    image: "https://http2.mlstatic.com/D_NQ_NP_2X_630729-MLA108925986834_032026-F.webp",
   },
   {
     id: "prt-elgin-i9",
@@ -206,6 +213,7 @@ export const HOMOLOGATED_PRINTERS: PrinterOption[] = [
     technicalCode: "ELG-I9-CUT80",
     notes: "Trilho deslizante e passagem de fita frontal em aço escovado.",
     active: true,
+    image: "https://http2.mlstatic.com/D_NQ_NP_2X_966189-MLA95500782664_102025-F.webp",
   },
   {
     id: "prt-bematech-4200",
@@ -216,6 +224,7 @@ export const HOMOLOGATED_PRINTERS: PrinterOption[] = [
     technicalCode: "BEM-MP4200-CUT80",
     notes: "Gabinete preparado para fácil troca rápida de bobina sem chave.",
     active: true,
+    image: "https://http2.mlstatic.com/D_NQ_NP_2X_850362-MLB95373778434_102025-F-impressora-termica-tectoy-q4-80mm.webp",
   },
   {
     id: "prt-daruma-dr800",
@@ -226,6 +235,7 @@ export const HOMOLOGATED_PRINTERS: PrinterOption[] = [
     technicalCode: "DAR-DR800-CUT80",
     notes: "Recorte padrão com suporte metálico antivibração.",
     active: true,
+    image: "https://http2.mlstatic.com/D_NQ_NP_2X_630729-MLA108925986834_032026-F.webp",
   },
 ];
 
@@ -239,6 +249,7 @@ export const HOMOLOGATED_READERS: BarcodeReaderOption[] = [
     technicalCode: "HON-HF680-WIN",
     notes: "Abertura frontal angular para leitura rápida de smartphones e papel.",
     active: true,
+    image: "https://http2.mlstatic.com/D_NQ_NP_2X_925519-MLB95131543745_102025-F-leitor-de-codigo-de-barras-fixo-caixa-usb-2d-5v-preto-220v.webp",
   },
   {
     id: "rdr-elgin-flash",
@@ -249,6 +260,7 @@ export const HOMOLOGATED_READERS: BarcodeReaderOption[] = [
     technicalCode: "ELG-FLASH-2D",
     notes: "Vidro frontal temperado anti-risco de alta durabilidade.",
     active: true,
+    image: "https://http2.mlstatic.com/D_NQ_NP_2X_925519-MLB95131543745_102025-F-leitor-de-codigo-de-barras-fixo-caixa-usb-2d-5v-preto-220v.webp",
   },
   {
     id: "rdr-bematech-i500",
@@ -259,5 +271,6 @@ export const HOMOLOGATED_READERS: BarcodeReaderOption[] = [
     technicalCode: "BEM-I500-2D",
     notes: "Encaixe embutido com inclinação otimizada para autosserviço.",
     active: true,
+    image: "https://http2.mlstatic.com/D_NQ_NP_2X_925519-MLB95131543745_102025-F-leitor-de-codigo-de-barras-fixo-caixa-usb-2d-5v-preto-220v.webp",
   },
 ];

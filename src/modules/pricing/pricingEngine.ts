@@ -1,5 +1,6 @@
 import { CabinetModel, ColorOption, MonitorOption, PrinterOption, BarcodeReaderOption } from "@/types/catalog";
 import { TotemConfiguration } from "@/types/order";
+import { isItemKit, getEffectiveKitItems, calculateKitTotalCents } from "@/modules/catalog/kitDefaults";
 
 export interface CustomizationAdjustment {
   approved: boolean;
@@ -14,6 +15,7 @@ export interface PriceCalculationInput {
   printer?: PrinterOption | null;
   barcodeReader?: BarcodeReaderOption | null;
   customization?: CustomizationAdjustment | null;
+  kitAdjustmentCents?: number;
 }
 
 export interface PriceBreakdown {
@@ -29,15 +31,22 @@ export interface PriceBreakdown {
  * Regra Comercial Inegociável:
  * - O gabinete possui preço-base configurável.
  * - Cores podem possuir acréscimo (Branco = 0, Preto = +X, Black White = +Y).
- * - Equipamentos homologados (Monitor, Impressora, Leitor) NÃO alteram o preço padrão do gabinete (+ R$ 0,00).
+ * - Equipamentos homologados avulsos NÃO alteram o preço padrão do gabinete (+ R$ 0,00 de furação).
+ * - O Kit de Montagem soma o valor dinâmico dos seus sub-itens de hardware ativos.
  * - Personalizações fora do catálogo homologado entram com acréscimo apenas se previamente aprovadas pelo admin.
  */
 export function calculateTotemPrice(input: PriceCalculationInput): PriceBreakdown {
   const basePriceCents = Math.max(0, input.cabinet.basePriceCents || 0);
   const colorAdjustmentCents = Math.max(0, input.color.priceAdjustmentCents || 0);
 
-  // Equipamentos homologados sempre somam 0 no produto gabinete
-  const equipmentAdjustmentCents = 0;
+  // Se for o Kit de Montagem, soma o valor total dos sub-itens de hardware selecionados
+  let equipmentAdjustmentCents = 0;
+  if (input.kitAdjustmentCents !== undefined) {
+    equipmentAdjustmentCents = Math.max(0, input.kitAdjustmentCents);
+  } else if (input.monitor && isItemKit(input.monitor)) {
+    const effectiveItems = getEffectiveKitItems(input.monitor);
+    equipmentAdjustmentCents = calculateKitTotalCents(effectiveItems);
+  }
 
   // Personalizações especiais avaliadas pelo admin
   const customizationAdjustmentCents =

@@ -10,6 +10,7 @@ import {
 } from "@/modules/catalog/catalogData";
 import { calculateTotemPrice, formatBRL } from "@/modules/pricing/pricingEngine";
 import { CabinetModel, ColorOption, MonitorOption, PrinterOption, BarcodeReaderOption } from "@/types/catalog";
+import { isItemKit, getEffectiveKitItems, calculateKitTotalCents } from "@/modules/catalog/kitDefaults";
 import { TotemConfiguration } from "@/types/order";
 import { useCart } from "@/modules/cart/CartContext";
 import { StepModel } from "./StepModel";
@@ -34,6 +35,7 @@ import {
   Printer,
   QrCode,
   Check,
+  Boxes,
 } from "lucide-react";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 
@@ -120,6 +122,18 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
   });
   const totalSteps = 6;
 
+  // Identificação Reativa de Seleção do Kit de Montagem
+  const isKitSelected = isItemKit(selectedMonitor);
+  const activeKitItems = useMemo(() => {
+    if (!isKitSelected) return [];
+    return selectedMonitor?.kitItems || getEffectiveKitItems(selectedMonitor);
+  }, [isKitSelected, selectedMonitor]);
+
+  const kitAdjustmentCents = useMemo(() => {
+    if (!isKitSelected) return 0;
+    return calculateKitTotalCents(activeKitItems);
+  }, [isKitSelected, activeKitItems]);
+
   // Sincronizar parâmetros de rota na URL sem reload
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -146,11 +160,17 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
       printer: selectedPrinter,
       barcodeReader: useReader ? selectedReader : null,
       customization: null,
+      kitAdjustmentCents: isKitSelected ? kitAdjustmentCents : 0,
     });
-  }, [selectedModel, selectedColor, selectedMonitor, selectedPrinter, useReader, selectedReader]);
+  }, [selectedModel, selectedColor, selectedMonitor, selectedPrinter, useReader, selectedReader, isKitSelected, kitAdjustmentCents]);
 
+  // Navegação para Frente: Pula etapas 4 e 5 se o Kit foi selecionado
   const handleNext = () => {
-    if (step < totalSteps) {
+    if (step === 3 && isKitSelected) {
+      // Se selecionou o Kit de Montagem, pula Impressora (4) e Leitor (5) indo direto para Revisão (6)
+      setStep(6);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else if (step < totalSteps) {
       setStep((prev) => prev + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
@@ -158,8 +178,13 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     }
   };
 
+  // Navegação para Trás: Pula de volta da Revisão (6) para o Monitor (3) se o Kit estiver selecionado
   const handleBack = () => {
-    if (step > 1) {
+    if (step === 6 && isKitSelected) {
+      // Retorno inteligente: da Revisão volta direto para a etapa do Kit
+      setStep(3);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else if (step > 1) {
       setStep((prev) => prev - 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else if (onBackToHome) {
@@ -262,9 +287,9 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
   const CONFIG_STEPS = [
     { id: 1, label: "Formato", subtitle: "Gabinete", icon: Box },
     { id: 2, label: "Acabamento", subtitle: "MDF BP", icon: Palette },
-    { id: 3, label: "Monitor", subtitle: "Touch", icon: Tv },
-    { id: 4, label: "Impressora", subtitle: "Térmica", icon: Printer },
-    { id: 5, label: "Leitor", subtitle: "Código 2D", icon: QrCode },
+    { id: 3, label: "Monitor", subtitle: isKitSelected ? "Kit Montagem" : "Touch", icon: Tv },
+    { id: 4, label: "Impressora", subtitle: isKitSelected ? "No Kit" : "Térmica", icon: Printer, isSkipped: isKitSelected },
+    { id: 5, label: "Leitor", subtitle: isKitSelected ? "No Kit" : "Código 2D", icon: QrCode, isSkipped: isKitSelected },
     { id: 6, label: "Revisão", subtitle: "Ficha CNC", icon: CheckCircle2 },
   ];
 
@@ -316,33 +341,53 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
               const Icon = s.icon;
               const isActive = s.id === step;
               const isCompleted = s.id < step;
+              const isSkippedByKit = isKitSelected && (s.id === 4 || s.id === 5);
 
               return (
                 <button
                   key={s.id}
-                  onClick={() => setStep(s.id)}
+                  onClick={() => {
+                    if (isSkippedByKit) {
+                      setStep(3); // Redireciona para o kit
+                      return;
+                    }
+                    setStep(s.id);
+                  }}
                   className={`flex items-center gap-2 py-1.5 px-2.5 sm:px-3 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
                     isActive
                       ? "bg-[#0071e3] text-white shadow-md shadow-blue-500/25 ring-2 ring-[#0071e3]/30"
+                      : isSkippedByKit
+                      ? "bg-slate-100 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 border border-dashed border-slate-300 dark:border-slate-700 hover:bg-slate-200/60"
                       : isCompleted
                       ? "bg-blue-50 dark:bg-indigo-950/40 text-[#0071e3] dark:text-indigo-300 hover:bg-blue-100"
                       : "text-slate-700 dark:text-slate-300 hover:bg-black/5 hover:text-black dark:hover:text-white"
                   }`}
-                  title={`Passo ${s.id}: ${s.label}`}
+                  title={
+                    isSkippedByKit
+                      ? `${s.label} já incluso no Kit de Montagem`
+                      : `Passo ${s.id}: ${s.label}`
+                  }
                 >
                   <div
                     className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black shrink-0 ${
                       isActive
                         ? "bg-white/20 text-white"
+                        : isSkippedByKit
+                        ? "bg-slate-200 dark:bg-slate-700 text-slate-500"
                         : isCompleted
                         ? "bg-[#0071e3] text-white"
                         : "bg-black/5 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-black/10 dark:border-slate-700"
                     }`}
                   >
-                    {isCompleted ? <Check className="w-2.5 h-2.5 stroke-[3]" /> : s.id}
+                    {isCompleted ? <Check className="w-2.5 h-2.5 stroke-[3]" /> : isSkippedByKit ? "✓" : s.id}
                   </div>
                   <Icon className="w-3.5 h-3.5 shrink-0 opacity-90" />
                   <span className="truncate">{s.label}</span>
+                  {isSkippedByKit && (
+                    <span className="text-[9px] font-extrabold uppercase px-1 py-0.2 rounded bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300">
+                      Kit
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -352,55 +397,80 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
         {/* Layout Desktop e Notebook em Duas Colunas (Viewport-Fit: sem rolagem externa) */}
         <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-stretch overflow-hidden">
           {/* Coluna Esquerda: Preview Visual Permanente do Totem */}
-          <div className="hidden lg:flex lg:col-span-4 flex-col justify-between h-full overflow-hidden">
-            <Card className="p-3.5 border-black/10 dark:border-slate-800 bg-white/95 dark:bg-slate-900/70 backdrop-blur-xl shadow-md rounded-2xl flex flex-col justify-between h-full space-y-3">
-              <div className="flex items-center justify-between">
+          <div className="hidden lg:flex lg:col-span-4 flex-col justify-between h-full min-h-0 overflow-hidden">
+            <Card className="p-3 sm:p-3.5 border-black/10 dark:border-slate-800 bg-white/95 dark:bg-slate-900/70 backdrop-blur-xl shadow-md rounded-2xl flex flex-col justify-between h-full space-y-2.5 overflow-hidden">
+              <div className="flex items-center justify-between shrink-0">
                 <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  Visualização do Totem
+                  {step === 3
+                    ? (isKitSelected ? "Kit de Montagem Completo" : "Visualização do Monitor")
+                    : step === 4
+                    ? "Visualização da Impressora"
+                    : step === 5
+                    ? "Visualização do Leitor"
+                    : "Visualização do Totem"}
                 </span>
-                <Badge variant="secondary" className="text-[9px]">
-                  Fotos Reais
+                <Badge variant={isKitSelected ? "primary" : "secondary"} className="text-[9px]">
+                  {isKitSelected && step === 3 ? "Pacote Hardware" : step >= 3 && step <= 5 ? "Item Selecionado" : "Fotos Reais"}
                 </Badge>
               </div>
 
-              {/* Visualizador de Fotos e Vídeos com Carrossel Automático de 10s */}
-              <div className="flex-1 min-h-0 flex items-center justify-center">
+              {/* Visualizador de Fotos e Vídeos com Suporte a Equipamentos e Totem */}
+              <div className="flex-1 min-h-0 flex items-center justify-center overflow-hidden">
                 <TotemViewer3DWrapper
                   selectedModel={selectedModel}
                   selectedColor={selectedColor}
+                  selectedMonitor={selectedMonitor}
+                  selectedPrinter={selectedPrinter}
+                  selectedReader={selectedReader}
+                  useReader={useReader}
+                  currentStep={step}
                   hasPrinter={!!selectedPrinter}
                   hasScanner={useReader && !!selectedReader}
                 />
               </div>
 
               {/* Resumo Dinâmico Compacto Lateral */}
-              <div className="space-y-1.5 text-xs border-t border-black/10 dark:border-slate-800/80 pt-2 text-slate-500 dark:text-slate-400">
-                <div className="flex justify-between items-center">
-                  <span>Modelo:</span>
-                  <span className="font-bold text-[#1d1d1f] dark:text-white truncate max-w-[140px]">{selectedModel.name}</span>
+              <div className="space-y-1.5 text-xs border-t border-black/10 dark:border-slate-800/80 pt-2 text-slate-500 dark:text-slate-400 shrink-0">
+                <div className="flex justify-between items-center gap-2">
+                  <span className="shrink-0 font-medium">Modelo:</span>
+                  <span className="font-bold text-[#1d1d1f] dark:text-white text-right leading-tight">
+                    {selectedModel.name}
+                  </span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span>Acabamento:</span>
-                  <div className="flex items-center gap-1.5">
+                <div className="flex justify-between items-center gap-2">
+                  <span className="shrink-0 font-medium">Acabamento:</span>
+                  <div className="flex items-center gap-1.5 justify-end min-w-0">
                     <span
-                      className="w-2.5 h-2.5 rounded-full border border-black/20"
+                      className="w-2.5 h-2.5 rounded-full border border-black/20 shrink-0 shadow-sm"
                       style={{ background: selectedColor.hexReference }}
                     />
-                    <span className="font-semibold text-[#1d1d1f] dark:text-white truncate max-w-[130px]">
+                    <span className="font-semibold text-[#1d1d1f] dark:text-white text-right leading-tight break-words">
                       {selectedColor.name}
                     </span>
                   </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span>Monitor:</span>
-                  <span className="font-semibold text-[#1d1d1f] dark:text-white truncate max-w-[140px]">
-                    {selectedMonitor?.displayName || "—"}
+                <div className="flex justify-between items-center gap-2">
+                  <span className="shrink-0 font-medium">Monitor:</span>
+                  <span className="font-semibold text-[#1d1d1f] dark:text-white text-right leading-tight">
+                    {isKitSelected
+                      ? `Kit de Montagem (${activeKitItems.filter((i) => i.selected).length} itens)`
+                      : selectedMonitor?.displayName || "—"}
                   </span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span>Impressora:</span>
-                  <span className="font-semibold text-[#1d1d1f] dark:text-white truncate max-w-[140px]">
-                    {selectedPrinter?.displayName || "—"}
+                <div className="flex justify-between items-center gap-2">
+                  <span className="shrink-0 font-medium">Impressora:</span>
+                  <span className="font-semibold text-[#1d1d1f] dark:text-white text-right leading-tight">
+                    {isKitSelected
+                      ? (activeKitItems.find((i) => i.category === "printer")?.selected ? "Inclusa no Kit" : "Removida do Kit")
+                      : selectedPrinter?.displayName || "—"}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center gap-2">
+                  <span className="shrink-0 font-medium">Leitor 2D:</span>
+                  <span className="font-semibold text-[#1d1d1f] dark:text-white text-right leading-tight">
+                    {isKitSelected
+                      ? (activeKitItems.find((i) => i.category === "reader")?.selected ? "Incluso no Kit" : "Removido do Kit")
+                      : (useReader && selectedReader ? selectedReader.displayName : "Sem leitor")}
                   </span>
                 </div>
 
@@ -486,6 +556,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
         onNext={handleNext}
         onBack={handleBack}
         isLastStep={step === totalSteps}
+        nextButtonLabel={step === 3 && isKitSelected ? "Avançar para Revisão" : undefined}
       />
 
       {/* Modal de Personalização Especial */}
@@ -550,6 +621,11 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
           <TotemViewer3DWrapper
             selectedModel={selectedModel}
             selectedColor={selectedColor}
+            selectedMonitor={selectedMonitor}
+            selectedPrinter={selectedPrinter}
+            selectedReader={selectedReader}
+            useReader={useReader}
+            currentStep={step}
             hasPrinter={!!selectedPrinter}
             hasScanner={useReader && !!selectedReader}
           />

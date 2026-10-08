@@ -48,6 +48,17 @@ export interface ColorOption {
   image?: string;
 }
 
+export interface KitSubItem {
+  id: string;
+  name: string;
+  category: "monitor" | "printer" | "reader" | "accessory" | "pc" | "other";
+  description?: string;
+  image?: string;
+  priceCents: number;
+  selected: boolean;
+  required?: boolean;
+}
+
 export interface EquipmentOption {
   id: string;
   brand: string;
@@ -57,6 +68,9 @@ export interface EquipmentOption {
   technicalCode?: string;
   notes?: string;
   active: boolean;
+  isKit?: boolean;
+  kitItems?: KitSubItem[];
+  priceAdjustmentCents?: number;
 }
 
 export interface MonitorOption extends EquipmentOption {

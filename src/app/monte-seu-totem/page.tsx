@@ -43,9 +43,9 @@ function MonteSeuTotemContent() {
 
 export default function MonteSeuTotemPage() {
   return (
-    <div className="min-h-screen md:h-screen md:max-h-screen md:overflow-hidden flex flex-col bg-[#fbfbfd] dark:bg-[#090a0f] text-[#1d1d1f] dark:text-slate-100 transition-colors duration-300">
+    <div className="min-h-screen md:h-screen flex flex-col bg-[#fbfbfd] dark:bg-[#090a0f] text-[#1d1d1f] dark:text-slate-100 transition-colors duration-300 overflow-x-hidden">
       <Navbar />
-      <main className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <main className="flex-1 min-h-0 flex flex-col overflow-y-auto lg:overflow-hidden">
         <Suspense
           fallback={
             <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3">

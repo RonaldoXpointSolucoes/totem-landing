@@ -1,13 +1,21 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { siteConfig } from "@/config/site";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 import { MessageSquare, X } from "lucide-react";
 
 export const FloatingWhatsAppButton: React.FC = () => {
+  const pathname = usePathname();
   const [isVisible, setIsVisible] = useState(false);
   const [isBadgeDismissed, setIsBadgeDismissed] = useState(false);
+
+  const isConfigurator =
+    pathname?.startsWith("/monte-seu-totem") ||
+    pathname?.startsWith("/configurador") ||
+    pathname?.startsWith("/carrinho") ||
+    pathname?.startsWith("/checkout");
 
   useEffect(() => {
     // Revela suavemente após 1 segundo de navegação
@@ -25,9 +33,13 @@ export const FloatingWhatsAppButton: React.FC = () => {
   if (!isVisible) return null;
 
   return (
-    <div className="fixed bottom-5 right-5 z-40 flex items-end flex-col gap-2 pointer-events-none select-none">
-      {/* Tooltip Balão Flutuante (Dismissível) */}
-      {!isBadgeDismissed && (
+    <div
+      className={`fixed right-4 sm:right-6 z-30 flex items-end flex-col gap-2 pointer-events-none select-none transition-all duration-300 ${
+        isConfigurator ? "bottom-20 sm:bottom-24" : "bottom-5"
+      }`}
+    >
+      {/* Tooltip Balão Flutuante (Dismissível - não exibido por padrão em fluxos com botões de compra fixos para não obstruir cards) */}
+      {!isBadgeDismissed && !isConfigurator && (
         <div className="pointer-events-auto flex items-center gap-2 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-3.5 py-2 rounded-2xl shadow-xl border border-black/10 dark:border-slate-800 text-xs font-medium animate-in fade-in slide-in-from-bottom-3 duration-300 max-w-[240px]">
           <div className="flex flex-col">
             <span className="font-bold text-[11px] text-emerald-600 dark:text-emerald-400">
