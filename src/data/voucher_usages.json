@@ -1,0 +1,138 @@
+[
+  {
+    "voucherCode": "CARLOS10",
+    "orderId": "ord_1791759118613_l3o5k",
+    "orderNumber": "TOT-2026-L3O5K",
+    "orderStatus": "awaiting_payment",
+    "customer": {
+      "name": "Rodrigo Lima TikTok",
+      "email": "rodrigo.tiktok@exemplo.com.br",
+      "whatsapp": "11988889999",
+      "city": "S�o Paulo",
+      "state": "SP"
+    },
+    "influencer": {
+      "sellerId": "user-seller-demo",
+      "name": "Carlos Vendedor",
+      "email": "vendedor@totempro.com.br",
+      "pixKey": "11988887777",
+      "phone": "(11) 98888-7777",
+      "commissionPercent": 8
+    },
+    "financials": {
+      "grossItemsTotalCents": 99000,
+      "eligibleCabinetBaseCents": 99000,
+      "discountPercent": 10,
+      "discountCents": 9900,
+      "shippingCents": 0,
+      "finalOrderTotalCents": 89100,
+      "influencerCommissionCents": 7920,
+      "payoutStatus": "pending",
+      "payoutNotes": "Pedido criado e aguardando compensação Pix para liberação do repasse ao influencer."
+    },
+    "campaignTracking": {
+      "device": "mobile",
+      "capturedAt": "2026-10-11T19:51:58.5096162-03:00",
+      "utmMedium": "video",
+      "hasTracking": true,
+      "utmCampaign": "tiktok_viral_totem",
+      "utmSource": "tiktok"
+    },
+    "id": "vch_1791759118615_ujl22",
+    "usedAt": "2026-10-11T22:51:58.615Z"
+  },
+  {
+    "voucherCode": "CARLOS10",
+    "orderId": "ord_test_1791758925733",
+    "orderNumber": "TOT-2026-TESTVCH",
+    "orderStatus": "paid",
+    "customer": {
+      "name": "João da Silva Teste",
+      "email": "joao.teste@empresa.com.br",
+      "whatsapp": "(11) 99999-8888",
+      "document": "12.345.678/0001-90",
+      "city": "Barueri",
+      "state": "SP"
+    },
+    "influencer": {
+      "sellerId": "user-seller-demo",
+      "name": "Carlos Vendedor",
+      "email": "vendedor@totempro.com.br",
+      "pixKey": "11988887777",
+      "phone": "(11) 98888-7777",
+      "commissionPercent": 8
+    },
+    "financials": {
+      "grossItemsTotalCents": 460200,
+      "eligibleCabinetBaseCents": 99000,
+      "discountPercent": 10,
+      "discountCents": 9900,
+      "shippingCents": 15000,
+      "finalOrderTotalCents": 465300,
+      "influencerCommissionCents": 7920,
+      "payoutStatus": "paid",
+      "payoutNotes": "Transferido via Itaú Pix pelo administrador.",
+      "paidAt": "2026-10-11T22:48:45.741Z",
+      "payoutProof": "E12345678202610119999988887777"
+    },
+    "campaignTracking": {
+      "hasTracking": true,
+      "landingUrl": "https://totempro.com.br/monte-seu-totem?cupom=CARLOS10&utm_source=instagram&utm_medium=stories&utm_campaign=stories_carlos10",
+      "referrer": "https://l.instagram.com/",
+      "utmSource": "instagram",
+      "utmMedium": "stories",
+      "utmCampaign": "stories_carlos10",
+      "refCode": "CARLOS10",
+      "device": "mobile",
+      "capturedAt": "2026-10-11T22:48:45.733Z"
+    },
+    "id": "vch_1791758925734_hu1c9",
+    "usedAt": "2026-10-11T22:48:45.734Z"
+  },
+  {
+    "id": "vch_1791750000000_carl",
+    "voucherCode": "CARLOS10",
+    "orderId": "ord_1791750000000_demo",
+    "orderNumber": "TOT-2026-CARL01",
+    "usedAt": "2026-10-11T16:20:00.000Z",
+    "orderStatus": "paid",
+    "customer": {
+      "name": "Mariana Costa Alvarenga",
+      "email": "mariana.alvarenga@techfood.com.br",
+      "whatsapp": "(11) 97123-4567",
+      "document": "38.291.849/0001-02",
+      "city": "São Paulo",
+      "state": "SP"
+    },
+    "influencer": {
+      "sellerId": "user-seller-demo",
+      "name": "Carlos Vendedor",
+      "email": "vendedor@totempro.com.br",
+      "pixKey": "11988887777",
+      "phone": "(11) 98888-7777",
+      "commissionPercent": 8
+    },
+    "financials": {
+      "grossItemsTotalCents": 460200,
+      "eligibleCabinetBaseCents": 99000,
+      "discountPercent": 10,
+      "discountCents": 9900,
+      "shippingCents": 0,
+      "finalOrderTotalCents": 450300,
+      "influencerCommissionCents": 7920,
+      "payoutStatus": "approved",
+      "payoutNotes": "Pedido pago via Pix. Comissão liberada para transferência via PIX."
+    },
+    "campaignTracking": {
+      "hasTracking": true,
+      "landingUrl": "https://totempro.com.br/monte-seu-totem?cupom=CARLOS10&utm_source=instagram&utm_medium=stories&utm_campaign=stories_carlos10",
+      "referrer": "https://l.instagram.com/",
+      "utmSource": "instagram",
+      "utmMedium": "stories",
+      "utmCampaign": "stories_carlos10",
+      "refCode": "CARLOS10",
+      "device": "mobile",
+      "capturedAt": "2026-10-11T16:15:30.000Z"
+    }
+  }
+]

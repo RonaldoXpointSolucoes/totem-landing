@@ -43,6 +43,16 @@ export async function PATCH(
 
     const updated = await updateOrderStatusAdmin(id, status);
 
+    // Sincroniza status do voucher associado a este pedido (libera comissão se pago)
+    try {
+      const orderNumber = (updated as any)?.order_number || id;
+      const { syncOrderStatusToVoucherUsage } = await import("@/lib/vouchers/voucherStore");
+      await syncOrderStatusToVoucherUsage(orderNumber, status);
+      await syncOrderStatusToVoucherUsage(id, status);
+    } catch (syncErr) {
+      console.warn("Aviso ao sincronizar status de voucher:", syncErr);
+    }
+
     return NextResponse.json({
       ok: true,
       message: `Status do pedido atualizado para "${status}".`,

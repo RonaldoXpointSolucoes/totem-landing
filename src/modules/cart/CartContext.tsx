@@ -2,6 +2,16 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { CartItem, TotemConfiguration } from "@/types/order";
+import {
+  calculateSelectiveCouponDiscount,
+  SelectiveCoupon,
+  CouponDiscountCalculation,
+} from "@/modules/pricing/couponEngine";
+import {
+  captureCampaignFromUrl,
+  getPersistedCampaignTracking,
+} from "@/lib/vouchers/campaignTracker";
+import { CampaignTrackingData } from "@/types/voucher";
 
 interface CartContextType {
   items: CartItem[];
@@ -12,13 +22,28 @@ interface CartContextType {
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
   totalItems: number;
-  totalPriceCents: number;
+  totalPriceCents: number; // Subtotal bruto sem desconto
   editingItem: CartItem | null;
   setEditingItem: (item: CartItem | null) => void;
   isInitialized: boolean;
+
+  // Sistema de Cupons Seletivos
+  appliedCoupon: SelectiveCoupon | null;
+  couponDiscountCents: number;
+  couponError: string | null;
+  isApplyingCoupon: boolean;
+  eligibleCabinetsSubtotalCents: number;
+  ineligibleSubtotalCents: number;
+  finalTotalPriceCents: number; // Valor final pós-desconto seletivo no gabinete
+  applyCoupon: (code: string) => Promise<boolean>;
+  removeCoupon: () => void;
+
+  // Link Track & UTM Campaign Attribution
+  campaignTracking: CampaignTrackingData | null;
 }
 
 const CART_STORAGE_KEY = "totem_pro_cart_items_v1";
+const COUPON_STORAGE_KEY = "totem_pro_applied_coupon_v1";
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
@@ -27,24 +52,67 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [editingItem, setEditingItem] = useState<CartItem | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // 1. Carregar itens do localStorage na montagem
+  // Cupons & Campanhas
+  const [appliedCoupon, setAppliedCoupon] = useState<SelectiveCoupon | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
+  const [campaignTracking, setCampaignTracking] = useState<CampaignTrackingData | null>(null);
+
+  // 1. Carregar itens, cupom e tracking de campanha na montagem
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(CART_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
+      const storedItems = localStorage.getItem(CART_STORAGE_KEY);
+      if (storedItems) {
+        const parsed = JSON.parse(storedItems);
         if (Array.isArray(parsed)) {
           setItems(parsed);
         }
       }
+
+      const storedCoupon = localStorage.getItem(COUPON_STORAGE_KEY);
+      if (storedCoupon) {
+        const parsedCoupon = JSON.parse(storedCoupon);
+        if (parsedCoupon && parsedCoupon.code) {
+          setAppliedCoupon(parsedCoupon);
+        }
+      }
+
+      // Captura soberana de tracking e UTMs da URL
+      const currentTracking = captureCampaignFromUrl();
+      if (currentTracking) {
+        setCampaignTracking(currentTracking);
+        // Se a campanha trouxe um cupom/ref e ainda não há cupom aplicado
+        if (currentTracking.refCode && !storedCoupon) {
+          applyCoupon(currentTracking.refCode);
+        }
+      } else {
+        const persisted = getPersistedCampaignTracking();
+        if (persisted) setCampaignTracking(persisted);
+      }
     } catch (err) {
-      console.error("Falha ao recuperar carrinho do localStorage:", err);
+      console.error("Falha ao recuperar dados do localStorage:", err);
     } finally {
       setIsInitialized(true);
     }
   }, []);
 
-  // 2. Persistir no localStorage sempre que items mudar
+  // 2. Captura automática contínua de cupom via Query String (?cupom=, ?voucher=, ?ref=)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const queryCoupon =
+      params.get("cupom") ||
+      params.get("voucher") ||
+      params.get("ref") ||
+      params.get("influencer");
+
+    if (queryCoupon && queryCoupon.trim()) {
+      applyCoupon(queryCoupon.trim());
+    }
+  }, []);
+
+  // 3. Persistir itens no localStorage
   useEffect(() => {
     if (!isInitialized) return;
     try {
@@ -53,6 +121,59 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error("Falha ao salvar carrinho no localStorage:", err);
     }
   }, [items, isInitialized]);
+
+  // 4. Persistir cupom no localStorage
+  useEffect(() => {
+    if (!isInitialized) return;
+    try {
+      if (appliedCoupon) {
+        localStorage.setItem(COUPON_STORAGE_KEY, JSON.stringify(appliedCoupon));
+      } else {
+        localStorage.removeItem(COUPON_STORAGE_KEY);
+      }
+    } catch (err) {
+      console.error("Falha ao salvar cupom no localStorage:", err);
+    }
+  }, [appliedCoupon, isInitialized]);
+
+  // Aplicar Cupom com validação na API
+  const applyCoupon = async (code: string): Promise<boolean> => {
+    const cleanCode = code.trim().toUpperCase();
+    if (!cleanCode) {
+      setCouponError("Digite o código do cupom.");
+      return false;
+    }
+
+    setIsApplyingCoupon(true);
+    setCouponError(null);
+
+    try {
+      const res = await fetch(`/api/coupons/validate?code=${encodeURIComponent(cleanCode)}`);
+      const data = await res.json();
+
+      if (data.ok && data.coupon) {
+        setAppliedCoupon(data.coupon);
+        setCouponError(null);
+        return true;
+      } else {
+        const errorMsg = data.error || `Cupom "${cleanCode}" inválido ou expirado.`;
+        setCouponError(errorMsg);
+        return false;
+      }
+    } catch (err: any) {
+      const errorMsg = "Erro ao validar cupom: " + err.message;
+      setCouponError(errorMsg);
+      return false;
+    } finally {
+      setIsApplyingCoupon(false);
+    }
+  };
+
+  // Remover Cupom
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponError(null);
+  };
 
   // Adicionar novo item
   const addItem = (configuration: TotemConfiguration, quantity: number = 1) => {
@@ -89,7 +210,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setEditingItem(null);
   };
 
-  // Duplicar configuração (Crucial para compras B2B em lote de 5, 10 ou mais totens idênticos)
+  // Duplicar configuração
   const duplicateItem = (id: string) => {
     const source = items.find((i) => i.id === id);
     if (!source) return;
@@ -141,10 +262,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const clearCart = () => {
     setItems([]);
     setEditingItem(null);
+    setAppliedCoupon(null);
   };
 
   const totalItems = items.reduce((acc, curr) => acc + curr.quantity, 0);
   const totalPriceCents = items.reduce((acc, curr) => acc + curr.subtotalCents, 0);
+
+  // Recálculo do desconto seletivo via couponEngine
+  const discountCalc = calculateSelectiveCouponDiscount(items, appliedCoupon);
 
   return (
     <CartContext.Provider
@@ -161,6 +286,16 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         editingItem,
         setEditingItem,
         isInitialized,
+        appliedCoupon,
+        couponDiscountCents: discountCalc.discountCents,
+        couponError,
+        isApplyingCoupon,
+        eligibleCabinetsSubtotalCents: discountCalc.eligibleCabinetsSubtotalCents,
+        ineligibleSubtotalCents: discountCalc.ineligibleSubtotalCents,
+        finalTotalPriceCents: discountCalc.finalSubtotalCents,
+        applyCoupon,
+        removeCoupon,
+        campaignTracking,
       }}
     >
       {children}

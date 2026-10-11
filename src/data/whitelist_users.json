@@ -1,0 +1,30 @@
+[
+  {
+    "email": "ronaldo.xpointsolucoes@gmail.com",
+    "name": "ronaldo.xpointsolucoes",
+    "role": "admin",
+    "status": "active",
+    "id": "usr_1791758095496_j5dd",
+    "discountPercent": 10,
+    "commissionPercent": 8,
+    "createdAt": "2026-10-11T22:34:55.496Z",
+    "totalSalesCents": 0,
+    "totalCommissionCents": 0
+  },
+  {
+    "id": "user-seller-demo",
+    "email": "vendedor@totempro.com.br",
+    "name": "Carlos Vendedor",
+    "avatarUrl": "",
+    "role": "seller",
+    "couponCode": "CARLOS10",
+    "discountPercent": 10,
+    "commissionPercent": 8,
+    "pixKey": "11988887777",
+    "phone": "(11) 98888-7777",
+    "status": "active",
+    "createdAt": "2026-10-05T14:00:00.000Z",
+    "totalSalesCents": 198000,
+    "totalCommissionCents": 15840
+  }
+]

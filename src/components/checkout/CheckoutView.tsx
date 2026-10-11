@@ -29,6 +29,7 @@ import {
   Loader2,
   RotateCcw,
   ExternalLink,
+  Tag,
 } from "lucide-react";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 
@@ -76,7 +77,23 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   onBackToCart,
   onOrderCompleted,
 }) => {
-  const { items, totalPriceCents, clearCart } = useCart();
+  const {
+    items,
+    totalPriceCents,
+    clearCart,
+    appliedCoupon,
+    couponDiscountCents,
+    finalTotalPriceCents,
+    eligibleCabinetsSubtotalCents,
+    ineligibleSubtotalCents,
+    applyCoupon,
+    removeCoupon,
+    couponError,
+    isApplyingCoupon,
+    campaignTracking,
+  } = useCart();
+
+  const [checkoutCouponInput, setCheckoutCouponInput] = useState("");
 
   // Estados do Fluxo
   const [step, setStep] = useState<"form" | "awaiting_pix" | "paid">("form");
@@ -270,7 +287,8 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   const selectedShippingQuote =
     shippingQuotes.find((q) => q.id === selectedShippingId && q.isAvailable) || null;
   const shippingCents = selectedShippingQuote ? selectedShippingQuote.priceCents : 0;
-  const finalTotalCents = totalPriceCents + shippingCents;
+  const effectiveSubtotalCents = appliedCoupon && finalTotalPriceCents !== undefined ? finalTotalPriceCents : totalPriceCents;
+  const finalTotalCents = effectiveSubtotalCents + shippingCents;
 
   // Busca automática de CEP com alta resiliência (Timeout ViaCEP + Fallback BrasilAPI)
   const handleCepChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -392,6 +410,8 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
         },
         shippingOptionId: selectedShippingId,
         shippingCents,
+        couponCode: appliedCoupon?.code || undefined,
+        campaignTracking: campaignTracking || undefined,
         items: items.map((i) => ({
           id: i.id,
           modelId: i.configuration.model.id,
@@ -1439,8 +1459,26 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
             <div className="space-y-2 pt-3 border-t border-black/10 dark:border-slate-800 text-xs">
               <div className="flex justify-between text-slate-600 dark:text-slate-400">
                 <span>Subtotal dos Gabinetes:</span>
-                <span className="font-semibold text-slate-900 dark:text-slate-200">{formatBRL(totalPriceCents)}</span>
+                <span className="font-semibold text-slate-900 dark:text-slate-200">
+                  {formatBRL(appliedCoupon ? eligibleCabinetsSubtotalCents : totalPriceCents)}
+                </span>
               </div>
+
+              {appliedCoupon && ineligibleSubtotalCents > 0 && (
+                <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                  <span>Kits & Periféricos (Integral):</span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-200">
+                    {formatBRL(ineligibleSubtotalCents)}
+                  </span>
+                </div>
+              )}
+
+              {appliedCoupon && couponDiscountCents > 0 && (
+                <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold">
+                  <span>Desconto ({appliedCoupon.code} • {appliedCoupon.discountPercent}% no Gabinete):</span>
+                  <span>-{formatBRL(couponDiscountCents)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-slate-600 dark:text-slate-400 items-center">
                 <span>Frete / Entrega:</span>
                 <span className="font-semibold">
@@ -1463,6 +1501,79 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   )}
                 </span>
               </div>
+              {/* Campo de Inserção de Cupom de Desconto no Checkout */}
+              <div className="pt-3 border-t border-black/10 dark:border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5 text-[#0071e3] dark:text-indigo-400" />
+                    Cupom de Desconto
+                  </span>
+                  {appliedCoupon && (
+                    <button
+                      type="button"
+                      onClick={removeCoupon}
+                      className="text-[11px] text-rose-500 hover:text-rose-600 font-semibold cursor-pointer"
+                    >
+                      Remover
+                    </button>
+                  )}
+                </div>
+
+                {appliedCoupon ? (
+                  <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <div>
+                        <div className="font-bold text-emerald-800 dark:text-emerald-300 font-mono">
+                          {appliedCoupon.code}
+                        </div>
+                        <div className="text-[10px] text-emerald-700 dark:text-emerald-400">
+                          {appliedCoupon.discountPercent}% OFF exclusivo no Gabinete
+                        </div>
+                      </div>
+                    </div>
+                    <span className="font-bold text-emerald-700 dark:text-emerald-400">
+                      -{formatBRL(couponDiscountCents)}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Código do cupom (ex: CARLOS10)..."
+                        value={checkoutCouponInput}
+                        onChange={(e) => setCheckoutCouponInput(e.target.value.toUpperCase())}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            applyCoupon(checkoutCouponInput);
+                          }
+                        }}
+                        className="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-black/15 dark:border-slate-800 rounded-xl text-xs font-mono uppercase placeholder-slate-400 text-slate-900 dark:text-white focus:outline-none focus:border-[#0071e3]"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => applyCoupon(checkoutCouponInput)}
+                        disabled={isApplyingCoupon || !checkoutCouponInput.trim()}
+                        className="h-auto py-1 px-3 text-xs font-bold shrink-0"
+                      >
+                        {isApplyingCoupon ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          "Aplicar"
+                        )}
+                      </Button>
+                    </div>
+                    {couponError && (
+                      <p className="text-[11px] text-rose-500 font-semibold">{couponError}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="pt-2 border-t border-black/10 dark:border-slate-800 flex justify-between items-baseline">
                 <span className="text-sm font-bold text-[#1d1d1f] dark:text-white">Total a Pagar (Pix):</span>
                 <span className="text-2xl font-black text-[#0071e3] dark:text-indigo-400">

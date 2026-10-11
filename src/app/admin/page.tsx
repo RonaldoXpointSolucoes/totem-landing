@@ -5,6 +5,10 @@ import { formatBRL } from "@/modules/pricing/pricingEngine";
 import { siteConfig } from "@/config/site";
 import { CatalogManager } from "@/components/admin/CatalogManager";
 import { MarketingSettingsManager } from "@/components/admin/MarketingSettingsManager";
+import { TeamManager } from "@/components/admin/TeamManager";
+import { VoucherManager } from "@/components/admin/VoucherManager";
+import { CustomersManager } from "@/components/admin/CustomersManager";
+import { GoogleLoginButton } from "@/components/auth/GoogleLoginButton";
 import {
   ShieldCheck,
   Package,
@@ -32,6 +36,7 @@ import {
   Users,
   Target,
   Share2,
+  Tag,
 } from "lucide-react";
 
 interface OrderItem {
@@ -93,12 +98,13 @@ const STATUS_CONFIG: Record<
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [passwordInput, setPasswordInput] = useState("");
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Navegação do painel
-  const [activeTab, setActiveTab] = useState<"orders" | "catalog" | "analytics" | "marketing" | "logs">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "catalog" | "vouchers" | "customers" | "analytics" | "marketing" | "team" | "logs">("orders");
   const [catalogSubTab, setCatalogSubTab] = useState<"models" | "colors" | "peripherals">("models");
 
   // Dados
@@ -145,16 +151,32 @@ export default function AdminPage() {
     ]);
   };
 
-  // Checar Auth ao carregar
+  // Checar Auth ao carregar (sessão Google ou legacy password)
   useEffect(() => {
-    fetch("/api/admin/auth")
+    fetch("/api/auth/session")
       .then((res) => res.json())
       .then((data) => {
         if (data.ok && data.authenticated) {
+          if (data.user?.role === "seller") {
+            window.location.href = "/vendedor";
+            return;
+          }
           setIsAuthenticated(true);
-        } else {
-          setIsAuthenticated(false);
+          setCurrentUser(data.user);
+          return;
         }
+
+        // Fallback para checar legacy admin token
+        return fetch("/api/admin/auth")
+          .then((res) => res.json())
+          .then((legacyData) => {
+            if (legacyData.ok && legacyData.authenticated) {
+              setIsAuthenticated(true);
+              setCurrentUser({ name: "Administrador Root", email: "admin@totempro.com.br", role: "admin" });
+            } else {
+              setIsAuthenticated(false);
+            }
+          });
       })
       .catch(() => setIsAuthenticated(false));
   }, []);
@@ -245,8 +267,13 @@ export default function AdminPage() {
 
   // Logout
   const handleLogout = async () => {
-    await fetch("/api/admin/auth", { method: "DELETE" });
-    setIsAuthenticated(false);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      await fetch("/api/admin/auth", { method: "DELETE" });
+    } finally {
+      setIsAuthenticated(false);
+      setCurrentUser(null);
+    }
   };
 
   // Atualizar Status do Pedido
@@ -342,6 +369,31 @@ export default function AdminPage() {
             <p className="text-xs text-slate-400 mt-1.5">
               Gestão de Produção CNC, Preços e Catálogo Appwrite
             </p>
+          </div>
+
+          {/* Login Oficial com Google & Whitelist */}
+          <div className="space-y-4 mb-5">
+            <GoogleLoginButton
+              onSuccess={(user) => {
+                if (user.role === "seller") {
+                  window.location.href = "/vendedor";
+                } else {
+                  setIsAuthenticated(true);
+                  setCurrentUser(user);
+                  addAuditLog("Login Google", user.email, "Autenticado via Google Whitelist");
+                }
+              }}
+              onError={(err) => setLoginError(err)}
+              buttonText="Continuar com o Google"
+            />
+
+            <div className="relative flex items-center justify-center my-3">
+              <div className="border-t border-slate-800 w-full" />
+              <span className="bg-slate-900 px-3 text-[11px] text-slate-500 font-semibold uppercase tracking-wider shrink-0">
+                ou com chave de acesso
+              </span>
+              <div className="border-t border-slate-800 w-full" />
+            </div>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
@@ -446,6 +498,15 @@ export default function AdminPage() {
               <ExternalLink className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Ver Loja</span>
             </a>
+            {currentUser && (
+              <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs">
+                <div className="w-5 h-5 rounded-full bg-indigo-600/30 text-indigo-400 flex items-center justify-center font-bold text-[10px]">
+                  {currentUser.name ? currentUser.name.substring(0, 1).toUpperCase() : "A"}
+                </div>
+                <span className="font-semibold text-slate-200">{currentUser.name || currentUser.email}</span>
+              </div>
+            )}
+
             <button
               onClick={handleLogout}
               className="p-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs flex items-center gap-1.5 transition-colors"
@@ -488,6 +549,30 @@ export default function AdminPage() {
           </button>
 
           <button
+            onClick={() => setActiveTab("vouchers")}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all shrink-0 ${
+              activeTab === "vouchers"
+                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25"
+                : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+            }`}
+          >
+            <Tag className="w-4 h-4 text-emerald-400" />
+            <span>Gestão de Vouchers</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("customers")}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all shrink-0 ${
+              activeTab === "customers"
+                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25"
+                : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+            }`}
+          >
+            <Users className="w-4 h-4 text-cyan-400" />
+            <span>Clientes & Compras</span>
+          </button>
+
+          <button
             onClick={() => {
               setActiveTab("analytics");
               loadAnalytics();
@@ -512,6 +597,18 @@ export default function AdminPage() {
           >
             <Share2 className="w-4 h-4 text-cyan-400" />
             <span>SEO & Tráfego Pago</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("team")}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all shrink-0 ${
+              activeTab === "team"
+                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25"
+                : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+            }`}
+          >
+            <Users className="w-4 h-4 text-emerald-400" />
+            <span>Equipe & Vendedores</span>
           </button>
 
           <button
@@ -710,6 +807,11 @@ export default function AdminPage() {
             }}
           />
         )}
+
+        {/* ======================================================== */}
+        {/* ABA: GESTÃO DE VOUCHERS, RASTREAMENTO & INFLUENCIADORES */}
+        {/* ======================================================== */}
+        {activeTab === "vouchers" && <VoucherManager />}
 
         {/* ======================================================== */}
         {/* ABA: ANALYTICS E FUNIL DE CONVERSÃO */}
@@ -940,6 +1042,16 @@ export default function AdminPage() {
         {/* ABA 4: CONFIGURAÇÃO DE SEO, MARKETING & TRÁFEGO PAGO */}
         {/* ======================================================== */}
         {activeTab === "marketing" && <MarketingSettingsManager />}
+
+        {/* ======================================================== */}
+        {/* ABA 5: EQUIPE, VENDEDORES & WHITELIST GOOGLE */}
+        {/* ======================================================== */}
+        {activeTab === "team" && <TeamManager />}
+
+        {/* ======================================================== */}
+        {/* ABA 6: CLIENTES CADASTRADOS & VOLUME DE COMPRAS */}
+        {/* ======================================================== */}
+        {activeTab === "customers" && <CustomersManager />}
       </main>
 
       {/* ======================================================== */}

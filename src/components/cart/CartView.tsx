@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useCart } from "@/modules/cart/CartContext";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
 import { Button, Card, Badge } from "@/components/ui";
@@ -16,6 +16,7 @@ import {
   Package,
   ShieldCheck,
   CheckCircle2,
+  Tag,
 } from "lucide-react";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 
@@ -30,8 +31,25 @@ export const CartView: React.FC<CartViewProps> = ({
   onEditItem,
   onProceedToCheckout,
 }) => {
-  const { items, duplicateItem, removeItem, updateQuantity, totalPriceCents, totalItems } =
-    useCart();
+  const {
+    items,
+    duplicateItem,
+    removeItem,
+    updateQuantity,
+    totalPriceCents,
+    totalItems,
+    appliedCoupon,
+    couponDiscountCents,
+    couponError,
+    isApplyingCoupon,
+    eligibleCabinetsSubtotalCents,
+    ineligibleSubtotalCents,
+    finalTotalPriceCents,
+    applyCoupon,
+    removeCoupon,
+  } = useCart();
+
+  const [couponInput, setCouponInput] = useState("");
 
   if (items.length === 0) {
     return (
@@ -239,18 +257,102 @@ export const CartView: React.FC<CartViewProps> = ({
               <div className="flex justify-between text-slate-600 dark:text-slate-400">
                 <span>Subtotal dos Gabinetes:</span>
                 <span className="font-semibold text-slate-900 dark:text-slate-200">
-                  {formatBRL(totalPriceCents)}
+                  {formatBRL(eligibleCabinetsSubtotalCents)}
                 </span>
               </div>
+
+              {ineligibleSubtotalCents > 0 && (
+                <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                  <span>Kits & Periféricos (Integral):</span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-200">
+                    {formatBRL(ineligibleSubtotalCents)}
+                  </span>
+                </div>
+              )}
+
+              {appliedCoupon && couponDiscountCents > 0 && (
+                <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold">
+                  <span>Desconto ({appliedCoupon.code} • {appliedCoupon.discountPercent}% no Gabinete):</span>
+                  <span>-{formatBRL(couponDiscountCents)}</span>
+                </div>
+              )}
+
               <div className="flex justify-between text-slate-600 dark:text-slate-400">
                 <span>Frete Especial (Transportadora):</span>
                 <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Calculado no Checkout</span>
               </div>
 
+              {/* Bloco de Cupom de Desconto */}
+              <div className="pt-3 border-t border-black/10 dark:border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5 text-[#0071e3] dark:text-indigo-400" />
+                    Cupom de Desconto
+                  </span>
+                  {appliedCoupon && (
+                    <button
+                      onClick={removeCoupon}
+                      className="text-[11px] text-rose-500 hover:text-rose-600 font-semibold cursor-pointer"
+                    >
+                      Remover
+                    </button>
+                  )}
+                </div>
+
+                {appliedCoupon ? (
+                  <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <div>
+                        <div className="font-bold text-emerald-800 dark:text-emerald-300 font-mono">
+                          {appliedCoupon.code}
+                        </div>
+                        <div className="text-[10px] text-emerald-700 dark:text-emerald-400">
+                          {appliedCoupon.discountPercent}% OFF exclusivo no Gabinete
+                        </div>
+                      </div>
+                    </div>
+                    <span className="font-bold text-emerald-700 dark:text-emerald-400">
+                      -{formatBRL(couponDiscountCents)}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Código do cupom..."
+                        value={couponInput}
+                        onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            applyCoupon(couponInput);
+                          }
+                        }}
+                        className="flex-1 px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-black/10 dark:border-slate-800 rounded-xl text-xs font-mono uppercase placeholder-slate-400 text-slate-900 dark:text-white focus:outline-none focus:border-[#0071e3]"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => applyCoupon(couponInput)}
+                        disabled={isApplyingCoupon || !couponInput.trim()}
+                        className="h-auto py-1 px-3 text-xs font-bold shrink-0"
+                      >
+                        {isApplyingCoupon ? "..." : "Aplicar"}
+                      </Button>
+                    </div>
+                    {couponError && (
+                      <p className="text-[11px] text-rose-500 font-semibold">{couponError}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="pt-3 border-t border-black/10 dark:border-slate-800 flex justify-between items-baseline">
                 <span className="text-sm font-bold text-[#1d1d1f] dark:text-white">Total Estimado:</span>
                 <span className="text-2xl font-black text-[#0071e3] dark:text-indigo-400">
-                  {formatBRL(totalPriceCents)}
+                  {formatBRL(finalTotalPriceCents)}
                 </span>
               </div>
             </div>

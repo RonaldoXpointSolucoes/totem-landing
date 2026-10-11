@@ -1,11 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { CabinetModel, ColorOption, MonitorOption, PrinterOption, BarcodeReaderOption } from "@/types/catalog";
 import { formatBRL, PriceBreakdown } from "@/modules/pricing/pricingEngine";
 import { Card, Button, Badge } from "@/components/ui";
-import { Edit3, ShoppingCart, ShieldCheck, Boxes, Check, PackageCheck, AlertCircle } from "lucide-react";
+import { Edit3, ShoppingCart, ShieldCheck, Boxes, Check, PackageCheck, AlertCircle, Tag, Loader2 } from "lucide-react";
 import { isItemKit, getEffectiveKitItems, calculateKitTotalCents } from "@/modules/catalog/kitDefaults";
+import { useCart } from "@/modules/cart/CartContext";
 
 interface StepReviewProps {
   model: CabinetModel;
@@ -30,16 +31,103 @@ export const StepReview: React.FC<StepReviewProps> = ({
   onEditStep,
   onAddToCart,
 }) => {
+  const { appliedCoupon, applyCoupon, removeCoupon, isApplyingCoupon, couponError } = useCart();
+  const [couponInput, setCouponInput] = useState("");
+  const [showInput, setShowInput] = useState(false);
+
   const isKit = isItemKit(monitor);
   const kitItems = isKit ? (monitor?.kitItems || getEffectiveKitItems(monitor)) : [];
   const activeKitItems = kitItems.filter((i) => i.selected);
   const kitTotalCents = calculateKitTotalCents(kitItems);
+
+  const itemDiscountCents = appliedCoupon
+    ? Math.round(model.basePriceCents * (appliedCoupon.discountPercent / 100))
+    : 0;
+  const finalTotemPriceCents = Math.max(0, pricing.totalPriceCents - itemDiscountCents);
 
   const printerSubItem = kitItems.find((i) => i.category === "printer");
   const readerSubItem = kitItems.find((i) => i.category === "reader");
 
   return (
     <div className="space-y-3 sm:space-y-4">
+      {appliedCoupon ? (
+        <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-2">
+            <Tag className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <span className="font-semibold">
+              Cupom de parceiro ativo: <strong className="font-mono text-emerald-800 dark:text-emerald-300">{appliedCoupon.code}</strong>
+            </span>
+            <span className="text-[11px] font-bold bg-emerald-500/20 px-2 py-0.5 rounded-full">
+              {appliedCoupon.discountPercent}% OFF no Gabinete
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={removeCoupon}
+            className="text-[11px] text-rose-500 hover:text-rose-600 font-semibold cursor-pointer ml-2"
+          >
+            Remover
+          </button>
+        </div>
+      ) : (
+        <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-black/10 dark:border-slate-800 text-xs shadow-xs">
+          {!showInput ? (
+            <button
+              type="button"
+              onClick={() => setShowInput(true)}
+              className="text-[#0071e3] hover:underline font-semibold flex items-center gap-1.5 cursor-pointer"
+            >
+              <Tag className="w-3.5 h-3.5" />
+              <span>Possui cupom de desconto de vendedor ou influenciador? Clique aqui</span>
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5 text-[#0071e3]" />
+                  Cupom de Desconto de Parceiro
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowInput(false)}
+                  className="text-slate-400 hover:text-slate-600 text-xs"
+                >
+                  Cancelar
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Código do cupom (ex: CARLOS10)..."
+                  value={couponInput}
+                  onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      applyCoupon(couponInput);
+                    }
+                  }}
+                  className="flex-1 px-3 py-1.5 bg-white dark:bg-slate-950 border border-black/15 dark:border-slate-800 rounded-xl text-xs font-mono uppercase placeholder-slate-400 text-slate-900 dark:text-white focus:outline-none focus:border-[#0071e3]"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => applyCoupon(couponInput)}
+                  disabled={isApplyingCoupon || !couponInput.trim()}
+                  className="h-auto py-1 px-3 text-xs font-bold shrink-0"
+                >
+                  {isApplyingCoupon ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Aplicar"}
+                </Button>
+              </div>
+              {couponError && (
+                <p className="text-[11px] text-rose-500 font-semibold">{couponError}</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="text-center sm:text-left space-y-1">
         <h2 className="text-lg sm:text-2xl font-black text-[#1d1d1f] dark:text-white tracking-tight">
           Confira as especificações do seu Totem
@@ -247,9 +335,23 @@ export const StepReview: React.FC<StepReviewProps> = ({
             <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">
               Total do Totem:
             </span>
-            <span className="text-xl sm:text-2xl font-black text-[#0071e3] dark:text-cyan-400">
-              {formatBRL(pricing.totalPriceCents)}
-            </span>
+            {itemDiscountCents > 0 ? (
+              <div className="flex items-baseline gap-2">
+                <span className="text-sm line-through text-slate-400 font-semibold">
+                  {formatBRL(pricing.totalPriceCents)}
+                </span>
+                <span className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                  {formatBRL(finalTotemPriceCents)}
+                </span>
+                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
+                  -{formatBRL(itemDiscountCents)} no Gabinete
+                </span>
+              </div>
+            ) : (
+              <span className="text-xl sm:text-2xl font-black text-[#0071e3] dark:text-cyan-400">
+                {formatBRL(pricing.totalPriceCents)}
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">

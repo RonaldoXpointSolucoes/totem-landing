@@ -114,6 +114,15 @@ export async function POST(req: Request) {
 
     console.log(`[Webhook Pix] Pedido ${orderDoc.order_number} compensado com sucesso!`);
 
+    // Sincroniza voucher e libera comissão para repasse ao influenciador
+    try {
+      const { syncOrderStatusToVoucherUsage } = await import("@/lib/vouchers/voucherStore");
+      await syncOrderStatusToVoucherUsage(orderDoc.order_number, paymentStatus);
+      await syncOrderStatusToVoucherUsage(orderDoc.$id, paymentStatus);
+    } catch (syncErr) {
+      console.warn("Aviso ao sincronizar status de voucher no webhook Pix:", syncErr);
+    }
+
     return NextResponse.json({
       ok: true,
       message: "Pagamento Pix compensado com sucesso e ordem liberada para usinagem CNC.",

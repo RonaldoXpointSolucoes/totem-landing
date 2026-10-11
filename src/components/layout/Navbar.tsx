@@ -1,11 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Cpu, ArrowRight, ArrowLeft, ShoppingCart } from "lucide-react";
+import { Cpu, ArrowRight, ArrowLeft, ShoppingCart, User } from "lucide-react";
 import { useCart } from "@/modules/cart/CartContext";
 import { Button } from "@/components/ui";
+import { CustomerAuthModal } from "@/components/auth/CustomerAuthModal";
 
 interface NavbarProps {
   className?: string;
@@ -15,6 +16,19 @@ export const Navbar: React.FC<NavbarProps> = ({ className = "" }) => {
   const pathname = usePathname();
   const router = useRouter();
   const { totalItems } = useCart();
+  const [customer, setCustomer] = useState<any>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/customer/session")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.ok && data.authenticated) {
+          setCustomer(data.customer);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const isConfigurator = pathname.startsWith("/monte-seu-totem") || pathname.startsWith("/configurador");
   const isCart = pathname.startsWith("/carrinho") || pathname.startsWith("/cart");
@@ -112,6 +126,30 @@ export const Navbar: React.FC<NavbarProps> = ({ className = "" }) => {
             )}
           </Link>
 
+          {/* Área do Cliente: Minha Conta ou Entrar */}
+          {customer ? (
+            <Link
+              href="/cliente"
+              className="p-2 sm:px-3 sm:py-1.5 rounded-full border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/60 text-[#0071e3] dark:text-cyan-400 hover:bg-blue-100 text-xs font-bold flex items-center gap-1.5 transition-colors"
+              title="Acessar Minha Conta e Compras"
+            >
+              <User className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">
+                {customer.name ? customer.name.split(" ")[0] : "Minha Conta"}
+              </span>
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsAuthModalOpen(true)}
+              className="p-2 sm:px-3 sm:py-1.5 rounded-full border border-black/10 dark:border-slate-800 bg-[#f5f5f7] dark:bg-slate-900/60 text-slate-700 dark:text-slate-300 hover:text-black dark:hover:text-white hover:border-black/20 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Entrar / Criar Conta"
+            >
+              <User className="w-3.5 h-3.5 text-slate-500" />
+              <span className="hidden sm:inline">Entrar</span>
+            </button>
+          )}
+
           {/* Botão Dinâmico de Contexto */}
           {isConfigurator ? (
             <Link href="/">
@@ -145,6 +183,16 @@ export const Navbar: React.FC<NavbarProps> = ({ className = "" }) => {
           )}
         </div>
       </div>
+
+      {/* Modal de Autenticação do Cliente */}
+      <CustomerAuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={(loggedCustomer) => {
+          setCustomer(loggedCustomer);
+          setIsAuthModalOpen(false);
+        }}
+      />
     </header>
   );
 };

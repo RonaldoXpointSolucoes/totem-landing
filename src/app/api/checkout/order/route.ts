@@ -7,17 +7,26 @@ import {
   HOMOLOGATED_READERS,
 } from "@/modules/catalog/catalogData";
 import { calculateTotemPrice } from "@/modules/pricing/pricingEngine";
+import { calculateSelectiveCouponDiscount, CouponDiscountCalculation } from "@/modules/pricing/couponEngine";
+import { findUserByCoupon, updateWhitelistUser } from "@/lib/auth/whitelistStore";
+import { recordVoucherUsage } from "@/lib/vouchers/voucherStore";
+import { CampaignTrackingData } from "@/types/voucher";
 import { generatePixPayload } from "@/lib/pix";
 import { CustomerInfo, DeliveryAddress, OrderDetails, ManufacturingSpec, CartItem } from "@/types/order";
 import { saveOrderWithSnapshot } from "@/lib/appwrite/server";
 import { createPixCharge } from "@/lib/payments/pixGateway";
 import { calculateShippingQuotes } from "@/modules/shipping";
+import { findOrCreateCustomerFromCheckout } from "@/lib/customers/customerStore";
+import { saveLocalOrder } from "@/lib/orders/orderStore";
+import { setCustomerSession } from "@/lib/customers/customerSession";
 
 interface RequestBody {
   customer: CustomerInfo;
   deliveryAddress: DeliveryAddress;
   shippingOptionId?: string;
   shippingCents?: number;
+  couponCode?: string;
+  campaignTracking?: CampaignTrackingData;
   items: {
     id?: string;
     modelId: string;
@@ -173,6 +182,46 @@ export async function POST(req: Request) {
       manufacturingSheets.push(manufacturingSpec);
     }
 
+    // 3.1. Recálculo Soberano do Cupom de Desconto no Backend (Apenas no Gabinete)
+    let discountCents = 0;
+    let appliedCouponCode: string | undefined;
+    let sellerEmail: string | undefined;
+    let sellerCommissionCents = 0;
+    let matchedSeller: any = null;
+    let executedCouponResult: CouponDiscountCalculation | null = null;
+
+    if (body.couponCode) {
+      const seller = await findUserByCoupon(body.couponCode);
+      if (seller && seller.status === "active") {
+        const couponResult = calculateSelectiveCouponDiscount(validatedCartItems, {
+          code: seller.couponCode!,
+          sellerId: seller.id,
+          sellerEmail: seller.email,
+          sellerName: seller.name,
+          discountPercent: seller.discountPercent || 10,
+          commissionPercent: seller.commissionPercent || 8,
+          active: true,
+          eligibleCategory: "cabinet_only",
+        });
+
+        if (couponResult.isValid && couponResult.discountCents > 0) {
+          discountCents = couponResult.discountCents;
+          appliedCouponCode = seller.couponCode;
+          sellerEmail = seller.email;
+          sellerCommissionCents = couponResult.sellerCommissionCents;
+          subtotalCents = couponResult.finalSubtotalCents;
+          matchedSeller = seller;
+          executedCouponResult = couponResult;
+
+          // Atualizar faturamento e comissão atribuídos ao vendedor na Whitelist
+          await updateWhitelistUser(seller.id, {
+            totalSalesCents: (seller.totalSalesCents || 0) + couponResult.eligibleCabinetsSubtotalCents,
+            totalCommissionCents: (seller.totalCommissionCents || 0) + sellerCommissionCents,
+          });
+        }
+      }
+    }
+
     // 4. Geração do Número de Pedido Exclusivo
     const randomHex = Math.random().toString(36).substring(2, 7).toUpperCase();
     const currentYear = new Date().getFullYear();
@@ -211,6 +260,52 @@ export async function POST(req: Request) {
     }
 
     const totalCents = subtotalCents + shippingCents;
+
+    // 5.1. Registro Auditado e Imutável da Utilização do Voucher com Link Tracking
+    if (appliedCouponCode && matchedSeller && executedCouponResult) {
+      try {
+        await recordVoucherUsage({
+          voucherCode: appliedCouponCode,
+          orderId,
+          orderNumber,
+          orderStatus: "awaiting_payment",
+          customer: {
+            name: customer.name.trim(),
+            email: customer.email.trim().toLowerCase(),
+            whatsapp: customer.whatsapp.trim(),
+            document: customer.document?.trim(),
+            city: deliveryAddress.city.trim(),
+            state: deliveryAddress.state?.trim() || "SP",
+          },
+          influencer: {
+            sellerId: matchedSeller.id,
+            name: matchedSeller.name,
+            email: matchedSeller.email,
+            pixKey: matchedSeller.pixKey,
+            phone: matchedSeller.phone,
+            commissionPercent: matchedSeller.commissionPercent || 8,
+          },
+          financials: {
+            grossItemsTotalCents: validatedCartItems.reduce((acc, c) => acc + c.subtotalCents, 0),
+            eligibleCabinetBaseCents: executedCouponResult.eligibleCabinetsSubtotalCents,
+            discountPercent: executedCouponResult.discountPercent,
+            discountCents,
+            shippingCents,
+            finalOrderTotalCents: totalCents,
+            influencerCommissionCents: sellerCommissionCents,
+            payoutStatus: "pending",
+            payoutNotes: "Pedido criado e aguardando compensação Pix para liberação do repasse ao influencer.",
+          },
+          campaignTracking: body.campaignTracking || {
+            hasTracking: false,
+            device: "desktop",
+            capturedAt: new Date().toISOString(),
+          },
+        });
+      } catch (voucherLogErr) {
+        console.warn("Aviso ao registrar auditoria de voucher:", voucherLogErr);
+      }
+    }
 
     // 6. Geração Dinâmica da Cobrança Pix com QR Code Real pelo Gateway
     const pixCharge = await createPixCharge({
@@ -277,9 +372,21 @@ export async function POST(req: Request) {
       manufacturingSheets,
     };
 
+    // 8. Persistência Local e Indexação Automática do Cliente
+    try {
+      saveLocalOrder(orderDetails);
+      const customerAccount = findOrCreateCustomerFromCheckout(customer, deliveryAddress, totalCents);
+      await setCustomerSession(customerAccount);
+    } catch (custErr) {
+      console.warn("Aviso ao vincular conta de cliente:", custErr);
+    }
+
     return NextResponse.json({
       ok: true,
       order: orderDetails,
+      couponCode: appliedCouponCode || null,
+      discountCents,
+      sellerCommissionCents,
       appwriteOrderId: appwriteResult?.orderId || null,
       message: "Ordem de pedido gerada com sucesso, recalculada pelo servidor e persistida no Appwrite.",
     });
