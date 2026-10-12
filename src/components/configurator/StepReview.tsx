@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { CabinetModel, ColorOption, MonitorOption, PrinterOption, BarcodeReaderOption } from "@/types/catalog";
 import { formatBRL, PriceBreakdown } from "@/modules/pricing/pricingEngine";
 import { Card, Button, Badge } from "@/components/ui";
-import { Edit3, ShoppingCart, ShieldCheck, Boxes, Check, PackageCheck, AlertCircle, Tag, Loader2 } from "lucide-react";
+import { Edit3, ShoppingCart, ShieldCheck, Boxes, Check, PackageCheck, AlertCircle, Tag, Loader2, Zap } from "lucide-react";
 import { isItemKit, getEffectiveKitItems, calculateKitTotalCents } from "@/modules/catalog/kitDefaults";
 import { useCart } from "@/modules/cart/CartContext";
 
@@ -44,6 +44,16 @@ export const StepReview: React.FC<StepReviewProps> = ({
     ? Math.round(model.basePriceCents * (appliedCoupon.discountPercent / 100))
     : 0;
   const finalTotemPriceCents = Math.max(0, pricing.totalPriceCents - itemDiscountCents);
+
+  const cabinetPixSavings = Math.max(
+    0,
+    model.basePriceCents -
+      (model.pixPriceCents ||
+        (model.basePriceCents >= 120000
+          ? Math.round(model.basePriceCents * 0.825)
+          : model.basePriceCents))
+  );
+  const reviewPixTotal = Math.max(0, finalTotemPriceCents - cabinetPixSavings);
 
   const printerSubItem = kitItems.find((i) => i.category === "printer");
   const readerSubItem = kitItems.find((i) => i.category === "reader");
@@ -331,26 +341,32 @@ export const StepReview: React.FC<StepReviewProps> = ({
 
         {/* Linha Financeira e Ações Rápidas */}
         <div className="pt-2 border-t border-black/10 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-baseline gap-2">
-            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">
-              Total do Totem:
-            </span>
-            {itemDiscountCents > 0 ? (
-              <div className="flex items-baseline gap-2">
-                <span className="text-sm line-through text-slate-400 font-semibold">
-                  {formatBRL(pricing.totalPriceCents)}
-                </span>
-                <span className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">
-                  {formatBRL(finalTotemPriceCents)}
-                </span>
-                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
-                  -{formatBRL(itemDiscountCents)} no Gabinete
-                </span>
-              </div>
-            ) : (
-              <span className="text-xl sm:text-2xl font-black text-[#0071e3] dark:text-cyan-400">
-                {formatBRL(pricing.totalPriceCents)}
+          <div className="space-y-1">
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">
+                Total:
               </span>
+              <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                {formatBRL(reviewPixTotal)}
+              </span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[10px] font-extrabold border border-emerald-500/30">
+                <Zap className="w-3 h-3 fill-emerald-500" />
+                <span>no PIX à vista</span>
+              </span>
+            </div>
+
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+              ou {formatBRL(finalTotemPriceCents)} em até{" "}
+              <strong className="text-slate-700 dark:text-slate-200 font-bold">
+                10x de {formatBRL(Math.round(finalTotemPriceCents / 10))}
+              </strong>{" "}
+              sem juros no cartão
+            </div>
+
+            {itemDiscountCents > 0 && (
+              <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                Cupom ativo: -{formatBRL(itemDiscountCents)} de desconto exclusivo no chassi
+              </div>
             )}
           </div>
 

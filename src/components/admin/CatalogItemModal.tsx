@@ -39,6 +39,7 @@ import {
   calculateKitTotalCents,
 } from "@/modules/catalog/kitDefaults";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
+import { SmartPricingAssistant } from "./SmartPricingAssistant";
 
 interface CatalogItemModalProps {
   isOpen: boolean;
@@ -170,6 +171,10 @@ export function CatalogItemModal({
         description: initialDescription || initialNotes || "",
         notes: initialNotes || initialDescription || "",
         base_price_cents: initialItem.base_price_cents ?? 0,
+        pix_price_cents: parsedDimensions.pixPriceCents || parsedDimensions.pix_price_cents || (initialItem.base_price_cents ? Math.round(initialItem.base_price_cents * 0.825) : 99000),
+        target_net_cents: parsedDimensions.targetNetCents || parsedDimensions.target_net_cents || (parsedDimensions.pixPriceCents || initialItem.base_price_cents || 99000),
+        anchor_price_cents: parsedDimensions.anchorPriceCents || 0,
+        max_installments: parsedDimensions.maxInstallments || 10,
         price_adjustment_cents: initialItem.price_adjustment_cents ?? 0,
         active: initialItem.active ?? true,
         sort_order: initialItem.sort_order ?? 1,
@@ -473,6 +478,10 @@ export function CatalogItemModal({
           images: finalGallery.length > 0 ? finalGallery : [primaryImg || "/models/cabinet-floor.svg"],
           videoUrls: finalVideos,
           instagramVideos: finalVideos,
+          pixPriceCents: Number(formData.pix_price_cents) || 0,
+          targetNetCents: Number(formData.target_net_cents) || 0,
+          anchorPriceCents: Number(formData.anchor_price_cents) || 0,
+          maxInstallments: Number(formData.max_installments) || 10,
         };
 
         payload = {
@@ -776,27 +785,112 @@ export function CatalogItemModal({
                 </div>
               </div>
 
+              {/* Assistente Inteligente de Formação de Preço Reversa */}
+              {collectionType === "models" && (
+                <SmartPricingAssistant
+                  initialTargetNetCents={
+                    formData.target_net_cents ||
+                    formData.pix_price_cents ||
+                    formData.base_price_cents ||
+                    99000
+                  }
+                  onApplyPrices={(prices) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      base_price_cents: prices.basePriceCents,
+                      pix_price_cents: prices.pixPriceCents,
+                      target_net_cents: prices.targetNetCents,
+                      anchor_price_cents: prices.anchorPriceCents,
+                      max_installments: prices.maxInstallments,
+                    }));
+                  }}
+                />
+              )}
+
               {/* Preço e Ordem */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {collectionType === "models" && (
-                  <div>
-                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-                      Preço Base (R$) *
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      required
-                      value={((formData.base_price_cents || 0) / 100).toFixed(2)}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          base_price_cents: Math.round(parseFloat(e.target.value || "0") * 100),
-                        })
-                      }
-                      className="w-full px-3.5 py-2.5 bg-slate-950 border border-indigo-500/50 rounded-xl text-indigo-300 font-extrabold text-sm focus:border-indigo-400 focus:outline-none"
-                    />
-                  </div>
+                  <>
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-xs font-bold text-indigo-300 uppercase tracking-wider">
+                          Preço Cartão (10x) *
+                        </label>
+                        <span className="text-[10px] text-indigo-400 font-bold bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-500/30">
+                          Tabela 10x
+                        </span>
+                      </div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        required
+                        value={((formData.base_price_cents || 0) / 100).toFixed(2)}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            base_price_cents: Math.round(parseFloat(e.target.value || "0") * 100),
+                          })
+                        }
+                        className="w-full px-3.5 py-2.5 bg-slate-950 border border-indigo-500/50 rounded-xl text-indigo-300 font-extrabold text-sm focus:border-indigo-400 focus:outline-none"
+                      />
+                      <span className="text-[10px] text-slate-400 mt-1 block">
+                        Ex: R$ 1.200,00 (10x de R$ 120,00)
+                      </span>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
+                          Preço no PIX *
+                        </label>
+                        <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                          À Vista
+                        </span>
+                      </div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        required
+                        value={((formData.pix_price_cents || 0) / 100).toFixed(2)}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            pix_price_cents: Math.round(parseFloat(e.target.value || "0") * 100),
+                          })
+                        }
+                        className="w-full px-3.5 py-2.5 bg-slate-950 border border-emerald-500/50 rounded-xl text-emerald-400 font-extrabold text-sm focus:border-emerald-400 focus:outline-none"
+                      />
+                      <span className="text-[10px] text-slate-400 mt-1 block">
+                        Ex: R$ 990,00 com desconto à vista
+                      </span>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-xs font-bold text-cyan-400 uppercase tracking-wider">
+                          Margem no Bolso
+                        </label>
+                        <span className="text-[10px] text-cyan-400 font-bold bg-cyan-950/60 px-1.5 py-0.5 rounded border border-cyan-500/30">
+                          Líquido Alvo
+                        </span>
+                      </div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={((formData.target_net_cents || 0) / 100).toFixed(2)}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            target_net_cents: Math.round(parseFloat(e.target.value || "0") * 100),
+                          })
+                        }
+                        className="w-full px-3.5 py-2.5 bg-slate-950 border border-cyan-500/40 rounded-xl text-cyan-300 font-extrabold text-sm focus:border-cyan-400 focus:outline-none"
+                      />
+                      <span className="text-[10px] text-slate-400 mt-1 block">
+                        Meta limpa no bolso por venda
+                      </span>
+                    </div>
+                  </>
                 )}
 
                 {collectionType === "colors" && (

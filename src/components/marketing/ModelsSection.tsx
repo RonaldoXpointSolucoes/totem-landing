@@ -7,6 +7,7 @@ import { formatBRL } from "@/modules/pricing/pricingEngine";
 import { Card, Button, Badge } from "@/components/ui";
 import { ArrowRight, Maximize2, Shield, Wrench, Play } from "lucide-react";
 import { InstagramVideoModal, InstagramGlyph, ModelImageCarousel } from "@/components/media";
+import { PriceTag } from "@/components/pricing/PriceTag";
 
 interface ModelsSectionProps {
   onSelectModelToConfigure: (modelId: string) => void;
@@ -186,11 +187,19 @@ export const ModelsSection: React.FC<ModelsSectionProps> = ({
 
                 {/* Preço e Botão de Ação */}
                 <div className="pt-2">
-                  <div className="mb-3">
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400">Preço inicial</span>
-                    <p className="text-xl font-extrabold text-[#1d1d1f] dark:text-white">
-                      {formatBRL(model.basePriceCents)}
-                    </p>
+                  <div className="mb-4">
+                    <PriceTag
+                      pixPriceCents={
+                        model.pixPriceCents ||
+                        (model.basePriceCents >= 120000
+                          ? Math.round(model.basePriceCents * 0.825)
+                          : model.basePriceCents)
+                      }
+                      cardPriceCents={model.basePriceCents}
+                      anchorPriceCents={model.anchorPriceCents}
+                      installments={model.maxInstallments || 10}
+                      size="md"
+                    />
                   </div>
                   <button
                     className="w-full py-3 px-4 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white text-xs font-bold flex items-center justify-between transition-all duration-200 shadow-md shadow-blue-500/20 active:scale-95 group cursor-pointer"

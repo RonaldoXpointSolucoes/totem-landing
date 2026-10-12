@@ -13,7 +13,11 @@ export const CABINET_MODELS: CabinetModel[] = [
     slug: "wall",
     description:
       "Máximo aproveitamento do espaço físico em ambientes de tráfego intenso. Fixação vertical reforçada com passagem interna oculta para cabeamento e ventilação ativa.",
-    basePriceCents: 99000, // R$ 990,00
+    basePriceCents: 120000, // R$ 1.200,00 em até 10x no cartão
+    pixPriceCents: 99000, // R$ 990,00 à vista no PIX
+    targetNetCents: 99000,
+    anchorPriceCents: 139000,
+    maxInstallments: 10,
     active: true,
     sortOrder: 1,
     mainImage: "/images/totems/wall/wall-white-1.png",
@@ -47,7 +51,11 @@ export const CABINET_MODELS: CabinetModel[] = [
     slug: "countertop",
     description:
       "Formato compacto e altamente ergonômico, ideal para checkouts expressos, balcões de atendimento, recepções clínicas e pagamentos rápidos.",
-    basePriceCents: 95000, // R$ 950,00
+    basePriceCents: 115000, // R$ 1.150,00 em até 10x no cartão
+    pixPriceCents: 95000, // R$ 950,00 à vista no PIX
+    targetNetCents: 95000,
+    anchorPriceCents: 133000,
+    maxInstallments: 10,
     active: true,
     sortOrder: 2,
     mainImage: "/images/totems/countertop/countertop-white-1.png",
@@ -81,7 +89,11 @@ export const CABINET_MODELS: CabinetModel[] = [
     slug: "floor",
     description:
       "Design imponente e estruturado com base de alta estabilidade, fechaduras traseiras duplas e compartimento interno dedicado para CPU, nobreak e guilhotina.",
-    basePriceCents: 149000, // R$ 1.490,00
+    basePriceCents: 193000, // R$ 1.930,00 em até 10x no cartão
+    pixPriceCents: 159000, // R$ 1.590,00 à vista no PIX
+    targetNetCents: 159000,
+    anchorPriceCents: 224000,
+    maxInstallments: 10,
     active: true,
     sortOrder: 3,
     mainImage: "/images/totems/floor/floor-white-1.png",

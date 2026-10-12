@@ -5,6 +5,7 @@ import { CabinetModel } from "@/types/catalog";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
 import { Card } from "@/components/ui";
 import { Check, Maximize2 } from "lucide-react";
+import { PriceTag } from "@/components/pricing/PriceTag";
 
 interface StepModelProps {
   models: CabinetModel[];
@@ -96,14 +97,21 @@ export const StepModel: React.FC<StepModelProps> = ({
                   )}
                 </div>
 
-                {/* Rodapé com Preço Chassi Base */}
-                <div className="flex items-center justify-between pt-1.5 border-t border-black/5 dark:border-slate-800/80 mt-1">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 dark:text-slate-400">
-                    Chassi Base:
-                  </span>
-                  <span className="text-xs sm:text-sm font-black text-[#0071e3] dark:text-cyan-400">
-                    {formatBRL(model.basePriceCents)}
-                  </span>
+                {/* Rodapé com Preço Chassi Base (PIX vs Cartão) */}
+                <div className="pt-2 border-t border-black/5 dark:border-slate-800/80 mt-1">
+                  <PriceTag
+                    pixPriceCents={
+                      model.pixPriceCents ||
+                      (model.basePriceCents >= 120000
+                        ? Math.round(model.basePriceCents * 0.825)
+                        : model.basePriceCents)
+                    }
+                    cardPriceCents={model.basePriceCents}
+                    anchorPriceCents={model.anchorPriceCents}
+                    installments={model.maxInstallments || 10}
+                    size="sm"
+                    showAnchor={false}
+                  />
                 </div>
               </div>
             </div>
@@ -164,13 +172,20 @@ export const StepModel: React.FC<StepModelProps> = ({
                   </div>
                 )}
 
-                <div className="flex items-center justify-between pt-1.5 border-t border-black/10 dark:border-slate-800">
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
-                    Chassi Base
-                  </span>
-                  <span className="text-sm lg:text-base font-black text-[#0071e3] dark:text-cyan-400">
-                    {formatBRL(model.basePriceCents)}
-                  </span>
+                <div className="pt-2 border-t border-black/10 dark:border-slate-800">
+                  <PriceTag
+                    pixPriceCents={
+                      model.pixPriceCents ||
+                      (model.basePriceCents >= 120000
+                        ? Math.round(model.basePriceCents * 0.825)
+                        : model.basePriceCents)
+                    }
+                    cardPriceCents={model.basePriceCents}
+                    anchorPriceCents={model.anchorPriceCents}
+                    installments={model.maxInstallments || 10}
+                    size="sm"
+                    showAnchor={true}
+                  />
                 </div>
               </div>
             </Card>

@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   CheckCircle2,
   Tag,
+  Zap,
 } from "lucide-react";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 
@@ -50,6 +51,18 @@ export const CartView: React.FC<CartViewProps> = ({
   } = useCart();
 
   const [couponInput, setCouponInput] = useState("");
+
+  const cartPixSavings = items.reduce((acc, it) => {
+    const model = it.configuration.model;
+    const pixPrice =
+      model.pixPriceCents ||
+      (model.basePriceCents >= 120000
+        ? Math.round(model.basePriceCents * 0.825)
+        : model.basePriceCents);
+    const diff = Math.max(0, model.basePriceCents - pixPrice);
+    return acc + diff * it.quantity;
+  }, 0);
+  const finalPixTotal = Math.max(0, finalTotalPriceCents - cartPixSavings);
 
   if (items.length === 0) {
     return (
@@ -349,11 +362,35 @@ export const CartView: React.FC<CartViewProps> = ({
                 )}
               </div>
 
-              <div className="pt-3 border-t border-black/10 dark:border-slate-800 flex justify-between items-baseline">
-                <span className="text-sm font-bold text-[#1d1d1f] dark:text-white">Total Estimado:</span>
-                <span className="text-2xl font-black text-[#0071e3] dark:text-indigo-400">
-                  {formatBRL(finalTotalPriceCents)}
-                </span>
+              <div className="pt-3 border-t border-black/10 dark:border-slate-800 space-y-2">
+                <div className="flex justify-between items-baseline">
+                  <span className="text-sm font-bold text-[#1d1d1f] dark:text-white">Total no Cartão:</span>
+                  <div className="text-right">
+                    <span className="text-2xl font-black text-[#0071e3] dark:text-indigo-400">
+                      {formatBRL(finalTotalPriceCents)}
+                    </span>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                      em até 10x de {formatBRL(Math.round(finalTotalPriceCents / 10))} sem juros
+                    </div>
+                  </div>
+                </div>
+
+                {cartPixSavings > 0 && (
+                  <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                      <Zap className="w-4 h-4 fill-emerald-500" />
+                      <span>À Vista no PIX:</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-base font-black text-emerald-700 dark:text-emerald-300">
+                        {formatBRL(finalPixTotal)}
+                      </span>
+                      <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+                        Economia de {formatBRL(cartPixSavings)}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

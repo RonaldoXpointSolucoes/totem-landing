@@ -11,6 +11,10 @@ export interface CabinetModel {
   slug: string;
   description: string;
   basePriceCents: number;
+  pixPriceCents?: number;
+  targetNetCents?: number;
+  anchorPriceCents?: number;
+  maxInstallments?: number;
   active: boolean;
   sortOrder: number;
   mainImage: string;

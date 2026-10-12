@@ -751,63 +751,48 @@ export function CatalogManager({
                         </div>
                       </div>
 
-                      {/* Bloco de Preço */}
-                      <div className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800/80 flex items-center justify-between">
-                        <div>
-                          <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">
-                            Preço Base de Venda
-                          </span>
-                          {isInlineEditing ? (
-                            <div className="flex items-center gap-1.5 mt-1">
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={(inlinePriceCents / 100).toFixed(2)}
-                                onChange={(e) =>
-                                  setInlinePriceCents(
-                                    Math.round(parseFloat(e.target.value || "0") * 100)
-                                  )
-                                }
-                                className="w-24 px-2 py-1 bg-slate-900 border border-indigo-500 rounded-lg text-white font-bold text-xs"
-                              />
-                              <button
-                                onClick={() =>
-                                  handleSaveInlinePrice(
-                                    "models",
-                                    model.$id,
-                                    "base_price_cents"
-                                  )
-                                }
-                                className="p-1 rounded bg-emerald-600 text-white text-xs hover:bg-emerald-500"
-                              >
-                                Salvar
-                              </button>
-                              <button
-                                onClick={() => setInlineEditingId(null)}
-                                className="p-1 rounded bg-slate-800 text-slate-400 text-xs hover:text-white"
-                              >
-                                X
-                              </button>
+                      {/* Bloco de Preço Detalhado (PIX vs Cartão 10x) */}
+                      <div className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800/80 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-[10px] text-emerald-400 uppercase font-bold tracking-wider flex items-center gap-1">
+                              <span>⚡ Preço no PIX</span>
+                              <span className="text-[9px] bg-emerald-950/80 text-emerald-400 px-1.5 py-0.2 rounded border border-emerald-500/30">
+                                À Vista
+                              </span>
+                            </span>
+                            <div className="text-xl font-extrabold text-white mt-0.5">
+                              {formatBRL(
+                                dimensions.pixPriceCents ||
+                                (model.base_price_cents >= 120000 ? Math.round(model.base_price_cents * 0.825) : model.base_price_cents)
+                              )}
                             </div>
-                          ) : (
-                            <div className="text-xl font-extrabold text-indigo-400">
+                          </div>
+
+                          <div className="text-right">
+                            <span className="text-[10px] text-indigo-300 uppercase font-bold tracking-wider block">
+                              Cartão (10x)
+                            </span>
+                            <div className="text-sm font-extrabold text-indigo-400 mt-0.5">
                               {formatBRL(model.base_price_cents)}
                             </div>
-                          )}
+                            <span className="text-[10px] text-slate-400">
+                              10x de {formatBRL(Math.round(model.base_price_cents / 10))}
+                            </span>
+                          </div>
                         </div>
 
-                        {!isInlineEditing && (
-                          <button
-                            onClick={() => {
-                              setInlineEditingId(model.$id);
-                              setInlinePriceCents(model.base_price_cents);
-                            }}
-                            className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white text-xs transition-all border border-slate-800"
-                            title="Editar Preço Rápido"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                        {/* Meta Líquida no Bolso */}
+                        <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px]">
+                          <span className="text-slate-400">Meta Líquida (No Bolso):</span>
+                          <span className="font-extrabold text-cyan-400">
+                            {formatBRL(
+                              dimensions.targetNetCents ||
+                              dimensions.pixPriceCents ||
+                              (model.base_price_cents >= 120000 ? Math.round(model.base_price_cents * 0.825) : model.base_price_cents)
+                            )}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
