@@ -23,7 +23,7 @@ function runCouponPrecisionAudit() {
     eligibleCategory: "cabinet_only",
   };
 
-  // Teste 1: Apenas Gabinete de Parede (R$ 990,00)
+  // Teste 1: Apenas Gabinete de Parede (basePriceCents dinâmico)
   totalTests++;
   const wallModel = CABINET_MODELS.find((m) => m.id === "cabinet-wall") || CABINET_MODELS[0];
   const item1: CartItem = {
@@ -39,10 +39,10 @@ function runCouponPrecisionAudit() {
   };
 
   const res1 = calculateSelectiveCouponDiscount([item1], coupon10);
-  const expectedEligible1 = 99000;
-  const expectedDiscount1 = 9900; // 10% de 990,00
-  const expectedFinal1 = 89100;
-  const expectedComm1 = 7920; // 8% de 990,00
+  const expectedEligible1 = wallModel.basePriceCents;
+  const expectedDiscount1 = Math.round(expectedEligible1 * 0.10);
+  const expectedFinal1 = expectedEligible1 - expectedDiscount1;
+  const expectedComm1 = Math.round(expectedEligible1 * 0.08);
 
   const pass1 =
     res1.eligibleCabinetsSubtotalCents === expectedEligible1 &&
@@ -51,17 +51,17 @@ function runCouponPrecisionAudit() {
     res1.sellerCommissionCents === expectedComm1;
 
   if (pass1) {
-    console.log("✅ Caso 1 PASS: Gabinete de Parede puro (R$ 990,00) -> Desconto R$ 99,00 | Final R$ 891,00 | Comissão R$ 79,20");
+    console.log(`✅ Caso 1 PASS: Gabinete de Parede puro (R$ ${(wallModel.basePriceCents/100).toFixed(2)}) -> Desconto R$ ${(expectedDiscount1/100).toFixed(2)} | Final R$ ${(expectedFinal1/100).toFixed(2)} | Comissão R$ ${(expectedComm1/100).toFixed(2)}`);
     passedTests++;
   } else {
     console.error("❌ Caso 1 FAIL:", res1);
   }
 
-  // Teste 2: Gabinete de Balcão (R$ 950,00) + Kit de Montagem Hardware (R$ 833,66)
+  // Teste 2: Gabinete de Balcão + Kit de Montagem Hardware (R$ 833,66)
   totalTests++;
   const deskModel = CABINET_MODELS.find((m) => m.id === "cabinet-desk") || CABINET_MODELS[1];
   const kitMonitor = HOMOLOGATED_MONITORS.find((m) => m.id === "hardware-assembly-kit") || HOMOLOGATED_MONITORS[0];
-  const item2UnitPrice = 95000 + 83366; // Gabinete (950) + Kit (833,66) = 1.783,66
+  const item2UnitPrice = deskModel.basePriceCents + 83366;
   const item2: CartItem = {
     id: "item-2",
     configuration: {
@@ -76,11 +76,11 @@ function runCouponPrecisionAudit() {
   };
 
   const res2 = calculateSelectiveCouponDiscount([item2], coupon10);
-  const expectedEligible2 = 95000; // APENAS O GABINETE
+  const expectedEligible2 = deskModel.basePriceCents; // APENAS O GABINETE
   const expectedIneligible2 = 83366; // KIT INTOCADO
-  const expectedDiscount2 = 9500; // 10% de 950,00
-  const expectedFinal2 = (95000 - 9500) + 83366; // 85.500 + 83.366 = 168.866 (R$ 1.688,66)
-  const expectedComm2 = 7600; // 8% de 950,00 (R$ 76,00)
+  const expectedDiscount2 = Math.round(expectedEligible2 * 0.10);
+  const expectedFinal2 = (expectedEligible2 - expectedDiscount2) + expectedIneligible2;
+  const expectedComm2 = Math.round(expectedEligible2 * 0.08);
 
   const pass2 =
     res2.eligibleCabinetsSubtotalCents === expectedEligible2 &&
@@ -90,7 +90,7 @@ function runCouponPrecisionAudit() {
     res2.sellerCommissionCents === expectedComm2;
 
   if (pass2) {
-    console.log("✅ Caso 2 PASS: Gabinete (R$ 950) + Kit (R$ 833,66) -> Desconto aplicado APENAS no gabinete (R$ 95,00) | Kit integral R$ 833,66 mantido!");
+    console.log(`✅ Caso 2 PASS: Gabinete (R$ ${(deskModel.basePriceCents/100).toFixed(2)}) + Kit (R$ 833,66) -> Desconto aplicado APENAS no gabinete (R$ ${(expectedDiscount2/100).toFixed(2)}) | Kit integral R$ 833,66 mantido!`);
     passedTests++;
   } else {
     console.error("❌ Caso 2 FAIL:", res2);

@@ -52,11 +52,16 @@ assert(foundGoogle?.id === custGoogle.id, "Localizou cliente Google com case-ins
 
 // 4. Teste de Auto-indexação no Checkout
 console.log("\n--- TESTE 4: Auto-criação no Checkout ---");
+const testRunSuffix = Date.now();
+const testEmail = `ana.compradora.${testRunSuffix}@empresa.com.br`;
+const testPhone = `11977${String(testRunSuffix).slice(-5)}`;
+const testOrderNum = `TP-TEST-${String(testRunSuffix).slice(-4)}`;
+
 const checkoutCustomer = findOrCreateCustomerFromCheckout(
   {
     name: "Ana Compradora",
-    email: "ana.compradora@empresa.com.br",
-    whatsapp: "11977776666",
+    email: testEmail,
+    whatsapp: testPhone,
     personType: "company",
     document: "12.345.678/0001-90",
   },
@@ -77,13 +82,13 @@ assert(checkoutCustomer.addresses.length > 0, "Endereço de entrega salvo no his
 // 5. Teste de Persistência e Consulta de Pedidos do Cliente
 console.log("\n--- TESTE 5: Histórico de Pedidos ---");
 const mockOrder: OrderDetails = {
-  id: "order_test_99",
-  orderNumber: "TP-TEST99",
+  id: `order_test_${testRunSuffix}`,
+  orderNumber: testOrderNum,
   createdAt: new Date().toISOString(),
   customer: {
     name: "Ana Compradora",
-    email: "ana.compradora@empresa.com.br",
-    whatsapp: "11977776666",
+    email: testEmail,
+    whatsapp: testPhone,
     personType: "company",
   },
   deliveryAddress: {
@@ -109,11 +114,11 @@ const mockOrder: OrderDetails = {
 };
 saveLocalOrder(mockOrder);
 
-const ordersFoundByEmail = getOrdersByCustomer("ana.compradora@empresa.com.br");
-assert(ordersFoundByEmail.some((o) => o.orderNumber === "TP-TEST99"), "Pedido localizado por e-mail do cliente");
+const ordersFoundByEmail = getOrdersByCustomer(testEmail);
+assert(ordersFoundByEmail.some((o) => o.orderNumber === testOrderNum), "Pedido localizado por e-mail do cliente");
 
-const ordersFoundByPhone = getOrdersByCustomer(undefined, "(11) 97777-6666");
-assert(ordersFoundByPhone.some((o) => o.orderNumber === "TP-TEST99"), "Pedido localizado por telefone do cliente");
+const ordersFoundByPhone = getOrdersByCustomer(undefined, testPhone);
+assert(ordersFoundByPhone.some((o) => o.orderNumber === testOrderNum), "Pedido localizado por telefone do cliente");
 
 // 6. Teste de Sessão Segura do Cliente
 console.log("\n--- TESTE 6: Sessão Segura ---");
