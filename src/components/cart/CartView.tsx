@@ -370,7 +370,7 @@ export const CartView: React.FC<CartViewProps> = ({
                       {formatBRL(finalTotalPriceCents)}
                     </span>
                     <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                      em até 10x de {formatBRL(Math.round(finalTotalPriceCents / 10))} sem juros
+                      ou em até 10x de {formatBRL(Math.round(finalTotalPriceCents / 10))} no cartão
                     </div>
                   </div>
                 </div>

@@ -74,11 +74,11 @@ export function PriceTag({
         <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium">
           <CreditCard className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
           <span>
-            ou {formatBRL(safeCard)} em até{" "}
+            ou em até{" "}
             <strong className="text-slate-700 dark:text-slate-200 font-bold">
               {safeInstallments}x de {formatBRL(monthlyCents)}
             </strong>{" "}
-            sem juros
+            no cartão
           </span>
         </div>
       )}

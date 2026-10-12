@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { CabinetModel, ColorOption, MonitorOption, PrinterOption, BarcodeReaderOption } from "@/types/catalog";
 import { formatBRL, PriceBreakdown } from "@/modules/pricing/pricingEngine";
 import { Card, Button, Badge } from "@/components/ui";
-import { Edit3, ShoppingCart, ShieldCheck, Boxes, Check, PackageCheck, AlertCircle, Tag, Loader2, Zap } from "lucide-react";
+import { Edit3, ShoppingCart, ShieldCheck, Boxes, Check, PackageCheck, AlertCircle, Tag, Loader2, Zap, CreditCard } from "lucide-react";
 import { isItemKit, getEffectiveKitItems, calculateKitTotalCents } from "@/modules/catalog/kitDefaults";
 import { useCart } from "@/modules/cart/CartContext";
 
@@ -355,12 +355,15 @@ export const StepReview: React.FC<StepReviewProps> = ({
               </span>
             </div>
 
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-              ou {formatBRL(finalTotemPriceCents)} em até{" "}
-              <strong className="text-slate-700 dark:text-slate-200 font-bold">
-                10x de {formatBRL(Math.round(finalTotemPriceCents / 10))}
-              </strong>{" "}
-              sem juros no cartão
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1.5">
+              <CreditCard className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+              <span>
+                ou em até{" "}
+                <strong className="text-slate-700 dark:text-slate-200 font-bold">
+                  10x de {formatBRL(Math.round(finalTotemPriceCents / 10))}
+                </strong>{" "}
+                no cartão
+              </span>
             </div>
 
             {itemDiscountCents > 0 && (
