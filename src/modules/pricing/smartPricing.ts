@@ -2,12 +2,20 @@
  * TotemPro — Motor de Precificação Reversa e Engenharia de Margem (Markup Reverso)
  * 
  * Permite ao lojista/administrador definir o valor líquido desejado ("No Meu Bolso")
- * e calcula automaticamente os preços de venda à vista no PIX, parcelado em até 10x no Cartão,
+ * e especificar os custos contábeis reais de venda:
+ *  - Desconto do Cliente (Cupom em R$ ou %)
+ *  - Comissão do Influenciador (em R$ ou %)
+ *  - Custo do Cartão em 10x (taxa de intermediação + antecipação em R$ ou %)
+ * 
+ * E calcula automaticamente os preços de venda à vista no PIX, parcelado em até 10x no Cartão,
  * âncoras comerciais ("De / Por") e simula o DRE completo para cada canal de venda.
  */
 
 export interface ReversePricingInput {
   targetNetCents: number; // Ex: 99000 (R$ 990,00)
+  customerDiscountCents?: number; // Ex: 10000 (R$ 100,00)
+  influencerCommissionCents?: number; // Ex: 10000 (R$ 100,00)
+  cardFeeCents?: number; // Ex: 20000 (R$ 200,00)
   customerCouponPercent?: number; // Ex: 0, 10 ou 20%
   influencerCommissionPercent?: number; // Ex: 0, 5 ou 10%
   installments?: number; // Ex: 10 parcelas
@@ -31,12 +39,19 @@ export interface DREScenario {
 
 export interface ReversePricingResult {
   targetNetCents: number;
-  cardPriceCents: number; // Preço no cartão (ex: R$ 1.200,00)
-  pixPriceCents: number; // Preço promocional no PIX (ex: R$ 990,00)
-  anchorPriceCents: number; // Preço "De" de vitrine (ex: R$ 1.390,00)
+  customerDiscountCents: number;
+  influencerCommissionCents: number;
+  cardFeeCents: number;
+  cardPriceCents: number; // Preço de tabela no cartão (ex: R$ 1.390,00)
+  cardPriceWithDiscountCents: number; // Preço pago no cartão com cupom (ex: R$ 1.290,00)
+  pixPriceCents: number; // Preço promocional no PIX à vista direto (ex: R$ 990,00)
+  pixInfluencerBaseCents: number; // Preço de tabela PIX com cupom (ex: R$ 1.190,00)
+  pixPriceWithDiscountCents: number; // Preço pago no PIX com cupom (ex: R$ 1.090,00)
+  anchorPriceCents: number; // Preço "De" de vitrine (ex: R$ 1.590,00)
   installments: number; // Ex: 10
-  installmentMonthlyCents: number; // Ex: R$ 120,00
-  effectivePixDiscountPercent: number; // Ex: 17.5% de economia no PIX
+  installmentMonthlyCents: number; // Ex: R$ 139,00
+  installmentWithDiscountMonthlyCents: number; // Ex: R$ 129,00
+  effectivePixDiscountPercent: number; // Ex: economia no PIX em relação ao cartão
   scenarios: {
     pixDirect: DREScenario;
     pixInfluencer: DREScenario;
@@ -50,7 +65,6 @@ export interface ReversePricingResult {
  */
 export function roundToCommercialPrice(cents: number): number {
   const reais = Math.round(cents / 100);
-  // Arredonda para a dezena mais próxima (ex: 1192 -> 1190 ou 1200)
   const remainder = reais % 10;
   let commercialReais = reais;
   if (remainder >= 5) {
@@ -66,40 +80,74 @@ export function roundToCommercialPrice(cents: number): number {
  */
 export function calculateReversePricing(input: ReversePricingInput): ReversePricingResult {
   const targetNetCents = Math.max(1000, input.targetNetCents || 99000);
-  const couponPercent = Math.max(0, Math.min(50, input.customerCouponPercent ?? 10));
-  const commissionPercent = Math.max(0, Math.min(30, input.influencerCommissionPercent ?? 10));
   const installments = Math.max(1, Math.min(24, input.installments ?? 10));
 
-  // 1. Preço no PIX à vista:
-  // Se o lojista quer receber R$ 990,00 no PIX direto, o preço à vista é o próprio targetNetCents
-  const pixPriceCents = targetNetCents;
+  // Verifica se o lojista definiu custos explícitos em reais (R$)
+  const hasExplicitCosts =
+    input.customerDiscountCents !== undefined ||
+    input.influencerCommissionCents !== undefined ||
+    input.cardFeeCents !== undefined;
 
-  // 2. Preço no Cartão (10x):
-  // Regra do Usuário: Para receber R$ 990,00 no bolso em 10x, o valor cobrado no cartão deve ser ~R$ 1.200,00 (+ comissões se houver)
-  // Taxa de cartão em 10x (antecipação parcelada ~14% do gateway)
-  // Se o lojista definiu R$ 990,00 e temos ~14% de cartão e comissão:
-  // Preço base cartão calculado: targetNet / (1 - taxaCartao) -> 990 / 0.825 = ~1.200
-  let calculatedCardCents = Math.round(targetNetCents * 1.212); // Coeficiente que transforma R$ 990 em ~R$ 1.200
-  calculatedCardCents = roundToCommercialPrice(calculatedCardCents);
+  let customerDiscountCents = 0;
+  let influencerCommissionCents = 0;
+  let cardFeeCents = 0;
+  let calculatedCardCents = 0;
+  let pixPriceCents = targetNetCents;
+  let pixInfluencerBaseCents = targetNetCents;
 
-  // Parcela individual (ex: 10x de R$ 120,00)
+  if (hasExplicitCosts) {
+    customerDiscountCents = Math.max(0, input.customerDiscountCents ?? 10000); // Padrão R$ 100,00
+    influencerCommissionCents = Math.max(0, input.influencerCommissionCents ?? 10000); // Padrão R$ 100,00
+    cardFeeCents = Math.max(0, input.cardFeeCents ?? 20000); // Padrão R$ 200,00
+
+    // PRECIFICAÇÃO REVERSA EXATA:
+    // No Cartão 10x: Preço de Tabela = Meta no Bolso + Desconto Cliente + Comissão Influencer + Custo Cartão 10x
+    calculatedCardCents = targetNetCents + customerDiscountCents + influencerCommissionCents + cardFeeCents;
+
+    // No PIX via Influencer: Preço Base = Meta no Bolso + Desconto Cliente + Comissão Influencer (SEM custo de cartão!)
+    pixInfluencerBaseCents = targetNetCents + customerDiscountCents + influencerCommissionCents;
+
+    // No PIX Direto à vista: Preço = Meta no Bolso (ou com desconto à vista)
+    pixPriceCents = targetNetCents;
+  } else {
+    // Modo percentual padrão / compatibilidade com catálogo base
+    const couponPercent = Math.max(0, Math.min(50, input.customerCouponPercent ?? 10));
+    const commissionPercent = Math.max(0, Math.min(30, input.influencerCommissionPercent ?? 10));
+
+    calculatedCardCents = Math.round(targetNetCents * 1.212);
+    calculatedCardCents = roundToCommercialPrice(calculatedCardCents);
+
+    customerDiscountCents = Math.round(calculatedCardCents * (couponPercent / 100));
+    influencerCommissionCents = Math.round(calculatedCardCents * (commissionPercent / 100));
+    cardFeeCents = Math.round(calculatedCardCents * 0.135);
+
+    pixInfluencerBaseCents = targetNetCents + customerDiscountCents + influencerCommissionCents;
+    pixPriceCents = targetNetCents;
+  }
+
+  // Preço que o cliente paga no cartão após aplicar o cupom
+  const cardPriceWithDiscountCents = Math.max(0, calculatedCardCents - customerDiscountCents);
+  // Preço que o cliente paga no PIX após aplicar o cupom
+  const pixPriceWithDiscountCents = Math.max(0, pixInfluencerBaseCents - customerDiscountCents);
+
+  // Parcelas mensais
   const installmentMonthlyCents = Math.round(calculatedCardCents / installments);
+  const installmentWithDiscountMonthlyCents = Math.round(cardPriceWithDiscountCents / installments);
 
-  // 3. Preço Âncora "De" (Âncora comercial para gerar sensação de alta economia na vitrine)
-  // Ex: Se o cartão é R$ 1.200, a âncora é ~R$ 1.390
+  // Preço Âncora comercial de vitrine ("De / Por")
   const anchorPriceCents = roundToCommercialPrice(Math.round(calculatedCardCents * 1.16));
 
-  // Economia percentual do PIX em relação ao valor do cartão
-  const effectivePixDiscountPercent = Math.round(
-    ((calculatedCardCents - pixPriceCents) / calculatedCardCents) * 100
-  );
+  // Economia percentual do PIX em relação ao valor de tabela do cartão
+  const effectivePixDiscountPercent = calculatedCardCents > 0
+    ? Math.round(((calculatedCardCents - pixPriceCents) / calculatedCardCents) * 100)
+    : 0;
 
-  // 4. Construção dos Cenários do DRE
-  // Cenário 1: PIX Direto (Sem cupom, sem comissão, taxa zero)
+  // CONSTRUÇÃO DO DRE CONTÁBIL (DEMONSTRAÇÃO DE RESULTADO DO EXERCÍCIO)
+  // Cenário 1: PIX Direto (Sem cupom, sem intermediários, 100% da meta)
   const pixDirectScenario: DREScenario = {
     id: "pix_direct",
-    title: "Venda Direta no PIX (Sem Cupom)",
-    badge: "Margem Máxima",
+    title: "Venda Direta no PIX à Vista",
+    badge: "100% Limpo no Bolso",
     customerPaysCents: pixPriceCents,
     discountCents: 0,
     influencerCommissionCents: 0,
@@ -107,64 +155,101 @@ export function calculateReversePricing(input: ReversePricingInput): ReversePric
     netReceivedCents: pixPriceCents,
     targetDifferenceCents: pixPriceCents - targetNetCents,
     percentageOfTarget: 100,
-    description: "Cliente paga à vista com desconto instantâneo no PIX. Você recebe 100% da sua meta limpa.",
+    description: "Cliente compra direto no site à vista. Zero taxas de operadora, zero comissões. Você recebe 100% da sua meta limpa.",
   };
 
-  // Cenário 2: PIX com Influenciador (Preço cartão/tabela com cupom de 10% e comissão de 10%)
-  // Cliente compra pelo link do influencer:
-  // Se aplicar cupom de 10% sobre o preço de tabela R$ 1.200:
-  // Cliente paga: R$ 1.200 - 10% = R$ 1.080
-  // Comissão influencer (10% sobre o gabinete): R$ 108
-  // Líquido lojista: R$ 1.080 - R$ 108 = R$ 972 (~98% da meta de R$ 990)
-  const discountAmountPix = Math.round(calculatedCardCents * (couponPercent / 100));
-  const customerPaysInfluencerPix = calculatedCardCents - discountAmountPix;
-  const influencerCommissionPix = Math.round(calculatedCardCents * (commissionPercent / 100));
-  const netPixInfluencer = customerPaysInfluencerPix - influencerCommissionPix;
+  let pixInfluencerScenario: DREScenario;
+  let cardInstallmentsScenario: DREScenario;
 
-  const pixInfluencerScenario: DREScenario = {
-    id: "pix_influencer",
-    title: `PIX via Influencer (Cupom ${couponPercent}% + Comiss. ${commissionPercent}%)`,
-    badge: "Parceria Influencer",
-    customerPaysCents: customerPaysInfluencerPix,
-    discountCents: discountAmountPix,
-    influencerCommissionCents: influencerCommissionPix,
-    gatewayFeeCents: 0,
-    netReceivedCents: netPixInfluencer,
-    targetDifferenceCents: netPixInfluencer - targetNetCents,
-    percentageOfTarget: Math.round((netPixInfluencer / targetNetCents) * 100),
-    description: `Cliente recebe ${couponPercent}% de desconto e o influencer ganha ${commissionPercent}%. Você recebe ${((netPixInfluencer) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} líquido.`,
-  };
+  if (hasExplicitCosts) {
+    // Cenário 2 Explícito: PIX com Influenciador (Desconto + Comissão, SEM taxa de cartão)
+    const netPixInfluencer = pixPriceWithDiscountCents - influencerCommissionCents;
+    pixInfluencerScenario = {
+      id: "pix_influencer",
+      title: "PIX via Link de Influencer",
+      badge: "Parceria sem Taxa de Cartão",
+      customerPaysCents: pixPriceWithDiscountCents,
+      discountCents: customerDiscountCents,
+      influencerCommissionCents: influencerCommissionCents,
+      gatewayFeeCents: 0,
+      netReceivedCents: netPixInfluencer,
+      targetDifferenceCents: netPixInfluencer - targetNetCents,
+      percentageOfTarget: targetNetCents > 0 ? Math.round((netPixInfluencer / targetNetCents) * 100) : 100,
+      description: `Cliente paga no PIX com desconto do cupom (R$ ${(customerDiscountCents / 100).toFixed(2)}). Você paga a comissão de R$ ${(influencerCommissionCents / 100).toFixed(2)} e sobra exatamente R$ ${(netPixInfluencer / 100).toFixed(2)} limpo no bolso, livre de taxas bancárias.`,
+    };
 
-  // Cenário 3: Cartão 10x com Parcelamento
-  // Cliente paga em 10x de R$ 120,00 = R$ 1.200,00
-  // Taxa de antecipação do cartão 10x (~13.5% = R$ 162,00)
-  // Comissão ou margem retida
-  const cardGatewayFee = Math.round(calculatedCardCents * 0.135); // ~13.5%
-  // Se houver comissão de influenciador no cartão (ex: 5% a 8% ou valor residual)
-  const influencerCardCommission = Math.max(0, calculatedCardCents - cardGatewayFee - targetNetCents);
-  const netCard = calculatedCardCents - cardGatewayFee - influencerCardCommission;
+    // Cenário 3 Explícito: Cartão em 10x com Influenciador (Absorve desconto, taxa de 10x e comissão)
+    const netCard = cardPriceWithDiscountCents - cardFeeCents - influencerCommissionCents;
+    cardInstallmentsScenario = {
+      id: "card_installments",
+      title: `Cartão em ${installments}x via Influencer`,
+      badge: "Parcelado Protegido",
+      customerPaysCents: cardPriceWithDiscountCents,
+      discountCents: customerDiscountCents,
+      influencerCommissionCents: influencerCommissionCents,
+      gatewayFeeCents: cardFeeCents,
+      netReceivedCents: netCard,
+      targetDifferenceCents: netCard - targetNetCents,
+      percentageOfTarget: targetNetCents > 0 ? Math.round((netCard / targetNetCents) * 100) : 100,
+      description: `Cliente parcela em até ${installments}x de ${((installmentWithDiscountMonthlyCents) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}. Absorve o cupom de R$ ${(customerDiscountCents / 100).toFixed(2)}, o custo do cartão de R$ ${(cardFeeCents / 100).toFixed(2)} e a comissão de R$ ${(influencerCommissionCents / 100).toFixed(2)}, entregando exatamente R$ ${(netCard / 100).toFixed(2)} no bolso.`,
+    };
+  } else {
+    // Modo percentual legado (garante compatibilidade matemática)
+    const couponPercent = Math.max(0, Math.min(50, input.customerCouponPercent ?? 10));
+    const commissionPercent = Math.max(0, Math.min(30, input.influencerCommissionPercent ?? 10));
 
-  const cardInstallmentsScenario: DREScenario = {
-    id: "card_installments",
-    title: `Cartão em ${installments}x (Parcelado sem juros)`,
-    badge: "Volume Máximo",
-    customerPaysCents: calculatedCardCents,
-    discountCents: 0,
-    influencerCommissionCents: influencerCardCommission,
-    gatewayFeeCents: cardGatewayFee,
-    netReceivedCents: netCard,
-    targetDifferenceCents: netCard - targetNetCents,
-    percentageOfTarget: Math.round((netCard / targetNetCents) * 100),
-    description: `Cliente parcela em até ${installments}x de ${((installmentMonthlyCents) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}. Absorve a taxa do cartão e entrega sua meta de R$ 990,00.`,
-  };
+    const discountAmountPix = Math.round(calculatedCardCents * (couponPercent / 100));
+    const customerPaysInfluencerPix = calculatedCardCents - discountAmountPix;
+    const influencerCommissionPix = Math.round(calculatedCardCents * (commissionPercent / 100));
+    const netPixInfluencer = customerPaysInfluencerPix - influencerCommissionPix;
+
+    pixInfluencerScenario = {
+      id: "pix_influencer",
+      title: `PIX via Influencer (Cupom ${couponPercent}% + Comiss. ${commissionPercent}%)`,
+      badge: "Parceria Influencer",
+      customerPaysCents: customerPaysInfluencerPix,
+      discountCents: discountAmountPix,
+      influencerCommissionCents: influencerCommissionPix,
+      gatewayFeeCents: 0,
+      netReceivedCents: netPixInfluencer,
+      targetDifferenceCents: netPixInfluencer - targetNetCents,
+      percentageOfTarget: Math.round((netPixInfluencer / targetNetCents) * 100),
+      description: `Cliente recebe ${couponPercent}% de desconto e o influencer ganha ${commissionPercent}%. Você recebe ${((netPixInfluencer) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} líquido.`,
+    };
+
+    const cardGatewayFee = Math.round(calculatedCardCents * 0.135);
+    const influencerCardCommission = Math.max(0, calculatedCardCents - cardGatewayFee - targetNetCents);
+    const netCard = calculatedCardCents - cardGatewayFee - influencerCardCommission;
+
+    cardInstallmentsScenario = {
+      id: "card_installments",
+      title: `Cartão em ${installments}x (Parcelado sem juros)`,
+      badge: "Volume Máximo",
+      customerPaysCents: calculatedCardCents,
+      discountCents: 0,
+      influencerCommissionCents: influencerCardCommission,
+      gatewayFeeCents: cardGatewayFee,
+      netReceivedCents: netCard,
+      targetDifferenceCents: netCard - targetNetCents,
+      percentageOfTarget: Math.round((netCard / targetNetCents) * 100),
+      description: `Cliente parcela em até ${installments}x de ${((installmentMonthlyCents) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}. Absorve a taxa do cartão e entrega sua meta de R$ ${(targetNetCents / 100).toFixed(2)}.`,
+    };
+  }
 
   return {
     targetNetCents,
+    customerDiscountCents,
+    influencerCommissionCents,
+    cardFeeCents,
     cardPriceCents: calculatedCardCents,
+    cardPriceWithDiscountCents,
     pixPriceCents,
+    pixInfluencerBaseCents,
+    pixPriceWithDiscountCents,
     anchorPriceCents,
     installments,
     installmentMonthlyCents,
+    installmentWithDiscountMonthlyCents,
     effectivePixDiscountPercent,
     scenarios: {
       pixDirect: pixDirectScenario,

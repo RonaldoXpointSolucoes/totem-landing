@@ -173,6 +173,9 @@ export function CatalogItemModal({
         base_price_cents: initialItem.base_price_cents ?? 0,
         pix_price_cents: parsedDimensions.pixPriceCents || parsedDimensions.pix_price_cents || (initialItem.base_price_cents ? Math.round(initialItem.base_price_cents * 0.825) : 99000),
         target_net_cents: parsedDimensions.targetNetCents || parsedDimensions.target_net_cents || (parsedDimensions.pixPriceCents || initialItem.base_price_cents || 99000),
+        customer_discount_cents: parsedDimensions.customerDiscountCents || parsedDimensions.customer_discount_cents || 10000,
+        influencer_commission_cents: parsedDimensions.influencerCommissionCents || parsedDimensions.influencer_commission_cents || 10000,
+        card_fee_cents: parsedDimensions.cardFeeCents || parsedDimensions.card_fee_cents || 20000,
         anchor_price_cents: parsedDimensions.anchorPriceCents || 0,
         max_installments: parsedDimensions.maxInstallments || 10,
         price_adjustment_cents: initialItem.price_adjustment_cents ?? 0,
@@ -480,6 +483,9 @@ export function CatalogItemModal({
           instagramVideos: finalVideos,
           pixPriceCents: Number(formData.pix_price_cents) || 0,
           targetNetCents: Number(formData.target_net_cents) || 0,
+          customerDiscountCents: Number(formData.customer_discount_cents) || 0,
+          influencerCommissionCents: Number(formData.influencer_commission_cents) || 0,
+          cardFeeCents: Number(formData.card_fee_cents) || 0,
           anchorPriceCents: Number(formData.anchor_price_cents) || 0,
           maxInstallments: Number(formData.max_installments) || 10,
         };
@@ -794,12 +800,18 @@ export function CatalogItemModal({
                     formData.base_price_cents ||
                     99000
                   }
+                  initialCustomerDiscountCents={formData.customer_discount_cents}
+                  initialInfluencerCommissionCents={formData.influencer_commission_cents}
+                  initialCardFeeCents={formData.card_fee_cents}
                   onApplyPrices={(prices) => {
                     setFormData((prev) => ({
                       ...prev,
                       base_price_cents: prices.basePriceCents,
                       pix_price_cents: prices.pixPriceCents,
                       target_net_cents: prices.targetNetCents,
+                      customer_discount_cents: prices.customerDiscountCents,
+                      influencer_commission_cents: prices.influencerCommissionCents,
+                      card_fee_cents: prices.cardFeeCents,
                       anchor_price_cents: prices.anchorPriceCents,
                       max_installments: prices.maxInstallments,
                     }));

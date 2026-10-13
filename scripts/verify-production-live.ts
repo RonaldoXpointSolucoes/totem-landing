@@ -22,8 +22,8 @@ async function main() {
     const js = await fetch("https://totem.xpointsolucoes.com.br" + s, {
       headers: { "Cache-Control": "no-cache" },
     }).then((r) => r.text());
-    if (js.includes("0.6.1")) {
-      console.log(`✓ Encontrado '0.6.1' no bundle estático: ${s}`);
+    if (js.includes("0.6.2")) {
+      console.log(`✓ Encontrado '0.6.2' no bundle estático: ${s}`);
       foundInScript = true;
       break;
     }
@@ -41,16 +41,16 @@ async function main() {
     const js = await fetch("https://totem.xpointsolucoes.com.br" + s, {
       headers: { "Cache-Control": "no-cache" },
     }).then((r) => r.text());
-    if (js.includes("0.6.1")) {
-      console.log(`✓ Encontrado '0.6.1' no bundle da home: ${s}`);
+    if (js.includes("0.6.2")) {
+      console.log(`✓ Encontrado '0.6.2' no bundle da home: ${s}`);
       foundInHomeScript = true;
       break;
     }
   }
 
   console.log("=================================================");
-  if (healthData.version === "0.6.1" && (foundInScript || foundInHomeScript)) {
-    console.log("🎉 SUCESSO TOTAL: A versão 0.6.1 está 100% NO AR em produção!");
+  if (healthData.version === "0.6.2" && (foundInScript || foundInHomeScript)) {
+    console.log("🎉 SUCESSO TOTAL: A versão 0.6.2 está 100% NO AR em produção!");
   } else {
     console.log("⚠️ Aguardando sincronização de cache.");
   }
