@@ -112,7 +112,7 @@ export const KitCustomizationModal: React.FC<KitCustomizationModalProps> = ({
                 <Boxes className="w-4 h-4" />
               </div>
               <h3 className="text-base sm:text-lg font-black text-[#1d1d1f] dark:text-white tracking-tight">
-                Personalizar Sub-Itens do Kit de Montagem
+                Detalhes e Itens do Kit de Montagem
               </h3>
             </div>
             <Badge variant="primary" className="text-[10px] uppercase font-bold tracking-wider">
@@ -120,7 +120,7 @@ export const KitCustomizationModal: React.FC<KitCustomizationModalProps> = ({
             </Badge>
           </div>
           <p className="text-xs text-slate-600 dark:text-slate-400">
-            Adicione ou remova componentes do seu kit de instalação industrial. Cada alteração recalcula dinamicamente o valor total em tempo real.
+            Confira todos os componentes inclusos no seu pacote de instalação industrial ou personalize adicionando/removendo itens com recálculo em tempo real.
           </p>
         </div>
 

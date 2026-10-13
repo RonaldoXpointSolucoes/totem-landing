@@ -9,6 +9,7 @@ import {
   Tv,
   HelpCircle,
   Edit3,
+  Eye,
   Plus,
   Sparkles,
   X,
@@ -449,18 +450,18 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
-                  {/* Botão de Edição de Sub-Itens sempre acessível no Kit */}
+                  {/* Botão de Ver Detalhes / Edição de Sub-Itens sempre acessível no Kit */}
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleOpenKitModal(mon);
                     }}
-                    title="Editar Sub-Itens do Kit de Montagem"
-                    className="p-1.5 rounded-lg text-[#0071e3] dark:text-cyan-400 hover:bg-blue-100 dark:hover:bg-slate-800 border border-blue-200 dark:border-indigo-800 transition-all flex items-center gap-1 cursor-pointer"
+                    title="Ver detalhes dos itens inclusos no Kit de Montagem"
+                    className="px-2.5 py-1.5 rounded-lg text-[#0071e3] dark:text-cyan-400 bg-blue-50/70 dark:bg-slate-800/80 hover:bg-blue-100 dark:hover:bg-slate-800 border border-blue-200 dark:border-indigo-800 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
                   >
-                    <Edit3 className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline text-[10px] font-bold">Editar</span>
+                    <Eye className="w-3.5 h-3.5" />
+                    <span className="text-[11px] font-bold">Ver detalhes</span>
                   </button>
 
                   <div

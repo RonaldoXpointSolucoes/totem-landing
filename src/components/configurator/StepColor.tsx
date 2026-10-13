@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { ColorOption } from "@/types/catalog";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
 import { Card } from "@/components/ui";
-import { Check, Sparkles, ZoomIn, X, ShieldCheck, Layers } from "lucide-react";
+import { Check, Sparkles, ZoomIn, X, ShieldCheck, Layers, Maximize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface StepColorProps {
@@ -18,8 +18,10 @@ export const StepColor: React.FC<StepColorProps> = ({
   selectedColor,
   onSelectColor,
 }) => {
-  // Estado para controlar qual cor está com a Lupa de Textura aberta
+  // Estado para controlar qual cor está sendo inspecionada na Lupa de Textura (Modal Macro Zoom)
   const [zoomedColorId, setZoomedColorId] = useState<string | null>(null);
+
+  const zoomedColor = colors.find((c) => c.id === zoomedColorId) || null;
 
   return (
     <div className="space-y-4 sm:space-y-5">
@@ -42,11 +44,13 @@ export const StepColor: React.FC<StepColorProps> = ({
         {colors.map((color) => {
           const isSelected = selectedColor.id === color.id;
           const hasAdjustment = color.priceAdjustmentCents > 0;
-          const isZoomed = zoomedColorId === color.id;
 
-          const isWhite = color.slug === "white";
-          const isBlack = color.slug === "black";
-          const isDual = color.slug === "black-white";
+          // Detecção robusta do acabamento por slug ou nome
+          const nameLower = (color.name || "").toLowerCase();
+          const slugLower = (color.slug || "").toLowerCase();
+          const isDual = slugLower.includes("dual") || slugLower.includes("black-white") || nameLower.includes("dual");
+          const isWhite = !isDual && (slugLower.includes("white") || slugLower.includes("branco") || nameLower.includes("branco"));
+          const isBlack = !isDual && (slugLower.includes("black") || slugLower.includes("preto") || nameLower.includes("preto"));
 
           return (
             <div key={color.id} className="relative">
@@ -68,14 +72,12 @@ export const StepColor: React.FC<StepColorProps> = ({
                     <div className="flex items-center gap-3">
                       {/* Amostra visual de cor com borda de MDF 15mm e botão de Lupa */}
                       <div
-                        className="relative group/swatch cursor-pointer"
-                        onMouseEnter={() => setZoomedColorId(color.id)}
-                        onMouseLeave={() => setZoomedColorId((prev) => (prev === color.id ? null : prev))}
+                        className="relative group/swatch cursor-pointer shrink-0"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setZoomedColorId(isZoomed ? null : color.id);
+                          setZoomedColorId(color.id);
                         }}
-                        title="Passe o mouse ou clique para ver a textura com zoom"
+                        title="Clique para ver a textura com zoom 2.5x e especificações"
                       >
                         <div
                           className={cn(
@@ -85,16 +87,16 @@ export const StepColor: React.FC<StepColorProps> = ({
                               : "border border-black/15 dark:border-slate-700 shadow-sm hover:scale-105"
                           )}
                           style={{
-                            background: color.hexReference,
+                            background: color.image ? `url(${color.image}) center/cover no-repeat` : color.hexReference,
                             boxShadow: isWhite
-                              ? "inset 0 1px 3px rgba(0,0,0,0.08), inset 0 0 0 1px rgba(0,0,0,0.12), 0 3px 8px rgba(0,0,0,0.06)"
+                              ? "inset 0 1px 3px rgba(0,0,0,0.1), inset 0 0 0 1px rgba(0,0,0,0.15), 0 3px 8px rgba(0,0,0,0.06)"
                               : isBlack
                               ? "inset 0 1px 2px rgba(255,255,255,0.15), 0 3px 8px rgba(0,0,0,0.25)"
                               : "inset 0 0 0 1px rgba(0,0,0,0.15), 0 3px 8px rgba(0,0,0,0.15)",
                           }}
                         >
-                          {/* Textura sutil de microporos para o Branco TX (elimina o efeito de tela vazia) */}
-                          {isWhite && (
+                          {/* Textura sutil de microporos para o Branco TX (elimina o efeito de tela vazia caso não use foto) */}
+                          {isWhite && !color.image && (
                             <div
                               className="absolute inset-0 opacity-40 pointer-events-none"
                               style={{
@@ -105,7 +107,7 @@ export const StepColor: React.FC<StepColorProps> = ({
                           )}
 
                           {/* Textura para o Preto TX */}
-                          {isBlack && (
+                          {isBlack && !color.image && (
                             <div
                               className="absolute inset-0 opacity-20 pointer-events-none"
                               style={{
@@ -121,12 +123,7 @@ export const StepColor: React.FC<StepColorProps> = ({
 
                         {/* Botão sutil de Lupa no cantinho da amostra */}
                         <div
-                          className={cn(
-                            "absolute -bottom-1 -right-1 p-1 rounded-full border shadow-sm transition-all duration-200 flex items-center justify-center",
-                            isZoomed
-                              ? "bg-[#0071e3] text-white border-blue-600 scale-110 shadow-md"
-                              : "bg-white/95 dark:bg-slate-800/95 text-slate-600 dark:text-slate-300 border-slate-200/90 dark:border-slate-700 hover:text-[#0071e3] hover:border-blue-400 group-hover/swatch:scale-110"
-                          )}
+                          className="absolute -bottom-1 -right-1 p-1 rounded-full bg-white/95 dark:bg-slate-800/95 text-slate-700 dark:text-slate-300 border border-slate-200/90 dark:border-slate-700 shadow-md hover:bg-[#0071e3] hover:text-white hover:border-blue-600 transition-all duration-200 group-hover/swatch:scale-115 flex items-center justify-center"
                           title="Ampliar textura (Zoom 2.5x)"
                         >
                           <ZoomIn className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
@@ -196,100 +193,6 @@ export const StepColor: React.FC<StepColorProps> = ({
                   </span>
                 </div>
               </Card>
-
-              {/* LUPA INTERATIVA / POPOVER DE TEXTURA AMPLIADA (ZOOM 2.5X) */}
-              {isZoomed && (
-                <div
-                  className="absolute z-50 bottom-[calc(100%+8px)] left-0 sm:left-auto right-0 sm:right-auto sm:w-80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-2 border-[#0071e3]/40 dark:border-blue-500/40 rounded-3xl shadow-2xl p-4 animate-in fade-in zoom-in-95 duration-200"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {/* Cabeçalho da Lente */}
-                  <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-black/10 dark:border-slate-800">
-                    <div className="flex items-center gap-1.5">
-                      <div className="p-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-[#0071e3] dark:text-blue-400">
-                        <ZoomIn className="w-3.5 h-3.5" />
-                      </div>
-                      <span className="text-xs font-black text-[#1d1d1f] dark:text-white tracking-tight">
-                        Lupa de Textura • Zoom 2.5x
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setZoomedColorId(null)}
-                      className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-                      title="Fechar lupa"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  {/* Lente Óptica Ampliada da Textura Física do Material */}
-                  <div
-                    className="w-full h-28 rounded-2xl relative overflow-hidden border-2 border-black/10 dark:border-slate-700 shadow-inner flex items-center justify-center mb-3"
-                    style={{ background: color.hexReference }}
-                  >
-                    {/* Textura ampliada para Branco TX */}
-                    {isWhite && (
-                      <div
-                        className="absolute inset-0 opacity-60 pointer-events-none"
-                        style={{
-                          backgroundImage: "radial-gradient(#94a3b8 1.5px, transparent 1.5px)",
-                          backgroundSize: "8px 8px",
-                          boxShadow: "inset 0 0 20px rgba(0,0,0,0.08)",
-                        }}
-                      />
-                    )}
-
-                    {/* Textura ampliada para Preto TX */}
-                    {isBlack && (
-                      <div
-                        className="absolute inset-0 opacity-40 pointer-events-none"
-                        style={{
-                          backgroundImage: "radial-gradient(#64748b 1.5px, transparent 1.5px)",
-                          backgroundSize: "8px 8px",
-                          boxShadow: "inset 0 0 25px rgba(0,0,0,0.5)",
-                        }}
-                      />
-                    )}
-
-                    {/* Divisão ampliada para Dual-Tone */}
-                    {isDual && (
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="w-0.5 h-full bg-blue-500/60 rotate-45 shadow-lg" />
-                      </div>
-                    )}
-
-                    {/* Reflexo especular simulando luz rasante industrial */}
-                    <div className="absolute inset-0 bg-gradient-to-tr from-black/5 via-transparent to-white/40 pointer-events-none" />
-
-                    {/* Selo Central da Lente */}
-                    <div className="relative z-10 px-3 py-1 rounded-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-black/10 dark:border-white/10 shadow-lg text-[10px] font-black text-slate-900 dark:text-white flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      <span>{color.name}</span>
-                    </div>
-
-                    {/* Indicador de Espessura no Canto */}
-                    <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/70 text-white text-[9px] font-bold tracking-wider backdrop-blur-xs">
-                      15mm BP
-                    </div>
-                  </div>
-
-                  {/* Informações Técnicas da Chapa */}
-                  <div className="space-y-1.5 text-[11px] text-slate-600 dark:text-slate-300">
-                    <div className="flex items-center gap-1.5 font-semibold text-[#1d1d1f] dark:text-white">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                      <span>MaDeFibra BP Arauco/Duratex</span>
-                    </div>
-                    <p className="text-[10px] leading-relaxed text-slate-500 dark:text-slate-400">
-                      Superfície melamínica termofundida com proteção anti-risco, resistente a produtos de limpeza (álcool 70%) e umidade moderada.
-                    </p>
-                    <div className="pt-1.5 border-t border-black/5 dark:border-slate-800/80 flex items-center justify-between text-[10px]">
-                      <span className="text-slate-400">Borda de Acabamento:</span>
-                      <strong className="text-slate-700 dark:text-slate-200">Fita PVC 1mm em Router CNC</strong>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           );
         })}
@@ -304,6 +207,110 @@ export const StepColor: React.FC<StepColorProps> = ({
           <strong className="text-[#1d1d1f] dark:text-white">Padrões Especiais Sob Encomenda:</strong> Usinamos sob medida em qualquer padrão MDF Arauco, Duratex ou Guararapes (madeirados, grafite, concreto) para projetos corporativos e redes de franquias.
         </p>
       </div>
+
+      {/* MODAL DE LUPA DE TEXTURA EM MACRO ZOOM 2.5X */}
+      {zoomedColor && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={() => setZoomedColorId(null)}
+        >
+          <div
+            className="bg-white dark:bg-slate-900 border-2 border-[#0071e3]/40 dark:border-blue-500/40 rounded-3xl shadow-2xl p-5 sm:p-6 w-full max-w-md animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header do Modal */}
+            <div className="flex items-center justify-between pb-3 mb-3.5 border-b border-black/10 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-[#0071e3] dark:text-blue-400">
+                  <ZoomIn className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-sm sm:text-base font-black text-[#1d1d1f] dark:text-white tracking-tight">
+                    {zoomedColor.name}
+                  </h4>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                    Lupa de Inspeção de Textura • Zoom Macro 2.5x
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setZoomedColorId(null)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                title="Fechar Lupa"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Lente de Alta Resolução */}
+            <div
+              className="w-full h-44 sm:h-52 rounded-2xl relative overflow-hidden border-2 border-black/10 dark:border-slate-700 shadow-inner flex items-center justify-center mb-4"
+              style={{
+                background: zoomedColor.image
+                  ? `url(${zoomedColor.image}) center/cover no-repeat`
+                  : zoomedColor.hexReference,
+              }}
+            >
+              {/* Textura ampliada caso não seja imagem externa */}
+              {!zoomedColor.image && (
+                <div
+                  className="absolute inset-0 opacity-50 pointer-events-none"
+                  style={{
+                    backgroundImage: "radial-gradient(#94a3b8 1.5px, transparent 1.5px)",
+                    backgroundSize: "8px 8px",
+                  }}
+                />
+              )}
+
+              {/* Reflexo especular simulando luz rasante industrial */}
+              <div className="absolute inset-0 bg-gradient-to-tr from-black/10 via-transparent to-white/40 pointer-events-none" />
+
+              {/* Selo Central da Lente */}
+              <div className="relative z-10 px-3.5 py-1.5 rounded-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-black/10 dark:border-white/10 shadow-xl text-xs font-black text-slate-900 dark:text-white flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Textura Real • 15mm BP</span>
+              </div>
+
+              {/* Indicador de Espessura e Selo */}
+              <div className="absolute bottom-2.5 right-2.5 px-2.5 py-1 rounded-lg bg-black/75 text-white text-[10px] font-black tracking-wider backdrop-blur-xs flex items-center gap-1.5">
+                <Maximize2 className="w-3 h-3 text-blue-400" />
+                <span>Zoom 2.5x</span>
+              </div>
+            </div>
+
+            {/* Informações Técnicas da Chapa */}
+            <div className="space-y-2 text-xs mb-5">
+              <div className="flex items-center gap-1.5 font-bold text-[#1d1d1f] dark:text-white">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span>MaDeFibra BP Arauco/Duratex 15mm</span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">
+                Superfície melamínica termofundida com proteção anti-risco, resistente a produtos de higienização frequente (álcool 70%) e umidade moderada.
+              </p>
+              <div className="pt-2 border-t border-black/5 dark:border-slate-800/80 flex items-center justify-between text-[11px]">
+                <span className="text-slate-400">Borda de Proteção:</span>
+                <strong className="text-slate-800 dark:text-slate-200">Fita de PVC 1mm usinada em Router CNC</strong>
+              </div>
+            </div>
+
+            {/* Botão de Confirmação e Seleção */}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onSelectColor(zoomedColor);
+                  setZoomedColorId(null);
+                }}
+                className="w-full py-2.5 px-4 rounded-xl bg-[#0071e3] hover:bg-[#0077ed] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 transition-all active:scale-95"
+              >
+                <Check className="w-4 h-4 stroke-[3]" />
+                <span>Confirmar e Selecionar Este Acabamento</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
