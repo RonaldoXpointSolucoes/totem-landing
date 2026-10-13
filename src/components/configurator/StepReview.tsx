@@ -258,8 +258,14 @@ export const StepReview: React.FC<StepReviewProps> = ({
             <span className="text-slate-500 font-medium">Acabamento:</span>
             <div className="flex items-center gap-1.5 min-w-0">
               <span
-                className="w-2.5 h-2.5 rounded-full border border-black/20 shrink-0"
-                style={{ background: color.hexReference }}
+                className="w-3.5 h-3.5 rounded-full border border-black/20 dark:border-white/30 shrink-0 shadow-xs ring-1 ring-black/10"
+                style={{
+                  background: color.hexReference,
+                  boxShadow:
+                    color.slug === "white"
+                      ? "inset 0 0 0 1px rgba(0,0,0,0.15), 0 1px 2px rgba(0,0,0,0.12)"
+                      : undefined,
+                }}
               />
               <strong className="text-[#1d1d1f] dark:text-white truncate">{color.name} (15mm BP)</strong>
               <button
