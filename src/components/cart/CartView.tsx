@@ -18,8 +18,12 @@ import {
   CheckCircle2,
   Tag,
   Zap,
+  Truck,
+  Loader2,
+  Check,
 } from "lucide-react";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
+import { cn } from "@/lib/utils";
 
 interface CartViewProps {
   onContinueShopping: () => void;
@@ -51,6 +55,91 @@ export const CartView: React.FC<CartViewProps> = ({
   } = useCart();
 
   const [couponInput, setCouponInput] = useState("");
+
+  // Estados de Frete Antecipado por CEP no Carrinho
+  const [shippingCep, setShippingCep] = useState("");
+  const [shippingQuotes, setShippingQuotes] = useState<any[]>([]);
+  const [selectedShippingId, setSelectedShippingId] = useState<string | null>(null);
+  const [isLoadingShipping, setIsLoadingShipping] = useState(false);
+  const [shippingError, setShippingError] = useState<string | null>(null);
+
+  // Recupera CEP persistido em sessão
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedCep = sessionStorage.getItem("totem_shipping_cep");
+      if (savedCep) {
+        const clean = savedCep.replace(/\D/g, "");
+        setShippingCep(clean.length === 8 ? `${clean.slice(0, 5)}-${clean.slice(5)}` : savedCep);
+      }
+    }
+  }, []);
+
+  const handleCepChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let raw = e.target.value.replace(/\D/g, "");
+    if (raw.length > 8) raw = raw.slice(0, 8);
+    if (raw.length > 5) {
+      setShippingCep(`${raw.slice(0, 5)}-${raw.slice(5)}`);
+    } else {
+      setShippingCep(raw);
+    }
+  };
+
+  const handleCalculateShipping = async () => {
+    const cleanCep = shippingCep.replace(/\D/g, "");
+    if (cleanCep.length !== 8) {
+      setShippingError("Digite um CEP válido com 8 dígitos.");
+      return;
+    }
+
+    setIsLoadingShipping(true);
+    setShippingError(null);
+
+    try {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("totem_shipping_cep", cleanCep);
+      }
+
+      const res = await fetch("/api/shipping/quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          destinationCep: cleanCep,
+          items: items.map((i) => ({
+            modelId: i.configuration.model.id,
+            quantity: i.quantity,
+          })),
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.ok && Array.isArray(data.quotes) && data.quotes.length > 0) {
+        setShippingQuotes(data.quotes);
+        const available = data.quotes.filter((q: any) => q.isAvailable);
+        if (available.length > 0) {
+          const chosen = available[0].id;
+          setSelectedShippingId(chosen);
+          if (typeof window !== "undefined") {
+            sessionStorage.setItem("totem_shipping_option_id", chosen);
+          }
+        }
+      } else {
+        setShippingError(data?.error || "Serviço de cotação temporariamente indisponível.");
+        setShippingQuotes([]);
+        setSelectedShippingId(null);
+      }
+    } catch {
+      setShippingError("Erro de comunicação ao calcular frete.");
+      setShippingQuotes([]);
+      setSelectedShippingId(null);
+    } finally {
+      setIsLoadingShipping(false);
+    }
+  };
+
+  const selectedShippingQuote = shippingQuotes.find(
+    (q) => q.id === selectedShippingId && q.isAvailable
+  ) || null;
+  const shippingCents = selectedShippingQuote ? selectedShippingQuote.priceCents : 0;
 
   const cartPixSavings = items.reduce((acc, it) => {
     const model = it.configuration.model;
@@ -290,9 +379,126 @@ export const CartView: React.FC<CartViewProps> = ({
                 </div>
               )}
 
-              <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                <span>Frete Especial (Transportadora):</span>
-                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Calculado no Checkout</span>
+              <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
+                <span>Frete Especial:</span>
+                {shippingCents > 0 && selectedShippingQuote ? (
+                  <div className="text-right">
+                    <span className="font-bold text-slate-900 dark:text-slate-100">
+                      {formatBRL(shippingCents)}
+                    </span>
+                    <span className="block text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                      {selectedShippingQuote.serviceName || selectedShippingQuote.carrier}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-slate-400 dark:text-slate-500 italic text-[11px]">
+                    Calcular abaixo
+                  </span>
+                )}
+              </div>
+
+              {/* Bloco de Cálculo de Frete por CEP */}
+              <div className="pt-3 border-t border-black/10 dark:border-slate-800 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <Truck className="w-3.5 h-3.5 text-[#0071e3] dark:text-cyan-400" />
+                    Calcular Frete e Prazo
+                  </span>
+                  {shippingQuotes.length > 0 && (
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+                      {shippingQuotes.filter((q) => q.isAvailable).length} opções
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="00000-000"
+                    value={shippingCep}
+                    onChange={handleCepChange}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleCalculateShipping();
+                      }
+                    }}
+                    className="flex-1 px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-black/10 dark:border-slate-800 rounded-xl text-xs font-mono placeholder-slate-400 text-slate-900 dark:text-white focus:outline-none focus:border-[#0071e3]"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCalculateShipping}
+                    disabled={isLoadingShipping || shippingCep.replace(/\D/g, "").length !== 8}
+                    className="h-auto py-1 px-3 text-xs font-bold shrink-0"
+                  >
+                    {isLoadingShipping ? (
+                      <span className="flex items-center gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Cotando
+                      </span>
+                    ) : (
+                      "Calcular"
+                    )}
+                  </Button>
+                </div>
+
+                {shippingError && (
+                  <p className="text-[11px] text-rose-500 font-semibold">{shippingError}</p>
+                )}
+
+                {/* Lista de Opções de Frete da Transportadora */}
+                {shippingQuotes.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    {shippingQuotes
+                      .filter((q) => q.isAvailable)
+                      .map((quote) => {
+                        const isSelected = selectedShippingId === quote.id;
+                        return (
+                          <div
+                            key={quote.id}
+                            onClick={() => {
+                              setSelectedShippingId(quote.id);
+                              if (typeof window !== "undefined") {
+                                sessionStorage.setItem("totem_shipping_option_id", quote.id);
+                              }
+                            }}
+                            className={cn(
+                              "p-2.5 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition-all",
+                              isSelected
+                                ? "border-[#0071e3] bg-blue-50/70 dark:bg-blue-950/40 text-slate-900 dark:text-white font-semibold ring-1 ring-[#0071e3]/30"
+                                : "border-black/10 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-slate-600 dark:text-slate-400 hover:border-black/20"
+                            )}
+                          >
+                            <div className="flex items-center gap-2">
+                              <div
+                                className={cn(
+                                  "w-4 h-4 rounded-full border flex items-center justify-center shrink-0",
+                                  isSelected
+                                    ? "border-[#0071e3] bg-[#0071e3] text-white"
+                                    : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
+                                )}
+                              >
+                                {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                              </div>
+                              <div>
+                                <div className="font-bold text-[#1d1d1f] dark:text-white leading-tight">
+                                  {quote.serviceName || quote.carrier}
+                                </div>
+                                <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                                  Entrega em até {quote.deliveryDays} {quote.deliveryDays === 1 ? "dia útil" : "dias úteis"}
+                                </div>
+                              </div>
+                            </div>
+                            <span className="font-black text-[#0071e3] dark:text-cyan-400 shrink-0">
+                              {formatBRL(quote.priceCents)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
               </div>
 
               {/* Bloco de Cupom de Desconto */}
@@ -367,10 +573,10 @@ export const CartView: React.FC<CartViewProps> = ({
                   <span className="text-sm font-bold text-[#1d1d1f] dark:text-white">Total no Cartão:</span>
                   <div className="text-right">
                     <span className="text-2xl font-black text-[#0071e3] dark:text-indigo-400">
-                      {formatBRL(finalTotalPriceCents)}
+                      {formatBRL(finalTotalPriceCents + shippingCents)}
                     </span>
                     <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                      ou em até 10x de {formatBRL(Math.round(finalTotalPriceCents / 10))} no cartão
+                      ou em até 10x de {formatBRL(Math.round((finalTotalPriceCents + shippingCents) / 10))} no cartão
                     </div>
                   </div>
                 </div>
@@ -383,7 +589,7 @@ export const CartView: React.FC<CartViewProps> = ({
                     </div>
                     <div className="text-right">
                       <span className="text-base font-black text-emerald-700 dark:text-emerald-300">
-                        {formatBRL(finalPixTotal)}
+                        {formatBRL(finalPixTotal + shippingCents)}
                       </span>
                       <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
                         Economia de {formatBRL(cartPixSavings)}
@@ -408,9 +614,17 @@ export const CartView: React.FC<CartViewProps> = ({
               variant="primary"
               size="lg"
               onClick={() => {
+                const clean = shippingCep.replace(/\D/g, "");
+                if (typeof window !== "undefined" && clean.length === 8) {
+                  sessionStorage.setItem("totem_shipping_cep", clean);
+                  if (selectedShippingId) {
+                    sessionStorage.setItem("totem_shipping_option_id", selectedShippingId);
+                  }
+                }
                 trackEvent(ANALYTICS_EVENTS.BEGIN_CHECKOUT, {
                   totalItems,
                   totalPriceCents,
+                  shippingCents,
                 });
                 onProceedToCheckout();
               }}

@@ -40,7 +40,7 @@ export const StepColor: React.FC<StepColorProps> = ({
       </div>
 
       {/* Grid de Cores e Acabamentos */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 lg:gap-4 relative">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 lg:gap-4 relative">
         {colors.map((color) => {
           const isSelected = selectedColor.id === color.id;
           const hasAdjustment = color.priceAdjustmentCents > 0;
@@ -59,123 +59,99 @@ export const StepColor: React.FC<StepColorProps> = ({
                 selected={isSelected}
                 onClick={() => onSelectColor(color)}
                 className={cn(
-                  "p-4 rounded-2xl flex flex-col justify-between transition-all duration-300 relative",
+                  "p-4 rounded-2xl flex flex-col justify-between transition-all duration-300 relative overflow-hidden",
                   isSelected
                     ? "border-2 border-[#0071e3] dark:border-blue-500 bg-gradient-to-b from-blue-50/70 via-white to-blue-50/20 dark:from-indigo-950/40 dark:via-slate-900 dark:to-indigo-950/20 shadow-xl shadow-blue-500/10 ring-2 ring-[#0071e3]/20"
                     : "border-black/10 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-900/80"
                 )}
               >
                 <div>
-                  {/* Cabeçalho do Card: Amostra com Lupa + Check ao Lado + Badge de Preço */}
-                  <div className="flex items-start justify-between gap-2.5 mb-3.5">
-                    {/* Bloco Amostra + Indicador de Seleção ao Lado */}
-                    <div className="flex items-center gap-3">
-                      {/* Amostra visual de cor com borda de MDF 15mm e botão de Lupa */}
+                  {/* Cabeçalho do Card: Amostra com Lupa + Nome do Acabamento + Radio Check */}
+                  <div className="flex items-center gap-3 mb-3">
+                    {/* Amostra visual de cor com borda de MDF 15mm e botão de Lupa */}
+                    <div
+                      className="relative group/swatch cursor-pointer shrink-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setZoomedColorId(color.id);
+                      }}
+                      title="Clique para ver a textura com zoom 2.5x e especificações"
+                    >
                       <div
-                        className="relative group/swatch cursor-pointer shrink-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setZoomedColorId(color.id);
+                        className={cn(
+                          "w-12 h-12 rounded-xl transition-all duration-300 relative overflow-hidden flex items-center justify-center",
+                          isSelected
+                            ? "ring-2 ring-[#0071e3] ring-offset-2 ring-offset-white dark:ring-offset-slate-900 shadow-md scale-[1.02]"
+                            : "border border-black/15 dark:border-slate-700 shadow-sm hover:scale-105"
+                        )}
+                        style={{
+                          background: color.image ? `url(${color.image}) center/cover no-repeat` : color.hexReference,
+                          boxShadow: isWhite
+                            ? "inset 0 1px 3px rgba(0,0,0,0.1), inset 0 0 0 1px rgba(0,0,0,0.15), 0 3px 8px rgba(0,0,0,0.06)"
+                            : isBlack
+                            ? "inset 0 1px 2px rgba(255,255,255,0.15), 0 3px 8px rgba(0,0,0,0.25)"
+                            : "inset 0 0 0 1px rgba(0,0,0,0.15), 0 3px 8px rgba(0,0,0,0.15)",
                         }}
-                        title="Clique para ver a textura com zoom 2.5x e especificações"
                       >
-                        <div
-                          className={cn(
-                            "w-12 h-12 sm:w-13 sm:h-13 rounded-2xl transition-all duration-300 relative overflow-hidden flex items-center justify-center",
-                            isSelected
-                              ? "ring-2 ring-[#0071e3] ring-offset-2 ring-offset-white dark:ring-offset-slate-900 shadow-md scale-[1.02]"
-                              : "border border-black/15 dark:border-slate-700 shadow-sm hover:scale-105"
-                          )}
-                          style={{
-                            background: color.image ? `url(${color.image}) center/cover no-repeat` : color.hexReference,
-                            boxShadow: isWhite
-                              ? "inset 0 1px 3px rgba(0,0,0,0.1), inset 0 0 0 1px rgba(0,0,0,0.15), 0 3px 8px rgba(0,0,0,0.06)"
-                              : isBlack
-                              ? "inset 0 1px 2px rgba(255,255,255,0.15), 0 3px 8px rgba(0,0,0,0.25)"
-                              : "inset 0 0 0 1px rgba(0,0,0,0.15), 0 3px 8px rgba(0,0,0,0.15)",
-                          }}
-                        >
-                          {/* Textura sutil de microporos para o Branco TX (elimina o efeito de tela vazia caso não use foto) */}
-                          {isWhite && !color.image && (
-                            <div
-                              className="absolute inset-0 opacity-40 pointer-events-none"
-                              style={{
-                                backgroundImage: "radial-gradient(#94a3b8 0.75px, transparent 0.75px)",
-                                backgroundSize: "4px 4px",
-                              }}
-                            />
-                          )}
+                        {/* Textura sutil de microporos para o Branco TX */}
+                        {isWhite && !color.image && (
+                          <div
+                            className="absolute inset-0 opacity-40 pointer-events-none"
+                            style={{
+                              backgroundImage: "radial-gradient(#94a3b8 0.75px, transparent 0.75px)",
+                              backgroundSize: "4px 4px",
+                            }}
+                          />
+                        )}
 
-                          {/* Textura para o Preto TX */}
-                          {isBlack && !color.image && (
-                            <div
-                              className="absolute inset-0 opacity-20 pointer-events-none"
-                              style={{
-                                backgroundImage: "radial-gradient(#64748b 0.75px, transparent 0.75px)",
-                                backgroundSize: "4px 4px",
-                              }}
-                            />
-                          )}
+                        {/* Textura para o Preto TX */}
+                        {isBlack && !color.image && (
+                          <div
+                            className="absolute inset-0 opacity-20 pointer-events-none"
+                            style={{
+                              backgroundImage: "radial-gradient(#64748b 0.75px, transparent 0.75px)",
+                              backgroundSize: "4px 4px",
+                            }}
+                          />
+                        )}
 
-                          {/* Reflexo de luz rasante para acabamento premium */}
-                          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/30 pointer-events-none" />
-                        </div>
-
-                        {/* Botão sutil de Lupa no cantinho da amostra */}
-                        <div
-                          className="absolute -bottom-1 -right-1 p-1 rounded-full bg-white/95 dark:bg-slate-800/95 text-slate-700 dark:text-slate-300 border border-slate-200/90 dark:border-slate-700 shadow-md hover:bg-[#0071e3] hover:text-white hover:border-blue-600 transition-all duration-200 group-hover/swatch:scale-115 flex items-center justify-center"
-                          title="Ampliar textura (Zoom 2.5x)"
-                        >
-                          <ZoomIn className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                        </div>
+                        {/* Reflexo de luz rasante para acabamento premium */}
+                        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/30 pointer-events-none" />
                       </div>
 
-                      {/* Indicador de Seleção AO LADO da cor (nunca mais em cima dela) */}
-                      <div className="flex flex-col gap-0.5 select-none">
-                        <div className="flex items-center gap-1.5">
-                          <div
-                            className={cn(
-                              "w-5 h-5 rounded-full flex items-center justify-center transition-all duration-200",
-                              isSelected
-                                ? "bg-[#0071e3] text-white shadow-sm ring-2 ring-blue-500/20"
-                                : "border-2 border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70"
-                            )}
-                          >
-                            {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                          </div>
-                          <span
-                            className={cn(
-                              "text-xs font-black uppercase tracking-wider transition-colors",
-                              isSelected
-                                ? "text-[#0071e3] dark:text-blue-400"
-                                : "text-slate-500 dark:text-slate-400"
-                            )}
-                          >
-                            {isSelected ? "Selecionado" : "Selecionar"}
-                          </span>
-                        </div>
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
-                          {isWhite ? "Clássico Clean" : isBlack ? "Sóbrio & Corporativo" : "Combinação Bicolor"}
-                        </span>
+                      {/* Botão de Lupa integrado na amostra */}
+                      <div
+                        className="absolute -bottom-1 -right-1 p-1 rounded-full bg-white/95 dark:bg-slate-800/95 text-slate-700 dark:text-slate-300 border border-slate-200/90 dark:border-slate-700 shadow-md hover:bg-[#0071e3] hover:text-white hover:border-blue-600 transition-all duration-200 group-hover/swatch:scale-115 flex items-center justify-center"
+                        title="Ampliar textura (Zoom 2.5x)"
+                      >
+                        <ZoomIn className="w-2.5 h-2.5" />
                       </div>
                     </div>
 
-                    {/* Badge de Acréscimo / Sem Acréscimo */}
-                    <span
-                      className={`text-[11px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${
-                        hasAdjustment
-                          ? "bg-blue-50 dark:bg-indigo-500/20 text-[#0071e3] dark:text-indigo-300 border-blue-200 dark:border-indigo-500/30"
-                          : "bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30"
-                      }`}
+                    {/* Informações de Título e Subtítulo protegidos contra quebra */}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm sm:text-base font-extrabold text-[#1d1d1f] dark:text-white truncate tracking-tight">
+                        {color.name}
+                      </h3>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                        {isWhite ? "Clássico Clean • Branco TX" : isBlack ? "Sóbrio & Corporativo • Preto TX" : "Bicolor • Branco e Preto"}
+                      </p>
+                    </div>
+
+                    {/* Radio Check Circular */}
+                    <div
+                      className={cn(
+                        "w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-all duration-200",
+                        isSelected
+                          ? "bg-[#0071e3] text-white shadow-sm ring-2 ring-blue-500/20"
+                          : "border-2 border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70"
+                      )}
                     >
-                      {hasAdjustment ? `+ ${formatBRL(color.priceAdjustmentCents)}` : "Sem Acréscimo"}
-                    </span>
+                      {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                    </div>
                   </div>
 
-                  {/* Nome e Descrição do Acabamento */}
-                  <h3 className="text-sm sm:text-base font-extrabold text-[#1d1d1f] dark:text-white mb-1 tracking-tight">
-                    {color.name}
-                  </h3>
+                  {/* Descrição Técnica do Acabamento */}
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-2">
                     {isWhite
                       ? "Padrão texturizado Branco TX 15mm com microporos foscos, ideal para saúde, clínicas e varejo clean."
@@ -185,11 +161,27 @@ export const StepColor: React.FC<StepColorProps> = ({
                   </p>
                 </div>
 
-                {/* Rodapé com Ajuste de Preço */}
-                <div className="mt-3.5 pt-2.5 border-t border-black/10 dark:border-slate-800 flex items-center justify-between text-xs">
-                  <span className="text-[10px] text-slate-500 font-medium">Ajuste no Total:</span>
-                  <span className="font-extrabold text-xs text-[#1d1d1f] dark:text-slate-100">
-                    {hasAdjustment ? `+ ${formatBRL(color.priceAdjustmentCents)}` : "R$ 0,00 (Incluso)"}
+                {/* Rodapé com Status e Badge de Preço Perfeitamente Contido */}
+                <div className="mt-3 pt-2.5 border-t border-black/10 dark:border-slate-800 flex items-center justify-between gap-2">
+                  <span
+                    className={cn(
+                      "text-[11px] font-bold uppercase tracking-wider",
+                      isSelected ? "text-[#0071e3] dark:text-blue-400" : "text-slate-400 dark:text-slate-500"
+                    )}
+                  >
+                    {isSelected ? "Selecionado" : "Selecionar"}
+                  </span>
+
+                  {/* Badge de Preço/Acréscimo alinhado à direita com borda e contraste */}
+                  <span
+                    className={cn(
+                      "text-[11px] font-bold px-2 py-0.5 rounded-full border shrink-0",
+                      hasAdjustment
+                        ? "bg-blue-50 dark:bg-indigo-500/20 text-[#0071e3] dark:text-indigo-300 border-blue-200 dark:border-indigo-500/30"
+                        : "bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30"
+                    )}
+                  >
+                    {hasAdjustment ? `+ ${formatBRL(color.priceAdjustmentCents)}` : "Incluso (R$ 0,00)"}
                   </span>
                 </div>
               </Card>

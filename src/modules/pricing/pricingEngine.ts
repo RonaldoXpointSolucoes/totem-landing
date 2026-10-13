@@ -20,23 +20,35 @@ export interface PriceCalculationInput {
 
 export interface PriceBreakdown {
   basePriceCents: number;
+  pixBasePriceCents: number;
+  cardBasePriceCents: number;
   colorAdjustmentCents: number;
   equipmentAdjustmentCents: number;
   customizationAdjustmentCents: number;
   totalPriceCents: number;
+  pixTotalPriceCents: number;
+  cardTotalPriceCents: number;
+  maxInstallments: number;
 }
 
 /**
  * Motor Único e Autoritativo de Precificação do Totem
  * Regra Comercial Inegociável:
- * - O gabinete possui preço-base configurável.
+ * - O gabinete possui preço-base configurável no Cartão e no PIX.
+ * - Por padrão, a experiência visual do configurador expõe o preço com desconto no PIX.
  * - Cores podem possuir acréscimo (Branco = 0, Preto = +X, Black White = +Y).
  * - Equipamentos homologados avulsos NÃO alteram o preço padrão do gabinete (+ R$ 0,00 de furação).
  * - O Kit de Montagem soma o valor dinâmico dos seus sub-itens de hardware ativos.
  * - Personalizações fora do catálogo homologado entram com acréscimo apenas se previamente aprovadas pelo admin.
  */
 export function calculateTotemPrice(input: PriceCalculationInput): PriceBreakdown {
-  const basePriceCents = Math.max(0, input.cabinet.basePriceCents || 0);
+  const cardBasePriceCents = Math.max(0, input.cabinet.basePriceCents || 0);
+  const pixBasePriceCents = Math.max(
+    0,
+    input.cabinet.pixPriceCents ||
+      (cardBasePriceCents >= 120000 ? Math.round(cardBasePriceCents * 0.825) : cardBasePriceCents)
+  );
+  const maxInstallments = input.cabinet.maxInstallments || 10;
   const colorAdjustmentCents = Math.max(0, input.color.priceAdjustmentCents || 0);
 
   // Se for o Kit de Montagem, soma o valor total dos sub-itens de hardware selecionados
@@ -54,18 +66,30 @@ export function calculateTotemPrice(input: PriceCalculationInput): PriceBreakdow
       ? Math.max(0, input.customization.priceAdjustmentCents || 0)
       : 0;
 
-  const totalPriceCents =
-    basePriceCents +
+  const pixTotalPriceCents =
+    pixBasePriceCents +
+    colorAdjustmentCents +
+    equipmentAdjustmentCents +
+    customizationAdjustmentCents;
+
+  const cardTotalPriceCents =
+    cardBasePriceCents +
     colorAdjustmentCents +
     equipmentAdjustmentCents +
     customizationAdjustmentCents;
 
   return {
-    basePriceCents,
+    basePriceCents: cardBasePriceCents,
+    pixBasePriceCents,
+    cardBasePriceCents,
     colorAdjustmentCents,
     equipmentAdjustmentCents,
     customizationAdjustmentCents,
-    totalPriceCents,
+    // O valor exibido como total do Totem no configurador passa a ser o PIX
+    totalPriceCents: pixTotalPriceCents,
+    pixTotalPriceCents,
+    cardTotalPriceCents,
+    maxInstallments,
   };
 }
 

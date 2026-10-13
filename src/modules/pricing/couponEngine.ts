@@ -39,20 +39,6 @@ export function calculateSelectiveCouponDiscount(
   items: CartItem[],
   coupon: SelectiveCoupon | null | undefined
 ): CouponDiscountCalculation {
-  if (!coupon || !coupon.active) {
-    const rawTotal = items.reduce((acc, curr) => acc + curr.subtotalCents, 0);
-    return {
-      couponCode: "",
-      isValid: false,
-      eligibleCabinetsSubtotalCents: 0,
-      ineligibleSubtotalCents: rawTotal,
-      discountPercent: 0,
-      discountCents: 0,
-      finalSubtotalCents: rawTotal,
-      sellerCommissionCents: 0,
-    };
-  }
-
   let eligibleCabinetsSubtotalCents = 0;
   let ineligibleSubtotalCents = 0;
 
@@ -60,14 +46,28 @@ export function calculateSelectiveCouponDiscount(
     const qty = Math.max(1, item.quantity);
     const cabinetBase = Math.max(0, item.configuration.model.basePriceCents || 0);
 
-    // O gabinete base é o único item elegível
+    // O gabinete base é o item base para cálculo
     eligibleCabinetsSubtotalCents += cabinetBase * qty;
 
-    // A diferença do preço unitário do item em relação ao gabinete base é composta por
-    // kits de hardware, cores especiais, periféricos, etc. que NÃO podem receber desconto.
+    // A diferença do preço unitário em relação ao gabinete base é composta por kits/extras
     const unitPrice = Math.max(0, item.unitPriceCents);
     const extraComponentsPerUnit = Math.max(0, unitPrice - cabinetBase);
     ineligibleSubtotalCents += extraComponentsPerUnit * qty;
+  }
+
+  const rawTotal = eligibleCabinetsSubtotalCents + ineligibleSubtotalCents;
+
+  if (!coupon || !coupon.active) {
+    return {
+      couponCode: "",
+      isValid: false,
+      eligibleCabinetsSubtotalCents,
+      ineligibleSubtotalCents,
+      discountPercent: 0,
+      discountCents: 0,
+      finalSubtotalCents: rawTotal,
+      sellerCommissionCents: 0,
+    };
   }
 
   // Verifica valor mínimo de pedido se configurado

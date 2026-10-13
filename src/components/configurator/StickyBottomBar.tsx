@@ -9,6 +9,7 @@ interface StickyBottomBarProps {
   currentStep: number;
   totalSteps: number;
   totalPriceCents: number;
+  cardTotalPriceCents?: number;
   onNext: () => void;
   onBack: () => void;
   isLastStep?: boolean;
@@ -20,6 +21,7 @@ export const StickyBottomBar: React.FC<StickyBottomBarProps> = ({
   currentStep,
   totalSteps,
   totalPriceCents,
+  cardTotalPriceCents,
   onNext,
   onBack,
   isLastStep = false,
@@ -42,12 +44,24 @@ export const StickyBottomBar: React.FC<StickyBottomBarProps> = ({
           )}
 
           <div className="flex flex-col">
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
-              Total Atual
-            </span>
-            <span className="text-base sm:text-xl font-black text-[#0071e3] dark:text-cyan-400 tracking-tight leading-tight">
-              {formatBRL(totalPriceCents)}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
+                Total Atual
+              </span>
+              <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 uppercase tracking-wide">
+                no PIX à vista
+              </span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-base sm:text-xl font-black text-[#0071e3] dark:text-cyan-400 tracking-tight leading-tight">
+                {formatBRL(totalPriceCents)}
+              </span>
+            </div>
+            {cardTotalPriceCents && cardTotalPriceCents > totalPriceCents && (
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                ou em até 10x de {formatBRL(Math.round(cardTotalPriceCents / 10))} no cartão
+              </span>
+            )}
           </div>
         </div>
 

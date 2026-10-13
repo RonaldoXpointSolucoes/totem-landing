@@ -212,12 +212,25 @@ export async function getAppwriteCatalog() {
         ? dims.instagramVideos
         : [];
 
+      const pixPrice =
+        dims?.pixPriceCents ??
+        dims?.pix_price_cents ??
+        doc.pix_price_cents ??
+        (doc.base_price_cents >= 120000 ? Math.round(doc.base_price_cents * 0.825) : doc.base_price_cents);
+      const targetNet = dims?.targetNetCents ?? dims?.target_net_cents ?? doc.target_net_cents ?? pixPrice;
+      const anchorPrice = dims?.anchorPriceCents ?? dims?.anchor_price_cents ?? doc.anchor_price_cents ?? Math.round(doc.base_price_cents * 1.15);
+      const maxInst = dims?.maxInstallments ?? dims?.max_installments ?? doc.max_installments ?? 10;
+
       return {
         id: doc.$id,
         name: doc.name,
         slug: doc.slug,
         description: doc.description,
         basePriceCents: doc.base_price_cents,
+        pixPriceCents: pixPrice,
+        targetNetCents: targetNet,
+        anchorPriceCents: anchorPrice,
+        maxInstallments: maxInst,
         active: doc.active,
         sortOrder: doc.sort_order,
         mainImage: effectiveMainImage,

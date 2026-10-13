@@ -274,7 +274,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
       monitor: selectedMonitor,
       printer: selectedPrinter,
       barcodeReader: useReader ? selectedReader : null,
-      calculatedPriceCents: pricing.totalPriceCents,
+      calculatedPriceCents: pricing.cardTotalPriceCents,
     };
 
     if (editingItem) {
@@ -533,11 +533,26 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                   </div>
                 )}
 
-                <div className="pt-2 border-t border-black/10 dark:border-slate-800 flex justify-between items-center">
-                  <span className="font-bold text-slate-700 dark:text-slate-300">Total Atual:</span>
-                  <span className="text-lg font-black text-[#0071e3] dark:text-cyan-400">
-                    {formatBRL(pricing.totalPriceCents)}
-                  </span>
+                <div className="pt-2 border-t border-black/10 dark:border-slate-800 space-y-1">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-slate-700 dark:text-slate-300 text-xs sm:text-sm">Total Atual:</span>
+                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 uppercase tracking-wide">
+                        no PIX
+                      </span>
+                    </div>
+                    <span className="text-base sm:text-lg font-black text-[#0071e3] dark:text-cyan-400">
+                      {formatBRL(pricing.pixTotalPriceCents)}
+                    </span>
+                  </div>
+                  {pricing.cardTotalPriceCents > pricing.pixTotalPriceCents && (
+                    <div className="flex justify-between items-center text-[11px] text-slate-500 dark:text-slate-400">
+                      <span>No Cartão (em até 10x):</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">
+                        {formatBRL(pricing.cardTotalPriceCents)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </Card>
@@ -612,6 +627,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
         currentStep={step}
         totalSteps={totalSteps}
         totalPriceCents={pricing.totalPriceCents}
+        cardTotalPriceCents={pricing.cardTotalPriceCents}
         onNext={handleNext}
         onBack={handleBack}
         isLastStep={step === totalSteps}

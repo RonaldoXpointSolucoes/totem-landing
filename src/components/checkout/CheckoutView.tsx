@@ -291,6 +291,75 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   const finalTotalCents = effectiveSubtotalCents + shippingCents;
 
   // Busca automática de CEP com alta resiliência (Timeout ViaCEP + Fallback BrasilAPI)
+  const lookupCep = async (cleanCep: string) => {
+    if (cleanCep.length !== 8) return;
+    setIsLoadingCep(true);
+    setErrorMsg(null);
+
+    // Dispara cotação de frete em paralelo
+    fetchShippingQuotes(cleanCep);
+
+    try {
+      let foundData: { logradouro?: string; bairro?: string; localidade?: string; uf?: string } | null = null;
+
+      // 1. Tentativa ViaCEP com timeout de 2.5s via AbortController
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`, {
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const data = await res.json();
+          if (!data.erro) {
+            foundData = {
+              logradouro: data.logradouro || "",
+              bairro: data.bairro || "",
+              localidade: data.localidade || "",
+              uf: data.uf || "",
+            };
+          }
+        }
+      } catch {
+        clearTimeout(timeoutId);
+      }
+
+      // 2. Fallback imediato: BrasilAPI se o ViaCEP demorar ou falhar
+      if (!foundData) {
+        try {
+          const resFallback = await fetch(`https://brasilapi.com.br/api/cep/v1/${cleanCep}`);
+          if (resFallback.ok) {
+            const dataFallback = await resFallback.json();
+            foundData = {
+              logradouro: dataFallback.street || "",
+              bairro: dataFallback.neighborhood || "",
+              localidade: dataFallback.city || "",
+              uf: dataFallback.state || "",
+            };
+          }
+        } catch {
+          // Falha silenciosa no fallback
+        }
+      }
+
+      if (foundData) {
+        setStreet(foundData.logradouro || "");
+        setNeighborhood(foundData.bairro || "");
+        setCity(foundData.localidade || "");
+        setState(foundData.uf || "");
+        setCepSuccess(true);
+      } else {
+        setErrorMsg("CEP não encontrado nas bases oficiais. Por favor, preencha o endereço manualmente.");
+      }
+    } catch (err) {
+      console.error("Erro na consulta de CEP:", err);
+    } finally {
+      setIsLoadingCep(false);
+    }
+  };
+
   const handleCepChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawVal = e.target.value;
     const masked = maskCEP(rawVal);
@@ -299,73 +368,26 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
 
     const cleanCep = rawVal.replace(/\D/g, "");
     if (cleanCep.length === 8) {
-      setIsLoadingCep(true);
-      setErrorMsg(null);
-
-      // Dispara cotação de frete em paralelo
-      fetchShippingQuotes(cleanCep);
-
-      try {
-        let foundData: { logradouro?: string; bairro?: string; localidade?: string; uf?: string } | null = null;
-
-        // 1. Tentativa ViaCEP com timeout de 2.5s via AbortController
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2500);
-
-        try {
-          const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`, {
-            signal: controller.signal,
-          });
-          clearTimeout(timeoutId);
-          if (res.ok) {
-            const data = await res.json();
-            if (!data.erro) {
-              foundData = {
-                logradouro: data.logradouro || "",
-                bairro: data.bairro || "",
-                localidade: data.localidade || "",
-                uf: data.uf || "",
-              };
-            }
-          }
-        } catch {
-          clearTimeout(timeoutId);
-        }
-
-        // 2. Fallback imediato: BrasilAPI se o ViaCEP demorar ou falhar
-        if (!foundData) {
-          try {
-            const resFallback = await fetch(`https://brasilapi.com.br/api/cep/v1/${cleanCep}`);
-            if (resFallback.ok) {
-              const dataFallback = await resFallback.json();
-              foundData = {
-                logradouro: dataFallback.street || "",
-                bairro: dataFallback.neighborhood || "",
-                localidade: dataFallback.city || "",
-                uf: dataFallback.state || "",
-              };
-            }
-          } catch {
-            // Falha silenciosa no fallback
-          }
-        }
-
-        if (foundData) {
-          setStreet(foundData.logradouro || "");
-          setNeighborhood(foundData.bairro || "");
-          setCity(foundData.localidade || "");
-          setState(foundData.uf || "");
-          setCepSuccess(true);
-        } else {
-          setErrorMsg("CEP não encontrado nas bases oficiais. Por favor, preencha o endereço manualmente.");
-        }
-      } catch (err) {
-        console.error("Erro na consulta de CEP:", err);
-      } finally {
-        setIsLoadingCep(false);
-      }
+      lookupCep(cleanCep);
     }
   };
+
+  // Pré-carrega o CEP e a transportadora previamente calculados no carrinho
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const savedCep = sessionStorage.getItem("totem_shipping_cep");
+    if (savedCep && savedCep.replace(/\D/g, "").length === 8 && !cep) {
+      const clean = savedCep.replace(/\D/g, "");
+      const formatted = `${clean.slice(0, 5)}-${clean.slice(5)}`;
+      setCep(formatted);
+      lookupCep(clean);
+
+      const savedOptionId = sessionStorage.getItem("totem_shipping_option_id");
+      if (savedOptionId) {
+        setSelectedShippingId(savedOptionId as any);
+      }
+    }
+  }, []);
 
   // Envio do Pedido para o Backend (com recálculo server-side)
   const handleSubmitOrder = async (e: React.FormEvent) => {

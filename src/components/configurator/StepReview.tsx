@@ -43,17 +43,8 @@ export const StepReview: React.FC<StepReviewProps> = ({
   const itemDiscountCents = appliedCoupon
     ? Math.round(model.basePriceCents * (appliedCoupon.discountPercent / 100))
     : 0;
-  const finalTotemPriceCents = Math.max(0, pricing.totalPriceCents - itemDiscountCents);
-
-  const cabinetPixSavings = Math.max(
-    0,
-    model.basePriceCents -
-      (model.pixPriceCents ||
-        (model.basePriceCents >= 120000
-          ? Math.round(model.basePriceCents * 0.825)
-          : model.basePriceCents))
-  );
-  const reviewPixTotal = Math.max(0, finalTotemPriceCents - cabinetPixSavings);
+  const finalTotemPriceCents = Math.max(0, pricing.cardTotalPriceCents - itemDiscountCents);
+  const reviewPixTotal = Math.max(0, pricing.pixTotalPriceCents - itemDiscountCents);
 
   const printerSubItem = kitItems.find((i) => i.category === "printer");
   const readerSubItem = kitItems.find((i) => i.category === "reader");
