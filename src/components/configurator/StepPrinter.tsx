@@ -34,7 +34,7 @@ export const StepPrinter: React.FC<StepPrinterProps> = ({
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[220px] lg:max-h-[250px] overflow-y-auto pr-1">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {printers.map((printer) => {
           const isSelected = selectedPrinter?.id === printer.id;
           return (
@@ -43,7 +43,7 @@ export const StepPrinter: React.FC<StepPrinterProps> = ({
               interactive
               selected={isSelected}
               onClick={() => onSelectPrinter(printer)}
-              className="p-3 sm:p-3.5 rounded-xl flex items-center justify-between gap-2.5"
+              className="p-3.5 sm:p-4 rounded-xl flex items-center justify-between gap-3"
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <div

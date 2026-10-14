@@ -94,7 +94,7 @@ export const StepReader: React.FC<StepReaderProps> = ({
             Selecione o modelo do leitor:
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[160px] overflow-y-auto pr-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {readers.map((reader) => {
               const isSelected = selectedReader?.id === reader.id;
               return (

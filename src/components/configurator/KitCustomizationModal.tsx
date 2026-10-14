@@ -150,7 +150,7 @@ export const KitCustomizationModal: React.FC<KitCustomizationModalProps> = ({
         </div>
 
         {/* Lista de Sub-Itens */}
-        <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+        <div className="space-y-2.5">
           {items.map((item) => {
             const Icon = getItemIcon(item.category);
             return (

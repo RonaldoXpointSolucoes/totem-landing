@@ -381,8 +381,8 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
         </div>
       )}
 
-      {/* Grid com Scroll Interno Seguro para Manter Viewport sem Estouro */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[260px] lg:max-h-[290px] overflow-y-auto pr-1">
+      {/* Grid Completo de Monitores Usando Todo o Espaço da Tela */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {/* Monitores Homologados & Kit de Montagem */}
         {filteredMonitors.map((mon) => {
           const isSelected = selectedMonitor?.id === mon.id;
