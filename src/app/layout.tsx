@@ -3,7 +3,6 @@ import { siteConfig } from "@/config/site";
 import { ThemeProvider } from "@/lib/theme/ThemeContext";
 import { CartProvider } from "@/modules/cart/CartContext";
 import { MarketingPixels } from "@/components/analytics/MarketingPixels";
-import { FloatingWhatsAppButton } from "@/components/marketing/FloatingWhatsAppButton";
 import { FAQ_DATA } from "@/config/faqData";
 import "./globals.css";
 
@@ -299,7 +298,6 @@ export default function RootLayout({
         <ThemeProvider>
           <CartProvider>
             {children}
-            <FloatingWhatsAppButton />
           </CartProvider>
         </ThemeProvider>
       </body>

@@ -319,8 +319,8 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
   ];
 
   return (
-    <div className="flex-1 flex flex-col justify-start lg:overflow-hidden lg:h-full pb-28 sm:pb-24">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 w-full flex-1 flex flex-col min-h-0 pt-2 sm:pt-3">
+    <div className="flex-1 flex flex-col justify-start pb-44 sm:pb-40">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 w-full flex-1 flex flex-col pt-2 sm:pt-3">
         {/* Topo: Identificação Enxuta + Cardápio Digital dos 6 Passos */}
         <div className="space-y-2 mb-2 sm:mb-3 shrink-0">
           <div className="flex items-center justify-between gap-2">
@@ -431,10 +431,10 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
           </div>
         </div>
 
-        {/* Layout Desktop e Notebook em Duas Colunas (Viewport-Fit: sem rolagem externa) */}
-        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-start lg:items-stretch lg:overflow-hidden">
+        {/* Layout Desktop e Notebook em Duas Colunas com Rolagem Livre */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-start">
           {/* Coluna Esquerda: Preview Visual Permanente do Totem */}
-          <div className="hidden lg:flex lg:col-span-4 flex-col justify-between h-full min-h-0 overflow-hidden">
+          <div className="hidden lg:flex lg:col-span-4 lg:sticky lg:top-20 flex-col justify-between lg:h-[calc(100vh-11.5rem)] lg:min-h-[480px] lg:max-h-[680px] overflow-hidden">
             <Card className="p-3 sm:p-3.5 border-black/10 dark:border-slate-800 bg-white/95 dark:bg-slate-900/70 backdrop-blur-xl shadow-md rounded-2xl flex flex-col justify-between h-full space-y-2.5 overflow-hidden">
               <div className="flex items-center justify-between shrink-0">
                 <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
@@ -558,8 +558,8 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
             </Card>
           </div>
 
-          {/* Coluna Direita: Área do Passo Ativo (Espaço Integral em Mobile e Viewport-Fit em Desktop) */}
-          <div className="lg:col-span-8 flex flex-col justify-start lg:h-full lg:overflow-y-auto lg:pr-1 pb-4">
+          {/* Coluna Direita: Área do Passo Ativo (Espaço Integral em Mobile, Tablet, Notebook e Desktop) */}
+          <div className="lg:col-span-8 flex flex-col justify-start pb-8">
             {step === 1 && (
               <StepModel
                 models={catalog.models}

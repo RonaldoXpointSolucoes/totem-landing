@@ -29,36 +29,36 @@ export const StickyBottomBar: React.FC<StickyBottomBarProps> = ({
   isNextDisabled = false,
 }) => {
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-950/95 border-t border-black/10 dark:border-slate-800/90 backdrop-blur-2xl px-4 py-2.5 pb-[max(0.65rem,env(safe-area-inset-bottom))] shadow-[0_-8px_30px_rgba(0,0,0,0.08)] dark:shadow-[0_-10px_30px_rgba(0,0,0,0.6)] transition-colors duration-300">
-      <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
+    <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-950/95 border-t border-black/10 dark:border-slate-800/90 backdrop-blur-2xl px-3 sm:px-4 py-2 sm:py-2.5 pb-[max(0.6rem,env(safe-area-inset-bottom))] shadow-[0_-8px_30px_rgba(0,0,0,0.08)] dark:shadow-[0_-10px_30px_rgba(0,0,0,0.6)] transition-colors duration-300">
+      <div className="max-w-6xl mx-auto flex items-center justify-between gap-2 sm:gap-3">
         {/* Lado Esquerdo: Botão Voltar + Preço Total */}
-        <div className="flex items-center gap-2.5 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           {currentStep > 1 && (
             <button
               onClick={onBack}
-              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl border border-black/10 dark:border-slate-700/80 bg-[#f5f5f7] dark:bg-slate-900/90 text-slate-700 dark:text-slate-300 hover:text-black dark:hover:text-white hover:border-black/20 dark:hover:border-slate-600 active:scale-90 flex items-center justify-center transition-all cursor-pointer shadow-sm"
+              className="w-9 h-9 sm:w-11 sm:h-11 shrink-0 rounded-xl border border-black/10 dark:border-slate-700/80 bg-[#f5f5f7] dark:bg-slate-900/90 text-slate-700 dark:text-slate-300 hover:text-black dark:hover:text-white hover:border-black/20 dark:hover:border-slate-600 active:scale-90 flex items-center justify-center transition-all cursor-pointer shadow-sm"
               aria-label="Voltar etapa"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
           )}
 
-          <div className="flex flex-col">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
+          <div className="flex flex-col min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider whitespace-nowrap">
                 Total Atual
               </span>
-              <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 uppercase tracking-wide">
-                no PIX à vista
+              <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 uppercase tracking-wide whitespace-nowrap shrink-0">
+                no PIX
               </span>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-base sm:text-xl font-black text-[#0071e3] dark:text-cyan-400 tracking-tight leading-tight">
+              <span className="text-base sm:text-xl font-black text-[#0071e3] dark:text-cyan-400 tracking-tight leading-tight whitespace-nowrap">
                 {formatBRL(totalPriceCents)}
               </span>
             </div>
             {cardTotalPriceCents && cardTotalPriceCents > totalPriceCents && (
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium leading-tight">
                 ou em até 10x de {formatBRL(Math.round(cardTotalPriceCents / 10))} no cartão
               </span>
             )}
@@ -66,8 +66,8 @@ export const StickyBottomBar: React.FC<StickyBottomBarProps> = ({
         </div>
 
         {/* Lado Direito: Indicador de Etapa + Botão Principal */}
-        <div className="flex items-center gap-3">
-          <span className="hidden sm:inline-block text-xs text-slate-500 dark:text-slate-400 font-medium">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <span className="hidden md:inline-block text-xs text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">
             Etapa <strong className="text-[#1d1d1f] dark:text-white font-bold">{currentStep}</strong> de {totalSteps}
           </span>
 
@@ -76,7 +76,7 @@ export const StickyBottomBar: React.FC<StickyBottomBarProps> = ({
             size="md"
             onClick={onNext}
             disabled={isNextDisabled}
-            className={`min-h-[44px] px-5 sm:px-7 font-bold shadow-md shadow-blue-500/25 active:scale-95 text-xs sm:text-sm group transition-all ${
+            className={`min-h-[42px] sm:min-h-[44px] px-3.5 sm:px-7 font-bold shadow-md shadow-blue-500/25 active:scale-95 text-xs sm:text-sm group transition-all whitespace-nowrap shrink-0 ${
               isNextDisabled
                 ? "opacity-50 cursor-not-allowed pointer-events-none saturate-50 shadow-none"
                 : ""
@@ -84,13 +84,13 @@ export const StickyBottomBar: React.FC<StickyBottomBarProps> = ({
           >
             {isLastStep ? (
               <>
-                <ShoppingCart className="w-4 h-4 mr-1.5" />
-                Adicionar ao Carrinho
+                <ShoppingCart className="w-4 h-4 mr-1.5 shrink-0" />
+                <span>Adicionar ao Carrinho</span>
               </>
             ) : (
               <>
-                {nextButtonLabel || "Continuar"}
-                <ArrowRight className="w-4 h-4 ml-1.5 transition-transform group-hover:translate-x-1" />
+                <span>{nextButtonLabel || "Continuar"}</span>
+                <ArrowRight className="w-4 h-4 ml-1.5 shrink-0 transition-transform group-hover:translate-x-1" />
               </>
             )}
           </Button>

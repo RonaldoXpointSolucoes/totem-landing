@@ -50,7 +50,7 @@ export const StepReview: React.FC<StepReviewProps> = ({
   const readerSubItem = kitItems.find((i) => i.category === "reader");
 
   return (
-    <div className="space-y-3 sm:space-y-4">
+    <div className="space-y-3 sm:space-y-4 pb-8">
       {appliedCoupon ? (
         <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs flex items-center justify-between shadow-xs">
           <div className="flex items-center gap-2">
@@ -140,14 +140,16 @@ export const StepReview: React.FC<StepReviewProps> = ({
 
       {/* Ficha Técnica de Produção Otimizada em 2 Colunas */}
       <Card className="p-4 sm:p-5 rounded-2xl space-y-3.5">
-        <div className="flex items-center justify-between pb-2.5 border-b border-black/10 dark:border-slate-800">
-          <h3 className="text-sm sm:text-base font-black text-[#1d1d1f] dark:text-white flex items-center gap-2">
-            <span>Ficha Técnica de Engenharia</span>
-            <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-500/20">
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-black/10 dark:border-slate-800">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-sm sm:text-base font-black text-[#1d1d1f] dark:text-white">
+              Ficha Técnica de Engenharia
+            </h3>
+            <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-500/20 whitespace-nowrap">
               100% Homologado CNC
             </span>
-          </h3>
-          <span className="text-xs font-semibold text-slate-500">
+          </div>
+          <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
             {model.dimensions ? `${model.dimensions.heightMm}×${model.dimensions.widthMm}×${model.dimensions.depthMm} mm` : ""}
           </span>
         </div>
@@ -337,7 +339,7 @@ export const StepReview: React.FC<StepReviewProps> = ({
         </div>
 
         {/* Linha Financeira e Ações Rápidas */}
-        <div className="pt-2 border-t border-black/10 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="pt-3 border-t border-black/10 dark:border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="space-y-1">
             <div className="flex items-baseline gap-2 flex-wrap">
               <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">
@@ -346,8 +348,8 @@ export const StepReview: React.FC<StepReviewProps> = ({
               <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
                 {formatBRL(reviewPixTotal)}
               </span>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[10px] font-extrabold border border-emerald-500/30">
-                <Zap className="w-3 h-3 fill-emerald-500" />
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[10px] font-extrabold border border-emerald-500/30 whitespace-nowrap">
+                <Zap className="w-3 h-3 fill-emerald-500 shrink-0" />
                 <span>no PIX à vista</span>
               </span>
             </div>
@@ -370,23 +372,23 @@ export const StepReview: React.FC<StepReviewProps> = ({
             )}
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-2 w-full sm:w-auto pt-1 sm:pt-0">
             <Button
               variant="outline"
-              size="sm"
+              size="md"
               onClick={() => onEditStep(1)}
-              className="text-xs font-semibold flex-1 sm:flex-none"
+              className="text-xs font-semibold flex-1 sm:flex-none whitespace-nowrap"
             >
-              <Edit3 className="w-3.5 h-3.5 mr-1" />
+              <Edit3 className="w-3.5 h-3.5 mr-1 shrink-0" />
               Editar
             </Button>
             <Button
               variant="primary"
               size="md"
               onClick={onAddToCart}
-              className="text-xs sm:text-sm font-bold shadow-lg shadow-blue-500/25 flex-1 sm:flex-none"
+              className="text-xs sm:text-sm font-bold shadow-lg shadow-blue-500/25 flex-1 sm:flex-none whitespace-nowrap"
             >
-              <ShoppingCart className="w-4 h-4 mr-1.5" />
+              <ShoppingCart className="w-4 h-4 mr-1.5 shrink-0" />
               Adicionar ao Carrinho
             </Button>
           </div>
