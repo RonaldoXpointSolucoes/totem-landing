@@ -297,9 +297,9 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
           </button>
         </div>
 
-        {/* Especificações Rápidas em Pílula */}
+        {/* Especificações Rápidas em Pílula (Oculto no Mobile) */}
         <div
-          className={`mt-12 pt-8 border-t border-black/5 dark:border-white/10 flex flex-wrap items-center justify-center gap-6 sm:gap-12 text-xs sm:text-sm text-slate-500 dark:text-slate-400 transition-all duration-800 ease-out ${
+          className={`mt-12 pt-8 border-t border-black/5 dark:border-white/10 hidden sm:flex sm:flex-wrap items-center justify-center gap-6 sm:gap-12 text-xs sm:text-sm text-slate-500 dark:text-slate-400 transition-all duration-800 ease-out ${
             isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
           }`}
           style={{ transitionDelay: isLoaded ? "660ms" : "0ms" }}

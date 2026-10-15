@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useCart } from "@/modules/cart/CartContext";
-import { formatBRL } from "@/modules/pricing/pricingEngine";
+import { formatBRL, calculateTotemPrice } from "@/modules/pricing/pricingEngine";
 import { CustomerInfo, DeliveryAddress, OrderDetails, ManufacturingSpec } from "@/types/order";
 import { ShippingQuote, ShippingOptionId } from "@/types/shipping";
 import { Card, Button, Input, Badge } from "@/components/ui";
@@ -30,6 +30,7 @@ import {
   RotateCcw,
   ExternalLink,
   Tag,
+  Zap,
 } from "lucide-react";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 
@@ -1454,33 +1455,50 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
 
             {/* Lista dos Totens do Pedido */}
             <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
-              {items.map((item, idx) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-black/10 dark:border-slate-800/80 text-xs"
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <span className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-bold flex items-center justify-center shrink-0">
-                      {idx + 1}
-                    </span>
-                    <div className="truncate">
-                      <p className="font-bold text-slate-900 dark:text-slate-200 truncate">{item.configuration.model.name}</p>
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                        {item.configuration.color.name} • Qtd: {item.quantity}
-                      </p>
+              {items.map((item, idx) => {
+                const itemPricing = calculateTotemPrice({
+                  cabinet: item.configuration.model,
+                  color: item.configuration.color,
+                  monitor: item.configuration.monitor,
+                  printer: item.configuration.printer,
+                  barcodeReader: item.configuration.barcodeReader,
+                });
+                const itemPixSubtotal = itemPricing.pixTotalPriceCents * item.quantity;
+                const itemCardSubtotal = itemPricing.cardTotalPriceCents * item.quantity;
+
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-black/10 dark:border-slate-800/80 text-xs"
+                  >
+                    <div className="flex items-center gap-2.5 truncate">
+                      <span className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-bold flex items-center justify-center shrink-0">
+                        {idx + 1}
+                      </span>
+                      <div className="truncate">
+                        <p className="font-bold text-slate-900 dark:text-slate-200 truncate">{item.configuration.model.name}</p>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                          {item.configuration.color.name} • Qtd: {item.quantity}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="font-black text-emerald-600 dark:text-emerald-400 text-xs sm:text-sm">
+                        {formatBRL(itemPixSubtotal)} <span className="text-[9px] uppercase font-extrabold">no PIX</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                        ou 10x de {formatBRL(Math.round(itemCardSubtotal / 10))} no cartão
+                      </div>
                     </div>
                   </div>
-                  <span className="font-semibold text-[#0071e3] dark:text-indigo-300 shrink-0">
-                    {formatBRL(item.subtotalCents)}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Valores Financeiros */}
             <div className="space-y-2 pt-3 border-t border-black/10 dark:border-slate-800 text-xs">
               <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                <span>Subtotal dos Gabinetes:</span>
+                <span>Subtotal dos Gabinetes (no PIX):</span>
                 <span className="font-semibold text-slate-900 dark:text-slate-200">
                   {formatBRL(appliedCoupon ? eligibleCabinetsSubtotalCents : totalPriceCents)}
                 </span>
@@ -1596,11 +1614,40 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                 )}
               </div>
 
-              <div className="pt-2 border-t border-black/10 dark:border-slate-800 flex justify-between items-baseline">
-                <span className="text-sm font-bold text-[#1d1d1f] dark:text-white">Total a Pagar (Pix):</span>
-                <span className="text-2xl font-black text-[#0071e3] dark:text-indigo-400">
-                  {formatBRL(finalTotalCents)}
-                </span>
+              <div className="pt-3 border-t border-black/10 dark:border-slate-800 space-y-2">
+                <div className="p-3 rounded-xl bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/70 flex justify-between items-center">
+                  <span className="text-xs sm:text-sm font-extrabold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                    <Zap className="w-4 h-4 fill-emerald-500 text-emerald-600 shrink-0" />
+                    <span>Total no PIX à vista:</span>
+                  </span>
+                  <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                    {formatBRL(finalTotalCents)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-[11px] text-slate-500 dark:text-slate-400 px-1">
+                  <span>No Cartão:</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                    ou em até 10x de{" "}
+                    {formatBRL(
+                      Math.round(
+                        (items.reduce((acc, it) => {
+                          const p = calculateTotemPrice({
+                            cabinet: it.configuration.model,
+                            color: it.configuration.color,
+                            monitor: it.configuration.monitor,
+                            printer: it.configuration.printer,
+                            barcodeReader: it.configuration.barcodeReader,
+                          });
+                          return acc + p.cardTotalPriceCents * it.quantity;
+                        }, 0) -
+                          couponDiscountCents +
+                          shippingCents) /
+                          10
+                      )
+                    )}{" "}
+                    no cartão
+                  </span>
+                </div>
               </div>
             </div>
 

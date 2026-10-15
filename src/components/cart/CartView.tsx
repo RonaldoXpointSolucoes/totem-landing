@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useCart } from "@/modules/cart/CartContext";
-import { formatBRL } from "@/modules/pricing/pricingEngine";
+import { formatBRL, calculateTotemPrice } from "@/modules/pricing/pricingEngine";
 import { Button, Card, Badge } from "@/components/ui";
 import {
   Copy,
@@ -21,6 +21,7 @@ import {
   Truck,
   Loader2,
   Check,
+  CreditCard,
 } from "lucide-react";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 import { cn } from "@/lib/utils";
@@ -141,17 +142,31 @@ export const CartView: React.FC<CartViewProps> = ({
   ) || null;
   const shippingCents = selectedShippingQuote ? selectedShippingQuote.priceCents : 0;
 
-  const cartPixSavings = items.reduce((acc, it) => {
-    const model = it.configuration.model;
-    const pixPrice =
-      model.pixPriceCents ||
-      (model.basePriceCents >= 120000
-        ? Math.round(model.basePriceCents * 0.825)
-        : model.basePriceCents);
-    const diff = Math.max(0, model.basePriceCents - pixPrice);
-    return acc + diff * it.quantity;
+  const rawPixTotalCents = items.reduce((acc, it) => {
+    const p = calculateTotemPrice({
+      cabinet: it.configuration.model,
+      color: it.configuration.color,
+      monitor: it.configuration.monitor,
+      printer: it.configuration.printer,
+      barcodeReader: it.configuration.barcodeReader,
+    });
+    return acc + p.pixTotalPriceCents * it.quantity;
   }, 0);
-  const finalPixTotal = Math.max(0, finalTotalPriceCents - cartPixSavings);
+
+  const rawCardTotalCents = items.reduce((acc, it) => {
+    const p = calculateTotemPrice({
+      cabinet: it.configuration.model,
+      color: it.configuration.color,
+      monitor: it.configuration.monitor,
+      printer: it.configuration.printer,
+      barcodeReader: it.configuration.barcodeReader,
+    });
+    return acc + p.cardTotalPriceCents * it.quantity;
+  }, 0);
+
+  const cartPixSavings = Math.max(0, rawCardTotalCents - rawPixTotalCents);
+  const finalPixTotal = Math.max(0, rawPixTotalCents - couponDiscountCents);
+  const finalCardTotal = Math.max(0, rawCardTotalCents - couponDiscountCents);
 
   if (items.length === 0) {
     return (
@@ -206,8 +221,18 @@ export const CartView: React.FC<CartViewProps> = ({
         {/* Coluna Esquerda: Lista de Totens */}
         <div className="lg:col-span-8 space-y-4">
           {items.map((item, index) => {
-            const { configuration, quantity, unitPriceCents, subtotalCents, id } = item;
+            const { configuration, quantity, id } = item;
             const { model, color, monitor, printer, barcodeReader } = configuration;
+            const itemPricing = calculateTotemPrice({
+              cabinet: model,
+              color,
+              monitor,
+              printer,
+              barcodeReader,
+            });
+            const itemPixUnitCents = itemPricing.pixTotalPriceCents;
+            const itemPixSubtotalCents = itemPixUnitCents * quantity;
+            const itemCardSubtotalCents = itemPricing.cardTotalPriceCents * quantity;
 
             return (
               <Card
@@ -229,11 +254,29 @@ export const CartView: React.FC<CartViewProps> = ({
                 {/* Detalhes Técnicos do Item */}
                 <div className="flex-1 flex flex-col justify-between space-y-3">
                   <div>
-                    <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
-                      <h3 className="text-base font-bold text-[#1d1d1f] dark:text-white">{model.name}</h3>
-                      <span className="text-base font-extrabold text-[#0071e3] dark:text-indigo-400">
-                        {formatBRL(subtotalCents)}
-                      </span>
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1.5 sm:gap-2 mb-1">
+                      <h3 className="text-base sm:text-lg font-bold text-[#1d1d1f] dark:text-white">{model.name}</h3>
+                      <div className="sm:text-right space-y-0.5">
+                        <div className="flex items-baseline sm:justify-end gap-1.5 flex-wrap">
+                          <span className="text-lg sm:text-xl font-black text-emerald-600 dark:text-emerald-400">
+                            {formatBRL(itemPixSubtotalCents)}
+                          </span>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[10px] font-extrabold border border-emerald-500/30 whitespace-nowrap">
+                            <Zap className="w-2.5 h-2.5 fill-emerald-500 shrink-0" />
+                            <span>no PIX</span>
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium flex items-center sm:justify-end gap-1">
+                          <CreditCard className="w-3 h-3 text-indigo-500 shrink-0" />
+                          <span>
+                            ou em até{" "}
+                            <strong className="text-slate-700 dark:text-slate-300 font-bold">
+                              10x de {formatBRL(Math.round(itemCardSubtotalCents / 10))}
+                            </strong>{" "}
+                            no cartão
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
                     {/* Especificação dos Componentes */}
@@ -282,7 +325,7 @@ export const CartView: React.FC<CartViewProps> = ({
                         </button>
                       </div>
                       <span className="text-[11px] text-slate-500">
-                        ({formatBRL(unitPriceCents)} un.)
+                        ({formatBRL(itemPixUnitCents)} un. no PIX)
                       </span>
                     </div>
 
@@ -326,7 +369,7 @@ export const CartView: React.FC<CartViewProps> = ({
                             itemId: id,
                             modelId: model.id,
                             modelName: model.name,
-                            totalPriceCents: subtotalCents,
+                            totalPriceCents: itemPixSubtotalCents,
                           });
                         }}
                         title="Remover do carrinho"
@@ -568,35 +611,39 @@ export const CartView: React.FC<CartViewProps> = ({
                 )}
               </div>
 
-              <div className="pt-3 border-t border-black/10 dark:border-slate-800 space-y-2">
-                <div className="flex justify-between items-baseline">
-                  <span className="text-sm font-bold text-[#1d1d1f] dark:text-white">Total no Cartão:</span>
-                  <div className="text-right">
-                    <span className="text-2xl font-black text-[#0071e3] dark:text-indigo-400">
-                      {formatBRL(finalTotalPriceCents + shippingCents)}
-                    </span>
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                      ou em até 10x de {formatBRL(Math.round((finalTotalPriceCents + shippingCents) / 10))} no cartão
+              <div className="pt-3 border-t border-black/10 dark:border-slate-800 space-y-2.5">
+                <div className="p-3.5 rounded-2xl bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/70 space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-xs sm:text-sm font-extrabold text-emerald-800 dark:text-emerald-300">
+                      <Zap className="w-4 h-4 fill-emerald-500 text-emerald-600 shrink-0" />
+                      <span>Total no PIX à vista:</span>
                     </div>
+                    <span className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
+                      {formatBRL(finalPixTotal + shippingCents)}
+                    </span>
                   </div>
+                  {cartPixSavings > 0 && (
+                    <div className="flex items-center justify-between text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">
+                      <span>Desconto à vista no PIX aplicado</span>
+                      <span>Economia de {formatBRL(cartPixSavings)}</span>
+                    </div>
+                  )}
                 </div>
 
-                {cartPixSavings > 0 && (
-                  <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400">
-                      <Zap className="w-4 h-4 fill-emerald-500" />
-                      <span>À Vista no PIX:</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-base font-black text-emerald-700 dark:text-emerald-300">
-                        {formatBRL(finalPixTotal + shippingCents)}
-                      </span>
-                      <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
-                        Economia de {formatBRL(cartPixSavings)}
-                      </div>
-                    </div>
+                <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 px-1">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <CreditCard className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                    <span>No Cartão:</span>
+                  </span>
+                  <div className="text-right">
+                    <span className="font-bold text-slate-700 dark:text-slate-300">
+                      ou em até 10x de {formatBRL(Math.round((finalCardTotal + shippingCents) / 10))} no cartão
+                    </span>
+                    <span className="block text-[10px] text-slate-400">
+                      (Total no cartão: {formatBRL(finalCardTotal + shippingCents)})
+                    </span>
                   </div>
-                )}
+                </div>
               </div>
             </div>
 

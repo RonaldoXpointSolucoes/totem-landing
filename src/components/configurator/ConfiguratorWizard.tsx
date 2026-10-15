@@ -274,7 +274,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
       monitor: selectedMonitor,
       printer: selectedPrinter,
       barcodeReader: useReader ? selectedReader : null,
-      calculatedPriceCents: pricing.cardTotalPriceCents,
+      calculatedPriceCents: pricing.pixTotalPriceCents,
     };
 
     if (editingItem) {
@@ -541,18 +541,16 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                         no PIX
                       </span>
                     </div>
-                    <span className="text-base sm:text-lg font-black text-[#0071e3] dark:text-cyan-400">
+                    <span className="text-lg sm:text-xl font-black text-emerald-600 dark:text-emerald-400">
                       {formatBRL(pricing.pixTotalPriceCents)}
                     </span>
                   </div>
-                  {pricing.cardTotalPriceCents > pricing.pixTotalPriceCents && (
-                    <div className="flex justify-between items-center text-[11px] text-slate-500 dark:text-slate-400">
-                      <span>No Cartão (em até 10x):</span>
-                      <span className="font-semibold text-slate-700 dark:text-slate-300">
-                        {formatBRL(pricing.cardTotalPriceCents)}
-                      </span>
-                    </div>
-                  )}
+                  <div className="flex justify-between items-center text-[11px] text-slate-500 dark:text-slate-400">
+                    <span>No Cartão:</span>
+                    <span className="font-medium text-slate-600 dark:text-slate-300">
+                      ou em até 10x de {formatBRL(Math.round(pricing.cardTotalPriceCents / 10))} no cartão
+                    </span>
+                  </div>
                 </div>
               </div>
             </Card>
@@ -664,9 +662,19 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
             <p className="text-slate-500 dark:text-slate-400">
               Monitor: {selectedMonitor?.displayName || "Sob Medida"} • Impressora: {selectedPrinter?.displayName}
             </p>
-            <p className="text-[#0071e3] dark:text-cyan-400 font-black text-base pt-1">
-              {formatBRL(pricing.totalPriceCents)}
-            </p>
+            <div className="pt-1.5 space-y-0.5">
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <span className="text-emerald-600 dark:text-emerald-400 font-black text-lg">
+                  {formatBRL(pricing.pixTotalPriceCents)}
+                </span>
+                <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 uppercase">
+                  no PIX à vista
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                ou em até 10x de {formatBRL(Math.round(pricing.cardTotalPriceCents / 10))} no cartão
+              </p>
+            </div>
           </div>
           <p className="text-slate-600 dark:text-slate-400">
             Você pode montar outro totem com configuração diferente ou ir para o carrinho para duplicar em lote e finalizar via Pix.

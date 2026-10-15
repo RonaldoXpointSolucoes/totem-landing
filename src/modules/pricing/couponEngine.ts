@@ -44,12 +44,18 @@ export function calculateSelectiveCouponDiscount(
 
   for (const item of items) {
     const qty = Math.max(1, item.quantity);
-    const cabinetBase = Math.max(0, item.configuration.model.basePriceCents || 0);
+    const model = item.configuration.model;
+    const cardBase = Math.max(0, model.basePriceCents || 0);
+    const cabinetBase = Math.max(
+      0,
+      model.pixPriceCents ||
+        (cardBase >= 120000 ? Math.round(cardBase * 0.825) : cardBase)
+    );
 
-    // O gabinete base é o item base para cálculo
+    // O gabinete base (no PIX) é o item base para cálculo
     eligibleCabinetsSubtotalCents += cabinetBase * qty;
 
-    // A diferença do preço unitário em relação ao gabinete base é composta por kits/extras
+    // A diferença do preço unitário em relação ao gabinete base é composta por cores/kits/extras
     const unitPrice = Math.max(0, item.unitPriceCents);
     const extraComponentsPerUnit = Math.max(0, unitPrice - cabinetBase);
     ineligibleSubtotalCents += extraComponentsPerUnit * qty;

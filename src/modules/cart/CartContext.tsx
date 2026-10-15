@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { CartItem, TotemConfiguration } from "@/types/order";
+import { calculateTotemPrice } from "@/modules/pricing/pricingEngine";
 import {
   calculateSelectiveCouponDiscount,
   SelectiveCoupon,
@@ -22,7 +23,7 @@ interface CartContextType {
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
   totalItems: number;
-  totalPriceCents: number; // Subtotal bruto sem desconto
+  totalPriceCents: number; // Subtotal bruto sem desconto (PIX)
   editingItem: CartItem | null;
   setEditingItem: (item: CartItem | null) => void;
   isInitialized: boolean;
@@ -65,7 +66,29 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (storedItems) {
         const parsed = JSON.parse(storedItems);
         if (Array.isArray(parsed)) {
-          setItems(parsed);
+          const normalized: CartItem[] = parsed.map((item: CartItem) => {
+            if (item?.configuration?.model && item?.configuration?.color) {
+              const p = calculateTotemPrice({
+                cabinet: item.configuration.model,
+                color: item.configuration.color,
+                monitor: item.configuration.monitor,
+                printer: item.configuration.printer,
+                barcodeReader: item.configuration.barcodeReader,
+              });
+              const qty = Math.max(1, item.quantity || 1);
+              return {
+                ...item,
+                configuration: {
+                  ...item.configuration,
+                  calculatedPriceCents: p.pixTotalPriceCents,
+                },
+                unitPriceCents: p.pixTotalPriceCents,
+                subtotalCents: p.pixTotalPriceCents * qty,
+              };
+            }
+            return item;
+          });
+          setItems(normalized);
         }
       }
 
