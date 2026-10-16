@@ -164,7 +164,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
       printer: selectedPrinter,
       barcodeReader: useReader ? selectedReader : null,
       customization: null,
-      kitAdjustmentCents: isKitSelected ? kitAdjustmentCents : 0,
+      kitAdjustmentCents: isKitSelected ? kitAdjustmentCents : undefined,
     });
   }, [selectedModel, selectedColor, selectedMonitor, selectedPrinter, useReader, selectedReader, isKitSelected, kitAdjustmentCents]);
 

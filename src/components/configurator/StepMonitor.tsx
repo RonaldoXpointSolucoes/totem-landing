@@ -506,7 +506,7 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
                   )}
                 </div>
                 <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-[10px] font-bold text-[#0071e3] dark:text-cyan-400 uppercase tracking-wider">
                       {mon.brand}
                     </span>
@@ -515,13 +515,21 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
                         {mon.sizeInches}"
                       </span>
                     )}
+                    {(mon.priceAdjustmentCents || 0) > 0 && (
+                      <span className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 px-1.5 py-0.2 rounded border border-emerald-500/30">
+                        + {formatBRL(mon.priceAdjustmentCents || 0)}
+                      </span>
+                    )}
                   </div>
                   <h3 className="text-xs font-bold text-[#1d1d1f] dark:text-white truncate">
                     {mon.displayName}
                   </h3>
                   {mon.vesaPattern && (
                     <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
-                      VESA: {mon.vesaPattern}
+                      VESA: {mon.vesaPattern}{" "}
+                      {(mon.priceAdjustmentCents || 0) > 0
+                        ? `• Equipamento incluso (+ ${formatBRL(mon.priceAdjustmentCents || 0)})`
+                        : "• Furação (+ R$ 0)"}
                     </p>
                   )}
                 </div>

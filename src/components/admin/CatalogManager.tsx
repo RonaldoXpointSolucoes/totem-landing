@@ -1078,9 +1078,78 @@ export function CatalogManager({
                             </div>
                           );
                         })()}
-                        <span className="text-[10px] text-slate-500 font-mono block">
-                          Cód Técnico CNC: {m.technical_code}
-                        </span>
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            Cód Técnico CNC: {m.technical_code}
+                          </span>
+                          {(() => {
+                            let effectivePrice = Number(m.price_adjustment_cents) || 0;
+                            if (typeof m.notes === "string" && m.notes.includes("kitItems")) {
+                              try {
+                                const parsed = JSON.parse(m.notes);
+                                if (typeof parsed.kitTotalCents === "number") {
+                                  effectivePrice = parsed.kitTotalCents;
+                                }
+                              } catch (e) {}
+                            }
+                            if (inlineEditingId === m.$id) {
+                              return (
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[10px] text-emerald-400 font-bold">R$</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    placeholder="0.00"
+                                    value={inlinePriceCents ? inlinePriceCents / 100 : ""}
+                                    onChange={(e) =>
+                                      setInlinePriceCents(
+                                        Math.max(0, Math.round(parseFloat(e.target.value || "0") * 100))
+                                      )
+                                    }
+                                    className="w-20 px-2 py-0.5 bg-slate-900 border border-emerald-500 rounded text-emerald-300 font-bold text-[11px]"
+                                  />
+                                  <button
+                                    onClick={() =>
+                                      handleSaveInlinePrice("monitors", m.$id, "price_adjustment_cents")
+                                    }
+                                    className="px-2 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-bold hover:bg-emerald-500"
+                                  >
+                                    Salvar
+                                  </button>
+                                  <button
+                                    onClick={() => setInlineEditingId(null)}
+                                    className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px] hover:text-white"
+                                  >
+                                    X
+                                  </button>
+                                </div>
+                              );
+                            }
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setInlineEditingId(m.$id);
+                                  setInlinePriceCents(effectivePrice);
+                                }}
+                                title="Clique para definir ou alterar o valor cobrado"
+                                className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold border flex items-center gap-1 transition-all ${
+                                  effectivePrice > 0
+                                    ? "bg-amber-500/15 text-amber-300 border-amber-500/30 hover:bg-amber-500/25"
+                                    : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20"
+                                }`}
+                              >
+                                <span>
+                                  {effectivePrice > 0
+                                    ? `Item Cobrado (+ ${formatBRL(effectivePrice)})`
+                                    : "Furação Homologada (+ R$ 0)"}
+                                </span>
+                                <Edit2 className="w-2.5 h-2.5 opacity-75" />
+                              </button>
+                            );
+                          })()}
+                        </div>
                       </div>
 
                       <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-900">
@@ -1164,9 +1233,64 @@ export function CatalogManager({
                           </span>
                         </div>
                         <p className="text-slate-400 text-xs leading-relaxed">{p.notes}</p>
-                        <span className="text-[10px] text-slate-500 font-mono block">
-                          Cód Técnico: {p.technical_code}
-                        </span>
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            Cód Técnico: {p.technical_code}
+                          </span>
+                          {inlineEditingId === p.$id ? (
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] text-emerald-400 font-bold">R$</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="0.00"
+                                value={inlinePriceCents ? inlinePriceCents / 100 : ""}
+                                onChange={(e) =>
+                                  setInlinePriceCents(
+                                    Math.max(0, Math.round(parseFloat(e.target.value || "0") * 100))
+                                  )
+                                }
+                                className="w-20 px-2 py-0.5 bg-slate-900 border border-emerald-500 rounded text-emerald-300 font-bold text-[11px]"
+                              />
+                              <button
+                                onClick={() =>
+                                  handleSaveInlinePrice("printers", p.$id, "price_adjustment_cents")
+                                }
+                                className="px-2 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-bold hover:bg-emerald-500"
+                              >
+                                Salvar
+                              </button>
+                              <button
+                                onClick={() => setInlineEditingId(null)}
+                                className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px] hover:text-white"
+                              >
+                                X
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setInlineEditingId(p.$id);
+                                setInlinePriceCents(Number(p.price_adjustment_cents) || 0);
+                              }}
+                              title="Clique para definir ou alterar o valor cobrado"
+                              className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold border flex items-center gap-1 transition-all ${
+                                (Number(p.price_adjustment_cents) || 0) > 0
+                                  ? "bg-amber-500/15 text-amber-300 border-amber-500/30 hover:bg-amber-500/25"
+                                  : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20"
+                              }`}
+                            >
+                              <span>
+                                {(Number(p.price_adjustment_cents) || 0) > 0
+                                  ? `Item Cobrado (+ ${formatBRL(Number(p.price_adjustment_cents))})`
+                                  : "Berço Homologado (+ R$ 0)"}
+                              </span>
+                              <Edit2 className="w-2.5 h-2.5 opacity-75" />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-900">
@@ -1248,9 +1372,64 @@ export function CatalogManager({
                           </span>
                         </div>
                         <p className="text-slate-400 text-xs leading-relaxed">{r.notes}</p>
-                        <span className="text-[10px] text-slate-500 font-mono block">
-                          Cód Técnico: {r.technical_code}
-                        </span>
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            Cód Técnico: {r.technical_code}
+                          </span>
+                          {inlineEditingId === r.$id ? (
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] text-emerald-400 font-bold">R$</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="0.00"
+                                value={inlinePriceCents ? inlinePriceCents / 100 : ""}
+                                onChange={(e) =>
+                                  setInlinePriceCents(
+                                    Math.max(0, Math.round(parseFloat(e.target.value || "0") * 100))
+                                  )
+                                }
+                                className="w-20 px-2 py-0.5 bg-slate-900 border border-emerald-500 rounded text-emerald-300 font-bold text-[11px]"
+                              />
+                              <button
+                                onClick={() =>
+                                  handleSaveInlinePrice("readers", r.$id, "price_adjustment_cents")
+                                }
+                                className="px-2 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-bold hover:bg-emerald-500"
+                              >
+                                Salvar
+                              </button>
+                              <button
+                                onClick={() => setInlineEditingId(null)}
+                                className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px] hover:text-white"
+                              >
+                                X
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setInlineEditingId(r.$id);
+                                setInlinePriceCents(Number(r.price_adjustment_cents) || 0);
+                              }}
+                              title="Clique para definir ou alterar o valor cobrado"
+                              className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold border flex items-center gap-1 transition-all ${
+                                (Number(r.price_adjustment_cents) || 0) > 0
+                                  ? "bg-amber-500/15 text-amber-300 border-amber-500/30 hover:bg-amber-500/25"
+                                  : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20"
+                              }`}
+                            >
+                              <span>
+                                {(Number(r.price_adjustment_cents) || 0) > 0
+                                  ? `Item Cobrado (+ ${formatBRL(Number(r.price_adjustment_cents))})`
+                                  : "Janela Homologada (+ R$ 0)"}
+                              </span>
+                              <Edit2 className="w-2.5 h-2.5 opacity-75" />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-900">

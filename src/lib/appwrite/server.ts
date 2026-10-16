@@ -253,7 +253,7 @@ export async function getAppwriteCatalog() {
     monitors: monitorsRes.documents.map((doc: any) => {
       let isKit = false;
       let kitItems = undefined;
-      let priceAdjustmentCents = undefined;
+      let priceAdjustmentCents = typeof doc.price_adjustment_cents === "number" ? doc.price_adjustment_cents : (parseInt(doc.price_adjustment_cents, 10) || 0);
 
       const name = (doc.display_name || doc.model || "").toLowerCase();
       if (doc.$id === "6ac6dbf90032d4f8586e" || name.includes("kit")) {
@@ -303,6 +303,7 @@ export async function getAppwriteCatalog() {
       active: doc.active,
       sortOrder: typeof doc.sort_order === "number" ? doc.sort_order : (parseInt(doc.sort_order, 10) || 999),
       image: doc.image,
+      priceAdjustmentCents: typeof doc.price_adjustment_cents === "number" ? doc.price_adjustment_cents : (parseInt(doc.price_adjustment_cents, 10) || 0),
     })).sort((a: any, b: any) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999)),
     barcodeReaders: readersRes.documents.map((doc: any) => ({
       id: doc.$id,
@@ -315,6 +316,7 @@ export async function getAppwriteCatalog() {
       active: doc.active,
       sortOrder: typeof doc.sort_order === "number" ? doc.sort_order : (parseInt(doc.sort_order, 10) || 999),
       image: doc.image,
+      priceAdjustmentCents: typeof doc.price_adjustment_cents === "number" ? doc.price_adjustment_cents : (parseInt(doc.price_adjustment_cents, 10) || 0),
     })).sort((a: any, b: any) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999)),
   };
 }

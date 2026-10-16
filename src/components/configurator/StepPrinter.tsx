@@ -2,6 +2,7 @@
 
 import React from "react";
 import { PrinterOption } from "@/types/catalog";
+import { formatBRL } from "@/modules/pricing/pricingEngine";
 import { Card } from "@/components/ui";
 import { Check, Printer, HelpCircle } from "lucide-react";
 
@@ -26,7 +27,9 @@ export const StepPrinter: React.FC<StepPrinterProps> = ({
             Qual impressora será utilizada?
           </h2>
           <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-500/20">
-            Berço CNC Homologado (+ R$ 0)
+            {selectedPrinter && (selectedPrinter.priceAdjustmentCents || 0) > 0
+              ? `Item Cobrado (+ ${formatBRL(selectedPrinter.priceAdjustmentCents || 0)})`
+              : "Berço CNC Homologado (+ R$ 0)"}
           </span>
         </div>
         <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
@@ -65,9 +68,16 @@ export const StepPrinter: React.FC<StepPrinterProps> = ({
                   )}
                 </div>
                 <div className="min-w-0">
-                  <span className="text-[10px] font-bold text-[#0071e3] dark:text-cyan-400 uppercase tracking-wider">
-                    {printer.brand}
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] font-bold text-[#0071e3] dark:text-cyan-400 uppercase tracking-wider">
+                      {printer.brand}
+                    </span>
+                    {(printer.priceAdjustmentCents || 0) > 0 && (
+                      <span className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 px-1.5 py-0.2 rounded border border-emerald-500/30">
+                        + {formatBRL(printer.priceAdjustmentCents || 0)}
+                      </span>
+                    )}
+                  </div>
                   <h3 className="text-xs font-bold text-[#1d1d1f] dark:text-white truncate">{printer.displayName}</h3>
                   <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
                     Bobina: {printer.paperWidthMm}mm • {printer.technicalCode}

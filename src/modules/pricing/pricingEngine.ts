@@ -51,13 +51,32 @@ export function calculateTotemPrice(input: PriceCalculationInput): PriceBreakdow
   const maxInstallments = input.cabinet.maxInstallments || 10;
   const colorAdjustmentCents = Math.max(0, input.color.priceAdjustmentCents || 0);
 
-  // Se for o Kit de Montagem, soma o valor total dos sub-itens de hardware selecionados
+  // Se for o Kit de Montagem, soma o valor total dos sub-itens de hardware selecionados.
+  // Se forem equipamentos homologados avulsos com valor configurado (priceAdjustmentCents > 0), soma seus valores.
   let equipmentAdjustmentCents = 0;
-  if (input.kitAdjustmentCents !== undefined) {
+  if (input.monitor && isItemKit(input.monitor)) {
+    if (input.kitAdjustmentCents !== undefined) {
+      equipmentAdjustmentCents = Math.max(0, input.kitAdjustmentCents);
+    } else {
+      const effectiveItems = getEffectiveKitItems(input.monitor);
+      equipmentAdjustmentCents = calculateKitTotalCents(effectiveItems);
+    }
+  } else if (input.kitAdjustmentCents !== undefined && input.kitAdjustmentCents > 0) {
     equipmentAdjustmentCents = Math.max(0, input.kitAdjustmentCents);
-  } else if (input.monitor && isItemKit(input.monitor)) {
-    const effectiveItems = getEffectiveKitItems(input.monitor);
-    equipmentAdjustmentCents = calculateKitTotalCents(effectiveItems);
+  } else {
+    const monitorPrice = Math.max(
+      0,
+      input.monitor?.priceAdjustmentCents ?? (input.monitor as any)?.price_adjustment_cents ?? 0
+    );
+    const printerPrice = Math.max(
+      0,
+      input.printer?.priceAdjustmentCents ?? (input.printer as any)?.price_adjustment_cents ?? 0
+    );
+    const readerPrice = Math.max(
+      0,
+      input.barcodeReader?.priceAdjustmentCents ?? (input.barcodeReader as any)?.price_adjustment_cents ?? 0
+    );
+    equipmentAdjustmentCents = monitorPrice + printerPrice + readerPrice;
   }
 
   // Personalizações especiais avaliadas pelo admin

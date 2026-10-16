@@ -2,6 +2,7 @@
 
 import React from "react";
 import { BarcodeReaderOption } from "@/types/catalog";
+import { formatBRL } from "@/modules/pricing/pricingEngine";
 import { Card } from "@/components/ui";
 import { Check, QrCode, Ban, HelpCircle } from "lucide-react";
 
@@ -30,7 +31,9 @@ export const StepReader: React.FC<StepReaderProps> = ({
             Seu Totem utilizará leitor de código de barras?
           </h2>
           <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-500/20">
-            Janela Angular Homologada (+ R$ 0)
+            {useReader && selectedReader && (selectedReader.priceAdjustmentCents || 0) > 0
+              ? `Item Cobrado (+ ${formatBRL(selectedReader.priceAdjustmentCents || 0)})`
+              : "Janela Angular Homologada (+ R$ 0)"}
           </span>
         </div>
         <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
@@ -125,9 +128,16 @@ export const StepReader: React.FC<StepReaderProps> = ({
                       )}
                     </div>
                     <div className="min-w-0">
-                      <span className="text-[9px] font-bold text-[#0071e3] dark:text-cyan-400 uppercase">
-                        {reader.brand}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[9px] font-bold text-[#0071e3] dark:text-cyan-400 uppercase">
+                          {reader.brand}
+                        </span>
+                        {(reader.priceAdjustmentCents || 0) > 0 && (
+                          <span className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 px-1.5 py-0.2 rounded border border-emerald-500/30">
+                            + {formatBRL(reader.priceAdjustmentCents || 0)}
+                          </span>
+                        )}
+                      </div>
                       <h4 className="text-xs font-bold text-[#1d1d1f] dark:text-white truncate">{reader.displayName}</h4>
                     </div>
                   </div>

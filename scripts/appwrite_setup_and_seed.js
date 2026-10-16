@@ -196,6 +196,7 @@ async function main() {
   await addStringAttribute('monitors', 'vesa_pattern', 32, false);
   await addStringAttribute('monitors', 'technical_code', 64, false);
   await addStringAttribute('monitors', 'notes', 1000, false);
+  await addIntegerAttribute('monitors', 'price_adjustment_cents', false, 0);
   await addBooleanAttribute('monitors', 'active', false, true);
   await addStringAttribute('monitors', 'image', 500, false);
 
@@ -207,6 +208,7 @@ async function main() {
   await addIntegerAttribute('printers', 'paper_width_mm', false, 80);
   await addStringAttribute('printers', 'technical_code', 64, false);
   await addStringAttribute('printers', 'notes', 1000, false);
+  await addIntegerAttribute('printers', 'price_adjustment_cents', false, 0);
   await addBooleanAttribute('printers', 'active', false, true);
   await addStringAttribute('printers', 'image', 500, false);
 
@@ -218,6 +220,7 @@ async function main() {
   await addBooleanAttribute('barcode_readers', 'is_2d', false, true);
   await addStringAttribute('barcode_readers', 'technical_code', 64, false);
   await addStringAttribute('barcode_readers', 'notes', 1000, false);
+  await addIntegerAttribute('barcode_readers', 'price_adjustment_cents', false, 0);
   await addBooleanAttribute('barcode_readers', 'active', false, true);
   await addStringAttribute('barcode_readers', 'image', 500, false);
 

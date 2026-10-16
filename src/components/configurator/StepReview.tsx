@@ -280,6 +280,11 @@ export const StepReview: React.FC<StepReviewProps> = ({
               <strong className="text-[#1d1d1f] dark:text-white truncate max-w-[140px]">
                 {isKit ? `Kit de Montagem (${activeKitItems.length} itens)` : monitor?.displayName || "—"}
               </strong>
+              {!isKit && (monitor?.priceAdjustmentCents || 0) > 0 && (
+                <span className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 shrink-0">
+                  (+{formatBRL(monitor?.priceAdjustmentCents || 0)})
+                </span>
+              )}
               <button
                 onClick={() => onEditStep(3)}
                 className="p-1 rounded-lg hover:bg-black/5 text-[#0071e3] transition-colors"
@@ -299,6 +304,11 @@ export const StepReview: React.FC<StepReviewProps> = ({
                   ? (printerSubItem?.selected ? "Inclusa no Kit (80mm)" : "Não inclusa no Kit")
                   : printer?.displayName || "—"}
               </strong>
+              {!isKit && (printer?.priceAdjustmentCents || 0) > 0 && (
+                <span className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 shrink-0">
+                  (+{formatBRL(printer?.priceAdjustmentCents || 0)})
+                </span>
+              )}
               <button
                 onClick={() => onEditStep(isKit ? 3 : 4)}
                 className="p-1 rounded-lg hover:bg-black/5 text-[#0071e3] transition-colors"
@@ -318,6 +328,11 @@ export const StepReview: React.FC<StepReviewProps> = ({
                   ? (readerSubItem?.selected ? "Incluso no Kit (2D QR Code)" : "Não incluso no Kit")
                   : (useReader ? reader?.displayName || "Sim" : "Sem leitor")}
               </strong>
+              {!isKit && useReader && (reader?.priceAdjustmentCents || 0) > 0 && (
+                <span className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 shrink-0">
+                  (+{formatBRL(reader?.priceAdjustmentCents || 0)})
+                </span>
+              )}
               <button
                 onClick={() => onEditStep(isKit ? 3 : 5)}
                 className="p-1 rounded-lg hover:bg-black/5 text-[#0071e3] transition-colors"

@@ -178,7 +178,7 @@ export function CatalogItemModal({
         card_fee_cents: parsedDimensions.cardFeeCents || parsedDimensions.card_fee_cents || 20000,
         anchor_price_cents: parsedDimensions.anchorPriceCents || 0,
         max_installments: parsedDimensions.maxInstallments || 10,
-        price_adjustment_cents: initialItem.price_adjustment_cents ?? 0,
+        price_adjustment_cents: initialItem.price_adjustment_cents ?? initialItem.priceAdjustmentCents ?? 0,
         active: initialItem.active ?? true,
         sort_order: initialItem.sort_order ?? 1,
         main_image: primaryImage,
@@ -519,8 +519,11 @@ export function CatalogItemModal({
         const displayName = formData.display_name || formData.name || `${brand} ${model} ${sizeInches}"`;
 
         let notesValue = formData.description || formData.notes || "";
+        let effectiveMonitorPriceCents = Number(formData.price_adjustment_cents) || 0;
         if (isKitEnabled || kitSubItems.length > 0) {
-          const kitTotal = kitSubItems.reduce((acc, it) => acc + (it.priceCents || 0), 0);
+          const kitTotal = kitSubItems
+            .filter((it) => it.selected !== false)
+            .reduce((acc, it) => acc + (it.priceCents || 0), 0);
           const cleanKitItems = kitSubItems.map(({ _uid, ...rest }) => rest);
           notesValue = JSON.stringify({
             isKit: true,
@@ -528,6 +531,9 @@ export function CatalogItemModal({
             kitTotalCents: kitTotal,
             updatedAt: new Date().toISOString(),
           });
+          if (isKitEnabled) {
+            effectiveMonitorPriceCents = kitTotal;
+          }
         }
 
         payload = {
@@ -541,6 +547,7 @@ export function CatalogItemModal({
             formData.technical_code ||
             `${brand.substring(0, 3).toUpperCase()}-${model.replace(/[^a-zA-Z0-9]/g, "").substring(0, 5).toUpperCase() || "MON"}-V100`,
           notes: notesValue,
+          price_adjustment_cents: effectiveMonitorPriceCents,
           active: Boolean(formData.active),
           sort_order: Number(formData.sort_order) || 1,
           image: primaryImg || "",
@@ -558,6 +565,7 @@ export function CatalogItemModal({
           paper_width_mm: Number(formData.paper_width_mm) || 80,
           technical_code: formData.technical_code || "",
           notes: formData.description || formData.notes || "",
+          price_adjustment_cents: Number(formData.price_adjustment_cents) || 0,
           active: Boolean(formData.active),
           sort_order: Number(formData.sort_order) || 1,
           image: primaryImg || "",
@@ -575,6 +583,7 @@ export function CatalogItemModal({
           is_2d: Boolean(formData.is_2d),
           technical_code: formData.technical_code || "",
           notes: formData.description || formData.notes || "",
+          price_adjustment_cents: Number(formData.price_adjustment_cents) || 0,
           active: Boolean(formData.active),
           sort_order: Number(formData.sort_order) || 1,
           image: primaryImg || "",
@@ -905,25 +914,69 @@ export function CatalogItemModal({
                   </>
                 )}
 
-                {collectionType === "colors" && (
+                {(collectionType === "colors" ||
+                  collectionType === "monitors" ||
+                  collectionType === "printers" ||
+                  collectionType === "readers") && (
                   <div>
-                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-                      Acréscimo Comercial (R$)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={((formData.price_adjustment_cents || 0) / 100).toFixed(2)}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          price_adjustment_cents: Math.round(
-                            parseFloat(e.target.value || "0") * 100
-                          ),
-                        })
-                      }
-                      className="w-full px-3.5 py-2.5 bg-slate-950 border border-indigo-500/50 rounded-xl text-indigo-300 font-extrabold text-sm focus:border-indigo-400 focus:outline-none"
-                    />
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
+                        {collectionType === "colors"
+                          ? "Acréscimo Comercial (R$)"
+                          : "Valor do Item (R$) — Opcional"}
+                      </label>
+                      <span
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                          (formData.price_adjustment_cents || 0) > 0
+                            ? "text-amber-300 bg-amber-950/60 border-amber-500/30"
+                            : "text-emerald-400 bg-emerald-950/60 border-emerald-500/30"
+                        }`}
+                      >
+                        {(formData.price_adjustment_cents || 0) > 0
+                          ? "Item Cobrado"
+                          : "Opcional (+ R$ 0)"}
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                        R$
+                      </span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        disabled={collectionType === "monitors" && isKitEnabled}
+                        value={
+                          collectionType === "monitors" && isKitEnabled
+                            ? (
+                                kitSubItems
+                                  .filter((it) => it.selected !== false)
+                                  .reduce((acc, it) => acc + (it.priceCents || 0), 0) / 100
+                              ).toFixed(2)
+                            : formData.price_adjustment_cents
+                            ? formData.price_adjustment_cents / 100
+                            : ""
+                        }
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            price_adjustment_cents: Math.max(
+                              0,
+                              Math.round(parseFloat(e.target.value || "0") * 100)
+                            ),
+                          })
+                        }
+                        placeholder="0,00 (Opcional - Sem custo)"
+                        className="w-full pl-9 pr-3.5 py-2.5 bg-slate-950 border border-emerald-500/50 rounded-xl text-emerald-400 font-extrabold text-sm placeholder:text-slate-500 placeholder:font-normal focus:border-emerald-400 focus:outline-none disabled:opacity-60"
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-400 mt-1 block">
+                      {collectionType === "monitors" && isKitEnabled
+                        ? "Calculado pela soma dos Sub-Itens do Kit"
+                        : (formData.price_adjustment_cents || 0) > 0
+                        ? `Será somado + ${formatBRL(formData.price_adjustment_cents || 0)} ao pedido`
+                        : "Deixe em branco ou 0 para apenas furação gratuita (+ R$ 0,00)"}
+                    </span>
                   </div>
                 )}
 
@@ -971,7 +1024,7 @@ export function CatalogItemModal({
               {/* ======================================================== */}
               {collectionType === "monitors" && (
                 <div className="p-4 bg-slate-950/90 rounded-2xl border border-indigo-500/40 space-y-4 shadow-inner">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center shadow-sm">
                         <Monitor className="w-4 h-4" />
@@ -981,14 +1034,144 @@ export function CatalogItemModal({
                           Especificações Técnicas do Display (Usinagem CNC)
                         </span>
                         <span className="text-[10px] text-slate-400">
-                          Medidas e furação VESA para o rasgo milimétrico na Router CNC
+                          Medidas, furação VESA e definição de valor caso o monitor seja fornecido junto
                         </span>
                       </div>
                     </div>
-                    <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
-                      Furação Homologada (+ R$ 0)
-                    </span>
+                    {isKitEnabled ? (
+                      <span className="text-[10px] text-indigo-300 font-bold bg-indigo-500/15 px-2.5 py-1 rounded-lg border border-indigo-500/30">
+                        Kit Completo (+{" "}
+                        {formatBRL(
+                          kitSubItems
+                            .filter((it) => it.selected !== false)
+                            .reduce((acc, it) => acc + (it.priceCents || 0), 0)
+                        )}
+                        )
+                      </span>
+                    ) : (formData.price_adjustment_cents || 0) > 0 ? (
+                      <span className="text-[10px] text-amber-300 font-bold bg-amber-500/15 px-2.5 py-1 rounded-lg border border-amber-500/30">
+                        Item Cobrado (+ {formatBRL(formData.price_adjustment_cents || 0)})
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                        Furação Homologada (+ R$ 0)
+                      </span>
+                    )}
                   </div>
+
+                  {/* Operação de Cobrança do Monitor Homologado */}
+                  {!isKitEnabled && (
+                    <div className="p-3.5 bg-slate-900/90 rounded-xl border border-emerald-500/30 space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <div>
+                            <span className="text-xs font-extrabold text-white block">
+                              Operação de Cobrança deste Equipamento
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              Defina se é apenas o recorte/furação gratuita ou se o monitor será cobrado no pedido
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setFormData({ ...formData, price_adjustment_cents: 0 })
+                            }
+                            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
+                              (formData.price_adjustment_cents || 0) === 0
+                                ? "bg-emerald-600 text-white shadow"
+                                : "text-slate-400 hover:text-white"
+                            }`}
+                          >
+                            Apenas Furação (+ R$ 0)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!formData.price_adjustment_cents || formData.price_adjustment_cents <= 0) {
+                                setFormData({ ...formData, price_adjustment_cents: 89000 });
+                              }
+                            }}
+                            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
+                              (formData.price_adjustment_cents || 0) > 0
+                                ? "bg-amber-500 text-slate-950 shadow font-extrabold"
+                                : "text-slate-400 hover:text-white"
+                            }`}
+                          >
+                            Item a ser Cobrado (+ R$)
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center pt-1">
+                        <div className="sm:col-span-5">
+                          <label className="block text-[10px] font-bold text-slate-300 uppercase tracking-wider mb-1">
+                            Valor a Cobrar pelo Monitor (R$) — Opcional
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-400">
+                              R$
+                            </span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={formData.price_adjustment_cents ? formData.price_adjustment_cents / 100 : ""}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  price_adjustment_cents: Math.max(
+                                    0,
+                                    Math.round(parseFloat(e.target.value || "0") * 100)
+                                  ),
+                                })
+                              }
+                              placeholder="0,00 (Opcional)"
+                              className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-emerald-500/40 rounded-xl text-emerald-400 font-extrabold text-sm placeholder:text-slate-500 placeholder:font-normal focus:border-emerald-400 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="sm:col-span-7">
+                          <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                            Sugestões Rápidas de Valor:
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {[
+                              { label: "Grátis (R$ 0)", cents: 0 },
+                              { label: "R$ 650", cents: 65000 },
+                              { label: "R$ 890", cents: 89000 },
+                              { label: "R$ 1.190", cents: 119000 },
+                              { label: "R$ 1.490", cents: 149000 },
+                              { label: "R$ 1.890", cents: 189000 },
+                            ].map((preset) => (
+                              <button
+                                key={preset.cents}
+                                type="button"
+                                onClick={() =>
+                                  setFormData({
+                                    ...formData,
+                                    price_adjustment_cents: preset.cents,
+                                  })
+                                }
+                                className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                                  (formData.price_adjustment_cents || 0) === preset.cents
+                                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50"
+                                    : "bg-slate-950 text-slate-400 hover:text-white border-slate-800"
+                                }`}
+                              >
+                                {preset.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Marca e Modelo */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1211,9 +1394,142 @@ export function CatalogItemModal({
               {/* CAMPOS ESPECÍFICOS: IMPRESSORAS */}
               {collectionType === "printers" && (
                 <div className="p-4 bg-slate-950/90 rounded-2xl border border-emerald-500/30 space-y-4">
-                  <span className="text-xs font-bold text-white uppercase tracking-wider block">
-                    Especificações da Impressora Térmica
-                  </span>
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shadow-sm">
+                        <PrinterIcon className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-white uppercase tracking-wider block">
+                          Especificações da Impressora Térmica
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          Berço técnico CNC e definição de valor caso a impressora seja fornecida
+                        </span>
+                      </div>
+                    </div>
+                    {(formData.price_adjustment_cents || 0) > 0 ? (
+                      <span className="text-[10px] text-amber-300 font-bold bg-amber-500/15 px-2.5 py-1 rounded-lg border border-amber-500/30">
+                        Item Cobrado (+ {formatBRL(formData.price_adjustment_cents || 0)})
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                        Berço Homologado (+ R$ 0)
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Operação de Cobrança da Impressora */}
+                  <div className="p-3.5 bg-slate-900/90 rounded-xl border border-emerald-500/30 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <div>
+                          <span className="text-xs font-extrabold text-white block">
+                            Operação de Cobrança desta Impressora
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            Defina se é apenas o rasgo/berço gratuito ou se a impressora será cobrada no pedido
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormData({ ...formData, price_adjustment_cents: 0 })
+                          }
+                          className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
+                            (formData.price_adjustment_cents || 0) === 0
+                              ? "bg-emerald-600 text-white shadow"
+                              : "text-slate-400 hover:text-white"
+                          }`}
+                        >
+                          Apenas Berço (+ R$ 0)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!formData.price_adjustment_cents || formData.price_adjustment_cents <= 0) {
+                              setFormData({ ...formData, price_adjustment_cents: 69000 });
+                            }
+                          }}
+                          className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
+                            (formData.price_adjustment_cents || 0) > 0
+                              ? "bg-amber-500 text-slate-950 shadow font-extrabold"
+                              : "text-slate-400 hover:text-white"
+                          }`}
+                        >
+                          Item a ser Cobrado (+ R$)
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center pt-1">
+                      <div className="sm:col-span-5">
+                        <label className="block text-[10px] font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          Valor a Cobrar pela Impressora (R$) — Opcional
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-400">
+                            R$
+                          </span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={formData.price_adjustment_cents ? formData.price_adjustment_cents / 100 : ""}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                price_adjustment_cents: Math.max(
+                                  0,
+                                  Math.round(parseFloat(e.target.value || "0") * 100)
+                                ),
+                              })
+                            }
+                            placeholder="0,00 (Opcional)"
+                            className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-emerald-500/40 rounded-xl text-emerald-400 font-extrabold text-sm placeholder:text-slate-500 placeholder:font-normal focus:border-emerald-400 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="sm:col-span-7">
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                          Sugestões Rápidas de Valor:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {[
+                            { label: "Grátis (R$ 0)", cents: 0 },
+                            { label: "R$ 590", cents: 59000 },
+                            { label: "R$ 690", cents: 69000 },
+                            { label: "R$ 790", cents: 79000 },
+                            { label: "R$ 950", cents: 95000 },
+                          ].map((preset) => (
+                            <button
+                              key={preset.cents}
+                              type="button"
+                              onClick={() =>
+                                setFormData({
+                                  ...formData,
+                                  price_adjustment_cents: preset.cents,
+                                })
+                              }
+                              className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                                (formData.price_adjustment_cents || 0) === preset.cents
+                                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50"
+                                  : "bg-slate-950 text-slate-400 hover:text-white border-slate-800"
+                              }`}
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
@@ -1251,6 +1567,189 @@ export function CatalogItemModal({
                         value={formData.technical_code || ""}
                         onChange={(e) => setFormData({ ...formData, technical_code: e.target.value })}
                         placeholder="Ex: EPS-T20X-CUT80"
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* CAMPOS ESPECÍFICOS: LEITORES ÓPTICOS */}
+              {collectionType === "readers" && (
+                <div className="p-4 bg-slate-950/90 rounded-2xl border border-cyan-500/30 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center shadow-sm">
+                        <QrCode className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-white uppercase tracking-wider block">
+                          Especificações do Leitor Óptico (1D / 2D / QR Code)
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          Janela óptica CNC e definição de valor caso o leitor seja fornecido
+                        </span>
+                      </div>
+                    </div>
+                    {(formData.price_adjustment_cents || 0) > 0 ? (
+                      <span className="text-[10px] text-amber-300 font-bold bg-amber-500/15 px-2.5 py-1 rounded-lg border border-amber-500/30">
+                        Item Cobrado (+ {formatBRL(formData.price_adjustment_cents || 0)})
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                        Janela Homologada (+ R$ 0)
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Operação de Cobrança do Leitor */}
+                  <div className="p-3.5 bg-slate-900/90 rounded-xl border border-emerald-500/30 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <div>
+                          <span className="text-xs font-extrabold text-white block">
+                            Operação de Cobrança deste Leitor
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            Defina se é apenas a janela de leitura gratuita ou se o leitor será cobrado no pedido
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormData({ ...formData, price_adjustment_cents: 0 })
+                          }
+                          className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
+                            (formData.price_adjustment_cents || 0) === 0
+                              ? "bg-emerald-600 text-white shadow"
+                              : "text-slate-400 hover:text-white"
+                          }`}
+                        >
+                          Apenas Janela (+ R$ 0)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!formData.price_adjustment_cents || formData.price_adjustment_cents <= 0) {
+                              setFormData({ ...formData, price_adjustment_cents: 29000 });
+                            }
+                          }}
+                          className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
+                            (formData.price_adjustment_cents || 0) > 0
+                              ? "bg-amber-500 text-slate-950 shadow font-extrabold"
+                              : "text-slate-400 hover:text-white"
+                          }`}
+                        >
+                          Item a ser Cobrado (+ R$)
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center pt-1">
+                      <div className="sm:col-span-5">
+                        <label className="block text-[10px] font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          Valor a Cobrar pelo Leitor (R$) — Opcional
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-400">
+                            R$
+                          </span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={formData.price_adjustment_cents ? formData.price_adjustment_cents / 100 : ""}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                price_adjustment_cents: Math.max(
+                                  0,
+                                  Math.round(parseFloat(e.target.value || "0") * 100)
+                                ),
+                              })
+                            }
+                            placeholder="0,00 (Opcional)"
+                            className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-emerald-500/40 rounded-xl text-emerald-400 font-extrabold text-sm placeholder:text-slate-500 placeholder:font-normal focus:border-emerald-400 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="sm:col-span-7">
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                          Sugestões Rápidas de Valor:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {[
+                            { label: "Grátis (R$ 0)", cents: 0 },
+                            { label: "R$ 190", cents: 19000 },
+                            { label: "R$ 290", cents: 29000 },
+                            { label: "R$ 390", cents: 39000 },
+                            { label: "R$ 490", cents: 49000 },
+                          ].map((preset) => (
+                            <button
+                              key={preset.cents}
+                              type="button"
+                              onClick={() =>
+                                setFormData({
+                                  ...formData,
+                                  price_adjustment_cents: preset.cents,
+                                })
+                              }
+                              className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                                (formData.price_adjustment_cents || 0) === preset.cents
+                                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50"
+                                  : "bg-slate-950 text-slate-400 hover:text-white border-slate-800"
+                              }`}
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                        Marca
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.brand || ""}
+                        onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                        placeholder="Ex: Elgin, Honeywell, Zebra..."
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                        Tecnologia de Leitura
+                      </label>
+                      <select
+                        value={formData.is_2d ? "2d" : "1d"}
+                        onChange={(e) =>
+                          setFormData({ ...formData, is_2d: e.target.value === "2d" })
+                        }
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs"
+                      >
+                        <option value="2d">2D Imager (QR Code, PIX & Barras)</option>
+                        <option value="1d">1D Laser (Apenas Código de Barras)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                        Código Técnico CNC
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.technical_code || ""}
+                        onChange={(e) => setFormData({ ...formData, technical_code: e.target.value })}
+                        placeholder="Ex: ELG-2DFX-WIN"
                         className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-xs"
                       />
                     </div>

@@ -13,7 +13,7 @@ import { recordVoucherUsage } from "@/lib/vouchers/voucherStore";
 import { CampaignTrackingData } from "@/types/voucher";
 import { generatePixPayload } from "@/lib/pix";
 import { CustomerInfo, DeliveryAddress, OrderDetails, ManufacturingSpec, CartItem } from "@/types/order";
-import { saveOrderWithSnapshot } from "@/lib/appwrite/server";
+import { saveOrderWithSnapshot, getAppwriteCatalog } from "@/lib/appwrite/server";
 import { createPixCharge } from "@/lib/payments/pixGateway";
 import { calculateShippingQuotes } from "@/modules/shipping";
 import { findOrCreateCustomerFromCheckout } from "@/lib/customers/customerStore";
@@ -33,6 +33,7 @@ interface RequestBody {
     colorId: string;
     monitorId?: string | null;
     printerId?: string | null;
+    readerId?: string | null;
     hasScanner?: boolean;
     customizationNotes?: string;
     quantity: number;
@@ -73,14 +74,29 @@ export async function POST(req: Request) {
       );
     }
 
-    // 2. Recálculo Rigoroso dos Preços no Backend (Soberania do Servidor)
+    // 2. Recálculo Rigoroso dos Preços no Backend (Soberania do Servidor com Catálogo Appwrite)
+    let liveCatalog: Awaited<ReturnType<typeof getAppwriteCatalog>> | null = null;
+    try {
+      liveCatalog = await getAppwriteCatalog();
+    } catch {
+      liveCatalog = null;
+    }
+
+    const catalogCabinets = liveCatalog?.cabinetModels?.length ? liveCatalog.cabinetModels : CABINET_MODELS;
+    const catalogColors = liveCatalog?.colors?.length ? liveCatalog.colors : COLOR_OPTIONS;
+    const catalogMonitors = liveCatalog?.monitors?.length ? liveCatalog.monitors : HOMOLOGATED_MONITORS;
+    const catalogPrinters = liveCatalog?.printers?.length ? liveCatalog.printers : HOMOLOGATED_PRINTERS;
+    const catalogReaders = liveCatalog?.barcodeReaders?.length ? liveCatalog.barcodeReaders : HOMOLOGATED_READERS;
+
     let subtotalCents = 0;
     const validatedCartItems: CartItem[] = [];
     const manufacturingSheets: ManufacturingSpec[] = [];
 
     for (let i = 0; i < items.length; i++) {
       const rawItem = items[i];
-      const model = CABINET_MODELS.find((m) => m.id === rawItem.modelId);
+      const model =
+        catalogCabinets.find((m: any) => m.id === rawItem.modelId || m.slug === rawItem.modelId) ||
+        CABINET_MODELS.find((m) => m.id === rawItem.modelId || m.slug === rawItem.modelId);
       if (!model) {
         return NextResponse.json(
           { error: `Modelo inválido informado para o item ${i + 1}: ${rawItem.modelId}` },
@@ -88,11 +104,28 @@ export async function POST(req: Request) {
         );
       }
 
-      const color = COLOR_OPTIONS.find((c) => c.id === rawItem.colorId) || COLOR_OPTIONS[0];
-      const monitor = rawItem.monitorId ? HOMOLOGATED_MONITORS.find((m) => m.id === rawItem.monitorId) || null : null;
-      const printer = rawItem.printerId ? HOMOLOGATED_PRINTERS.find((p) => p.id === rawItem.printerId) || null : null;
-      const barcodeReader = rawItem.hasScanner
-        ? HOMOLOGATED_READERS[0]
+      const color =
+        catalogColors.find((c: any) => c.id === rawItem.colorId || c.slug === rawItem.colorId) ||
+        COLOR_OPTIONS.find((c) => c.id === rawItem.colorId || c.slug === rawItem.colorId) ||
+        catalogColors[0] ||
+        COLOR_OPTIONS[0];
+      const monitor = rawItem.monitorId
+        ? catalogMonitors.find((m: any) => m.id === rawItem.monitorId) ||
+          HOMOLOGATED_MONITORS.find((m) => m.id === rawItem.monitorId) ||
+          null
+        : null;
+      const printer = rawItem.printerId
+        ? catalogPrinters.find((p: any) => p.id === rawItem.printerId) ||
+          HOMOLOGATED_PRINTERS.find((p) => p.id === rawItem.printerId) ||
+          null
+        : null;
+      const barcodeReader = rawItem.readerId
+        ? catalogReaders.find((r: any) => r.id === rawItem.readerId) ||
+          HOMOLOGATED_READERS.find((r) => r.id === rawItem.readerId) ||
+          catalogReaders[0] ||
+          HOMOLOGATED_READERS[0]
+        : rawItem.hasScanner
+        ? catalogReaders[0] || HOMOLOGATED_READERS[0]
         : null;
 
       const quantity = Math.max(1, Math.floor(rawItem.quantity || 1));

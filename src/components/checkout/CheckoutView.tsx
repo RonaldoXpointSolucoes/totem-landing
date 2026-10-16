@@ -441,6 +441,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           colorId: i.configuration.color.id,
           monitorId: i.configuration.monitor?.id || null,
           printerId: i.configuration.printer?.id || null,
+          readerId: i.configuration.barcodeReader?.id || null,
           hasScanner: !!i.configuration.barcodeReader,
           customizationNotes: i.configuration.customizationNotes || "",
           quantity: i.quantity,

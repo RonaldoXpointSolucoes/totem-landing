@@ -63,6 +63,7 @@ const SCHEMA_ATTRIBUTES: Record<string, string[]> = {
     "vesa_pattern",
     "technical_code",
     "notes",
+    "price_adjustment_cents",
     "active",
     "image",
     "slug",
@@ -75,6 +76,7 @@ const SCHEMA_ATTRIBUTES: Record<string, string[]> = {
     "paper_width_mm",
     "technical_code",
     "notes",
+    "price_adjustment_cents",
     "active",
     "image",
     "slug",
@@ -87,6 +89,7 @@ const SCHEMA_ATTRIBUTES: Record<string, string[]> = {
     "is_2d",
     "technical_code",
     "notes",
+    "price_adjustment_cents",
     "active",
     "image",
     "slug",
@@ -141,6 +144,9 @@ function sanitizeAttributes(collectionType: string, input: Record<string, any>):
   }
   if (input.base_price_cents !== undefined) {
     input.base_price_cents = Math.round(Number(input.base_price_cents)) || 0;
+  }
+  if (input.priceAdjustmentCents !== undefined && input.price_adjustment_cents === undefined) {
+    input.price_adjustment_cents = input.priceAdjustmentCents;
   }
   if (input.price_adjustment_cents !== undefined) {
     input.price_adjustment_cents = Math.round(Number(input.price_adjustment_cents)) || 0;
