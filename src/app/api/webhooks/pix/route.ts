@@ -3,7 +3,7 @@ import { getServerDatabases } from "@/lib/appwrite/server";
 import { APPWRITE_CONFIG } from "@/lib/appwrite/config";
 import { Query } from "node-appwrite";
 
-const WEBHOOK_SECRET = process.env.PIX_WEBHOOK_SECRET || "totem_pix_secret_webhook_token_2026";
+const WEBHOOK_SECRET = process.env.PIX_WEBHOOK_SECRET;
 
 export async function POST(req: Request) {
   try {
@@ -13,7 +13,7 @@ export async function POST(req: Request) {
       req.headers.get("x-asaas-access-token") ||
       req.headers.get("authorization")?.replace("Bearer ", "");
 
-    if (tokenHeader && tokenHeader !== WEBHOOK_SECRET) {
+    if (!WEBHOOK_SECRET || !tokenHeader || tokenHeader !== WEBHOOK_SECRET) {
       console.warn("Webhook rejeitado: Assinatura/Token inválido.");
       return NextResponse.json(
         { ok: false, error: "Assinatura do webhook inválida." },
@@ -79,6 +79,11 @@ export async function POST(req: Request) {
         { ok: false, error: `Pedido "${orderIdentifier}" não encontrado no banco de dados.` },
         { status: 404 }
       );
+    }
+
+    const paymentCheck = await db.listDocuments(dbId, cols.payments, [Query.equal("order_id", orderDoc.$id), Query.limit(1)]);
+    if (paymentCheck.documents[0]?.provider === "mercadopago") {
+      return NextResponse.json({ ok: false, error: "Este pedido requer confirmação autenticada pelo Mercado Pago." }, { status: 403 });
     }
 
     // 4. Verificação de IDEMPOTÊNCIA (Evita duplo processamento)

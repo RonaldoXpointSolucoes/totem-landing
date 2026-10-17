@@ -30,7 +30,7 @@ export type OrderStatus =
   | "delivered"
   | "cancelled";
 
-export type PaymentStatus = "pending" | "paid" | "expired" | "cancelled" | "failed";
+export type PaymentStatus = "pending" | "paid" | "expired" | "cancelled" | "failed" | "refunded" | "partially_refunded" | "charged_back";
 
 export interface CustomerInfo {
   personType: "individual" | "company";
@@ -99,7 +99,12 @@ export interface OrderDetails {
   status: OrderStatus;
   payment: {
     status: PaymentStatus;
-    method: "pix";
+    method: "pix" | "credit_card";
+    provider?: string;
+    gatewayPaymentId?: string;
+    gatewayPreferenceId?: string;
+    checkoutUrl?: string;
+    statusToken?: string;
     pixCode: string;
     qrCodeUrl?: string;
     expiresAt: string;

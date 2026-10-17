@@ -39,7 +39,7 @@ const STATUS_CONFIG: Record<
   { label: string; bg: string; text: string; icon: React.ComponentType<{ className?: string }> }
 > = {
   awaiting_payment: {
-    label: "Aguardando Pix",
+    label: "Aguardando pagamento",
     bg: "bg-amber-500/10 border-amber-500/30",
     text: "text-amber-500 dark:text-amber-400",
     icon: Clock,
@@ -211,7 +211,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
               {[
                 { id: "all", label: "Todos" },
-                { id: "pending", label: "Aguardando Pix" },
+                { id: "pending", label: "Aguardando pagamento" },
                 { id: "production", label: "Em Produção" },
                 { id: "shipped", label: "Enviados" },
               ].map((f) => (
@@ -340,6 +340,9 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                       </div>
                     </div>
 
+                    {isPendingPix && order.payment?.method === "credit_card" && order.payment.checkoutUrl && (
+                      <a href={order.payment.checkoutUrl} className="block rounded-xl bg-blue-600 p-3 text-center font-semibold text-white">Continuar pagamento no Mercado Pago</a>
+                    )}
                     {/* Caixa de Ação Rápida Pix (Se Pendente) */}
                     {isPendingPix && order.payment?.pixCode && (
                       <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-3">

@@ -9,6 +9,12 @@ export async function GET() {
       service: "totem-landing",
       version: siteConfig.version,
       subsystems: {
+        payments: {
+          provider: "mercadopago",
+          configured: Boolean(process.env.MERCADOPAGO_ACCESS_TOKEN && process.env.MERCADOPAGO_WEBHOOK_SECRET && process.env.CHECKOUT_STATUS_SECRET),
+          methods: ["pix", "credit_card"],
+          maxInstallments: 10,
+        },
         shipping: {
           status: "healthy",
           antiFailureGuard: "active",

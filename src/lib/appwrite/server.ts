@@ -43,6 +43,7 @@ export interface SaveOrderPayload {
     status: string;
     pixCode: string;
     expiresAt: string;
+    method?: "pix" | "credit_card";
   };
 }
 
@@ -112,6 +113,7 @@ export async function saveOrderWithSnapshot(payload: SaveOrderPayload) {
       status: payload.payment.status,
       pix_code: payload.payment.pixCode,
       expires_at: payload.payment.expiresAt,
+      ...(payload.payment.method ? { payment_method: payload.payment.method } : {}),
     }
   );
 

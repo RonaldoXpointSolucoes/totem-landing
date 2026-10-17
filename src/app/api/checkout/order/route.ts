@@ -1,26 +1,21 @@
 import { NextResponse } from "next/server";
-import {
-  CABINET_MODELS,
-  COLOR_OPTIONS,
-  HOMOLOGATED_MONITORS,
-  HOMOLOGATED_PRINTERS,
-  HOMOLOGATED_READERS,
-} from "@/modules/catalog/catalogData";
+import { randomBytes } from "node:crypto";
 import { calculateTotemPrice } from "@/modules/pricing/pricingEngine";
 import { calculateSelectiveCouponDiscount, CouponDiscountCalculation } from "@/modules/pricing/couponEngine";
 import { findUserByCoupon, updateWhitelistUser } from "@/lib/auth/whitelistStore";
 import { recordVoucherUsage } from "@/lib/vouchers/voucherStore";
 import { CampaignTrackingData } from "@/types/voucher";
-import { generatePixPayload } from "@/lib/pix";
 import { CustomerInfo, DeliveryAddress, OrderDetails, ManufacturingSpec, CartItem } from "@/types/order";
 import { saveOrderWithSnapshot, getAppwriteCatalog } from "@/lib/appwrite/server";
-import { createPixCharge } from "@/lib/payments/pixGateway";
+import { checkoutStatusToken, createMercadoPagoPayment, requirePaymentConfiguration } from "@/lib/payments/mercadoPago";
+import { updateMercadoPagoPayment } from "@/lib/payments/mercadoPagoStore";
 import { calculateShippingQuotes } from "@/modules/shipping";
 import { findOrCreateCustomerFromCheckout } from "@/lib/customers/customerStore";
 import { saveLocalOrder } from "@/lib/orders/orderStore";
 import { setCustomerSession } from "@/lib/customers/customerSession";
 
 interface RequestBody {
+  paymentMethod?: "pix" | "credit_card";
   customer: CustomerInfo;
   deliveryAddress: DeliveryAddress;
   shippingOptionId?: string;
@@ -44,6 +39,15 @@ export async function POST(req: Request) {
   try {
     const body: RequestBody = await req.json();
     const { customer, deliveryAddress, items, shippingOptionId } = body;
+    const paymentMethod = body.paymentMethod || "pix";
+    if (!["pix", "credit_card"].includes(paymentMethod)) {
+      return NextResponse.json({ error: "Forma de pagamento inválida." }, { status: 400 });
+    }
+    try {
+      requirePaymentConfiguration();
+    } catch {
+      return NextResponse.json({ error: "Pagamento temporariamente indisponível. Tente novamente em instantes." }, { status: 503 });
+    }
 
     // 1. Validações preliminares
     if (!customer || !customer.name || !customer.email || !customer.whatsapp) {
@@ -53,9 +57,9 @@ export async function POST(req: Request) {
       );
     }
 
-    if (customer.personType === "company" && !customer.document) {
+    if (!customer.document || customer.document.replace(/\D/g, "").length !== (customer.personType === "company" ? 14 : 11)) {
       return NextResponse.json(
-        { error: "Para compras como Pessoa Jurídica, o CNPJ é obrigatório." },
+        { error: "Informe o CPF ou CNPJ do comprador para processar o pagamento." },
         { status: 400 }
       );
     }
@@ -82,11 +86,14 @@ export async function POST(req: Request) {
       liveCatalog = null;
     }
 
-    const catalogCabinets = liveCatalog?.cabinetModels?.length ? liveCatalog.cabinetModels : CABINET_MODELS;
-    const catalogColors = liveCatalog?.colors?.length ? liveCatalog.colors : COLOR_OPTIONS;
-    const catalogMonitors = liveCatalog?.monitors?.length ? liveCatalog.monitors : HOMOLOGATED_MONITORS;
-    const catalogPrinters = liveCatalog?.printers?.length ? liveCatalog.printers : HOMOLOGATED_PRINTERS;
-    const catalogReaders = liveCatalog?.barcodeReaders?.length ? liveCatalog.barcodeReaders : HOMOLOGATED_READERS;
+    if (!liveCatalog?.cabinetModels?.length || !liveCatalog.colors?.length) {
+      return NextResponse.json({ error: "Catálogo indisponível para confirmar os preços. Tente novamente." }, { status: 503 });
+    }
+    const catalogCabinets = liveCatalog.cabinetModels;
+    const catalogColors = liveCatalog.colors;
+    const catalogMonitors = liveCatalog.monitors;
+    const catalogPrinters = liveCatalog.printers;
+    const catalogReaders = liveCatalog.barcodeReaders;
 
     let subtotalCents = 0;
     const validatedCartItems: CartItem[] = [];
@@ -95,8 +102,7 @@ export async function POST(req: Request) {
     for (let i = 0; i < items.length; i++) {
       const rawItem = items[i];
       const model =
-        catalogCabinets.find((m: any) => m.id === rawItem.modelId || m.slug === rawItem.modelId) ||
-        CABINET_MODELS.find((m) => m.id === rawItem.modelId || m.slug === rawItem.modelId);
+        catalogCabinets.find((m: any) => m.id === rawItem.modelId || m.slug === rawItem.modelId);
       if (!model) {
         return NextResponse.json(
           { error: `Modelo inválido informado para o item ${i + 1}: ${rawItem.modelId}` },
@@ -105,30 +111,27 @@ export async function POST(req: Request) {
       }
 
       const color =
-        catalogColors.find((c: any) => c.id === rawItem.colorId || c.slug === rawItem.colorId) ||
-        COLOR_OPTIONS.find((c) => c.id === rawItem.colorId || c.slug === rawItem.colorId) ||
-        catalogColors[0] ||
-        COLOR_OPTIONS[0];
+        catalogColors.find((c: any) => c.id === rawItem.colorId || c.slug === rawItem.colorId);
+      if (!color) return NextResponse.json({ error: "Acabamento inválido no carrinho." }, { status: 400 });
       const monitor = rawItem.monitorId
-        ? catalogMonitors.find((m: any) => m.id === rawItem.monitorId) ||
-          HOMOLOGATED_MONITORS.find((m) => m.id === rawItem.monitorId) ||
-          null
+        ? catalogMonitors.find((m: any) => m.id === rawItem.monitorId) || null
         : null;
       const printer = rawItem.printerId
-        ? catalogPrinters.find((p: any) => p.id === rawItem.printerId) ||
-          HOMOLOGATED_PRINTERS.find((p) => p.id === rawItem.printerId) ||
-          null
+        ? catalogPrinters.find((p: any) => p.id === rawItem.printerId) || null
         : null;
       const barcodeReader = rawItem.readerId
-        ? catalogReaders.find((r: any) => r.id === rawItem.readerId) ||
-          HOMOLOGATED_READERS.find((r) => r.id === rawItem.readerId) ||
-          catalogReaders[0] ||
-          HOMOLOGATED_READERS[0]
+        ? catalogReaders.find((r: any) => r.id === rawItem.readerId) || null
         : rawItem.hasScanner
-        ? catalogReaders[0] || HOMOLOGATED_READERS[0]
+        ? catalogReaders[0]
         : null;
+      if ((rawItem.monitorId && !monitor) || (rawItem.printerId && !printer) || (rawItem.readerId && !barcodeReader)) {
+        return NextResponse.json({ error: "Equipamento indisponível no catálogo. Revise o carrinho." }, { status: 400 });
+      }
 
-      const quantity = Math.max(1, Math.floor(rawItem.quantity || 1));
+      if (!Number.isInteger(rawItem.quantity) || rawItem.quantity < 1 || rawItem.quantity > 100) {
+        return NextResponse.json({ error: "Quantidade inválida no carrinho." }, { status: 400 });
+      }
+      const quantity = rawItem.quantity;
 
       // Cálculo server-side inegociável
       const pricing = calculateTotemPrice({
@@ -138,7 +141,7 @@ export async function POST(req: Request) {
         printer,
         barcodeReader,
       });
-      const unitPriceCents = pricing.totalPriceCents;
+      const unitPriceCents = paymentMethod === "credit_card" ? pricing.cardTotalPriceCents : pricing.pixTotalPriceCents;
       const itemSubtotalCents = unitPriceCents * quantity;
 
       subtotalCents += itemSubtotalCents;
@@ -256,7 +259,7 @@ export async function POST(req: Request) {
     }
 
     // 4. Geração do Número de Pedido Exclusivo
-    const randomHex = Math.random().toString(36).substring(2, 7).toUpperCase();
+    const randomHex = randomBytes(6).toString("hex").toUpperCase();
     const currentYear = new Date().getFullYear();
     const orderNumber = `TOT-${currentYear}-${randomHex}`;
     const orderId = `ord_${Date.now()}_${randomHex.toLowerCase()}`;
@@ -292,7 +295,14 @@ export async function POST(req: Request) {
       }
     }
 
+    if (!selectedShippingInfo) {
+      return NextResponse.json({ error: "Selecione uma opção de entrega válida e recalcule o frete." }, { status: 400 });
+    }
+
     const totalCents = subtotalCents + shippingCents;
+    if (!Number.isSafeInteger(totalCents) || totalCents <= 0) {
+      return NextResponse.json({ error: "Valor do pedido inválido." }, { status: 400 });
+    }
 
     // 5.1. Registro Auditado e Imutável da Utilização do Voucher com Link Tracking
     if (appliedCouponCode && matchedSeller && executedCouponResult) {
@@ -327,7 +337,7 @@ export async function POST(req: Request) {
             finalOrderTotalCents: totalCents,
             influencerCommissionCents: sellerCommissionCents,
             payoutStatus: "pending",
-            payoutNotes: "Pedido criado e aguardando compensação Pix para liberação do repasse ao influencer.",
+            payoutNotes: "Pedido criado e aguardando confirmação do pagamento para liberação do repasse ao influencer.",
           },
           campaignTracking: body.campaignTracking || {
             hasTracking: false,
@@ -340,13 +350,8 @@ export async function POST(req: Request) {
       }
     }
 
-    // 6. Geração Dinâmica da Cobrança Pix com QR Code Real pelo Gateway
-    const pixCharge = await createPixCharge({
-      orderNumber,
-      amountCents: totalCents,
-      customer,
-    });
-    const { pixCode, qrCodeBase64, expiresAt, provider } = pixCharge;
+    // Persist the immutable price snapshot before contacting the payment provider.
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
     const now = new Date();
 
     // 7. Persistência e Congelamento de Snapshot Imutável de Venda no Appwrite
@@ -372,16 +377,28 @@ export async function POST(req: Request) {
           subtotalCents: item.subtotalCents,
         })),
         payment: {
-          provider: "pix_xpoint",
+          provider: "mercadopago",
+          method: paymentMethod,
           amountCents: totalCents,
           status: "pending",
-          pixCode,
+          pixCode: "",
           expiresAt,
         },
       });
     } catch (persistErr: any) {
-      console.warn("Aviso: Registro no Appwrite falhou, prosseguindo com dados em memória:", persistErr?.message);
+      console.error("Não foi possível persistir o pedido antes do pagamento.");
+      return NextResponse.json({ error: "Não foi possível salvar o pedido. Nenhuma cobrança foi iniciada. Tente novamente." }, { status: 503 });
     }
+
+    const payment = await createMercadoPagoPayment({
+      orderId: appwriteResult!.orderId, orderNumber, amountCents: totalCents, customer, method: paymentMethod,
+    });
+    await updateMercadoPagoPayment(appwriteResult!.orderId, {
+      pix_code: payment.pixCode, expires_at: payment.expiresAt,
+      gateway_payment_id: "gatewayPaymentId" in payment ? payment.gatewayPaymentId : "",
+      gateway_preference_id: "gatewayPreferenceId" in payment ? payment.gatewayPreferenceId : "",
+      checkout_url: "checkoutUrl" in payment ? payment.checkoutUrl : "",
+    });
 
     const orderDetails: OrderDetails = {
       id: appwriteResult?.orderId || orderId,
@@ -395,13 +412,7 @@ export async function POST(req: Request) {
       shippingMethod: selectedShippingInfo,
       totalCents,
       status: "awaiting_payment",
-      payment: {
-        status: "pending",
-        method: "pix",
-        pixCode,
-        qrCodeUrl: qrCodeBase64,
-        expiresAt,
-      },
+      payment: { ...payment, statusToken: checkoutStatusToken(appwriteResult!.orderId) },
       manufacturingSheets,
     };
 
@@ -426,7 +437,7 @@ export async function POST(req: Request) {
   } catch (error: any) {
     console.error("Erro no processamento do checkout:", error);
     return NextResponse.json(
-      { error: "Erro interno no servidor ao processar o checkout: " + (error?.message || "Desconhecido") },
+      { error: "Não foi possível concluir o pedido. Tente novamente em instantes." },
       { status: 500 }
     );
   }

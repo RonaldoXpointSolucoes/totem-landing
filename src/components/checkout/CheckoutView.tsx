@@ -97,7 +97,8 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   const [checkoutCouponInput, setCheckoutCouponInput] = useState("");
 
   // Estados do Fluxo
-  const [step, setStep] = useState<"form" | "awaiting_pix" | "paid">("form");
+  const [step, setStep] = useState<"form" | "awaiting_pix" | "awaiting_card" | "paid">("form");
+  const [paymentMethod, setPaymentMethod] = useState<"pix" | "credit_card">("pix");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
@@ -123,6 +124,21 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   // Estados Pix
   const [copied, setCopied] = useState(false);
   const [timeLeftSeconds, setTimeLeftSeconds] = useState(1800); // 30 minutos
+  const [paymentNotice, setPaymentNotice] = useState("");
+
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem("totem_pending_payment");
+      if (saved) {
+        const order: OrderDetails = JSON.parse(saved);
+        if (order.payment?.statusToken && order.status === "awaiting_payment") {
+          setOrderDetails(order);
+          setPaymentMethod(order.payment.method);
+          setStep(order.payment.method === "credit_card" ? "awaiting_card" : "awaiting_pix");
+        }
+      }
+    } catch { sessionStorage.removeItem("totem_pending_payment"); }
+  }, []);
 
   // Estados de Frete & Entrega com Resiliência Avançada
   const [shippingQuotes, setShippingQuotes] = useState<ShippingQuote[]>([]);
@@ -136,19 +152,21 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   // Timer decrescente para a tela de Pix
   useEffect(() => {
     if (step !== "awaiting_pix") return;
+    const updateTimer = () => setTimeLeftSeconds(Math.max(0, Math.ceil((Date.parse(orderDetails?.payment.expiresAt || "") - Date.now()) / 1000)));
+    updateTimer();
     const interval = setInterval(() => {
-      setTimeLeftSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+      updateTimer();
     }, 1000);
     return () => clearInterval(interval);
-  }, [step]);
+  }, [step, orderDetails?.payment.expiresAt]);
 
   // Live polling automático em tempo real para detectar compensação do Pix via Webhook
   useEffect(() => {
-    if (step !== "awaiting_pix" || !orderDetails?.id) return;
+    if (!["awaiting_pix", "awaiting_card"].includes(step) || !orderDetails?.id) return;
 
     const pollInterval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/checkout/status?orderId=${orderDetails.id}`);
+        const res = await fetch(`/api/checkout/status?orderId=${encodeURIComponent(orderDetails.id)}&token=${encodeURIComponent(orderDetails.payment.statusToken || "")}`, { cache: "no-store" });
         const data = await res.json();
         if (data.ok && data.isPaid) {
           trackEvent(ANALYTICS_EVENTS.PURCHASE, {
@@ -172,13 +190,18 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
               : null
           );
           setStep("paid");
+          sessionStorage.removeItem("totem_pending_payment");
           clearCart();
           window.scrollTo({ top: 0, behavior: "smooth" });
+        } else if (data.expired) {
+          setPaymentNotice("Este pagamento expirou. Volte para gerar um novo pedido.");
+        } else if (["failed", "cancelled", "refunded", "charged_back"].includes(data.paymentStatus)) {
+          setPaymentNotice("Pagamento não concluído. Volte ao checkout para tentar novamente.");
         }
       } catch (err) {
         // Silencioso em caso de oscilação transitória
       }
-    }, 2500);
+    }, 5000);
 
     return () => clearInterval(pollInterval);
   }, [step, orderDetails?.id, clearCart]);
@@ -288,7 +311,12 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   const selectedShippingQuote =
     shippingQuotes.find((q) => q.id === selectedShippingId && q.isAvailable) || null;
   const shippingCents = selectedShippingQuote ? selectedShippingQuote.priceCents : 0;
-  const effectiveSubtotalCents = appliedCoupon && finalTotalPriceCents !== undefined ? finalTotalPriceCents : totalPriceCents;
+  const pixSubtotalCents = appliedCoupon && finalTotalPriceCents !== undefined ? finalTotalPriceCents : totalPriceCents;
+  const cardSubtotalCents = Math.max(0, items.reduce((acc, item) => acc + calculateTotemPrice({
+    cabinet: item.configuration.model, color: item.configuration.color, monitor: item.configuration.monitor,
+    printer: item.configuration.printer, barcodeReader: item.configuration.barcodeReader,
+  }).cardTotalPriceCents * item.quantity, 0) - couponDiscountCents);
+  const effectiveSubtotalCents = paymentMethod === "credit_card" ? cardSubtotalCents : pixSubtotalCents;
   const finalTotalCents = effectiveSubtotalCents + shippingCents;
 
   // Busca automática de CEP com alta resiliência (Timeout ViaCEP + Fallback BrasilAPI)
@@ -400,6 +428,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     if (personType === "company" && (!document.trim() || document.replace(/\D/g, "").length < 14)) {
       return setErrorMsg("Por favor, preencha um CNPJ válido da empresa.");
     }
+    if (personType === "individual" && document.replace(/\D/g, "").length !== 11) return setErrorMsg("Informe seu CPF para processar o pagamento.");
     if (!email.trim() || !email.includes("@")) return setErrorMsg("Por favor, informe um e-mail válido.");
     if (!whatsapp.trim() || whatsapp.replace(/\D/g, "").length < 10) {
       return setErrorMsg("Por favor, informe um WhatsApp válido com DDD.");
@@ -415,10 +444,11 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
 
     try {
       const payload = {
+        paymentMethod,
         customer: {
           personType,
           name: name.trim(),
-          document: personType === "company" ? document.trim() : "",
+          document: document.trim(),
           email: email.trim().toLowerCase(),
           whatsapp: whatsapp.trim(),
         },
@@ -471,6 +501,13 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
       });
 
       setOrderDetails(data.order);
+      setPaymentNotice("");
+      sessionStorage.setItem("totem_pending_payment", JSON.stringify(data.order));
+      if (data.order.payment.method === "credit_card") {
+        setStep("awaiting_card");
+        window.location.assign(data.order.payment.checkoutUrl);
+        return;
+      }
       trackEvent(ANALYTICS_EVENTS.PIX_GENERATED, {
         orderId: data.order.id,
         orderNumber: data.order.orderNumber,
@@ -497,30 +534,6 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     setTimeout(() => setCopied(false), 2500);
   };
 
-  // Simulação de Pagamento Confirmado (MVP 0)
-  const handleSimulatePaymentConfirmation = () => {
-    if (!orderDetails) return;
-    trackEvent(ANALYTICS_EVENTS.PURCHASE, {
-      orderId: orderDetails.id,
-      orderNumber: orderDetails.orderNumber,
-      totalPriceCents: orderDetails.totalCents,
-      totalCents: orderDetails.totalCents,
-      source: "manual_simulation",
-    });
-    setOrderDetails({
-      ...orderDetails,
-      status: "paid",
-      payment: {
-        ...orderDetails.payment,
-        status: "paid",
-        paidAt: new Date().toISOString(),
-      },
-    });
-    setStep("paid");
-    clearCart(); // Esvazia o carrinho após confirmação de compra
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
   // ----------------------------------------------------
   // TELA 3: PAGAMENTO CONFIRMADO & FICHA TÉCNICA CNC
   // ----------------------------------------------------
@@ -534,7 +547,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           </div>
 
           <Badge variant="success" className="mx-auto text-xs py-1 px-3">
-            PAGAMENTO PIX CONFIRMADO ✓
+            PAGAMENTO CONFIRMADO ✓
           </Badge>
 
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1d1d1f] dark:text-white tracking-tight">
@@ -718,20 +731,29 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   // ----------------------------------------------------
   // TELA 2: AGUARDANDO PAGAMENTO PIX
   // ----------------------------------------------------
+  if (step === "awaiting_card" && orderDetails) {
+    return (
+      <div className="max-w-lg mx-auto px-4 py-12 space-y-5 text-center">
+        <CreditCard className="w-12 h-12 mx-auto text-blue-600" />
+        <h1 className="text-2xl font-bold">Pagamento com cartão de crédito</h1>
+        <p>Pedido <strong>{orderDetails.orderNumber}</strong> · {formatBRL(orderDetails.totalCents)}</p>
+        <p className="text-sm text-slate-600 dark:text-slate-300">Conclua o pagamento no ambiente seguro do Mercado Pago. Você pode escolher até 10 parcelas, conforme as condições exibidas antes da confirmação.</p>
+        {orderDetails.payment.checkoutUrl && <a href={orderDetails.payment.checkoutUrl} className="block rounded-xl bg-blue-600 px-4 py-3 font-bold text-white">Continuar no Mercado Pago</a>}
+        {paymentNotice && <p role="status" className="text-sm text-amber-700">{paymentNotice}</p>}
+        <Button onClick={() => { sessionStorage.removeItem("totem_pending_payment"); setStep("form"); }} variant="ghost">Voltar ao checkout</Button>
+      </div>
+    );
+  }
+
   if (step === "awaiting_pix" && orderDetails) {
-    // QR Code autêntico gerado pelo Gateway Pix (Data URL ou fallback)
-    const qrCodeUrl =
-      orderDetails.payment.qrCodeUrl ||
-      `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=12&data=${encodeURIComponent(
-        orderDetails.payment.pixCode
-      )}`;
+    const qrCodeUrl = orderDetails.payment.qrCodeUrl || "";
 
     return (
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6 animate-in fade-in-50 duration-500">
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => setStep("form")}
+          onClick={() => { sessionStorage.removeItem("totem_pending_payment"); setStep("form"); }}
           className="text-xs text-slate-600 dark:text-slate-400 hover:text-black dark:hover:text-white"
         >
           <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
@@ -763,7 +785,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
               {formatBRL(orderDetails.totalCents)}
             </span>
             <span className="text-[11px] text-slate-500 mt-1">
-              Beneficiário: TOTEM PRO ENGENHARIA CNC (X-Point)
+              Pagamento processado pelo Mercado Pago
             </span>
           </div>
 
@@ -821,30 +843,8 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
             </div>
           </div>
 
-          {/* Bloco de Simulação / Homologação (MVP 0) */}
-          <div className="p-4 rounded-xl bg-amber-50 dark:bg-gradient-to-r dark:from-amber-950/30 dark:to-indigo-950/30 border border-amber-300 dark:border-amber-500/30 text-left space-y-3">
-            <div className="flex items-start gap-2.5">
-              <Sparkles className="w-5 h-5 text-amber-500 dark:text-amber-400 shrink-0 mt-0.5" />
-              <div>
-                <h4 className="text-xs font-bold text-amber-900 dark:text-white uppercase tracking-wider">
-                  Ambiente de Simulação de Pagamento (MVP 0)
-                </h4>
-                <p className="text-[11px] text-amber-800 dark:text-slate-300 mt-0.5 leading-relaxed">
-                  Para validar o fluxo de ponta a ponta sem efetuar cobrança bancária real nesta fase,
-                  clique no botão abaixo para simular a liquidação imediata do Pix e gerar a Ficha Técnica de Fabricação para a Router CNC.
-                </p>
-              </div>
-            </div>
-
-            <Button
-              variant="primary"
-              size="lg"
-              onClick={handleSimulatePaymentConfirmation}
-              className="w-full font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/20"
-            >
-              ⚡ Simular Pagamento Pix Confirmado
-            </Button>
-          </div>
+          <p className="text-sm text-slate-600 dark:text-slate-300">A confirmação será automática após o Mercado Pago aprovar o pagamento.</p>
+          {paymentNotice && <p role="status" className="text-sm text-amber-700">{paymentNotice}</p>}
         </Card>
       </div>
     );
@@ -869,7 +869,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
 
         <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
           <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-          <span>Checkout Seguro SSL & Pix Direto</span>
+          <span>Checkout seguro · Mercado Pago</span>
         </div>
       </div>
 
@@ -992,6 +992,10 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                 </>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2">
+                    <label htmlFor="checkout-cpf" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">CPF do comprador *</label>
+                    <Input id="checkout-cpf" inputMode="numeric" placeholder="000.000.000-00" value={document} onChange={(e) => setDocument(maskCPF(e.target.value))} required />
+                  </div>
                   <div>
                     <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                       WhatsApp para Acompanhamento *
@@ -1488,7 +1492,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                         {formatBRL(itemPixSubtotal)} <span className="text-[9px] uppercase font-extrabold">no PIX</span>
                       </div>
                       <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                        ou 10x de {formatBRL(Math.round(itemCardSubtotal / 10))} no cartão
+                        {formatBRL(itemCardSubtotal)} no cartão · até 10x com condições no Mercado Pago
                       </div>
                     </div>
                   </div>
@@ -1622,31 +1626,14 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                     <span>Total no PIX à vista:</span>
                   </span>
                   <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
-                    {formatBRL(finalTotalCents)}
+                    {formatBRL(pixSubtotalCents + shippingCents)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center text-[11px] text-slate-500 dark:text-slate-400 px-1">
-                  <span>No Cartão:</span>
+                  <span>No cartão:</span>
                   <span className="font-semibold text-slate-700 dark:text-slate-300">
-                    ou em até 10x de{" "}
-                    {formatBRL(
-                      Math.round(
-                        (items.reduce((acc, it) => {
-                          const p = calculateTotemPrice({
-                            cabinet: it.configuration.model,
-                            color: it.configuration.color,
-                            monitor: it.configuration.monitor,
-                            printer: it.configuration.printer,
-                            barcodeReader: it.configuration.barcodeReader,
-                          });
-                          return acc + p.cardTotalPriceCents * it.quantity;
-                        }, 0) -
-                          couponDiscountCents +
-                          shippingCents) /
-                          10
-                      )
-                    )}{" "}
-                    no cartão
+                    {formatBRL(cardSubtotalCents + shippingCents)} · até 10x
+
                   </span>
                 </div>
               </div>
@@ -1655,12 +1642,26 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
             <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-black/10 dark:border-slate-800/80 text-[11px] text-slate-600 dark:text-slate-400 space-y-1">
               <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-300">
                 <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <span>Garantia de Recálculo Confiável</span>
+                <span>Pagamento seguro</span>
               </div>
               <p>
-                Os preços foram recalculados diretamente pelos nossos servidores conforme especificações de engenharia CNC.
+                Os dados do cartão são informados no ambiente seguro do Mercado Pago. No Pix, use o QR Code ou o código copia e cola.
               </p>
             </div>
+
+            <fieldset className="space-y-3">
+              <legend className="text-sm font-bold mb-3">Como você quer pagar?</legend>
+              <label className={`flex gap-3 rounded-xl border p-3 cursor-pointer ${paymentMethod === "pix" ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30" : "border-slate-200 dark:border-slate-700"}`}>
+                <input type="radio" name="paymentMethod" value="pix" checked={paymentMethod === "pix"} onChange={() => setPaymentMethod("pix")} />
+                <span className="text-sm"><strong className="block">Pix à vista</strong><span>{formatBRL(pixSubtotalCents + shippingCents)} · QR Code e copia e cola</span></span>
+              </label>
+              <label className={`flex gap-3 rounded-xl border p-3 cursor-pointer ${paymentMethod === "credit_card" ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30" : "border-slate-200 dark:border-slate-700"}`}>
+                <input type="radio" name="paymentMethod" value="credit_card" checked={paymentMethod === "credit_card"} onChange={() => setPaymentMethod("credit_card")} />
+                <span className="text-sm"><strong className="block">Cartão de crédito em até 10x</strong><span>{formatBRL(cardSubtotalCents + shippingCents)} · acréscimos e parcelas informados pelo Mercado Pago</span></span>
+              </label>
+              <p className="text-xs text-slate-500">Pagamento processado com segurança pelo Mercado Pago.</p>
+              <p className="flex justify-between text-sm font-bold"><span>Total selecionado</span><span>{formatBRL(finalTotalCents)}</span></p>
+            </fieldset>
 
             <Button
               type="submit"
@@ -1672,11 +1673,11 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
               {isSubmitting ? (
                 <span className="flex items-center justify-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin text-white" />
-                  <span>Processando Pedido e Gerando Pix...</span>
+                  <span>Preparando pagamento...</span>
                 </span>
               ) : (
                 <>
-                  Gerar Pix & Concluir Pedido
+                  {paymentMethod === "pix" ? "Gerar Pix e concluir pedido" : "Pagar com cartão em até 10x"}
                   <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
                 </>
               )}
