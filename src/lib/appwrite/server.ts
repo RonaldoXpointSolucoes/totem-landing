@@ -31,6 +31,16 @@ export interface SaveOrderPayload {
   orderNumber: string;
   customer: CustomerInfo;
   deliveryAddress: DeliveryAddress;
+  shippingMethod?: {
+    id: string;
+    name: string;
+    carrier: string;
+    priceCents: number;
+    deliveryDaysMin: number;
+    deliveryDaysMax: number;
+  } | null;
+  couponCode?: string;
+  discountCents?: number;
   subtotalCents: number;
   shippingCents: number;
   totalCents: number;
@@ -69,7 +79,13 @@ export async function saveOrderWithSnapshot(payload: SaveOrderPayload) {
       customer_document: payload.customer.document,
       customer_email: payload.customer.email,
       customer_whatsapp: payload.customer.whatsapp,
-      delivery_address_json: JSON.stringify(payload.deliveryAddress),
+      delivery_address_json: JSON.stringify({
+        ...payload.deliveryAddress,
+        shippingMethod: payload.shippingMethod || null,
+        paymentMethod: payload.payment.method || "pix",
+        couponCode: payload.couponCode || null,
+        discountCents: payload.discountCents || 0,
+      }),
       subtotal_cents: payload.subtotalCents,
       shipping_cents: payload.shippingCents,
       total_cents: payload.totalCents,

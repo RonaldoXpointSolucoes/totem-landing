@@ -37,6 +37,12 @@ import {
   Target,
   Share2,
   Tag,
+  MapPin,
+  CreditCard,
+  QrCode,
+  Copy,
+  MessageCircle,
+  Printer,
 } from "lucide-react";
 
 interface OrderItem {
@@ -51,6 +57,29 @@ interface OrderItem {
   subtotal_cents: number;
 }
 
+interface ShippingMethodInfo {
+  id?: string;
+  name: string;
+  carrier?: string;
+  priceCents: number;
+  deliveryDaysMin?: number;
+  deliveryDaysMax?: number;
+}
+
+interface ParsedDeliveryAddress {
+  cep?: string;
+  street?: string;
+  number?: string;
+  complement?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  shippingMethod?: ShippingMethodInfo | null;
+  paymentMethod?: "pix" | "credit_card";
+  couponCode?: string | null;
+  discountCents?: number;
+}
+
 interface OrderRecord {
   $id: string;
   order_number: string;
@@ -60,6 +89,11 @@ interface OrderRecord {
   customer_email: string;
   customer_whatsapp: string;
   delivery_address_json: string;
+  delivery_address?: ParsedDeliveryAddress | null;
+  shipping_method?: ShippingMethodInfo | null;
+  manufacturing_sheets?: any[];
+  coupon_code?: string | null;
+  discount_cents?: number;
   subtotal_cents: number;
   shipping_cents: number;
   total_cents: number;
@@ -72,6 +106,9 @@ interface OrderRecord {
     status: string;
     pix_code?: string;
     paid_at?: string;
+    payment_method?: "pix" | "credit_card" | string | null;
+    gateway_payment_id?: string | null;
+    gateway_status?: string | null;
   };
 }
 
@@ -126,6 +163,70 @@ export default function AdminPage() {
 
   // Modal de Detalhes do Pedido / Ficha CNC
   const [selectedOrder, setSelectedOrder] = useState<OrderRecord | null>(null);
+  const [copiedAddressId, setCopiedAddressId] = useState<string | null>(null);
+
+  const getOrderAddress = (order: OrderRecord): ParsedDeliveryAddress | null => {
+    if (order.delivery_address) return order.delivery_address;
+    try {
+      if (order.delivery_address_json) {
+        return JSON.parse(order.delivery_address_json);
+      }
+    } catch {}
+    return null;
+  };
+
+  const getOrderShipping = (order: OrderRecord): ShippingMethodInfo => {
+    if (order.shipping_method) return order.shipping_method;
+    const addr = getOrderAddress(order);
+    if (addr?.shippingMethod) return addr.shippingMethod;
+    if (order.shipping_cents > 0) {
+      return {
+        name: "Transportadora / Correios (Frete Contratado)",
+        carrier: "Logística Homologada",
+        priceCents: order.shipping_cents,
+      };
+    }
+    return {
+      name: "Retirada na Fábrica / Frete Isento",
+      carrier: "X-Point Engenharia (SP)",
+      priceCents: 0,
+    };
+  };
+
+  const getOrderPaymentMethod = (order: OrderRecord): "pix" | "credit_card" => {
+    const addr = getOrderAddress(order);
+    const raw = order.payment?.payment_method || addr?.paymentMethod || "pix";
+    return raw === "credit_card" ? "credit_card" : "pix";
+  };
+
+  const getOrderSheets = (order: OrderRecord): any[] => {
+    if (Array.isArray(order.manufacturing_sheets) && order.manufacturing_sheets.length > 0) {
+      return order.manufacturing_sheets;
+    }
+    try {
+      if (order.manufacturing_sheet_json) {
+        const parsed = JSON.parse(order.manufacturing_sheet_json);
+        return Array.isArray(parsed) ? parsed : [];
+      }
+    } catch {}
+    return [];
+  };
+
+  const formatFullAddressText = (addr: ParsedDeliveryAddress | null): string => {
+    if (!addr || !addr.street) return "Endereço não informado";
+    const comp = addr.complement ? ` (${addr.complement})` : "";
+    const neigh = addr.neighborhood ? ` - Bairro ${addr.neighborhood}` : "";
+    const cityState = addr.city ? ` - ${addr.city}/${addr.state || "SP"}` : "";
+    const cep = addr.cep ? ` - CEP: ${addr.cep}` : "";
+    return `${addr.street}, nº ${addr.number || "S/N"}${comp}${neigh}${cityState}${cep}`;
+  };
+
+  const handleCopyAddress = (orderId: string, addr: ParsedDeliveryAddress | null, customerName?: string) => {
+    const text = `${customerName ? `Destinatário: ${customerName}\n` : ""}${formatFullAddressText(addr)}`;
+    navigator.clipboard.writeText(text);
+    setCopiedAddressId(orderId);
+    setTimeout(() => setCopiedAddressId(null), 2500);
+  };
 
   // Auditoria
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([
@@ -706,20 +807,30 @@ export default function AdminPage() {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-1 gap-5">
                 {filteredOrders.map((order) => {
                   const statusInfo = STATUS_CONFIG[order.status] || STATUS_CONFIG.awaiting_payment;
                   const StatusIcon = statusInfo.icon;
-                  const itemsCount = order.items?.length || 0;
+                  const addr = getOrderAddress(order);
+                  const shipping = getOrderShipping(order);
+                  const payMethod = getOrderPaymentMethod(order);
+                  const sheets = getOrderSheets(order);
+                  const cleanPhone = (order.customer_whatsapp || "").replace(/\D/g, "");
+                  const waHref = cleanPhone
+                    ? `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(
+                        `Olá ${order.customer_name || ""}, referente ao seu pedido ${order.order_number} na Totem Pro:`
+                      )}`
+                    : null;
 
                   return (
                     <div
                       key={order.$id}
-                      className="bg-slate-900/70 border border-slate-800/90 hover:border-slate-700/80 rounded-2xl p-5 transition-all shadow-lg flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+                      className="bg-slate-900/80 border border-slate-800 hover:border-indigo-500/40 rounded-3xl p-4 sm:p-6 transition-all shadow-xl space-y-4"
                     >
-                      <div className="space-y-2">
+                      {/* Topo do Card: Número do Pedido, Status, Pagamento, Método de Entrega e Ações Rápidas */}
+                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3.5 border-b border-slate-800/80">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-extrabold text-white text-base font-mono">
+                          <span className="font-extrabold text-white text-base sm:text-lg font-mono tracking-tight">
                             {order.order_number}
                           </span>
                           <span
@@ -728,44 +839,43 @@ export default function AdminPage() {
                             <StatusIcon className="w-3.5 h-3.5" />
                             <span>{statusInfo.label}</span>
                           </span>
-                          <span className="text-xs text-slate-500">
+
+                          {/* Badge Forma de Pagamento */}
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-[11px] font-extrabold border flex items-center gap-1.5 ${
+                              payMethod === "credit_card"
+                                ? "bg-indigo-500/15 text-indigo-300 border-indigo-500/30"
+                                : "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                            }`}
+                          >
+                            {payMethod === "credit_card" ? (
+                              <CreditCard className="w-3.5 h-3.5" />
+                            ) : (
+                              <QrCode className="w-3.5 h-3.5" />
+                            )}
+                            <span>{payMethod === "credit_card" ? "CARTÃO DE CRÉDITO" : "PIX À VISTA"}</span>
+                          </span>
+
+                          {/* Badge Método de Entrega */}
+                          <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 flex items-center gap-1.5">
+                            <Truck className="w-3.5 h-3.5" />
+                            <span>
+                              {shipping.name}{" "}
+                              {order.shipping_cents > 0 ? `(${formatBRL(order.shipping_cents)})` : "(Isento)"}
+                            </span>
+                          </span>
+
+                          <span className="text-xs text-slate-500 font-mono">
                             {new Date(order.$createdAt).toLocaleString("pt-BR")}
                           </span>
                         </div>
 
-                        <div className="text-xs text-slate-300">
-                          <span className="font-bold text-white">{order.customer_name}</span> •{" "}
-                          <span className="text-slate-400">{order.customer_document}</span> •{" "}
-                          <span className="text-slate-400">{order.customer_whatsapp}</span>
-                        </div>
-
-                        {/* Itens Gravados com Snapshot */}
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          {order.items?.map((it, idx) => (
-                            <span
-                              key={idx}
-                              className="text-[11px] px-2.5 py-1 rounded-lg bg-slate-950/80 border border-slate-800 text-slate-300"
-                            >
-                              <strong>{it.quantity}x</strong> {it.cabinet_name} ({it.color_name})
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between lg:justify-end gap-3 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-800/80">
-                        <div className="text-right sm:pr-4">
-                          <div className="text-[11px] text-slate-400">Total Faturado</div>
-                          <div className="text-lg font-extrabold text-indigo-400">
-                            {formatBRL(order.total_cents)}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 w-full sm:w-auto">
-                          {/* Botão de Transição Rápida de Status */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          {/* Seletor rápido de Status */}
                           <select
                             value={order.status}
                             onChange={(e) => handleUpdateOrderStatus(order.$id, e.target.value)}
-                            className="bg-slate-950 border border-slate-800 text-xs rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500"
+                            className="bg-slate-950 border border-slate-800 text-xs rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"
                           >
                             {Object.entries(STATUS_CONFIG).map(([k, cfg]) => (
                               <option key={k} value={k}>
@@ -774,14 +884,211 @@ export default function AdminPage() {
                             ))}
                           </select>
 
-                          {/* Botão de Ver Ficha CNC */}
+                          {/* Botão de Ver Pedido Completo & Ficha CNC */}
                           <button
                             onClick={() => setSelectedOrder(order)}
-                            className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-600/20 transition-all shrink-0"
+                            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-600/25 transition-all shrink-0 cursor-pointer"
                           >
                             <Eye className="w-3.5 h-3.5" />
-                            <span>Ficha CNC</span>
+                            <span>Ver Pedido Completo & Ficha CNC</span>
                           </button>
+                        </div>
+                      </div>
+
+                      {/* Painel de Conferência em 3 Colunas: (1) Cliente & Endereço, (2) Entrega & Pagamento, (3) Detalhes na Escolha */}
+                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 text-xs">
+                        {/* 1-) CLIENTE & ENDEREÇO DE ENTREGA */}
+                        <div className="lg:col-span-4 bg-slate-950/80 border border-slate-800/80 rounded-2xl p-3.5 space-y-2.5 flex flex-col justify-between">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-black uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
+                                <MapPin className="w-3.5 h-3.5" />
+                                <span>1. Cliente & Endereço de Entrega</span>
+                              </span>
+                              {addr?.street && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyAddress(order.$id, addr, order.customer_name)}
+                                  className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1 transition-colors cursor-pointer"
+                                  title="Copiar endereço completo para etiqueta de envio"
+                                >
+                                  <Copy className="w-3 h-3" />
+                                  <span>{copiedAddressId === order.$id ? "Copiado!" : "Copiar Endereço"}</span>
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="space-y-0.5 text-slate-300 border-b border-slate-800/70 pb-2">
+                              <p className="font-bold text-white text-xs sm:text-sm">{order.customer_name}</p>
+                              <p className="text-[11px] text-slate-400 font-mono">
+                                CPF/CNPJ: <strong className="text-slate-200">{order.customer_document || "—"}</strong>
+                              </p>
+                              <p className="text-[11px] text-slate-400 truncate">
+                                E-mail: <span className="text-slate-300">{order.customer_email || "—"}</span>
+                              </p>
+                              <div className="flex items-center justify-between gap-2 pt-0.5">
+                                <span className="text-[11px] text-slate-400">
+                                  WhatsApp: <strong className="text-slate-200">{order.customer_whatsapp || "—"}</strong>
+                                </span>
+                                {waHref && (
+                                  <a
+                                    href={waHref}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
+                                  >
+                                    <MessageCircle className="w-3 h-3" />
+                                    <span>Chamar</span>
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Endereço de Entrega */}
+                            {addr && addr.street ? (
+                              <div className="space-y-0.5 text-[11px] text-slate-300">
+                                <p className="font-bold text-white">
+                                  {addr.street}, nº {addr.number || "S/N"}
+                                  {addr.complement ? ` • ${addr.complement}` : ""}
+                                </p>
+                                <p className="text-slate-400">
+                                  Bairro: <strong className="text-slate-200">{addr.neighborhood || "—"}</strong>
+                                </p>
+                                <p className="text-slate-400">
+                                  Cidade/UF:{" "}
+                                  <strong className="text-cyan-300">
+                                    {addr.city}/{addr.state || "SP"}
+                                  </strong>{" "}
+                                  • CEP: <strong className="font-mono text-white">{addr.cep}</strong>
+                                </p>
+                              </div>
+                            ) : (
+                              <p className="text-[11px] text-slate-500 italic">
+                                Endereço não registrado neste pedido.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 2-) MÉTODO DE ENTREGA & CONFERÊNCIA DE PAGAMENTO */}
+                        <div className="lg:col-span-4 bg-slate-950/80 border border-slate-800/80 rounded-2xl p-3.5 space-y-2.5 flex flex-col justify-between">
+                          <div className="space-y-2">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
+                              <Truck className="w-3.5 h-3.5" />
+                              <span>2. Método de Entrega & Pagamento</span>
+                            </span>
+
+                            {/* Box Método de Envio */}
+                            <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[10px] uppercase font-bold text-slate-400">Modalidade de Frete:</span>
+                                <span className="text-[11px] font-extrabold text-cyan-300">
+                                  {order.shipping_cents > 0 ? formatBRL(order.shipping_cents) : "Grátis / Isento"}
+                                </span>
+                              </div>
+                              <p className="font-bold text-white text-xs">{shipping.name}</p>
+                              <p className="text-[10px] text-slate-400">
+                                {shipping.carrier ? `Transportadora: ${shipping.carrier}` : ""}
+                                {shipping.deliveryDaysMin && shipping.deliveryDaysMax
+                                  ? ` • Prazo: ${shipping.deliveryDaysMin} a ${shipping.deliveryDaysMax} dias úteis`
+                                  : ""}
+                              </p>
+                            </div>
+
+                            {/* Box Demonstrativo Financeiro (O que o cliente pagou) */}
+                            <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1 text-[11px]">
+                              <div className="flex justify-between text-slate-400">
+                                <span>Subtotal dos Gabinetes:</span>
+                                <span className="font-semibold text-slate-200">{formatBRL(order.subtotal_cents)}</span>
+                              </div>
+                              {(order.discount_cents || addr?.discountCents) ? (
+                                <div className="flex justify-between text-emerald-400">
+                                  <span>Cupom ({order.coupon_code || addr?.couponCode}):</span>
+                                  <span className="font-bold">
+                                    - {formatBRL(order.discount_cents || addr?.discountCents || 0)}
+                                  </span>
+                                </div>
+                              ) : null}
+                              <div className="flex justify-between text-slate-400">
+                                <span>Frete ({shipping.name.split(" ")[0]}):</span>
+                                <span className="font-semibold text-slate-200">
+                                  {order.shipping_cents > 0 ? `+ ${formatBRL(order.shipping_cents)}` : "R$ 0,00"}
+                                </span>
+                              </div>
+                              <div className="pt-1.5 border-t border-slate-800 flex items-baseline justify-between">
+                                <span className="font-bold text-white">
+                                  Valor Pago ({payMethod === "credit_card" ? "Cartão" : "PIX"}):
+                                </span>
+                                <span className="text-base font-black text-emerald-400">
+                                  {formatBRL(order.total_cents)}
+                                </span>
+                              </div>
+                              {order.payment?.gateway_payment_id && (
+                                <p className="text-[10px] text-slate-500 font-mono pt-0.5">
+                                  ID Mercado Pago: #{order.payment.gateway_payment_id}
+                                  {order.payment.paid_at
+                                    ? ` • Pago em ${new Date(order.payment.paid_at).toLocaleString("pt-BR")}`
+                                    : ""}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 3-) DETALHES NA ESCOLHA (ITENS E EQUIPAMENTOS DO PEDIDO) */}
+                        <div className="lg:col-span-4 bg-slate-950/80 border border-slate-800/80 rounded-2xl p-3.5 space-y-2.5 flex flex-col justify-between">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                                <Package className="w-3.5 h-3.5" />
+                                <span>3. Detalhes na Escolha ({order.items?.length || 0} item/ns)</span>
+                              </span>
+                            </div>
+
+                            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                              {order.items?.map((it, idx) => {
+                                const sheet = sheets[idx] || null;
+                                return (
+                                  <div
+                                    key={it.$id || idx}
+                                    className="p-2.5 rounded-xl bg-slate-900/95 border border-slate-800 space-y-1.5 text-[11px]"
+                                  >
+                                    <div className="flex items-center justify-between gap-2 border-b border-slate-800/80 pb-1">
+                                      <span className="font-extrabold text-white">
+                                        {it.quantity}x {it.cabinet_name}
+                                      </span>
+                                      <span className="font-bold text-indigo-400 font-mono">
+                                        {formatBRL(it.subtotal_cents)}
+                                      </span>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-0.5 text-slate-300">
+                                      <p>
+                                        <span className="text-slate-500">Acabamento/Cor:</span>{" "}
+                                        <strong className="text-white">{it.color_name}</strong>
+                                      </p>
+                                      <p>
+                                        <span className="text-slate-500">Monitor:</span>{" "}
+                                        <strong className="text-cyan-300">{it.monitor_name || "Nenhum"}</strong>
+                                      </p>
+                                      {sheet?.screenSpecs?.screenCutoutMm && (
+                                        <p className="text-[10px] text-slate-400 pl-2 border-l-2 border-cyan-500/40">
+                                          {sheet.screenSpecs.screenCutoutMm}
+                                        </p>
+                                      )}
+                                      <p>
+                                        <span className="text-slate-500">Impressora:</span>{" "}
+                                        <strong className="text-slate-200">{it.printer_name || "Nenhuma"}</strong>
+                                      </p>
+                                      <p>
+                                        <span className="text-slate-500">Leitor 2D/QR:</span>{" "}
+                                        <strong className="text-slate-200">{it.reader_name || "Sem leitor"}</strong>
+                                      </p>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1055,207 +1362,491 @@ export default function AdminPage() {
       </main>
 
       {/* ======================================================== */}
-      {/* MODAL: DETALHES DO PEDIDO & FICHA TÉCNICA CNC */}
+      {/* MODAL: ESPELHO COMPLETO DO PEDIDO DE COMPRA & FICHA TÉCNICA CNC */}
       {/* ======================================================== */}
-      {selectedOrder && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 space-y-6 shadow-2xl relative animate-fade-in">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div>
-                <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">
-                  Ficha Técnica de Fabricação CNC
-                </span>
-                <h2 className="text-xl font-extrabold text-white font-mono mt-0.5">
-                  {selectedOrder.order_number}
-                </h2>
-              </div>
-              <button
-                onClick={() => setSelectedOrder(null)}
-                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
+      {selectedOrder && (() => {
+        const modalAddr = getOrderAddress(selectedOrder);
+        const modalShipping = getOrderShipping(selectedOrder);
+        const modalPayMethod = getOrderPaymentMethod(selectedOrder);
+        const modalSheets = getOrderSheets(selectedOrder);
+        const modalStatusInfo = STATUS_CONFIG[selectedOrder.status] || STATUS_CONFIG.awaiting_payment;
+        const ModalStatusIcon = modalStatusInfo.icon;
+        const cleanModalPhone = (selectedOrder.customer_whatsapp || "").replace(/\D/g, "");
+        const modalWaHref = cleanModalPhone
+          ? `https://wa.me/55${cleanModalPhone}?text=${encodeURIComponent(
+              `Olá ${selectedOrder.customer_name || ""}, referente ao seu pedido ${selectedOrder.order_number} na Totem Pro:`
+            )}`
+          : null;
 
-            {/* Dados do Cliente */}
-            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800/80 space-y-2 text-xs">
-              <h4 className="font-bold text-white uppercase text-[11px] tracking-wider text-slate-400">
-                Cliente e Faturamento
-              </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-300">
-                <div>
-                  <span className="text-slate-500">Nome:</span> {selectedOrder.customer_name}
-                </div>
-                <div>
-                  <span className="text-slate-500">Documento:</span> {selectedOrder.customer_document}
-                </div>
-                <div>
-                  <span className="text-slate-500">E-mail:</span> {selectedOrder.customer_email}
-                </div>
-                <div>
-                  <span className="text-slate-500">WhatsApp:</span> {selectedOrder.customer_whatsapp}
-                </div>
-              </div>
-            </div>
-
-            {/* Itens Faturados com Snapshot Imutável */}
-            <div className="space-y-3">
-              <h4 className="font-bold text-white text-xs uppercase tracking-wider text-slate-400">
-                Componentes de Fabricação (Snapshot Imutável)
-              </h4>
-              {selectedOrder.items?.map((item, idx) => (
-                <div
-                  key={idx}
-                  className="bg-slate-950 p-4 rounded-2xl border border-slate-800/80 space-y-2 text-xs"
-                >
-                  <div className="flex justify-between items-center font-bold text-sm text-white">
-                    <span>
-                      {item.quantity}x {item.cabinet_name}
+        return (
+          <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl w-full max-h-[94dvh] flex flex-col overflow-hidden shadow-2xl relative animate-fade-in">
+              {/* Cabeçalho Fixo da Ordem de Compra */}
+              <div className="flex flex-wrap items-center justify-between gap-3 px-5 sm:px-7 py-4 border-b border-slate-800 bg-slate-900/95 shrink-0">
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] font-black text-indigo-400 uppercase tracking-wider">
+                      Ordem de Compra Completa & Ficha CNC
                     </span>
-                    <span className="text-indigo-400">{formatBRL(item.subtotal_cents)}</span>
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border flex items-center gap-1 ${modalStatusInfo.color}`}
+                    >
+                      <ModalStatusIcon className="w-3 h-3" />
+                      <span>{modalStatusInfo.label}</span>
+                    </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-slate-300 pt-1 text-[11px]">
-                    <div>
-                      <span className="text-slate-500">Acabamento:</span> {item.color_name}
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Monitor:</span> {item.monitor_name || "Nenhum"}
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Impressora:</span> {item.printer_name || "Nenhum"}
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Scanner Óptico:</span> {item.reader_name || "Nenhum"}
-                    </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <h2 className="text-lg sm:text-2xl font-extrabold text-white font-mono">
+                      {selectedOrder.order_number}
+                    </h2>
+                    <span className="text-xs text-slate-400">
+                      Emitido em: {new Date(selectedOrder.$createdAt).toLocaleString("pt-BR")}
+                    </span>
                   </div>
                 </div>
-              ))}
-            </div>
 
-            {/* Pagamento Pix */}
-            <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 flex justify-between items-center text-xs">
-              <div>
-                <span className="text-slate-500 block">Status Financeiro Pix</span>
-                <span className="font-bold text-emerald-400">
-                  {selectedOrder.payment?.status === "paid" ? "PIX LIQUIDADO" : "AGUARDANDO PAGAMENTO"}
-                </span>
-              </div>
-              <div className="text-right">
-                <span className="text-slate-500 block">Valor Total</span>
-                <span className="text-lg font-extrabold text-white">
-                  {formatBRL(selectedOrder.total_cents)}
-                </span>
-              </div>
-            </div>
-
-            {/* Avaliação e Precificação de Personalização Especial (Engenharia CNC) */}
-            {selectedOrder.status === "awaiting_custom_analysis" ||
-            selectedOrder.status === "custom_approved" ||
-            selectedOrder.order_number.startsWith("CUST-") ? (
-              <div className="p-5 rounded-2xl bg-indigo-950/30 border border-indigo-500/30 space-y-4">
                 <div className="flex items-center gap-2">
-                  <Wrench className="w-5 h-5 text-indigo-400" />
-                  <h4 className="font-extrabold text-white text-sm">
-                    Painel do Engenheiro CNC — Avaliação de Gabarito & Corte
-                  </h4>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <label className="block text-slate-400 font-semibold mb-1">
-                      Acréscimo de Usinagem CNC (R$)
-                    </label>
-                    <input
-                      type="number"
-                      placeholder="Ex: 280.00"
-                      defaultValue={(selectedOrder.total_cents - selectedOrder.subtotal_cents) / 100 || 0}
-                      id="custom_adj_input"
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-slate-400 font-semibold mb-1">
-                      Parecer Técnico de Engenharia
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Ex: Viável corte sob medida com folga +1.5mm"
-                      defaultValue="Viável usinagem e fixação com gabarito especial."
-                      id="custom_notes_input"
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-2 pt-2">
                   <button
-                    onClick={async () => {
-                      const adjInput = document.getElementById("custom_adj_input") as HTMLInputElement;
-                      const notesInput = document.getElementById("custom_notes_input") as HTMLInputElement;
-                      const adjVal = Math.round(parseFloat(adjInput?.value || "0") * 100);
-                      const notesVal = notesInput?.value || "";
-
-                      const res = await fetch(`/api/customizations/${selectedOrder.$id}`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          feasibility: "approved",
-                          customAdjustmentCents: adjVal,
-                          engineeringNotes: notesVal,
-                        }),
-                      });
-                      const json = await res.json();
-                      if (json.ok) {
-                        addAuditLog(
-                          "Aprovação de Orçamento Especial",
-                          selectedOrder.order_number,
-                          `Aprovado com acréscimo de ${formatBRL(adjVal)}`
-                        );
-                        loadOrders();
-                        setSelectedOrder(null);
-                      }
-                    }}
-                    className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-emerald-600/20"
+                    type="button"
+                    onClick={() => window.print()}
+                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition-colors cursor-pointer"
+                    title="Imprimir Ordem de Compra e Ficha CNC"
                   >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Aprovar Orçamento e Liberar ao Cliente</span>
+                    <Printer className="w-3.5 h-3.5 text-cyan-400" />
+                    <span className="hidden sm:inline">Imprimir Pedido</span>
                   </button>
-
                   <button
-                    onClick={async () => {
-                      const res = await fetch(`/api/customizations/${selectedOrder.$id}`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          feasibility: "rejected",
-                          customAdjustmentCents: 0,
-                          engineeringNotes: "Inviável dimensionalmente para este padrão de gabinete.",
-                        }),
-                      });
-                      const json = await res.json();
-                      if (json.ok) {
-                        addAuditLog("Recusa de Orçamento Especial", selectedOrder.order_number, "Inviável");
-                        loadOrders();
-                        setSelectedOrder(null);
-                      }
-                    }}
-                    className="px-4 py-2.5 bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 font-bold rounded-xl text-xs transition-all"
+                    type="button"
+                    onClick={() => setSelectedOrder(null)}
+                    className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-rose-500/20 hover:text-rose-300 flex items-center justify-center text-slate-400 transition-colors cursor-pointer"
                   >
-                    Recusar Inviável
+                    ✕
                   </button>
                 </div>
               </div>
-            ) : null}
 
-            <button
-              onClick={() => setSelectedOrder(null)}
-              className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-xs transition-all"
-            >
-              Fechar Ficha Técnica
-            </button>
+              {/* Corpo Rolável do Pedido Completo */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-7 space-y-5">
+                {/* LINHA 1: DADOS DO CLIENTE + ENDEREÇO DE ENTREGA E MÉTODO DE ENVIO */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Card 1: Dados do Comprador */}
+                  <div className="bg-slate-950 p-4 sm:p-5 rounded-2xl border border-slate-800/90 space-y-3 text-xs">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <h4 className="font-black text-indigo-400 uppercase text-[11px] tracking-wider flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5" />
+                        <span>Dados do Comprador / Faturamento</span>
+                      </h4>
+                      {modalWaHref && (
+                        <a
+                          href={modalWaHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-bold text-[11px] flex items-center gap-1 transition-colors"
+                        >
+                          <MessageCircle className="w-3 h-3" />
+                          <span>WhatsApp</span>
+                        </a>
+                      )}
+                    </div>
+                    <div className="space-y-1.5 text-slate-300">
+                      <div className="flex justify-between gap-2">
+                        <span className="text-slate-500">Nome / Razão Social:</span>
+                        <strong className="text-white text-right">{selectedOrder.customer_name}</strong>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-slate-500">CPF / CNPJ:</span>
+                        <strong className="text-slate-200 font-mono">{selectedOrder.customer_document || "—"}</strong>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-slate-500">E-mail:</span>
+                        <span className="text-slate-200 break-all text-right">{selectedOrder.customer_email || "—"}</span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-slate-500">WhatsApp / Telefone:</span>
+                        <strong className="text-emerald-400">{selectedOrder.customer_whatsapp || "—"}</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Endereço de Entrega & Método de Frete */}
+                  <div className="bg-slate-950 p-4 sm:p-5 rounded-2xl border border-slate-800/90 space-y-3 text-xs">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <h4 className="font-black text-cyan-400 uppercase text-[11px] tracking-wider flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5" />
+                        <span>1. Endereço de Entrega & 2. Método de Envio</span>
+                      </h4>
+                      {modalAddr?.street && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleCopyAddress(`modal_${selectedOrder.$id}`, modalAddr, selectedOrder.customer_name)
+                          }
+                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-[10px] flex items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <Copy className="w-3 h-3" />
+                          <span>
+                            {copiedAddressId === `modal_${selectedOrder.$id}` ? "Endereço Copiado!" : "Copiar Etiqueta"}
+                          </span>
+                        </button>
+                      )}
+                    </div>
+
+                    {modalAddr && modalAddr.street ? (
+                      <div className="space-y-1 text-slate-300">
+                        <p className="font-extrabold text-white text-sm">
+                          {modalAddr.street}, nº {modalAddr.number || "S/N"}
+                          {modalAddr.complement ? ` (${modalAddr.complement})` : ""}
+                        </p>
+                        <p className="text-slate-400">
+                          Bairro: <strong className="text-slate-200">{modalAddr.neighborhood || "—"}</strong>
+                        </p>
+                        <p className="text-slate-400">
+                          Cidade / UF:{" "}
+                          <strong className="text-cyan-300">
+                            {modalAddr.city} / {modalAddr.state || "SP"}
+                          </strong>{" "}
+                          • CEP: <strong className="font-mono text-white">{modalAddr.cep}</strong>
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-slate-500 italic">Endereço não cadastrado neste pedido.</p>
+                    )}
+
+                    {/* Box do Método de Entrega */}
+                    <div className="p-3 rounded-xl bg-cyan-950/25 border border-cyan-500/30 flex items-center justify-between gap-3">
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] uppercase font-extrabold text-cyan-400 block">
+                          Método de Entrega Selecionado:
+                        </span>
+                        <p className="font-extrabold text-white text-xs sm:text-sm">{modalShipping.name}</p>
+                        <p className="text-[11px] text-slate-400">
+                          {modalShipping.carrier ? `${modalShipping.carrier}` : ""}
+                          {modalShipping.deliveryDaysMin && modalShipping.deliveryDaysMax
+                            ? ` • Prazo estimado: ${modalShipping.deliveryDaysMin} a ${modalShipping.deliveryDaysMax} dias úteis`
+                            : ""}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-[10px] text-slate-400 block">Valor do Frete</span>
+                        <span className="text-sm font-black text-cyan-300">
+                          {selectedOrder.shipping_cents > 0 ? formatBRL(selectedOrder.shipping_cents) : "Grátis"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* LINHA 2: DETALHES NA ESCOLHA (ESPELHO COMERCIAL + FICHA TÉCNICA DE CORTE CNC) */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-black text-emerald-400 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                      <Package className="w-4 h-4" />
+                      <span>
+                        3. Detalhes na Escolha do Cliente & Especificações de Usinagem CNC (
+                        {selectedOrder.items?.length || 0} item/ns)
+                      </span>
+                    </h4>
+                  </div>
+
+                  <div className="space-y-3">
+                    {selectedOrder.items?.map((item, idx) => {
+                      const sheet = modalSheets[idx] || null;
+                      return (
+                        <div
+                          key={item.$id || idx}
+                          className="bg-slate-950 p-4 sm:p-5 rounded-2xl border border-slate-800/90 space-y-3 text-xs"
+                        >
+                          {/* Cabeçalho do Item */}
+                          <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-800">
+                            <div className="flex items-center gap-2.5">
+                              <span className="w-7 h-7 rounded-xl bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 font-black text-xs flex items-center justify-center">
+                                #{idx + 1}
+                              </span>
+                              <div>
+                                <h5 className="font-extrabold text-sm sm:text-base text-white">
+                                  {item.quantity}x {item.cabinet_name}
+                                </h5>
+                                <p className="text-[11px] text-slate-400">
+                                  Valor Unitário: <strong className="text-slate-200">{formatBRL(item.unit_price_cents)}</strong>
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-[10px] text-slate-500 uppercase font-bold block">Subtotal do Item</span>
+                              <span className="text-base font-black text-indigo-400 font-mono">
+                                {formatBRL(item.subtotal_cents)}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Escolhas do Cliente no Configurador */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                            <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800/80">
+                              <span className="text-[10px] font-bold uppercase text-slate-500 block">
+                                Acabamento / Cor
+                              </span>
+                              <strong className="text-white text-xs">{item.color_name}</strong>
+                            </div>
+                            <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800/80">
+                              <span className="text-[10px] font-bold uppercase text-slate-500 block">
+                                Monitor / Kit Escolhido
+                              </span>
+                              <strong className="text-cyan-300 text-xs">{item.monitor_name || "Nenhum"}</strong>
+                            </div>
+                            <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800/80">
+                              <span className="text-[10px] font-bold uppercase text-slate-500 block">
+                                Impressora Térmica
+                              </span>
+                              <strong className="text-white text-xs">{item.printer_name || "Nenhuma"}</strong>
+                            </div>
+                            <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800/80">
+                              <span className="text-[10px] font-bold uppercase text-slate-500 block">
+                                Leitor / Scanner 2D
+                              </span>
+                              <strong className="text-white text-xs">{item.reader_name || "Sem leitor frontal"}</strong>
+                            </div>
+                          </div>
+
+                          {/* Detalhamento Técnico de Corte Router CNC (se disponível na ficha) */}
+                          {sheet && (
+                            <div className="p-3 rounded-xl bg-indigo-950/20 border border-indigo-500/25 space-y-2 text-[11px]">
+                              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-500/20 pb-1.5">
+                                <span className="font-black text-indigo-300 uppercase text-[10px] tracking-wider">
+                                  Gabarito de Usinagem Router CNC — Item #{idx + 1}
+                                </span>
+                                {sheet.dimensionsMm && (
+                                  <span className="font-mono text-slate-300 text-[10px]">
+                                    Dimensões Gabinete: {sheet.dimensionsMm.heightMm}×{sheet.dimensionsMm.widthMm}×
+                                    {sheet.dimensionsMm.depthMm} mm
+                                    {sheet.dimensionsMm.weightKg ? ` • ${sheet.dimensionsMm.weightKg}kg` : ""}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-slate-300">
+                                <div>
+                                  <span className="text-slate-500 font-semibold block text-[10px]">
+                                    Corte de Tela e VESA:
+                                  </span>
+                                  <p className="text-slate-200">{sheet.screenSpecs?.screenCutoutMm || "—"}</p>
+                                  <p className="text-indigo-300 text-[10px]">{sheet.screenSpecs?.vesaPattern || ""}</p>
+                                </div>
+                                <div>
+                                  <span className="text-slate-500 font-semibold block text-[10px]">
+                                    Rasgo e Berço de Impressora:
+                                  </span>
+                                  <p className="text-slate-200">{sheet.printerSpecs?.slotOpeningMm || "—"}</p>
+                                  <p className="text-slate-400 text-[10px]">{sheet.printerSpecs?.rollSize || ""}</p>
+                                </div>
+                                <div>
+                                  <span className="text-slate-500 font-semibold block text-[10px]">
+                                    Janela de Scanner & Segurança:
+                                  </span>
+                                  <p className="text-slate-200">{sheet.scannerSpecs?.windowSpecs || "—"}</p>
+                                  <p className="text-slate-400 text-[10px]">{sheet.securityLock || ""}</p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* LINHA 3: DEMONSTRATIVO FINANCEIRO COMPLETO (O QUE O CLIENTE PAGOU) */}
+                <div className="p-4 sm:p-5 bg-slate-950 rounded-2xl border border-slate-800 space-y-3 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 block">
+                        4. Conferência Financeira & Método de Pagamento
+                      </span>
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <span className="font-extrabold text-white text-sm">
+                          {modalPayMethod === "credit_card"
+                            ? "Pagamento via Cartão de Crédito (Mercado Pago)"
+                            : "Pagamento via PIX à Vista (Mercado Pago)"}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                            selectedOrder.payment?.status === "paid" || selectedOrder.status === "paid"
+                              ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                              : "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                          }`}
+                        >
+                          {selectedOrder.payment?.status === "paid" || selectedOrder.status === "paid"
+                            ? "PAGAMENTO CONFIRMADO / LIQUIDADO"
+                            : "AGUARDANDO COMPENSAÇÃO"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {selectedOrder.payment?.gateway_payment_id && (
+                      <div className="text-left sm:text-right font-mono text-[11px] text-slate-400">
+                        <div>Transação MP: #{selectedOrder.payment.gateway_payment_id}</div>
+                        {selectedOrder.payment.paid_at && (
+                          <div className="text-emerald-400">
+                            Pago em: {new Date(selectedOrder.payment.paid_at).toLocaleString("pt-BR")}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                    <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                      <span className="text-slate-400 text-[11px] block">Subtotal dos Produtos</span>
+                      <span className="text-base font-extrabold text-white font-mono">
+                        {formatBRL(selectedOrder.subtotal_cents)}
+                      </span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                      <span className="text-slate-400 text-[11px] block">
+                        Frete ({modalShipping.name})
+                      </span>
+                      <span className="text-base font-extrabold text-cyan-300 font-mono">
+                        {selectedOrder.shipping_cents > 0 ? `+ ${formatBRL(selectedOrder.shipping_cents)}` : "R$ 0,00"}
+                      </span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30">
+                      <span className="text-emerald-300 text-[11px] font-bold block">
+                        Valor Total Pago pelo Cliente
+                      </span>
+                      <span className="text-xl font-black text-emerald-400 font-mono">
+                        {formatBRL(selectedOrder.total_cents)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Avaliação e Precificação de Personalização Especial (Engenharia CNC) */}
+                {selectedOrder.status === "awaiting_custom_analysis" ||
+                selectedOrder.status === "custom_approved" ||
+                selectedOrder.order_number.startsWith("CUST-") ? (
+                  <div className="p-5 rounded-2xl bg-indigo-950/30 border border-indigo-500/30 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Wrench className="w-5 h-5 text-indigo-400" />
+                      <h4 className="font-extrabold text-white text-sm">
+                        Painel do Engenheiro CNC — Avaliação de Gabarito & Corte
+                      </h4>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <label className="block text-slate-400 font-semibold mb-1">
+                          Acréscimo de Usinagem CNC (R$)
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="Ex: 280.00"
+                          defaultValue={(selectedOrder.total_cents - selectedOrder.subtotal_cents) / 100 || 0}
+                          id="custom_adj_input"
+                          className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-400 font-semibold mb-1">
+                          Parecer Técnico de Engenharia
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Viável corte sob medida com folga +1.5mm"
+                          defaultValue="Viável usinagem e fixação com gabarito especial."
+                          id="custom_notes_input"
+                          className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                      <button
+                        onClick={async () => {
+                          const adjInput = document.getElementById("custom_adj_input") as HTMLInputElement;
+                          const notesInput = document.getElementById("custom_notes_input") as HTMLInputElement;
+                          const adjVal = Math.round(parseFloat(adjInput?.value || "0") * 100);
+                          const notesVal = notesInput?.value || "";
+
+                          const res = await fetch(`/api/customizations/${selectedOrder.$id}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              feasibility: "approved",
+                              customAdjustmentCents: adjVal,
+                              engineeringNotes: notesVal,
+                            }),
+                          });
+                          const json = await res.json();
+                          if (json.ok) {
+                            addAuditLog(
+                              "Aprovação de Orçamento Especial",
+                              selectedOrder.order_number,
+                              `Aprovado com acréscimo de ${formatBRL(adjVal)}`
+                            );
+                            loadOrders();
+                            setSelectedOrder(null);
+                          }
+                        }}
+                        className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-emerald-600/20"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Aprovar Orçamento e Liberar ao Cliente</span>
+                      </button>
+
+                      <button
+                        onClick={async () => {
+                          const res = await fetch(`/api/customizations/${selectedOrder.$id}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              feasibility: "rejected",
+                              customAdjustmentCents: 0,
+                              engineeringNotes: "Inviável dimensionalmente para este padrão de gabinete.",
+                            }),
+                          });
+                          const json = await res.json();
+                          if (json.ok) {
+                            addAuditLog("Recusa de Orçamento Especial", selectedOrder.order_number, "Inviável");
+                            loadOrders();
+                            setSelectedOrder(null);
+                          }
+                        }}
+                        className="px-4 py-2.5 bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 font-bold rounded-xl text-xs transition-all"
+                      >
+                        Recusar Inviável
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Rodapé Fixo do Modal */}
+              <div className="px-5 sm:px-7 py-3.5 border-t border-slate-800 bg-slate-900/95 flex items-center justify-between gap-3 shrink-0">
+                <div className="text-xs text-slate-400">
+                  Alterar status do pedido:{" "}
+                  <select
+                    value={selectedOrder.status}
+                    onChange={(e) => handleUpdateOrderStatus(selectedOrder.$id, e.target.value)}
+                    className="ml-1.5 bg-slate-950 border border-slate-700 text-xs rounded-lg px-2.5 py-1.5 text-white font-bold focus:outline-none focus:border-indigo-500 cursor-pointer"
+                  >
+                    {Object.entries(STATUS_CONFIG).map(([k, cfg]) => (
+                      <option key={k} value={k}>
+                        {cfg.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  onClick={() => setSelectedOrder(null)}
+                  className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-xs transition-all cursor-pointer"
+                >
+                  Fechar Pedido
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
