@@ -73,6 +73,9 @@ export interface ManufacturingSpec {
   };
   ventilationSpecs: string;
   securityLock: string;
+  customizationNotes?: string;
+  isCustomMonitor?: boolean;
+  customDimensions?: any;
   status: "ready_for_cutting" | "machining" | "assembly" | "quality_check";
 }
 

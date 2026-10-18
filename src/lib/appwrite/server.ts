@@ -462,3 +462,153 @@ export async function updateOrderStatusAdmin(orderId: string, newStatus: string)
   return updatedOrder;
 }
 
+export interface AdminOrderUpdatePayload {
+  status?: string;
+  customer_name?: string;
+  customer_document?: string;
+  customer_email?: string;
+  customer_whatsapp?: string;
+  subtotal_cents?: number;
+  shipping_cents?: number;
+  total_cents?: number;
+  delivery_address_json?: string;
+  manufacturing_sheet_json?: string;
+  items?: {
+    $id?: string;
+    cabinet_name: string;
+    color_name: string;
+    monitor_name?: string;
+    printer_name?: string;
+    reader_name?: string;
+    unit_price_cents: number;
+    quantity: number;
+    subtotal_cents: number;
+  }[];
+  payment_method?: "pix" | "credit_card";
+}
+
+/**
+ * Atualiza integralmente os dados de um pedido, seus itens e método de pagamento no Appwrite.
+ */
+export async function updateOrderAdmin(orderId: string, payload: AdminOrderUpdatePayload) {
+  const db = getServerDatabases();
+  const dbId = APPWRITE_CONFIG.databaseId;
+  const cols = APPWRITE_CONFIG.collections;
+
+  const docUpdates: Record<string, any> = {};
+  if (payload.status !== undefined) docUpdates.status = payload.status;
+  if (payload.customer_name !== undefined) docUpdates.customer_name = payload.customer_name;
+  if (payload.customer_document !== undefined) docUpdates.customer_document = payload.customer_document;
+  if (payload.customer_email !== undefined) docUpdates.customer_email = payload.customer_email;
+  if (payload.customer_whatsapp !== undefined) docUpdates.customer_whatsapp = payload.customer_whatsapp;
+  if (payload.subtotal_cents !== undefined) docUpdates.subtotal_cents = payload.subtotal_cents;
+  if (payload.shipping_cents !== undefined) docUpdates.shipping_cents = payload.shipping_cents;
+  if (payload.total_cents !== undefined) docUpdates.total_cents = payload.total_cents;
+  if (payload.delivery_address_json !== undefined) docUpdates.delivery_address_json = payload.delivery_address_json;
+  if (payload.manufacturing_sheet_json !== undefined) docUpdates.manufacturing_sheet_json = payload.manufacturing_sheet_json;
+
+  const updatedOrder = await db.updateDocument(dbId, cols.orders, orderId, docUpdates);
+
+  // Atualiza itens vinculados se enviados
+  if (Array.isArray(payload.items)) {
+    const existingItemsRes = await db.listDocuments(dbId, cols.orderItems, [
+      Query.equal("order_id", orderId),
+      Query.limit(100),
+    ]);
+    const existingIds = new Set(existingItemsRes.documents.map((d: any) => d.$id));
+    const incomingIds = new Set(payload.items.map((i) => i.$id).filter(Boolean));
+
+    // Remove itens que foram excluídos na edição
+    for (const oldDoc of existingItemsRes.documents) {
+      if (!incomingIds.has(oldDoc.$id)) {
+        try {
+          await db.deleteDocument(dbId, cols.orderItems, oldDoc.$id);
+        } catch {}
+      }
+    }
+
+    // Atualiza ou cria itens
+    for (const item of payload.items) {
+      const itemData = {
+        order_id: orderId,
+        cabinet_name: item.cabinet_name,
+        color_name: item.color_name,
+        monitor_name: item.monitor_name || "Nenhum",
+        printer_name: item.printer_name || "Nenhum",
+        reader_name: item.reader_name || "Nenhum",
+        unit_price_cents: Number(item.unit_price_cents) || 0,
+        quantity: Number(item.quantity) || 1,
+        subtotal_cents: Number(item.subtotal_cents) || 0,
+      };
+      if (item.$id && existingIds.has(item.$id)) {
+        await db.updateDocument(dbId, cols.orderItems, item.$id, itemData);
+      } else {
+        await db.createDocument(dbId, cols.orderItems, ID.unique(), itemData);
+      }
+    }
+  }
+
+  // Sincroniza pagamento se status ou valor total mudou
+  try {
+    const paymentsRes = await db.listDocuments(dbId, cols.payments, [
+      Query.equal("order_id", orderId),
+      Query.limit(10),
+    ]);
+    if (paymentsRes.documents.length > 0) {
+      const paymentDoc = paymentsRes.documents[0];
+      const payUpdates: Record<string, any> = {};
+      if (payload.total_cents !== undefined) payUpdates.amount_cents = payload.total_cents;
+      if (payload.payment_method !== undefined) payUpdates.payment_method = payload.payment_method;
+      if (payload.status === "paid" && paymentDoc.status !== "paid") {
+        payUpdates.status = "paid";
+        payUpdates.paid_at = new Date().toISOString();
+      }
+      if (Object.keys(payUpdates).length > 0) {
+        await db.updateDocument(dbId, cols.payments, paymentDoc.$id, payUpdates);
+      }
+    }
+  } catch {}
+
+  return updatedOrder;
+}
+
+/**
+ * Exclui permanentemente um pedido e todos os seus itens e registros de pagamento vinculados no Appwrite.
+ */
+export async function deleteOrderAdmin(orderId: string) {
+  const db = getServerDatabases();
+  const dbId = APPWRITE_CONFIG.databaseId;
+  const cols = APPWRITE_CONFIG.collections;
+
+  // 1. Buscar e remover order_items vinculados
+  try {
+    const itemsRes = await db.listDocuments(dbId, cols.orderItems, [
+      Query.equal("order_id", orderId),
+      Query.limit(100),
+    ]);
+    for (const itemDoc of itemsRes.documents) {
+      await db.deleteDocument(dbId, cols.orderItems, itemDoc.$id);
+    }
+  } catch (err) {
+    console.warn("Aviso ao excluir itens do pedido:", err);
+  }
+
+  // 2. Buscar e remover payments vinculados
+  try {
+    const paymentsRes = await db.listDocuments(dbId, cols.payments, [
+      Query.equal("order_id", orderId),
+      Query.limit(100),
+    ]);
+    for (const payDoc of paymentsRes.documents) {
+      await db.deleteDocument(dbId, cols.payments, payDoc.$id);
+    }
+  } catch (err) {
+    console.warn("Aviso ao excluir pagamentos do pedido:", err);
+  }
+
+  // 3. Excluir o documento principal do pedido
+  await db.deleteDocument(dbId, cols.orders, orderId);
+  return { deleted: true, orderId };
+}
+
+

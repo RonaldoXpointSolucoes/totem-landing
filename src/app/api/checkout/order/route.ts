@@ -231,6 +231,9 @@ export async function POST(req: Request) {
         scannerSpecs,
         ventilationSpecs: "Grelhas de exaustão térmica convectiva superior e inferior (passagem de ar 35 CFM)",
         securityLock: "Fechadura tipo tubular escamoteável com segredo e par de chaves",
+        customizationNotes: rawItem.customizationNotes || "",
+        isCustomMonitor: Boolean(monitor?.isCustom || customDims),
+        customDimensions: customDims || null,
         status: "ready_for_cutting",
       };
 

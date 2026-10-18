@@ -16,6 +16,8 @@ interface StepReviewProps {
   reader: BarcodeReaderOption | null;
   useReader: boolean;
   pricing: PriceBreakdown;
+  customizationNotes?: string;
+  onChangeNotes?: (notes: string) => void;
   onEditStep: (stepNumber: number) => void;
   onAddToCart: () => void;
 }
@@ -28,6 +30,8 @@ export const StepReview: React.FC<StepReviewProps> = ({
   reader,
   useReader,
   pricing,
+  customizationNotes = "",
+  onChangeNotes,
   onEditStep,
   onAddToCart,
 }) => {
@@ -416,6 +420,22 @@ export const StepReview: React.FC<StepReviewProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Campo Opcional de Observações do Cliente para a Produção CNC */}
+        {onChangeNotes && (
+          <div className="pt-2 space-y-1.5">
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+              Observações ou Detalhes Especiais para a Fábrica (Opcional):
+            </label>
+            <textarea
+              rows={2}
+              value={customizationNotes}
+              onChange={(e) => onChangeNotes(e.target.value)}
+              placeholder="Ex: Posição de passagem de cabos, detalhe específico do seu equipamento ou instrução para a produção..."
+              className="w-full px-3 py-2 rounded-xl border border-black/15 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/70 text-xs text-[#1d1d1f] dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-[#0071e3] dark:focus:border-indigo-500 transition-colors"
+            />
+          </div>
+        )}
 
         {/* Linha Financeira e Ações Rápidas */}
         <div className="pt-3 border-t border-black/10 dark:border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">

@@ -108,3 +108,57 @@ export function updateLocalOrderStatus(
   }
   return null;
 }
+
+/**
+ * Atualiza dados de um pedido no armazenamento local a partir de edição administrativa.
+ */
+export function updateLocalOrderAdmin(
+  orderIdOrNumber: string,
+  updates: Partial<OrderDetails>
+): OrderDetails | null {
+  try {
+    const orders = getAllLocalOrders();
+    const index = orders.findIndex(
+      (o) => o.id === orderIdOrNumber || o.orderNumber === orderIdOrNumber
+    );
+    if (index >= 0) {
+      orders[index] = { ...orders[index], ...updates };
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2), "utf-8");
+      return orders[index];
+    }
+    return null;
+  } catch (error) {
+    console.error("Erro ao atualizar pedido local:", error);
+    return null;
+  }
+}
+
+/**
+ * Remove permanentemente um pedido do armazenamento local.
+ */
+export function deleteLocalOrder(orderIdOrNumber: string, altOrderNumber?: string): boolean {
+  try {
+    const orders = getAllLocalOrders();
+    const filtered = orders.filter(
+      (o) =>
+        o.id !== orderIdOrNumber &&
+        o.orderNumber !== orderIdOrNumber &&
+        (!altOrderNumber || (o.id !== altOrderNumber && o.orderNumber !== altOrderNumber))
+    );
+    if (filtered.length !== orders.length) {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      fs.writeFileSync(ORDERS_FILE, JSON.stringify(filtered, null, 2), "utf-8");
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error("Erro ao remover pedido local:", error);
+    return false;
+  }
+}
+

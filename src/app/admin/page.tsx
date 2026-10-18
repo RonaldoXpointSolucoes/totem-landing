@@ -43,6 +43,11 @@ import {
   Copy,
   MessageCircle,
   Printer,
+  Trash2,
+  AlertTriangle,
+  Monitor,
+  Sparkles,
+  X,
 } from "lucide-react";
 
 interface OrderItem {
@@ -78,6 +83,46 @@ interface ParsedDeliveryAddress {
   paymentMethod?: "pix" | "credit_card";
   couponCode?: string | null;
   discountCents?: number;
+  customerNotes?: string | null;
+}
+
+interface EditableOrderItem {
+  $id?: string;
+  cabinet_name: string;
+  color_name: string;
+  monitor_name: string;
+  printer_name: string;
+  reader_name: string;
+  unit_price_cents: number;
+  quantity: number;
+  subtotal_cents: number;
+  screenCutoutMm: string;
+  customizationNotes: string;
+}
+
+interface EditOrderFormState {
+  status: string;
+  payment_method: "pix" | "credit_card";
+  customer_name: string;
+  customer_document: string;
+  customer_email: string;
+  customer_whatsapp: string;
+  cep: string;
+  street: string;
+  number: string;
+  complement: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  shipping_name: string;
+  shipping_carrier: string;
+  shipping_cents: number;
+  subtotal_cents: number;
+  discount_cents: number;
+  coupon_code: string;
+  total_cents: number;
+  order_notes: string;
+  items: EditableOrderItem[];
 }
 
 interface OrderRecord {
@@ -124,6 +169,8 @@ const STATUS_CONFIG: Record<
   string,
   { label: string; color: string; icon: React.ComponentType<{ className?: string }> }
 > = {
+  awaiting_custom_analysis: { label: "Em Análise CNC", color: "bg-amber-500/15 text-amber-300 border-amber-500/40", icon: AlertTriangle },
+  custom_approved: { label: "Orçamento Aprovado", color: "bg-cyan-500/15 text-cyan-300 border-cyan-500/40", icon: CheckCircle2 },
   awaiting_payment: { label: "Aguardando Pix", color: "bg-amber-500/10 text-amber-400 border-amber-500/30", icon: Clock },
   paid: { label: "Pago / Confirmado", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30", icon: CheckCircle2 },
   in_production: { label: "Em Produção CNC", color: "bg-blue-500/10 text-blue-400 border-blue-500/30", icon: Wrench },
@@ -164,6 +211,13 @@ export default function AdminPage() {
   // Modal de Detalhes do Pedido / Ficha CNC
   const [selectedOrder, setSelectedOrder] = useState<OrderRecord | null>(null);
   const [copiedAddressId, setCopiedAddressId] = useState<string | null>(null);
+
+  // Modal de Edição Completa do Pedido e Exclusão de Pedido
+  const [editingOrder, setEditingOrder] = useState<OrderRecord | null>(null);
+  const [editOrderForm, setEditOrderForm] = useState<EditOrderFormState | null>(null);
+  const [isSavingOrderEdit, setIsSavingOrderEdit] = useState(false);
+  const [deletingOrder, setDeletingOrder] = useState<OrderRecord | null>(null);
+  const [isDeletingOrder, setIsDeletingOrder] = useState(false);
 
   const getOrderAddress = (order: OrderRecord): ParsedDeliveryAddress | null => {
     if (order.delivery_address) return order.delivery_address;
@@ -206,10 +260,126 @@ export default function AdminPage() {
     try {
       if (order.manufacturing_sheet_json) {
         const parsed = JSON.parse(order.manufacturing_sheet_json);
-        return Array.isArray(parsed) ? parsed : [];
+        return Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
       }
     } catch {}
     return [];
+  };
+
+  const getCabinetCategoryLabel = (cabinetName: string): string => {
+    const lower = (cabinetName || "").toLowerCase();
+    if (lower.includes("balc") || lower.includes("mesa")) return "GABINETE DE BALCÃO / MESA";
+    if (lower.includes("parede")) return "GABINETE DE PAREDE";
+    return "GABINETE DE CHÃO (PEDESTAL)";
+  };
+
+  const getItemCabinetImage = (item: OrderItem, sheet: any): string => {
+    // 1. Tenta foto salva no snapshot da ficha de fabricação
+    const sheetImages = sheet?.dimensionsMm?.images;
+    if (Array.isArray(sheetImages) && sheetImages.length > 0) {
+      const validImg = sheetImages.find((u: string) => typeof u === "string" && u.startsWith("http") && !u.endsWith(".svg"));
+      if (validImg) return validImg;
+    }
+
+    // 2. Tenta buscar no catálogo carregado
+    const nameLower = (item.cabinet_name || "").toLowerCase();
+    const colorLower = (item.color_name || "").toLowerCase();
+    const isBlack = colorLower.includes("preto") || colorLower.includes("black") || colorLower.includes("grafite");
+
+    if (catalogData?.models && Array.isArray(catalogData.models)) {
+      const matchedModel = catalogData.models.find((m: any) => {
+        const mName = (m.name || "").toLowerCase();
+        return (
+          mName === nameLower ||
+          (nameLower.includes("balc") && (mName.includes("balc") || mName.includes("mesa"))) ||
+          (nameLower.includes("parede") && mName.includes("parede")) ||
+          (nameLower.includes("chão") && mName.includes("chão"))
+        );
+      });
+      if (matchedModel) {
+        try {
+          const dims = matchedModel.dimensions_json ? JSON.parse(matchedModel.dimensions_json) : null;
+          if (Array.isArray(dims?.images) && dims.images.length > 0) {
+            const colorMatched = dims.images.find((u: string) =>
+              isBlack ? u.toLowerCase().includes("preto") : u.toLowerCase().includes("branco")
+            );
+            if (colorMatched) return colorMatched;
+            const firstHttp = dims.images.find((u: string) => typeof u === "string" && !u.endsWith(".svg"));
+            if (firstHttp) return firstHttp;
+          }
+        } catch {}
+        if (matchedModel.main_image && !matchedModel.main_image.endsWith(".svg")) {
+          return matchedModel.main_image;
+        }
+      }
+    }
+
+    // 3. Imagens oficiais em alta definição por tipo e cor do gabinete
+    if (nameLower.includes("balc") || nameLower.includes("mesa")) {
+      return isBlack
+        ? "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/MESA/totem%20mesa%20preto%20(1).png"
+        : "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/MESA/totem%20mesa%20branco%20(1).png";
+    }
+    if (nameLower.includes("parede")) {
+      return isBlack
+        ? "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/PAREDE/totem%20parede%20preto%20(1).png"
+        : "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/PAREDE/totem%20parede%20branco%20(10).png";
+    }
+    return isBlack
+      ? "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/CHAO/totem%20chao%20preto%20(1).png"
+      : "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/CHAO/totem%20chao%20branco%20(1).png";
+  };
+
+  const getItemAlertInfo = (order: OrderRecord, item: OrderItem, sheet: any, idx: number) => {
+    const addr = getOrderAddress(order);
+    const monName = item.monitor_name || "";
+    const prtName = item.printer_name || "";
+    const rdrName = item.reader_name || "";
+    const colName = item.color_name || "";
+    const cutoutText = sheet?.screenSpecs?.screenCutoutMm || "";
+
+    const isCustomMonitor =
+      Boolean(sheet?.isCustomMonitor || sheet?.customDimensions || sheet?.isCustomRequest) ||
+      /sob medida|custom|outro|especial/i.test(monName) ||
+      cutoutText.includes("Monitor Inteiro:") ||
+      cutoutText.includes("Barras");
+
+    const isCustomPrinter = /sob medida|custom|outro|especial/i.test(prtName);
+    const isCustomReader = /sob medida|custom|outro|especial/i.test(rdrName);
+    const isCustomColor = /sob medida|custom|outro|especial/i.test(colName);
+
+    const itemNote =
+      sheet?.customizationNotes ||
+      sheet?.customerNotes ||
+      sheet?.customNotes ||
+      (idx === 0 && addr?.customerNotes ? addr.customerNotes : "") ||
+      "";
+
+    const engineeringNote =
+      sheet?.engineeringAnalysis?.engineeringParecer &&
+      order.order_number?.startsWith("CUST-")
+        ? sheet.engineeringAnalysis.engineeringParecer
+        : "";
+
+    const hasDeviation =
+      isCustomMonitor ||
+      isCustomPrinter ||
+      isCustomReader ||
+      isCustomColor ||
+      Boolean(itemNote && itemNote.trim().length > 0) ||
+      Boolean(order.order_number?.startsWith("CUST-"));
+
+    return {
+      hasDeviation,
+      isCustomMonitor,
+      isCustomPrinter,
+      isCustomReader,
+      isCustomColor,
+      cutoutText,
+      customDims: sheet?.customDimensions || null,
+      itemNote: itemNote.trim(),
+      engineeringNote: engineeringNote.trim(),
+    };
   };
 
   const formatFullAddressText = (addr: ParsedDeliveryAddress | null): string => {
@@ -395,6 +565,233 @@ export default function AdminPage() {
       }
     } catch (err) {
       console.error("Erro ao mudar status:", err);
+    }
+  };
+
+  // Abrir Modal de Edição Completa do Pedido
+  const handleOpenEditOrder = (order: OrderRecord) => {
+    const addr = getOrderAddress(order);
+    const shipping = getOrderShipping(order);
+    const payMethod = getOrderPaymentMethod(order);
+    const sheets = getOrderSheets(order);
+
+    const editableItems: EditableOrderItem[] = (order.items || []).map((it, idx) => {
+      const sheet = sheets[idx] || null;
+      return {
+        $id: it.$id,
+        cabinet_name: it.cabinet_name || "Gabinete de Parede Compacto",
+        color_name: it.color_name || "Branco TX",
+        monitor_name: it.monitor_name || "Nenhum",
+        printer_name: it.printer_name || "Nenhum",
+        reader_name: it.reader_name || "Nenhum",
+        unit_price_cents: it.unit_price_cents || 0,
+        quantity: it.quantity || 1,
+        subtotal_cents: it.subtotal_cents || 0,
+        screenCutoutMm: sheet?.screenSpecs?.screenCutoutMm || "",
+        customizationNotes:
+          sheet?.customizationNotes ||
+          sheet?.customerNotes ||
+          sheet?.customNotes ||
+          "",
+      };
+    });
+
+    setEditingOrder(order);
+    setEditOrderForm({
+      status: order.status || "awaiting_payment",
+      payment_method: payMethod,
+      customer_name: order.customer_name || "",
+      customer_document: order.customer_document || "",
+      customer_email: order.customer_email || "",
+      customer_whatsapp: order.customer_whatsapp || "",
+      cep: addr?.cep || "",
+      street: addr?.street || "",
+      number: addr?.number || "",
+      complement: addr?.complement || "",
+      neighborhood: addr?.neighborhood || "",
+      city: addr?.city || "",
+      state: addr?.state || "SP",
+      shipping_name: shipping.name || "PAC (Correios)",
+      shipping_carrier: shipping.carrier || "Correios",
+      shipping_cents: order.shipping_cents || 0,
+      subtotal_cents: order.subtotal_cents || 0,
+      discount_cents: order.discount_cents || addr?.discountCents || 0,
+      coupon_code: order.coupon_code || addr?.couponCode || "",
+      total_cents: order.total_cents || 0,
+      order_notes: addr?.customerNotes || "",
+      items: editableItems,
+    });
+  };
+
+  // Salvar Edição Completa do Pedido
+  const handleSaveOrderEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingOrder || !editOrderForm) return;
+    setIsSavingOrderEdit(true);
+
+    try {
+      const prevAddr = getOrderAddress(editingOrder) || {};
+      const prevSheets = getOrderSheets(editingOrder);
+
+      const newDeliveryAddress = {
+        ...prevAddr,
+        cep: editOrderForm.cep.trim(),
+        street: editOrderForm.street.trim(),
+        number: editOrderForm.number.trim(),
+        complement: editOrderForm.complement.trim(),
+        neighborhood: editOrderForm.neighborhood.trim(),
+        city: editOrderForm.city.trim(),
+        state: editOrderForm.state.trim() || "SP",
+        paymentMethod: editOrderForm.payment_method,
+        couponCode: editOrderForm.coupon_code.trim() || null,
+        discountCents: Number(editOrderForm.discount_cents) || 0,
+        customerNotes: editOrderForm.order_notes.trim() || null,
+        shippingMethod: {
+          ...(prevAddr.shippingMethod || {}),
+          id: prevAddr.shippingMethod?.id || "custom_shipping",
+          name: editOrderForm.shipping_name.trim() || "Transportadora / Correios",
+          carrier: editOrderForm.shipping_carrier.trim() || "Logística Homologada",
+          priceCents: Number(editOrderForm.shipping_cents) || 0,
+          deliveryDaysMin: prevAddr.shippingMethod?.deliveryDaysMin || 5,
+          deliveryDaysMax: prevAddr.shippingMethod?.deliveryDaysMax || 9,
+        },
+      };
+
+      const newSheets = editOrderForm.items.map((it, idx) => {
+        const baseSheet = prevSheets[idx] || {
+          itemIndex: idx + 1,
+          dimensionsMm: { heightMm: 680, widthMm: 420, depthMm: 220 },
+          finishType: "Pintura Eletrostática a Pó Microtexturizada (Cura 200°C)",
+          ventilationSpecs: "Grelhas de exaustão térmica convectiva superior e inferior (passagem de ar 35 CFM)",
+          securityLock: "Fechadura tipo tubular escamoteável com segredo e par de chaves",
+          status: "ready_for_cutting",
+        };
+        const isCustomMon =
+          /sob medida|custom|outro|especial/i.test(it.monitor_name) ||
+          it.screenCutoutMm.includes("Monitor Inteiro:") ||
+          Boolean(baseSheet.isCustomMonitor);
+
+        return {
+          ...baseSheet,
+          itemIndex: idx + 1,
+          cabinetModelName: it.cabinet_name,
+          colorName: it.color_name,
+          customizationNotes: it.customizationNotes.trim(),
+          isCustomMonitor: isCustomMon,
+          screenSpecs: {
+            ...(baseSheet.screenSpecs || {}),
+            monitorName: it.monitor_name,
+            screenCutoutMm:
+              it.screenCutoutMm.trim() ||
+              baseSheet.screenSpecs?.screenCutoutMm ||
+              `Abertura usinada para ${it.monitor_name}`,
+            vesaPattern: baseSheet.screenSpecs?.vesaPattern || "Padrão VESA 75/100 mm com insertos M4",
+          },
+          printerSpecs: {
+            ...(baseSheet.printerSpecs || {}),
+            printerName: it.printer_name,
+            slotOpeningMm:
+              baseSheet.printerSpecs?.slotOpeningMm ||
+              "Rasgo de saída 80mm x 6 mm com chanfro ergonômico",
+            rollSize: baseSheet.printerSpecs?.rollSize || "Compartimento interno para bobina térmica 80mm",
+          },
+          scannerSpecs: {
+            ...(baseSheet.scannerSpecs || {}),
+            hasScanner: it.reader_name !== "Nenhum" && it.reader_name !== "Sem leitor",
+            scannerName: it.reader_name,
+            windowSpecs:
+              baseSheet.scannerSpecs?.windowSpecs ||
+              "Janela usinada 65 x 45 mm com visor acrílico cristal 2mm",
+          },
+        };
+      });
+
+      const payload = {
+        order_number: editingOrder.order_number,
+        status: editOrderForm.status,
+        payment_method: editOrderForm.payment_method,
+        customer_name: editOrderForm.customer_name.trim(),
+        customer_document: editOrderForm.customer_document.trim(),
+        customer_email: editOrderForm.customer_email.trim(),
+        customer_whatsapp: editOrderForm.customer_whatsapp.trim(),
+        subtotal_cents: Number(editOrderForm.subtotal_cents) || 0,
+        shipping_cents: Number(editOrderForm.shipping_cents) || 0,
+        total_cents: Number(editOrderForm.total_cents) || 0,
+        delivery_address_json: JSON.stringify(newDeliveryAddress),
+        manufacturing_sheet_json: JSON.stringify(newSheets),
+        items: editOrderForm.items.map((it) => ({
+          $id: it.$id,
+          cabinet_name: it.cabinet_name.trim(),
+          color_name: it.color_name.trim(),
+          monitor_name: it.monitor_name.trim() || "Nenhum",
+          printer_name: it.printer_name.trim() || "Nenhum",
+          reader_name: it.reader_name.trim() || "Nenhum",
+          unit_price_cents: Number(it.unit_price_cents) || 0,
+          quantity: Number(it.quantity) || 1,
+          subtotal_cents: Number(it.subtotal_cents) || 0,
+        })),
+      };
+
+      const res = await fetch(`/api/admin/orders/${editingOrder.$id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+
+      if (json.ok) {
+        addAuditLog(
+          "Edição de Pedido",
+          editingOrder.order_number,
+          `Pedido de ${editOrderForm.customer_name} atualizado pelo administrador`
+        );
+        setSaveSuccessMsg(`Pedido ${editingOrder.order_number} atualizado com sucesso!`);
+        setTimeout(() => setSaveSuccessMsg(""), 4000);
+        setEditingOrder(null);
+        setEditOrderForm(null);
+        await loadOrders();
+        if (selectedOrder && selectedOrder.$id === editingOrder.$id) {
+          setSelectedOrder(null);
+        }
+      } else {
+        alert(json.error || "Erro ao salvar alterações do pedido.");
+      }
+    } catch (err: any) {
+      alert("Erro de conexão ao salvar pedido: " + err?.message);
+    } finally {
+      setIsSavingOrderEdit(false);
+    }
+  };
+
+  // Confirmar Exclusão Definitiva do Pedido
+  const handleConfirmDeleteOrder = async () => {
+    if (!deletingOrder) return;
+    setIsDeletingOrder(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${deletingOrder.$id}`, {
+        method: "DELETE",
+      });
+      const json = await res.json();
+      if (json.ok) {
+        addAuditLog(
+          "Exclusão de Pedido",
+          deletingOrder.order_number,
+          `Pedido de ${deletingOrder.customer_name} (${formatBRL(deletingOrder.total_cents)}) excluído permanentemente`
+        );
+        setOrders((prev) => prev.filter((o) => o.$id !== deletingOrder.$id));
+        if (selectedOrder && selectedOrder.$id === deletingOrder.$id) {
+          setSelectedOrder(null);
+        }
+        setSaveSuccessMsg(`Pedido ${deletingOrder.order_number} excluído com sucesso!`);
+        setTimeout(() => setSaveSuccessMsg(""), 4000);
+        setDeletingOrder(null);
+      } else {
+        alert(json.error || "Erro ao excluir pedido.");
+      }
+    } catch (err: any) {
+      alert("Erro ao excluir pedido: " + err?.message);
+    } finally {
+      setIsDeletingOrder(false);
     }
   };
 
@@ -822,13 +1219,22 @@ export default function AdminPage() {
                       )}`
                     : null;
 
+                  const orderHasAnyDeviation =
+                    Boolean(addr?.customerNotes && addr.customerNotes.trim()) ||
+                    Boolean(order.order_number?.startsWith("CUST-")) ||
+                    (order.items || []).some((it, idx) => getItemAlertInfo(order, it, sheets[idx], idx).hasDeviation);
+
                   return (
                     <div
                       key={order.$id}
-                      className="bg-slate-900/80 border border-slate-800 hover:border-indigo-500/40 rounded-3xl p-4 sm:p-6 transition-all shadow-xl space-y-4"
+                      className={`bg-slate-900/85 border rounded-3xl p-4 sm:p-6 transition-all shadow-xl space-y-4 ${
+                        orderHasAnyDeviation
+                          ? "border-amber-400/70 hover:border-amber-400 shadow-amber-500/10"
+                          : "border-slate-800 hover:border-indigo-500/40"
+                      }`}
                     >
-                      {/* Topo do Card: Número do Pedido, Status, Pagamento, Método de Entrega e Ações Rápidas */}
-                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3.5 border-b border-slate-800/80">
+                      {/* Topo do Card: Número do Pedido, Status, Pagamento, Método de Entrega e Ações (Editar / Excluir / Ver) */}
+                      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 pb-3.5 border-b border-slate-800/80">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-extrabold text-white text-base sm:text-lg font-mono tracking-tight">
                             {order.order_number}
@@ -865,6 +1271,14 @@ export default function AdminPage() {
                             </span>
                           </span>
 
+                          {/* Badge Alerta Fora do Padrão / Observação no Topo */}
+                          {orderHasAnyDeviation && (
+                            <span className="px-2.5 py-1 rounded-full text-[11px] font-black bg-amber-500/20 text-amber-300 border-2 border-amber-400 flex items-center gap-1.5 animate-pulse">
+                              <AlertTriangle className="w-3.5 h-3.5 text-amber-300" />
+                              <span>ATENÇÃO: FORA DO PADRÃO / OBSERVAÇÃO</span>
+                            </span>
+                          )}
+
                           <span className="text-xs text-slate-500 font-mono">
                             {new Date(order.$createdAt).toLocaleString("pt-BR")}
                           </span>
@@ -884,8 +1298,31 @@ export default function AdminPage() {
                             ))}
                           </select>
 
+                          {/* 1-) Botão Editar Pedido */}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditOrder(order)}
+                            className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 border border-amber-500/30 font-bold text-xs flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+                            title="Editar dados, itens, equipamentos ou observações deste pedido"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                            <span>Editar Pedido</span>
+                          </button>
+
+                          {/* 1-) Botão Excluir Pedido */}
+                          <button
+                            type="button"
+                            onClick={() => setDeletingOrder(order)}
+                            className="px-3 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 active:scale-95 text-rose-400 border border-rose-500/30 font-bold text-xs flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+                            title="Excluir este pedido permanentemente"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Excluir</span>
+                          </button>
+
                           {/* Botão de Ver Pedido Completo & Ficha CNC */}
                           <button
+                            type="button"
                             onClick={() => setSelectedOrder(order)}
                             className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-600/25 transition-all shrink-0 cursor-pointer"
                           >
@@ -895,25 +1332,25 @@ export default function AdminPage() {
                         </div>
                       </div>
 
-                      {/* Painel de Conferência em 3 Colunas: (1) Cliente & Endereço, (2) Entrega & Pagamento, (3) Detalhes na Escolha */}
+                      {/* Painel de Conferência em 3 Colunas: (1) Cliente & Endereço [3 cols], (2) Entrega & Pagamento [3 cols], (3) Detalhes na Escolha & Alertas [6 cols] */}
                       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 text-xs">
                         {/* 1-) CLIENTE & ENDEREÇO DE ENTREGA */}
-                        <div className="lg:col-span-4 bg-slate-950/80 border border-slate-800/80 rounded-2xl p-3.5 space-y-2.5 flex flex-col justify-between">
+                        <div className="lg:col-span-3 bg-slate-950/80 border border-slate-800/80 rounded-2xl p-3.5 space-y-2.5 flex flex-col justify-between">
                           <div className="space-y-2">
                             <div className="flex items-center justify-between gap-2">
                               <span className="text-[10px] font-black uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
-                                <MapPin className="w-3.5 h-3.5" />
-                                <span>1. Cliente & Endereço de Entrega</span>
+                                <MapPin className="w-3.5 h-3.5 shrink-0" />
+                                <span>1. Cliente & Endereço</span>
                               </span>
                               {addr?.street && (
                                 <button
                                   type="button"
                                   onClick={() => handleCopyAddress(order.$id, addr, order.customer_name)}
-                                  className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1 transition-colors cursor-pointer"
+                                  className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1 transition-colors cursor-pointer shrink-0"
                                   title="Copiar endereço completo para etiqueta de envio"
                                 >
                                   <Copy className="w-3 h-3" />
-                                  <span>{copiedAddressId === order.$id ? "Copiado!" : "Copiar Endereço"}</span>
+                                  <span>{copiedAddressId === order.$id ? "Copiado!" : "Copiar"}</span>
                                 </button>
                               )}
                             </div>
@@ -971,11 +1408,11 @@ export default function AdminPage() {
                         </div>
 
                         {/* 2-) MÉTODO DE ENTREGA & CONFERÊNCIA DE PAGAMENTO */}
-                        <div className="lg:col-span-4 bg-slate-950/80 border border-slate-800/80 rounded-2xl p-3.5 space-y-2.5 flex flex-col justify-between">
+                        <div className="lg:col-span-3 bg-slate-950/80 border border-slate-800/80 rounded-2xl p-3.5 space-y-2.5 flex flex-col justify-between">
                           <div className="space-y-2">
                             <span className="text-[10px] font-black uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
-                              <Truck className="w-3.5 h-3.5" />
-                              <span>2. Método de Entrega & Pagamento</span>
+                              <Truck className="w-3.5 h-3.5 shrink-0" />
+                              <span>2. Entrega & Pagamento</span>
                             </span>
 
                             {/* Box Método de Envio */}
@@ -1035,55 +1472,229 @@ export default function AdminPage() {
                           </div>
                         </div>
 
-                        {/* 3-) DETALHES NA ESCOLHA (ITENS E EQUIPAMENTOS DO PEDIDO) */}
-                        <div className="lg:col-span-4 bg-slate-950/80 border border-slate-800/80 rounded-2xl p-3.5 space-y-2.5 flex flex-col justify-between">
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
+                        {/* 3-) DETALHES NA ESCOLHA (FOTO DO GABINETE, EQUIPAMENTOS EM DESTAQUE & ALERTAS FORA DO PADRÃO) */}
+                        <div className="lg:col-span-6 bg-slate-950/90 border border-slate-800/90 rounded-2xl p-3.5 sm:p-4 space-y-3 flex flex-col justify-between">
+                          <div className="space-y-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
                               <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
                                 <Package className="w-3.5 h-3.5" />
-                                <span>3. Detalhes na Escolha ({order.items?.length || 0} item/ns)</span>
+                                <span>
+                                  3. Detalhes na Escolha, Equipamentos & Alertas de Produção ({order.items?.length || 0} item/ns)
+                                </span>
                               </span>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditOrder(order)}
+                                className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-slate-700 hover:border-amber-500/40 flex items-center gap-1 transition-colors cursor-pointer"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                                <span>+ Observação / Editar Itens</span>
+                              </button>
                             </div>
 
-                            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                            {/* Alerta Geral de Observação do Pedido (se houver no nível do pedido) */}
+                            {addr?.customerNotes && addr.customerNotes.trim().length > 0 && (
+                              <div className="p-3 rounded-xl bg-gradient-to-r from-amber-500/25 via-rose-500/20 to-amber-500/25 border-2 border-amber-400 space-y-1 shadow-lg shadow-amber-500/10">
+                                <div className="flex items-center gap-1.5 text-amber-300 font-black text-[11px] uppercase tracking-wider">
+                                  <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0" />
+                                  <span>⚠️ OBSERVAÇÃO GERAL DO PEDIDO / EXPEDIÇÃO</span>
+                                </div>
+                                <p className="text-xs sm:text-sm font-extrabold text-white bg-black/40 p-2 rounded-lg border border-amber-400/40">
+                                  {addr.customerNotes}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Lista Integral de Itens (Sem corte de scroll max-h-56) */}
+                            <div className="space-y-3">
                               {order.items?.map((it, idx) => {
                                 const sheet = sheets[idx] || null;
+                                const cabinetImg = getItemCabinetImage(it, sheet);
+                                const cabinetCategory = getCabinetCategoryLabel(it.cabinet_name);
+                                const alertInfo = getItemAlertInfo(order, it, sheet, idx);
+                                const isBlackColor = (it.color_name || "").toLowerCase().includes("preto");
+
                                 return (
                                   <div
                                     key={it.$id || idx}
-                                    className="p-2.5 rounded-xl bg-slate-900/95 border border-slate-800 space-y-1.5 text-[11px]"
+                                    className={`p-3 rounded-2xl border space-y-2.5 text-[11px] transition-all ${
+                                      alertInfo.hasDeviation
+                                        ? "bg-amber-950/20 border-2 border-amber-400/80 shadow-lg shadow-amber-500/10"
+                                        : "bg-slate-900/95 border-slate-800"
+                                    }`}
                                   >
-                                    <div className="flex items-center justify-between gap-2 border-b border-slate-800/80 pb-1">
-                                      <span className="font-extrabold text-white">
-                                        {it.quantity}x {it.cabinet_name}
-                                      </span>
-                                      <span className="font-bold text-indigo-400 font-mono">
-                                        {formatBRL(it.subtotal_cents)}
-                                      </span>
-                                    </div>
-                                    <div className="grid grid-cols-1 gap-0.5 text-slate-300">
-                                      <p>
-                                        <span className="text-slate-500">Acabamento/Cor:</span>{" "}
-                                        <strong className="text-white">{it.color_name}</strong>
-                                      </p>
-                                      <p>
-                                        <span className="text-slate-500">Monitor:</span>{" "}
-                                        <strong className="text-cyan-300">{it.monitor_name || "Nenhum"}</strong>
-                                      </p>
-                                      {sheet?.screenSpecs?.screenCutoutMm && (
-                                        <p className="text-[10px] text-slate-400 pl-2 border-l-2 border-cyan-500/40">
-                                          {sheet.screenSpecs.screenCutoutMm}
+                                    {/* Linha Superior do Item: Foto do Gabinete + Nome + Acabamento + Valor */}
+                                    <div className="flex items-start gap-3 pb-2.5 border-b border-slate-800/80">
+                                      {/* Miniatura Real do Gabinete Escolhido */}
+                                      <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-white p-1.5 border border-slate-700 shrink-0 flex items-center justify-center overflow-hidden shadow-md">
+                                        <img
+                                          src={cabinetImg}
+                                          alt={it.cabinet_name}
+                                          className="w-full h-full object-contain"
+                                        />
+                                        <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-slate-950/90 text-white font-black text-[10px] font-mono shadow">
+                                          {it.quantity}x
+                                        </span>
+                                      </div>
+
+                                      {/* Identificação do Gabinete e Cor */}
+                                      <div className="flex-1 min-w-0 space-y-1">
+                                        <div className="flex flex-wrap items-center justify-between gap-1.5">
+                                          <span className="px-2 py-0.5 rounded-md bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 font-black text-[9px] uppercase tracking-wider">
+                                            {cabinetCategory}
+                                          </span>
+                                          <div className="flex items-center gap-1.5">
+                                            {alertInfo.hasDeviation ? (
+                                              <span className="px-2 py-0.5 rounded-full bg-amber-500/25 border border-amber-400 text-amber-300 font-black text-[9px] uppercase flex items-center gap-1">
+                                                <AlertTriangle className="w-3 h-3" />
+                                                <span>FORA DO PADRÃO / OBS</span>
+                                              </span>
+                                            ) : (
+                                              <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold text-[9px] uppercase">
+                                                ✓ Padrão Homologado
+                                              </span>
+                                            )}
+                                            <span className="font-black text-indigo-400 font-mono text-xs sm:text-sm">
+                                              {formatBRL(it.subtotal_cents)}
+                                            </span>
+                                          </div>
+                                        </div>
+
+                                        <p className="font-extrabold text-white text-xs sm:text-sm leading-tight">
+                                          {it.quantity}x {it.cabinet_name}
                                         </p>
-                                      )}
-                                      <p>
-                                        <span className="text-slate-500">Impressora:</span>{" "}
-                                        <strong className="text-slate-200">{it.printer_name || "Nenhuma"}</strong>
-                                      </p>
-                                      <p>
-                                        <span className="text-slate-500">Leitor 2D/QR:</span>{" "}
-                                        <strong className="text-slate-200">{it.reader_name || "Sem leitor"}</strong>
-                                      </p>
+
+                                        <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-300 pt-0.5">
+                                          <span className="inline-flex items-center gap-1.5 bg-slate-950 px-2 py-0.5 rounded-lg border border-slate-800">
+                                            <span
+                                              className="w-2.5 h-2.5 rounded-full border border-white/40 shrink-0"
+                                              style={{ backgroundColor: isBlackColor ? "#18181b" : "#f8fafc" }}
+                                            />
+                                            <span className="text-slate-400">Cor:</span>
+                                            <strong className="text-white">{it.color_name}</strong>
+                                          </span>
+
+                                          {sheet?.dimensionsMm?.heightMm && (
+                                            <span className="text-[10px] font-mono text-slate-400">
+                                              Medidas: {sheet.dimensionsMm.heightMm}×{sheet.dimensionsMm.widthMm}×
+                                              {sheet.dimensionsMm.depthMm}mm
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
                                     </div>
+
+                                    {/* DESTAQUE DOS EQUIPAMENTOS ESCOLHIDOS: MONITOR, IMPRESSORA E LEITOR */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                      {/* MONITOR ESCOLHIDO (EM DESTAQUE) */}
+                                      <div
+                                        className={`p-2.5 rounded-xl border space-y-0.5 ${
+                                          alertInfo.isCustomMonitor
+                                            ? "bg-amber-500/20 border-2 border-amber-400"
+                                            : "bg-cyan-950/55 border-cyan-500/40"
+                                        }`}
+                                      >
+                                        <div className="flex items-center justify-between gap-1">
+                                          <span className="text-[9px] font-black uppercase tracking-wider text-cyan-300 flex items-center gap-1">
+                                            <Monitor className="w-3 h-3 shrink-0" />
+                                            <span>Monitor Escolhido</span>
+                                          </span>
+                                          {alertInfo.isCustomMonitor && (
+                                            <span className="text-[8px] font-black px-1.5 py-0.2 rounded bg-amber-400 text-slate-950 uppercase">
+                                              SOB MEDIDA
+                                            </span>
+                                          )}
+                                        </div>
+                                        <p className="font-extrabold text-white text-xs leading-snug">
+                                          {it.monitor_name || "Nenhum"}
+                                        </p>
+                                      </div>
+
+                                      {/* IMPRESSORA ESCOLHIDA (EM DESTAQUE) */}
+                                      <div
+                                        className={`p-2.5 rounded-xl border space-y-0.5 ${
+                                          alertInfo.isCustomPrinter
+                                            ? "bg-amber-500/20 border-2 border-amber-400"
+                                            : "bg-indigo-950/55 border-indigo-500/40"
+                                        }`}
+                                      >
+                                        <div className="flex items-center justify-between gap-1">
+                                          <span className="text-[9px] font-black uppercase tracking-wider text-indigo-300 flex items-center gap-1">
+                                            <Printer className="w-3 h-3 shrink-0" />
+                                            <span>Impressora Escolhida</span>
+                                          </span>
+                                          {alertInfo.isCustomPrinter && (
+                                            <span className="text-[8px] font-black px-1.5 py-0.2 rounded bg-amber-400 text-slate-950 uppercase">
+                                              ESPECIAL
+                                            </span>
+                                          )}
+                                        </div>
+                                        <p className="font-extrabold text-white text-xs leading-snug">
+                                          {it.printer_name || "Nenhuma"}
+                                        </p>
+                                      </div>
+
+                                      {/* LEITOR 2D / QR CODE */}
+                                      <div
+                                        className={`p-2.5 rounded-xl border space-y-0.5 ${
+                                          alertInfo.isCustomReader
+                                            ? "bg-amber-500/20 border-2 border-amber-400"
+                                            : "bg-purple-950/40 border-purple-500/30"
+                                        }`}
+                                      >
+                                        <span className="text-[9px] font-black uppercase tracking-wider text-purple-300 flex items-center gap-1">
+                                          <QrCode className="w-3 h-3 shrink-0" />
+                                          <span>Leitor 2D / QR</span>
+                                        </span>
+                                        <p className="font-bold text-slate-100 text-xs leading-snug">
+                                          {it.reader_name || "Sem leitor"}
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    {/* 🚨 CAIXA DE ALTA EVIDÊNCIA: ITEM FORA DO PADRÃO / MEDIDAS ESPECIAIS / OBSERVAÇÃO DO CLIENTE */}
+                                    {alertInfo.hasDeviation ? (
+                                      <div className="p-3 rounded-xl bg-gradient-to-r from-amber-500/25 via-rose-500/20 to-amber-500/25 border-2 border-amber-400 space-y-1.5 shadow-md">
+                                        <div className="flex items-center gap-1.5 text-amber-300 font-black text-[10px] sm:text-[11px] uppercase tracking-wider">
+                                          <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0" />
+                                          <span>
+                                            ⚠️ ATENÇÃO FÁBRICA: ITEM FORA DO PADRÃO / OBSERVAÇÃO DO CLIENTE
+                                          </span>
+                                        </div>
+
+                                        {alertInfo.isCustomMonitor && alertInfo.cutoutText && (
+                                          <div className="p-2 rounded-lg bg-black/50 border border-amber-400/50 text-amber-100 font-mono text-[11px]">
+                                            <span className="text-amber-300 font-bold block uppercase text-[10px]">
+                                              📐 Medidas de Corte CNC / Monitor Sob Medida:
+                                            </span>
+                                            {alertInfo.cutoutText}
+                                          </div>
+                                        )}
+
+                                        {alertInfo.itemNote && (
+                                          <div className="p-2.5 rounded-lg bg-black/60 border border-rose-400/60 text-white">
+                                            <span className="text-rose-300 font-black block uppercase text-[10px] mb-0.5">
+                                              📝 Observação Escrita para este Gabinete:
+                                            </span>
+                                            <p className="text-xs sm:text-sm font-extrabold text-amber-200 whitespace-pre-wrap">
+                                              {alertInfo.itemNote}
+                                            </p>
+                                          </div>
+                                        )}
+
+                                        {alertInfo.engineeringNote && (
+                                          <p className="text-[11px] text-amber-200 font-semibold">
+                                            🔧 Parecer Engenharia: {alertInfo.engineeringNote}
+                                          </p>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      sheet?.screenSpecs?.screenCutoutMm && (
+                                        <p className="text-[10px] text-slate-400 pl-2 border-l-2 border-cyan-500/40">
+                                          Corte CNC: {sheet.screenSpecs.screenCutoutMm}
+                                        </p>
+                                      )
+                                    )}
                                   </div>
                                 );
                               })}
@@ -1405,7 +2016,23 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditOrder(selectedOrder)}
+                    className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-xs font-bold flex items-center gap-1.5 border border-amber-500/30 transition-colors cursor-pointer"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                    <span>Editar Pedido</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeletingOrder(selectedOrder)}
+                    className="px-3 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 text-xs font-bold flex items-center gap-1.5 border border-rose-500/30 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Excluir</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => window.print()}
@@ -1536,7 +2163,20 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                {/* LINHA 2: DETALHES NA ESCOLHA (ESPELHO COMERCIAL + FICHA TÉCNICA DE CORTE CNC) */}
+                {/* Alerta de Observação Geral do Pedido no Modal */}
+                {modalAddr?.customerNotes && modalAddr.customerNotes.trim().length > 0 && (
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/25 via-rose-500/20 to-amber-500/25 border-2 border-amber-400 space-y-1.5 shadow-lg shadow-amber-500/10">
+                    <div className="flex items-center gap-2 text-amber-300 font-black text-xs uppercase tracking-wider">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span>⚠️ OBSERVAÇÃO GERAL DO PEDIDO / INSTRUÇÃO DO CLIENTE</span>
+                    </div>
+                    <p className="text-xs sm:text-sm font-extrabold text-white bg-black/40 p-3 rounded-xl border border-amber-400/50 whitespace-pre-wrap">
+                      {modalAddr.customerNotes}
+                    </p>
+                  </div>
+                )}
+
+                {/* LINHA 2: DETALHES NA ESCOLHA (ESPELHO COMERCIAL + FOTOS + EQUIPAMENTOS EM DESTAQUE + FICHA TÉCNICA CNC) */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h4 className="font-black text-emerald-400 text-xs uppercase tracking-wider flex items-center gap-1.5">
@@ -1548,21 +2188,39 @@ export default function AdminPage() {
                     </h4>
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="space-y-3.5">
                     {selectedOrder.items?.map((item, idx) => {
                       const sheet = modalSheets[idx] || null;
+                      const cabinetImg = getItemCabinetImage(item, sheet);
+                      const cabinetCategory = getCabinetCategoryLabel(item.cabinet_name);
+                      const alertInfo = getItemAlertInfo(selectedOrder, item, sheet, idx);
+
                       return (
                         <div
                           key={item.$id || idx}
-                          className="bg-slate-950 p-4 sm:p-5 rounded-2xl border border-slate-800/90 space-y-3 text-xs"
+                          className={`p-4 sm:p-5 rounded-2xl border space-y-3.5 text-xs ${
+                            alertInfo.hasDeviation
+                              ? "bg-amber-950/20 border-2 border-amber-400"
+                              : "bg-slate-950 border-slate-800/90"
+                          }`}
                         >
-                          {/* Cabeçalho do Item */}
-                          <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-800">
-                            <div className="flex items-center gap-2.5">
-                              <span className="w-7 h-7 rounded-xl bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 font-black text-xs flex items-center justify-center">
-                                #{idx + 1}
-                              </span>
-                              <div>
+                          {/* Cabeçalho do Item com Foto do Gabinete */}
+                          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
+                            <div className="flex items-center gap-3">
+                              <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-white p-1.5 border border-slate-700 shrink-0 flex items-center justify-center overflow-hidden shadow-md">
+                                <img
+                                  src={cabinetImg}
+                                  alt={item.cabinet_name}
+                                  className="w-full h-full object-contain"
+                                />
+                                <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-slate-950/90 text-white font-black text-[10px] font-mono">
+                                  #{idx + 1}
+                                </span>
+                              </div>
+                              <div className="space-y-1">
+                                <span className="px-2 py-0.5 rounded-md bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 font-black text-[9px] uppercase tracking-wider inline-block">
+                                  {cabinetCategory}
+                                </span>
                                 <h5 className="font-extrabold text-sm sm:text-base text-white">
                                   {item.quantity}x {item.cabinet_name}
                                 </h5>
@@ -1571,41 +2229,98 @@ export default function AdminPage() {
                                 </p>
                               </div>
                             </div>
-                            <div className="text-right">
-                              <span className="text-[10px] text-slate-500 uppercase font-bold block">Subtotal do Item</span>
-                              <span className="text-base font-black text-indigo-400 font-mono">
-                                {formatBRL(item.subtotal_cents)}
-                              </span>
+                            <div className="text-right space-y-1">
+                              {alertInfo.hasDeviation && (
+                                <span className="px-2.5 py-0.5 rounded-full bg-amber-500/25 border border-amber-400 text-amber-300 font-black text-[10px] uppercase inline-flex items-center gap-1">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  <span>ITEM FORA DO PADRÃO / OBS</span>
+                                </span>
+                              )}
+                              <div>
+                                <span className="text-[10px] text-slate-500 uppercase font-bold block">Subtotal do Item</span>
+                                <span className="text-base font-black text-indigo-400 font-mono">
+                                  {formatBRL(item.subtotal_cents)}
+                                </span>
+                              </div>
                             </div>
                           </div>
 
-                          {/* Escolhas do Cliente no Configurador */}
+                          {/* Escolhas do Cliente em Destaque no Configurador */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                            <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800/80">
-                              <span className="text-[10px] font-bold uppercase text-slate-500 block">
+                            <div className="p-3 rounded-xl bg-slate-900 border border-slate-800/80">
+                              <span className="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">
                                 Acabamento / Cor
                               </span>
-                              <strong className="text-white text-xs">{item.color_name}</strong>
+                              <strong className="text-white text-xs sm:text-sm">{item.color_name}</strong>
                             </div>
-                            <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800/80">
-                              <span className="text-[10px] font-bold uppercase text-slate-500 block">
-                                Monitor / Kit Escolhido
+                            <div
+                              className={`p-3 rounded-xl border ${
+                                alertInfo.isCustomMonitor
+                                  ? "bg-amber-500/20 border-2 border-amber-400"
+                                  : "bg-cyan-950/60 border-cyan-500/40"
+                              }`}
+                            >
+                              <span className="text-[10px] font-black uppercase text-cyan-300 flex items-center gap-1 mb-0.5">
+                                <Monitor className="w-3.5 h-3.5" />
+                                <span>Monitor Escolhido</span>
                               </span>
-                              <strong className="text-cyan-300 text-xs">{item.monitor_name || "Nenhum"}</strong>
+                              <strong className="text-white text-xs sm:text-sm block">
+                                {item.monitor_name || "Nenhum"}
+                              </strong>
                             </div>
-                            <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800/80">
-                              <span className="text-[10px] font-bold uppercase text-slate-500 block">
-                                Impressora Térmica
+                            <div
+                              className={`p-3 rounded-xl border ${
+                                alertInfo.isCustomPrinter
+                                  ? "bg-amber-500/20 border-2 border-amber-400"
+                                  : "bg-indigo-950/60 border-indigo-500/40"
+                              }`}
+                            >
+                              <span className="text-[10px] font-black uppercase text-indigo-300 flex items-center gap-1 mb-0.5">
+                                <Printer className="w-3.5 h-3.5" />
+                                <span>Impressora Escolhida</span>
                               </span>
-                              <strong className="text-white text-xs">{item.printer_name || "Nenhuma"}</strong>
+                              <strong className="text-white text-xs sm:text-sm block">
+                                {item.printer_name || "Nenhuma"}
+                              </strong>
                             </div>
-                            <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800/80">
-                              <span className="text-[10px] font-bold uppercase text-slate-500 block">
-                                Leitor / Scanner 2D
+                            <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-500/30">
+                              <span className="text-[10px] font-black uppercase text-purple-300 flex items-center gap-1 mb-0.5">
+                                <QrCode className="w-3.5 h-3.5" />
+                                <span>Leitor / Scanner 2D</span>
                               </span>
-                              <strong className="text-white text-xs">{item.reader_name || "Sem leitor frontal"}</strong>
+                              <strong className="text-white text-xs sm:text-sm block">
+                                {item.reader_name || "Sem leitor frontal"}
+                              </strong>
                             </div>
                           </div>
+
+                          {/* Alerta de Evidência de Item Fora do Padrão / Observação no Modal */}
+                          {alertInfo.hasDeviation && (
+                            <div className="p-3.5 rounded-xl bg-gradient-to-r from-amber-500/25 via-rose-500/20 to-amber-500/25 border-2 border-amber-400 space-y-2">
+                              <div className="flex items-center gap-1.5 text-amber-300 font-black text-xs uppercase tracking-wider">
+                                <AlertTriangle className="w-4 h-4 shrink-0" />
+                                <span>⚠️ ATENÇÃO PRODUÇÃO: ESPECIFICAÇÃO ESPECIAL / OBSERVAÇÃO</span>
+                              </div>
+                              {alertInfo.isCustomMonitor && alertInfo.cutoutText && (
+                                <div className="p-2.5 rounded-lg bg-black/50 border border-amber-400/50 text-amber-100 font-mono text-xs">
+                                  <strong className="text-amber-300 block uppercase text-[10px]">
+                                    Medidas do Monitor Sob Medida:
+                                  </strong>
+                                  {alertInfo.cutoutText}
+                                </div>
+                              )}
+                              {alertInfo.itemNote && (
+                                <div className="p-2.5 rounded-lg bg-black/60 border border-rose-400/60 text-white">
+                                  <strong className="text-rose-300 block uppercase text-[10px] mb-0.5">
+                                    Observação Escrita para este Item:
+                                  </strong>
+                                  <p className="text-xs sm:text-sm font-extrabold text-amber-200 whitespace-pre-wrap">
+                                    {alertInfo.itemNote}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
 
                           {/* Detalhamento Técnico de Corte Router CNC (se disponível na ficha) */}
                           {sheet && (
@@ -1847,6 +2562,612 @@ export default function AdminPage() {
           </div>
         );
       })()}
+
+      {/* ======================================================== */}
+      {/* MODAL: EDIÇÃO COMPLETA DO PEDIDO (CLIENTE, ENDEREÇO, FRETE, ITENS E OBSERVAÇÕES) */}
+      {/* ======================================================== */}
+      {editingOrder && editOrderForm && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <form
+            onSubmit={handleSaveOrderEdit}
+            className="bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl w-full max-h-[94dvh] flex flex-col overflow-hidden shadow-2xl relative animate-fade-in"
+          >
+            {/* Header Fixo */}
+            <div className="flex items-center justify-between gap-3 px-5 sm:px-7 py-4 border-b border-slate-800 bg-slate-900/95 shrink-0">
+              <div>
+                <span className="text-[11px] font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span>Edição Administrativa Completa do Pedido</span>
+                </span>
+                <h2 className="text-lg sm:text-xl font-extrabold text-white font-mono mt-0.5">
+                  {editingOrder.order_number} — {editOrderForm.customer_name}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingOrder(null);
+                  setEditOrderForm(null);
+                }}
+                className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-rose-500/20 hover:text-rose-300 flex items-center justify-center text-slate-400 transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Corpo Rolável do Formulário */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-7 space-y-5 text-xs">
+              {/* 1. Status, Pagamento e Observação Geral de Alerta */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                <h4 className="font-black text-indigo-400 uppercase text-[11px] tracking-wider">
+                  Status, Pagamento & Alerta Geral de Produção
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">Status do Pedido</label>
+                    <select
+                      value={editOrderForm.status}
+                      onChange={(e) => setEditOrderForm({ ...editOrderForm, status: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold focus:outline-none focus:border-indigo-500"
+                    >
+                      {Object.entries(STATUS_CONFIG).map(([k, cfg]) => (
+                        <option key={k} value={k}>
+                          {cfg.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">Método de Pagamento</label>
+                    <select
+                      value={editOrderForm.payment_method}
+                      onChange={(e) =>
+                        setEditOrderForm({
+                          ...editOrderForm,
+                          payment_method: e.target.value as "pix" | "credit_card",
+                        })
+                      }
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="pix">PIX à Vista</option>
+                      <option value="credit_card">Cartão de Crédito</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-500/40 space-y-1.5">
+                  <label className="block text-amber-300 font-extrabold uppercase text-[10px] tracking-wider flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    <span>⚠️ Observação Geral do Pedido / Instrução em Destaque para Fábrica ou Expedição:</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={editOrderForm.order_notes}
+                    onChange={(e) => setEditOrderForm({ ...editOrderForm, order_notes: e.target.value })}
+                    placeholder="Se preenchido, ficará em evidência máxima (alerta amarelo/vermelho) no card do pedido para evitar qualquer erro na entrega..."
+                    className="w-full px-3 py-2 bg-slate-950 border border-amber-500/40 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+              </div>
+
+              {/* 2. Dados do Cliente & Endereço de Entrega */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                  <h4 className="font-black text-indigo-400 uppercase text-[11px] tracking-wider">
+                    1. Dados do Cliente
+                  </h4>
+                  <div className="space-y-2.5">
+                    <div>
+                      <label className="block text-slate-400 font-semibold mb-1">Nome / Razão Social</label>
+                      <input
+                        type="text"
+                        value={editOrderForm.customer_name}
+                        onChange={(e) => setEditOrderForm({ ...editOrderForm, customer_name: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 font-semibold mb-1">CPF / CNPJ</label>
+                      <input
+                        type="text"
+                        value={editOrderForm.customer_document}
+                        onChange={(e) => setEditOrderForm({ ...editOrderForm, customer_document: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-slate-400 font-semibold mb-1">WhatsApp</label>
+                        <input
+                          type="text"
+                          value={editOrderForm.customer_whatsapp}
+                          onChange={(e) => setEditOrderForm({ ...editOrderForm, customer_whatsapp: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-400 font-semibold mb-1">E-mail</label>
+                        <input
+                          type="email"
+                          value={editOrderForm.customer_email}
+                          onChange={(e) => setEditOrderForm({ ...editOrderForm, customer_email: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                  <h4 className="font-black text-cyan-400 uppercase text-[11px] tracking-wider">
+                    Endereço de Entrega
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-slate-400 font-semibold mb-1">CEP</label>
+                      <input
+                        type="text"
+                        value={editOrderForm.cep}
+                        onChange={(e) => setEditOrderForm({ ...editOrderForm, cep: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-slate-400 font-semibold mb-1">Rua / Logradouro</label>
+                      <input
+                        type="text"
+                        value={editOrderForm.street}
+                        onChange={(e) => setEditOrderForm({ ...editOrderForm, street: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-slate-400 font-semibold mb-1">Número</label>
+                      <input
+                        type="text"
+                        value={editOrderForm.number}
+                        onChange={(e) => setEditOrderForm({ ...editOrderForm, number: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-slate-400 font-semibold mb-1">Complemento</label>
+                      <input
+                        type="text"
+                        value={editOrderForm.complement}
+                        onChange={(e) => setEditOrderForm({ ...editOrderForm, complement: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-5 gap-2">
+                    <div className="col-span-2">
+                      <label className="block text-slate-400 font-semibold mb-1">Bairro</label>
+                      <input
+                        type="text"
+                        value={editOrderForm.neighborhood}
+                        onChange={(e) => setEditOrderForm({ ...editOrderForm, neighborhood: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-slate-400 font-semibold mb-1">Cidade</label>
+                      <input
+                        type="text"
+                        value={editOrderForm.city}
+                        onChange={(e) => setEditOrderForm({ ...editOrderForm, city: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 font-semibold mb-1">UF</label>
+                      <input
+                        type="text"
+                        maxLength={2}
+                        value={editOrderForm.state}
+                        onChange={(e) => setEditOrderForm({ ...editOrderForm, state: e.target.value.toUpperCase() })}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white uppercase font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Método de Entrega & Valores Financeiros */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h4 className="font-black text-cyan-400 uppercase text-[11px] tracking-wider">
+                    2. Método de Entrega & Valores Financeiros
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const itemsSum = editOrderForm.items.reduce((acc, i) => acc + (Number(i.subtotal_cents) || 0), 0);
+                      const disc = Number(editOrderForm.discount_cents) || 0;
+                      const ship = Number(editOrderForm.shipping_cents) || 0;
+                      setEditOrderForm({
+                        ...editOrderForm,
+                        subtotal_cents: itemsSum,
+                        total_cents: Math.max(0, itemsSum - disc + ship),
+                      });
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 font-bold text-[10px] cursor-pointer"
+                  >
+                    Recalcular Total pelos Itens + Frete
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                  <div className="lg:col-span-2">
+                    <label className="block text-slate-400 font-semibold mb-1">Modalidade de Frete (PAC, SEDEX, etc.)</label>
+                    <input
+                      type="text"
+                      value={editOrderForm.shipping_name}
+                      onChange={(e) => setEditOrderForm({ ...editOrderForm, shipping_name: e.target.value })}
+                      placeholder="Ex: PAC (Correios) ou SEDEX (Correios)"
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">Subtotal Gabinetes (R$)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={(editOrderForm.subtotal_cents / 100).toFixed(2)}
+                      onChange={(e) =>
+                        setEditOrderForm({
+                          ...editOrderForm,
+                          subtotal_cents: Math.round((parseFloat(e.target.value) || 0) * 100),
+                        })
+                      }
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">Valor do Frete (R$)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={(editOrderForm.shipping_cents / 100).toFixed(2)}
+                      onChange={(e) =>
+                        setEditOrderForm({
+                          ...editOrderForm,
+                          shipping_cents: Math.round((parseFloat(e.target.value) || 0) * 100),
+                        })
+                      }
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-cyan-300 font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-emerald-400 font-bold mb-1">Total Pago (R$)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={(editOrderForm.total_cents / 100).toFixed(2)}
+                      onChange={(e) =>
+                        setEditOrderForm({
+                          ...editOrderForm,
+                          total_cents: Math.round((parseFloat(e.target.value) || 0) * 100),
+                        })
+                      }
+                      className="w-full px-3 py-2 bg-emerald-950/40 border border-emerald-500/40 rounded-xl text-emerald-300 font-mono font-black"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. Itens do Pedido, Equipamentos (Monitor/Impressora) e Observações por Gabinete */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-black text-emerald-400 uppercase text-[11px] tracking-wider">
+                    3. Itens do Pedido, Monitor, Impressora & Especificações Fora do Padrão ({editOrderForm.items.length})
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditOrderForm({
+                        ...editOrderForm,
+                        items: [
+                          ...editOrderForm.items,
+                          {
+                            cabinet_name: "Gabinete de Balcão Compacto",
+                            color_name: "Branco TX",
+                            monitor_name: 'Touch 21.5" Full HD — Mais Vendido',
+                            printer_name: "Elgin i9",
+                            reader_name: "Sem leitor",
+                            unit_price_cents: 120000,
+                            quantity: 1,
+                            subtotal_cents: 120000,
+                            screenCutoutMm: "",
+                            customizationNotes: "",
+                          },
+                        ],
+                      })
+                    }
+                    className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-bold text-xs flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Adicionar Item ao Pedido</span>
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {editOrderForm.items.map((it, idx) => (
+                    <div
+                      key={it.$id || idx}
+                      className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3"
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                        <span className="font-black text-white text-xs">
+                          Item #{idx + 1} — {it.cabinet_name}
+                        </span>
+                        {editOrderForm.items.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = editOrderForm.items.filter((_, i) => i !== idx);
+                              setEditOrderForm({ ...editOrderForm, items: next });
+                            }}
+                            className="text-rose-400 hover:text-rose-300 font-bold text-[11px] flex items-center gap-1 cursor-pointer"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Remover Item</span>
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                        <div className="lg:col-span-2">
+                          <label className="block text-slate-400 font-semibold mb-1">Modelo do Gabinete</label>
+                          <input
+                            type="text"
+                            value={it.cabinet_name}
+                            onChange={(e) => {
+                              const next = [...editOrderForm.items];
+                              next[idx] = { ...next[idx], cabinet_name: e.target.value };
+                              setEditOrderForm({ ...editOrderForm, items: next });
+                            }}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-slate-400 font-semibold mb-1">Acabamento / Cor</label>
+                          <input
+                            type="text"
+                            value={it.color_name}
+                            onChange={(e) => {
+                              const next = [...editOrderForm.items];
+                              next[idx] = { ...next[idx], color_name: e.target.value };
+                              setEditOrderForm({ ...editOrderForm, items: next });
+                            }}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-slate-400 font-semibold mb-1">Qtd</label>
+                            <input
+                              type="number"
+                              min={1}
+                              value={it.quantity}
+                              onChange={(e) => {
+                                const q = Math.max(1, parseInt(e.target.value, 10) || 1);
+                                const next = [...editOrderForm.items];
+                                next[idx] = {
+                                  ...next[idx],
+                                  quantity: q,
+                                  subtotal_cents: q * (next[idx].unit_price_cents || 0),
+                                };
+                                setEditOrderForm({ ...editOrderForm, items: next });
+                              }}
+                              className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-400 font-semibold mb-1">Subtotal (R$)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={(it.subtotal_cents / 100).toFixed(2)}
+                              onChange={(e) => {
+                                const sub = Math.round((parseFloat(e.target.value) || 0) * 100);
+                                const next = [...editOrderForm.items];
+                                next[idx] = {
+                                  ...next[idx],
+                                  subtotal_cents: sub,
+                                  unit_price_cents: Math.round(sub / Math.max(1, next[idx].quantity)),
+                                };
+                                setEditOrderForm({ ...editOrderForm, items: next });
+                              }}
+                              className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-indigo-300 font-mono font-bold"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        <div>
+                          <label className="block text-cyan-300 font-bold mb-1">Monitor Escolhido</label>
+                          <input
+                            type="text"
+                            value={it.monitor_name}
+                            onChange={(e) => {
+                              const next = [...editOrderForm.items];
+                              next[idx] = { ...next[idx], monitor_name: e.target.value };
+                              setEditOrderForm({ ...editOrderForm, items: next });
+                            }}
+                            placeholder='Ex: Touch 21.5" Full HD ou Monitor Sob Medida'
+                            className="w-full px-3 py-2 bg-cyan-950/30 border border-cyan-500/40 rounded-xl text-white font-bold"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-indigo-300 font-bold mb-1">Impressora Escolhida</label>
+                          <input
+                            type="text"
+                            value={it.printer_name}
+                            onChange={(e) => {
+                              const next = [...editOrderForm.items];
+                              next[idx] = { ...next[idx], printer_name: e.target.value };
+                              setEditOrderForm({ ...editOrderForm, items: next });
+                            }}
+                            placeholder="Ex: Elgin i9, Epson TM-T20X..."
+                            className="w-full px-3 py-2 bg-indigo-950/30 border border-indigo-500/40 rounded-xl text-white font-bold"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-purple-300 font-bold mb-1">Leitor 2D / QR Code</label>
+                          <input
+                            type="text"
+                            value={it.reader_name}
+                            onChange={(e) => {
+                              const next = [...editOrderForm.items];
+                              next[idx] = { ...next[idx], reader_name: e.target.value };
+                              setEditOrderForm({ ...editOrderForm, items: next });
+                            }}
+                            placeholder="Ex: Sem leitor ou Leitor 2D Fixo"
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                        <div>
+                          <label className="block text-slate-400 font-semibold mb-1">
+                            Especificação de Corte CNC da Tela / Medidas do Monitor
+                          </label>
+                          <input
+                            type="text"
+                            value={it.screenCutoutMm}
+                            onChange={(e) => {
+                              const next = [...editOrderForm.items];
+                              next[idx] = { ...next[idx], screenCutoutMm: e.target.value };
+                              setEditOrderForm({ ...editOrderForm, items: next });
+                            }}
+                            placeholder="Ex: Monitor Inteiro: 49.6x30cm | Tela: 47.6x27cm..."
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 font-mono text-[11px]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-amber-300 font-extrabold mb-1">
+                            ⚠️ Observação Especial / Alerta Fora do Padrão deste Item
+                          </label>
+                          <input
+                            type="text"
+                            value={it.customizationNotes}
+                            onChange={(e) => {
+                              const next = [...editOrderForm.items];
+                              next[idx] = { ...next[idx], customizationNotes: e.target.value };
+                              setEditOrderForm({ ...editOrderForm, items: next });
+                            }}
+                            placeholder="Qualquer observação escrita aqui ficará em destaque amarelo/vermelho no card!"
+                            className="w-full px-3 py-2 bg-amber-950/30 border border-amber-500/50 rounded-xl text-amber-100 placeholder-slate-500 font-bold"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Rodapé Fixo de Ações */}
+            <div className="px-5 sm:px-7 py-4 border-t border-slate-800 bg-slate-900/95 flex items-center justify-end gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingOrder(null);
+                  setEditOrderForm(null);
+                }}
+                className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={isSavingOrderEdit}
+                className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer"
+              >
+                {isSavingOrderEdit ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Salvando no Appwrite...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    <span>Salvar Alterações do Pedido</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL: CONFIRMAÇÃO DE EXCLUSÃO DE PEDIDO */}
+      {/* ======================================================== */}
+      {deletingOrder && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border-2 border-rose-500/40 rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-fade-in">
+            <div className="flex items-start gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-400 flex items-center justify-center shrink-0">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-extrabold text-white">
+                  Excluir Pedido Permanentemente?
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Você está prestes a remover o pedido{" "}
+                  <strong className="text-white font-mono">{deletingOrder.order_number}</strong> do cliente{" "}
+                  <strong className="text-white">{deletingOrder.customer_name}</strong> no valor de{" "}
+                  <strong className="text-emerald-400">{formatBRL(deletingOrder.total_cents)}</strong>.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-rose-950/30 border border-rose-500/30 text-[11px] text-rose-300 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>
+                Esta ação removerá o pedido e seus itens do banco de dados Appwrite e do painel administrativo.
+              </span>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-1">
+              <button
+                type="button"
+                disabled={isDeletingOrder}
+                onClick={() => setDeletingOrder(null)}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingOrder}
+                onClick={handleConfirmDeleteOrder}
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-lg shadow-rose-600/25 transition-all cursor-pointer"
+              >
+                {isDeletingOrder ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Excluindo...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Sim, Excluir Pedido</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -53,7 +53,8 @@ export async function GET(req: Request) {
       let parsedSheets: any[] = [];
       try {
         if (o.manufacturing_sheet_json) {
-          parsedSheets = JSON.parse(o.manufacturing_sheet_json);
+          const rawParsed = JSON.parse(o.manufacturing_sheet_json);
+          parsedSheets = Array.isArray(rawParsed) ? rawParsed : rawParsed ? [rawParsed] : [];
         }
       } catch {}
 

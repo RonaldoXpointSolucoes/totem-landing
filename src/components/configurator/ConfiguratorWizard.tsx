@@ -119,6 +119,11 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     return !!editingItem;
   });
 
+  const [customizationNotes, setCustomizationNotes] = useState<string>(() => {
+    if (editingItem) return editingItem.configuration.customizationNotes || "";
+    return "";
+  });
+
   // Passo atual
   const [step, setStep] = useState<number>(() => {
     if (initialStep && initialStep >= 1 && initialStep <= 6) return initialStep;
@@ -274,6 +279,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
       monitor: selectedMonitor,
       printer: selectedPrinter,
       barcodeReader: useReader ? selectedReader : null,
+      customizationNotes: customizationNotes.trim() || undefined,
       calculatedPriceCents: pricing.pixTotalPriceCents,
     };
 
@@ -304,6 +310,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     setUseReader(true);
     setSelectedReader(null);
     setReaderConfigured(false);
+    setCustomizationNotes("");
     setStep(1);
     setIsCartSuccessModalOpen(false);
   };
@@ -612,6 +619,8 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                 reader={selectedReader}
                 useReader={useReader}
                 pricing={pricing}
+                customizationNotes={customizationNotes}
+                onChangeNotes={setCustomizationNotes}
                 onEditStep={(stepNum) => setStep(stepNum)}
                 onAddToCart={handleAddToCart}
               />
