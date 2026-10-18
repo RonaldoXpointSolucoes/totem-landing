@@ -89,8 +89,12 @@ export async function PATCH(
 
       const orderNumber = body.order_number || updated?.order_number || id;
       let parsedAddr: any = undefined;
+      let parsedSheets: any = undefined;
       try {
         if (body.delivery_address_json) parsedAddr = JSON.parse(body.delivery_address_json);
+      } catch {}
+      try {
+        if (body.manufacturing_sheet_json) parsedSheets = JSON.parse(body.manufacturing_sheet_json);
       } catch {}
 
       updateLocalOrderAdmin(orderNumber, {
@@ -98,7 +102,9 @@ export async function PATCH(
         ...(body.subtotal_cents !== undefined ? { subtotalCents: body.subtotal_cents } : {}),
         ...(body.shipping_cents !== undefined ? { shippingCents: body.shipping_cents } : {}),
         ...(body.total_cents !== undefined ? { totalCents: body.total_cents } : {}),
+        ...(parsedAddr ? { deliveryAddress: parsedAddr } : {}),
         ...(parsedAddr?.shippingMethod ? { shippingMethod: parsedAddr.shippingMethod } : {}),
+        ...(parsedSheets ? { manufacturingSheets: parsedSheets } : {}),
       });
     }
 

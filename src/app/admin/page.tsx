@@ -8,6 +8,14 @@ import { MarketingSettingsManager } from "@/components/admin/MarketingSettingsMa
 import { TeamManager } from "@/components/admin/TeamManager";
 import { VoucherManager } from "@/components/admin/VoucherManager";
 import { CustomersManager } from "@/components/admin/CustomersManager";
+import {
+  OrderExecutionEditor,
+  OrderExecutionViewer,
+  OrderExecutionData,
+  ExecutionAttachment,
+  createDefaultExecutionOrder,
+  hasExecutionOrderContent,
+} from "@/components/admin/OrderExecutionEditor";
 import { GoogleLoginButton } from "@/components/auth/GoogleLoginButton";
 import {
   ShieldCheck,
@@ -48,6 +56,10 @@ import {
   Monitor,
   Sparkles,
   X,
+  Camera,
+  Film,
+  ClipboardCheck,
+  Upload,
 } from "lucide-react";
 
 interface OrderItem {
@@ -84,6 +96,7 @@ interface ParsedDeliveryAddress {
   couponCode?: string | null;
   discountCents?: number;
   customerNotes?: string | null;
+  executionOrder?: OrderExecutionData | null;
 }
 
 interface EditableOrderItem {
@@ -98,6 +111,7 @@ interface EditableOrderItem {
   subtotal_cents: number;
   screenCutoutMm: string;
   customizationNotes: string;
+  itemAttachments: ExecutionAttachment[];
 }
 
 interface EditOrderFormState {
@@ -122,6 +136,7 @@ interface EditOrderFormState {
   coupon_code: string;
   total_cents: number;
   order_notes: string;
+  execution_order: OrderExecutionData;
   items: EditableOrderItem[];
 }
 
@@ -215,6 +230,8 @@ export default function AdminPage() {
   // Modal de Edição Completa do Pedido e Exclusão de Pedido
   const [editingOrder, setEditingOrder] = useState<OrderRecord | null>(null);
   const [editOrderForm, setEditOrderForm] = useState<EditOrderFormState | null>(null);
+  const [editModalFocusSection, setEditModalFocusSection] = useState<"all" | "execution">("all");
+  const [uploadingItemIdx, setUploadingItemIdx] = useState<number | null>(null);
   const [isSavingOrderEdit, setIsSavingOrderEdit] = useState(false);
   const [deletingOrder, setDeletingOrder] = useState<OrderRecord | null>(null);
   const [isDeletingOrder, setIsDeletingOrder] = useState(false);
@@ -361,11 +378,16 @@ export default function AdminPage() {
         ? sheet.engineeringAnalysis.engineeringParecer
         : "";
 
+    const itemAttachments: ExecutionAttachment[] = Array.isArray(sheet?.itemAttachments)
+      ? sheet.itemAttachments
+      : [];
+
     const hasDeviation =
       isCustomMonitor ||
       isCustomPrinter ||
       isCustomReader ||
       isCustomColor ||
+      itemAttachments.length > 0 ||
       Boolean(itemNote && itemNote.trim().length > 0) ||
       Boolean(order.order_number?.startsWith("CUST-"));
 
@@ -379,6 +401,7 @@ export default function AdminPage() {
       customDims: sheet?.customDimensions || null,
       itemNote: itemNote.trim(),
       engineeringNote: engineeringNote.trim(),
+      itemAttachments,
     };
   };
 
@@ -568,8 +591,8 @@ export default function AdminPage() {
     }
   };
 
-  // Abrir Modal de Edição Completa do Pedido
-  const handleOpenEditOrder = (order: OrderRecord) => {
+  // Abrir Modal de Edição Completa do Pedido (com opção de foco na Ordem de Execução)
+  const handleOpenEditOrder = (order: OrderRecord, focusSection: "all" | "execution" = "all") => {
     const addr = getOrderAddress(order);
     const shipping = getOrderShipping(order);
     const payMethod = getOrderPaymentMethod(order);
@@ -593,9 +616,11 @@ export default function AdminPage() {
           sheet?.customerNotes ||
           sheet?.customNotes ||
           "",
+        itemAttachments: Array.isArray(sheet?.itemAttachments) ? sheet.itemAttachments : [],
       };
     });
 
+    setEditModalFocusSection(focusSection);
     setEditingOrder(order);
     setEditOrderForm({
       status: order.status || "awaiting_payment",
@@ -619,11 +644,58 @@ export default function AdminPage() {
       coupon_code: order.coupon_code || addr?.couponCode || "",
       total_cents: order.total_cents || 0,
       order_notes: addr?.customerNotes || "",
+      execution_order: createDefaultExecutionOrder(addr?.executionOrder || null),
       items: editableItems,
     });
   };
 
-  // Salvar Edição Completa do Pedido
+  // Upload de Foto/Vídeo diretamente em um Item específico do Pedido
+  const handleUploadItemMedia = async (itemIdx: number, files: FileList | File[]) => {
+    if (!editOrderForm || !editingOrder) return;
+    const fileArray = Array.from(files);
+    if (fileArray.length === 0) return;
+
+    setUploadingItemIdx(itemIdx);
+    const uploaded: ExecutionAttachment[] = [];
+
+    try {
+      for (const file of fileArray) {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("orderNumber", `${editingOrder.order_number}_ITEM${itemIdx + 1}`);
+        formData.append("caption", file.name);
+
+        const res = await fetch("/api/admin/orders/media", {
+          method: "POST",
+          body: formData,
+        });
+        const json = await res.json();
+        if (json.ok && json.attachment) {
+          uploaded.push(json.attachment);
+        } else {
+          alert(json.error || `Falha ao enviar arquivo ${file.name}`);
+        }
+      }
+
+      if (uploaded.length > 0) {
+        const nextItems = [...editOrderForm.items];
+        nextItems[itemIdx] = {
+          ...nextItems[itemIdx],
+          itemAttachments: [...(nextItems[itemIdx].itemAttachments || []), ...uploaded],
+        };
+        setEditOrderForm({
+          ...editOrderForm,
+          items: nextItems,
+        });
+      }
+    } catch (err: any) {
+      alert("Erro ao enviar anexo do item: " + err?.message);
+    } finally {
+      setUploadingItemIdx(null);
+    }
+  };
+
+  // Salvar Edição Completa do Pedido (incluindo Ordem de Execução & Anexos Multimídia)
   const handleSaveOrderEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingOrder || !editOrderForm) return;
@@ -646,6 +718,7 @@ export default function AdminPage() {
         couponCode: editOrderForm.coupon_code.trim() || null,
         discountCents: Number(editOrderForm.discount_cents) || 0,
         customerNotes: editOrderForm.order_notes.trim() || null,
+        executionOrder: editOrderForm.execution_order,
         shippingMethod: {
           ...(prevAddr.shippingMethod || {}),
           id: prevAddr.shippingMethod?.id || "custom_shipping",
@@ -677,6 +750,7 @@ export default function AdminPage() {
           cabinetModelName: it.cabinet_name,
           colorName: it.color_name,
           customizationNotes: it.customizationNotes.trim(),
+          itemAttachments: it.itemAttachments || [],
           isCustomMonitor: isCustomMon,
           screenSpecs: {
             ...(baseSheet.screenSpecs || {}),
@@ -741,11 +815,11 @@ export default function AdminPage() {
 
       if (json.ok) {
         addAuditLog(
-          "Edição de Pedido",
+          "Ordem de Execução & Edição",
           editingOrder.order_number,
-          `Pedido de ${editOrderForm.customer_name} atualizado pelo administrador`
+          `Pedido e Ordem de Execução de ${editOrderForm.customer_name} salvos pelo administrador`
         );
-        setSaveSuccessMsg(`Pedido ${editingOrder.order_number} atualizado com sucesso!`);
+        setSaveSuccessMsg(`Pedido e Ordem de Execução ${editingOrder.order_number} salvos com sucesso!`);
         setTimeout(() => setSaveSuccessMsg(""), 4000);
         setEditingOrder(null);
         setEditOrderForm(null);
@@ -1219,9 +1293,11 @@ export default function AdminPage() {
                       )}`
                     : null;
 
+                  const hasExecOrder = hasExecutionOrderContent(addr?.executionOrder);
                   const orderHasAnyDeviation =
                     Boolean(addr?.customerNotes && addr.customerNotes.trim()) ||
                     Boolean(order.order_number?.startsWith("CUST-")) ||
+                    Boolean(addr?.executionOrder?.priority === "urgent") ||
                     (order.items || []).some((it, idx) => getItemAlertInfo(order, it, sheets[idx], idx).hasDeviation);
 
                   return (
@@ -1271,6 +1347,16 @@ export default function AdminPage() {
                             </span>
                           </span>
 
+                          {/* Badge Ordem de Execução Ativa */}
+                          {hasExecOrder && (
+                            <span className="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-400/50 flex items-center gap-1.5">
+                              <ClipboardCheck className="w-3.5 h-3.5 text-indigo-300" />
+                              <span>
+                                O.S. Técnica ({addr?.executionOrder?.attachments?.length || 0} mídia/s)
+                              </span>
+                            </span>
+                          )}
+
                           {/* Badge Alerta Fora do Padrão / Observação no Topo */}
                           {orderHasAnyDeviation && (
                             <span className="px-2.5 py-1 rounded-full text-[11px] font-black bg-amber-500/20 text-amber-300 border-2 border-amber-400 flex items-center gap-1.5 animate-pulse">
@@ -1298,10 +1384,21 @@ export default function AdminPage() {
                             ))}
                           </select>
 
+                          {/* Botão Direto: Ordem de Execução (Fotos, Vídeos & Dados Técnicos) */}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditOrder(order, "execution")}
+                            className="px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 active:scale-95 text-emerald-300 border border-emerald-500/40 font-extrabold text-xs flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+                            title="Abrir Editor Rico da Ordem de Execução para anexar fotos, vídeos e dados técnicos"
+                          >
+                            <Camera className="w-3.5 h-3.5" />
+                            <span>Ordem de Execução (Fotos & Vídeos)</span>
+                          </button>
+
                           {/* 1-) Botão Editar Pedido */}
                           <button
                             type="button"
-                            onClick={() => handleOpenEditOrder(order)}
+                            onClick={() => handleOpenEditOrder(order, "all")}
                             className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 border border-amber-500/30 font-bold text-xs flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
                             title="Editar dados, itens, equipamentos ou observações deste pedido"
                           >
@@ -1482,15 +1579,36 @@ export default function AdminPage() {
                                   3. Detalhes na Escolha, Equipamentos & Alertas de Produção ({order.items?.length || 0} item/ns)
                                 </span>
                               </span>
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEditOrder(order)}
-                                className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-slate-700 hover:border-amber-500/40 flex items-center gap-1 transition-colors cursor-pointer"
-                              >
-                                <Edit2 className="w-3 h-3" />
-                                <span>+ Observação / Editar Itens</span>
-                              </button>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditOrder(order, "execution")}
+                                  className="text-[10px] font-extrabold px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 transition-colors cursor-pointer"
+                                >
+                                  <Camera className="w-3 h-3" />
+                                  <span>+ Anexar Fotos / Vídeos / Ordem de Execução</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditOrder(order, "all")}
+                                  className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-slate-700 hover:border-amber-500/40 flex items-center gap-1 transition-colors cursor-pointer"
+                                >
+                                  <Edit2 className="w-3 h-3" />
+                                  <span>+ Observação / Editar Itens</span>
+                                </button>
+                              </div>
                             </div>
+
+                            {/* Visualização da Ordem de Execução & Anexos Multimídia (se preenchido) */}
+                            {hasExecOrder && (
+                              <OrderExecutionViewer
+                                orderNumber={order.order_number}
+                                customerName={order.customer_name}
+                                executionOrder={addr?.executionOrder}
+                                onEditClick={() => handleOpenEditOrder(order, "execution")}
+                                compact
+                              />
+                            )}
 
                             {/* Alerta Geral de Observação do Pedido (se houver no nível do pedido) */}
                             {addr?.customerNotes && addr.customerNotes.trim().length > 0 && (
@@ -1652,13 +1770,13 @@ export default function AdminPage() {
                                       </div>
                                     </div>
 
-                                    {/* 🚨 CAIXA DE ALTA EVIDÊNCIA: ITEM FORA DO PADRÃO / MEDIDAS ESPECIAIS / OBSERVAÇÃO DO CLIENTE */}
+                                    {/* 🚨 CAIXA DE ALTA EVIDÊNCIA: ITEM FORA DO PADRÃO / MEDIDAS ESPECIAIS / OBSERVAÇÃO DO CLIENTE / FOTOS & VÍDEOS DO ITEM */}
                                     {alertInfo.hasDeviation ? (
-                                      <div className="p-3 rounded-xl bg-gradient-to-r from-amber-500/25 via-rose-500/20 to-amber-500/25 border-2 border-amber-400 space-y-1.5 shadow-md">
+                                      <div className="p-3 rounded-xl bg-gradient-to-r from-amber-500/25 via-rose-500/20 to-amber-500/25 border-2 border-amber-400 space-y-2 shadow-md">
                                         <div className="flex items-center gap-1.5 text-amber-300 font-black text-[10px] sm:text-[11px] uppercase tracking-wider">
                                           <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0" />
                                           <span>
-                                            ⚠️ ATENÇÃO FÁBRICA: ITEM FORA DO PADRÃO / OBSERVAÇÃO DO CLIENTE
+                                            ⚠️ ATENÇÃO FÁBRICA: ITEM FORA DO PADRÃO / OBSERVAÇÃO OU MÍDIA ANEXADA
                                           </span>
                                         </div>
 
@@ -1679,6 +1797,42 @@ export default function AdminPage() {
                                             <p className="text-xs sm:text-sm font-extrabold text-amber-200 whitespace-pre-wrap">
                                               {alertInfo.itemNote}
                                             </p>
+                                          </div>
+                                        )}
+
+                                        {alertInfo.itemAttachments && alertInfo.itemAttachments.length > 0 && (
+                                          <div className="space-y-1.5 pt-1">
+                                            <span className="text-cyan-300 font-black block uppercase text-[10px]">
+                                              📎 Fotos & Vídeos Técnicos deste Gabinete ({alertInfo.itemAttachments.length}):
+                                            </span>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                              {alertInfo.itemAttachments.map((att) => (
+                                                <div
+                                                  key={att.id}
+                                                  className="p-2 rounded-lg bg-black/70 border border-slate-700 space-y-1"
+                                                >
+                                                  {att.type === "video" ? (
+                                                    <video
+                                                      src={att.url}
+                                                      controls
+                                                      preload="metadata"
+                                                      className="w-full h-32 object-contain rounded bg-black"
+                                                    />
+                                                  ) : (
+                                                    <a href={att.url} target="_blank" rel="noopener noreferrer">
+                                                      <img
+                                                        src={att.url}
+                                                        alt={att.caption}
+                                                        className="w-full h-32 object-contain rounded bg-black"
+                                                      />
+                                                    </a>
+                                                  )}
+                                                  <p className="text-[10px] font-bold text-slate-200 truncate">
+                                                    {att.caption}
+                                                  </p>
+                                                </div>
+                                              ))}
+                                            </div>
                                           </div>
                                         )}
 
@@ -2019,7 +2173,15 @@ export default function AdminPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => handleOpenEditOrder(selectedOrder)}
+                    onClick={() => handleOpenEditOrder(selectedOrder, "execution")}
+                    className="px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500/25 via-indigo-500/20 to-cyan-500/20 hover:from-amber-500/35 hover:to-cyan-500/30 text-amber-200 text-xs font-extrabold flex items-center gap-1.5 border border-amber-400/50 transition-colors cursor-pointer"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Ordem de Execução (Fotos & Vídeos)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditOrder(selectedOrder, "all")}
                     className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-xs font-bold flex items-center gap-1.5 border border-amber-500/30 transition-colors cursor-pointer"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
@@ -2054,6 +2216,40 @@ export default function AdminPage() {
 
               {/* Corpo Rolável do Pedido Completo */}
               <div className="flex-1 overflow-y-auto p-4 sm:p-7 space-y-5">
+                {/* ORDEM DE EXECUÇÃO & DADOS TÉCNICOS MULTIMÍDIA (FOTOS, VÍDEOS, TEXTO RICO E CHECKLIST) */}
+                {modalAddr?.executionOrder && hasExecutionOrderContent(modalAddr.executionOrder) ? (
+                  <OrderExecutionViewer
+                    orderNumber={selectedOrder.order_number}
+                    customerName={selectedOrder.customer_name}
+                    executionOrder={modalAddr.executionOrder}
+                    onEditClick={() => handleOpenEditOrder(selectedOrder, "execution")}
+                  />
+                ) : (
+                  <div className="p-4 rounded-2xl bg-slate-950/90 border border-dashed border-amber-500/40 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-extrabold text-white">
+                          Ordem de Execução & Ficha Técnica Multimídia (O.S. CNC)
+                        </h4>
+                        <p className="text-[11px] text-slate-400">
+                          Anexe fotos enviadas pelo cliente, vídeos de demonstração, medidas técnicas em texto rico e checklist de produção.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditOrder(selectedOrder, "execution")}
+                      className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-lg shadow-amber-500/20"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Criar Ordem de Execução (Fotos, Vídeos & Texto)</span>
+                    </button>
+                  </div>
+                )}
+
                 {/* LINHA 1: DADOS DO CLIENTE + ENDEREÇO DE ENTREGA E MÉTODO DE ENVIO */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Card 1: Dados do Comprador */}
@@ -2319,6 +2515,41 @@ export default function AdminPage() {
                                   </p>
                                 </div>
                               )}
+                              {alertInfo.itemAttachments && alertInfo.itemAttachments.length > 0 && (
+                                <div className="pt-1 space-y-2">
+                                  <strong className="text-cyan-300 block uppercase text-[10px]">
+                                    Anexos Técnicos deste Item ({alertInfo.itemAttachments.length}):
+                                  </strong>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                                    {alertInfo.itemAttachments.map((att) => (
+                                      <div
+                                        key={att.id}
+                                        className="rounded-xl overflow-hidden bg-slate-950 border border-slate-700"
+                                      >
+                                        {att.type === "video" ? (
+                                          <video
+                                            src={att.url}
+                                            controls
+                                            preload="metadata"
+                                            className="w-full h-36 object-cover bg-black"
+                                          />
+                                        ) : (
+                                          <a href={att.url} target="_blank" rel="noopener noreferrer">
+                                            <img
+                                              src={att.url}
+                                              alt={att.caption || att.fileName}
+                                              className="w-full h-36 object-cover bg-black hover:opacity-90 transition-opacity"
+                                            />
+                                          </a>
+                                        )}
+                                        <div className="p-2 text-[10px] font-bold text-slate-200 truncate">
+                                          {att.caption || att.fileName}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
 
@@ -2564,513 +2795,676 @@ export default function AdminPage() {
       })()}
 
       {/* ======================================================== */}
-      {/* MODAL: EDIÇÃO COMPLETA DO PEDIDO (CLIENTE, ENDEREÇO, FRETE, ITENS E OBSERVAÇÕES) */}
+      {/* MODAL: EDIÇÃO COMPLETA DO PEDIDO + ORDEM DE EXECUÇÃO MULTIMÍDIA */}
       {/* ======================================================== */}
       {editingOrder && editOrderForm && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
           <form
             onSubmit={handleSaveOrderEdit}
-            className="bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl w-full max-h-[94dvh] flex flex-col overflow-hidden shadow-2xl relative animate-fade-in"
+            className="bg-slate-900 border border-slate-800 rounded-3xl max-w-5xl w-full max-h-[95dvh] flex flex-col overflow-hidden shadow-2xl relative animate-fade-in"
           >
             {/* Header Fixo */}
-            <div className="flex items-center justify-between gap-3 px-5 sm:px-7 py-4 border-b border-slate-800 bg-slate-900/95 shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 sm:px-7 py-4 border-b border-slate-800 bg-slate-900/95 shrink-0">
               <div>
                 <span className="text-[11px] font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                   <Edit2 className="w-3.5 h-3.5" />
-                  <span>Edição Administrativa Completa do Pedido</span>
+                  <span>Edição Administrativa & Ordem de Execução Técnica (O.S.)</span>
                 </span>
                 <h2 className="text-lg sm:text-xl font-extrabold text-white font-mono mt-0.5">
                   {editingOrder.order_number} — {editOrderForm.customer_name}
                 </h2>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingOrder(null);
-                  setEditOrderForm(null);
-                }}
-                className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-rose-500/20 hover:text-rose-300 flex items-center justify-center text-slate-400 transition-colors cursor-pointer"
-              >
-                ✕
-              </button>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Seletor rápido de modo no modal */}
+                <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setEditModalFocusSection("execution")}
+                    className={`px-3 py-1.5 rounded-lg text-[11px] font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
+                      editModalFocusSection === "execution"
+                        ? "bg-amber-500 text-slate-950 shadow-md"
+                        : "text-slate-300 hover:text-white"
+                    }`}
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Ordem de Execução (Fotos, Vídeos & Texto)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditModalFocusSection("all")}
+                    className={`px-3 py-1.5 rounded-lg text-[11px] font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
+                      editModalFocusSection === "all"
+                        ? "bg-indigo-600 text-white shadow-md"
+                        : "text-slate-300 hover:text-white"
+                    }`}
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                    <span>Pedido Completo (Cliente, Itens & Tudo)</span>
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingOrder(null);
+                    setEditOrderForm(null);
+                  }}
+                  className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-rose-500/20 hover:text-rose-300 flex items-center justify-center text-slate-400 transition-colors cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             {/* Corpo Rolável do Formulário */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-7 space-y-5 text-xs">
-              {/* 1. Status, Pagamento e Observação Geral de Alerta */}
-              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
-                <h4 className="font-black text-indigo-400 uppercase text-[11px] tracking-wider">
-                  Status, Pagamento & Alerta Geral de Produção
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-slate-400 font-semibold mb-1">Status do Pedido</label>
-                    <select
-                      value={editOrderForm.status}
-                      onChange={(e) => setEditOrderForm({ ...editOrderForm, status: e.target.value })}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold focus:outline-none focus:border-indigo-500"
-                    >
-                      {Object.entries(STATUS_CONFIG).map(([k, cfg]) => (
-                        <option key={k} value={k}>
-                          {cfg.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-slate-400 font-semibold mb-1">Método de Pagamento</label>
-                    <select
-                      value={editOrderForm.payment_method}
-                      onChange={(e) =>
-                        setEditOrderForm({
-                          ...editOrderForm,
-                          payment_method: e.target.value as "pix" | "credit_card",
-                        })
-                      }
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold focus:outline-none focus:border-indigo-500"
-                    >
-                      <option value="pix">PIX à Vista</option>
-                      <option value="credit_card">Cartão de Crédito</option>
-                    </select>
-                  </div>
-                </div>
+            <div className="flex-1 overflow-y-auto p-4 sm:p-7 space-y-6 text-xs">
+              {/* ===================================================================== */}
+              {/* BLOCO PRINCIPAL: EDITOR POTENTE DE ORDEM DE EXECUÇÃO (TEXTO, FOTOS E VÍDEOS) */}
+              {/* ===================================================================== */}
+              <OrderExecutionEditor
+                orderNumber={editingOrder.order_number}
+                value={editOrderForm.execution_order}
+                onChange={(nextExecutionOrder) =>
+                  setEditOrderForm({
+                    ...editOrderForm,
+                    execution_order: nextExecutionOrder,
+                  })
+                }
+              />
 
-                <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-500/40 space-y-1.5">
-                  <label className="block text-amber-300 font-extrabold uppercase text-[10px] tracking-wider flex items-center gap-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5" />
-                    <span>⚠️ Observação Geral do Pedido / Instrução em Destaque para Fábrica ou Expedição:</span>
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={editOrderForm.order_notes}
-                    onChange={(e) => setEditOrderForm({ ...editOrderForm, order_notes: e.target.value })}
-                    placeholder="Se preenchido, ficará em evidência máxima (alerta amarelo/vermelho) no card do pedido para evitar qualquer erro na entrega..."
-                    className="w-full px-3 py-2 bg-slate-950 border border-amber-500/40 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
-                  />
+              {editModalFocusSection === "execution" && (
+                <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-slate-400 text-xs">
+                    Deseja também alterar dados do cliente, endereço, valores ou anexar fotos/vídeos a um item específico?
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setEditModalFocusSection("all")}
+                    className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                    <span>Mostrar Campos Comerciais e Itens do Pedido</span>
+                  </button>
                 </div>
-              </div>
+              )}
 
-              {/* 2. Dados do Cliente & Endereço de Entrega */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
-                  <h4 className="font-black text-indigo-400 uppercase text-[11px] tracking-wider">
-                    1. Dados do Cliente
-                  </h4>
-                  <div className="space-y-2.5">
-                    <div>
-                      <label className="block text-slate-400 font-semibold mb-1">Nome / Razão Social</label>
-                      <input
-                        type="text"
-                        value={editOrderForm.customer_name}
-                        onChange={(e) => setEditOrderForm({ ...editOrderForm, customer_name: e.target.value })}
-                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-400 font-semibold mb-1">CPF / CNPJ</label>
-                      <input
-                        type="text"
-                        value={editOrderForm.customer_document}
-                        onChange={(e) => setEditOrderForm({ ...editOrderForm, customer_document: e.target.value })}
-                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono"
-                      />
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {editModalFocusSection === "all" && (
+                <>
+                  {/* 1. Status, Pagamento e Observação Geral de Alerta */}
+                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                    <h4 className="font-black text-indigo-400 uppercase text-[11px] tracking-wider">
+                      Status, Pagamento & Alerta Geral de Produção
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-slate-400 font-semibold mb-1">WhatsApp</label>
+                        <label className="block text-slate-400 font-semibold mb-1">Status do Pedido</label>
+                        <select
+                          value={editOrderForm.status}
+                          onChange={(e) => setEditOrderForm({ ...editOrderForm, status: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold focus:outline-none focus:border-indigo-500"
+                        >
+                          {Object.entries(STATUS_CONFIG).map(([k, cfg]) => (
+                            <option key={k} value={k}>
+                              {cfg.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-slate-400 font-semibold mb-1">Método de Pagamento</label>
+                        <select
+                          value={editOrderForm.payment_method}
+                          onChange={(e) =>
+                            setEditOrderForm({
+                              ...editOrderForm,
+                              payment_method: e.target.value as "pix" | "credit_card",
+                            })
+                          }
+                          className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold focus:outline-none focus:border-indigo-500"
+                        >
+                          <option value="pix">PIX à Vista</option>
+                          <option value="credit_card">Cartão de Crédito</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-500/40 space-y-1.5">
+                      <label className="block text-amber-300 font-extrabold uppercase text-[10px] tracking-wider flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        <span>⚠️ Observação Geral do Pedido / Instrução em Destaque para Fábrica ou Expedição:</span>
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={editOrderForm.order_notes}
+                        onChange={(e) => setEditOrderForm({ ...editOrderForm, order_notes: e.target.value })}
+                        placeholder="Se preenchido, ficará em evidência máxima (alerta amarelo/vermelho) no card do pedido para evitar qualquer erro na entrega..."
+                        className="w-full px-3 py-2 bg-slate-950 border border-amber-500/40 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 2. Dados do Cliente & Endereço de Entrega */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                      <h4 className="font-black text-indigo-400 uppercase text-[11px] tracking-wider">
+                        1. Dados do Cliente
+                      </h4>
+                      <div className="space-y-2.5">
+                        <div>
+                          <label className="block text-slate-400 font-semibold mb-1">Nome / Razão Social</label>
+                          <input
+                            type="text"
+                            value={editOrderForm.customer_name}
+                            onChange={(e) => setEditOrderForm({ ...editOrderForm, customer_name: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-slate-400 font-semibold mb-1">CPF / CNPJ</label>
+                          <input
+                            type="text"
+                            value={editOrderForm.customer_document}
+                            onChange={(e) => setEditOrderForm({ ...editOrderForm, customer_document: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono"
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-slate-400 font-semibold mb-1">WhatsApp</label>
+                            <input
+                              type="text"
+                              value={editOrderForm.customer_whatsapp}
+                              onChange={(e) => setEditOrderForm({ ...editOrderForm, customer_whatsapp: e.target.value })}
+                              className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-400 font-semibold mb-1">E-mail</label>
+                            <input
+                              type="email"
+                              value={editOrderForm.customer_email}
+                              onChange={(e) => setEditOrderForm({ ...editOrderForm, customer_email: e.target.value })}
+                              className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                      <h4 className="font-black text-cyan-400 uppercase text-[11px] tracking-wider">
+                        Endereço de Entrega
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div>
+                          <label className="block text-slate-400 font-semibold mb-1">CEP</label>
+                          <input
+                            type="text"
+                            value={editOrderForm.cep}
+                            onChange={(e) => setEditOrderForm({ ...editOrderForm, cep: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono"
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="block text-slate-400 font-semibold mb-1">Rua / Logradouro</label>
+                          <input
+                            type="text"
+                            value={editOrderForm.street}
+                            onChange={(e) => setEditOrderForm({ ...editOrderForm, street: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="block text-slate-400 font-semibold mb-1">Número</label>
+                          <input
+                            type="text"
+                            value={editOrderForm.number}
+                            onChange={(e) => setEditOrderForm({ ...editOrderForm, number: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="block text-slate-400 font-semibold mb-1">Complemento</label>
+                          <input
+                            type="text"
+                            value={editOrderForm.complement}
+                            onChange={(e) => setEditOrderForm({ ...editOrderForm, complement: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-5 gap-2">
+                        <div className="col-span-2">
+                          <label className="block text-slate-400 font-semibold mb-1">Bairro</label>
+                          <input
+                            type="text"
+                            value={editOrderForm.neighborhood}
+                            onChange={(e) => setEditOrderForm({ ...editOrderForm, neighborhood: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="block text-slate-400 font-semibold mb-1">Cidade</label>
+                          <input
+                            type="text"
+                            value={editOrderForm.city}
+                            onChange={(e) => setEditOrderForm({ ...editOrderForm, city: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-slate-400 font-semibold mb-1">UF</label>
+                          <input
+                            type="text"
+                            maxLength={2}
+                            value={editOrderForm.state}
+                            onChange={(e) => setEditOrderForm({ ...editOrderForm, state: e.target.value.toUpperCase() })}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white uppercase font-mono"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3. Método de Entrega & Valores Financeiros */}
+                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h4 className="font-black text-cyan-400 uppercase text-[11px] tracking-wider">
+                        2. Método de Entrega & Valores Financeiros
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const itemsSum = editOrderForm.items.reduce((acc, i) => acc + (Number(i.subtotal_cents) || 0), 0);
+                          const disc = Number(editOrderForm.discount_cents) || 0;
+                          const ship = Number(editOrderForm.shipping_cents) || 0;
+                          setEditOrderForm({
+                            ...editOrderForm,
+                            subtotal_cents: itemsSum,
+                            total_cents: Math.max(0, itemsSum - disc + ship),
+                          });
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 font-bold text-[10px] cursor-pointer"
+                      >
+                        Recalcular Total pelos Itens + Frete
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                      <div className="lg:col-span-2">
+                        <label className="block text-slate-400 font-semibold mb-1">Modalidade de Frete (PAC, SEDEX, etc.)</label>
                         <input
                           type="text"
-                          value={editOrderForm.customer_whatsapp}
-                          onChange={(e) => setEditOrderForm({ ...editOrderForm, customer_whatsapp: e.target.value })}
-                          className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                          value={editOrderForm.shipping_name}
+                          onChange={(e) => setEditOrderForm({ ...editOrderForm, shipping_name: e.target.value })}
+                          placeholder="Ex: PAC (Correios) ou SEDEX (Correios)"
+                          className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold"
                         />
                       </div>
                       <div>
-                        <label className="block text-slate-400 font-semibold mb-1">E-mail</label>
+                        <label className="block text-slate-400 font-semibold mb-1">Subtotal Gabinetes (R$)</label>
                         <input
-                          type="email"
-                          value={editOrderForm.customer_email}
-                          onChange={(e) => setEditOrderForm({ ...editOrderForm, customer_email: e.target.value })}
-                          className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                          type="number"
+                          step="0.01"
+                          value={(editOrderForm.subtotal_cents / 100).toFixed(2)}
+                          onChange={(e) =>
+                            setEditOrderForm({
+                              ...editOrderForm,
+                              subtotal_cents: Math.round((parseFloat(e.target.value) || 0) * 100),
+                            })
+                          }
+                          className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-400 font-semibold mb-1">Valor do Frete (R$)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={(editOrderForm.shipping_cents / 100).toFixed(2)}
+                          onChange={(e) =>
+                            setEditOrderForm({
+                              ...editOrderForm,
+                              shipping_cents: Math.round((parseFloat(e.target.value) || 0) * 100),
+                            })
+                          }
+                          className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-cyan-300 font-mono font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-emerald-400 font-bold mb-1">Total Pago (R$)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={(editOrderForm.total_cents / 100).toFixed(2)}
+                          onChange={(e) =>
+                            setEditOrderForm({
+                              ...editOrderForm,
+                              total_cents: Math.round((parseFloat(e.target.value) || 0) * 100),
+                            })
+                          }
+                          className="w-full px-3 py-2 bg-emerald-950/40 border border-emerald-500/40 rounded-xl text-emerald-300 font-mono font-black"
                         />
                       </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
-                  <h4 className="font-black text-cyan-400 uppercase text-[11px] tracking-wider">
-                    Endereço de Entrega
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <div>
-                      <label className="block text-slate-400 font-semibold mb-1">CEP</label>
-                      <input
-                        type="text"
-                        value={editOrderForm.cep}
-                        onChange={(e) => setEditOrderForm({ ...editOrderForm, cep: e.target.value })}
-                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono"
-                      />
+                  {/* 4. Itens do Pedido, Equipamentos (Monitor/Impressora), Observações e Anexos por Gabinete */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-black text-emerald-400 uppercase text-[11px] tracking-wider">
+                        3. Itens do Pedido, Monitor, Impressora, Especificações & Fotos/Vídeos por Item ({editOrderForm.items.length})
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditOrderForm({
+                            ...editOrderForm,
+                            items: [
+                              ...editOrderForm.items,
+                              {
+                                cabinet_name: "Gabinete de Balcão Compacto",
+                                color_name: "Branco TX",
+                                monitor_name: 'Touch 21.5" Full HD — Mais Vendido',
+                                printer_name: "Elgin i9",
+                                reader_name: "Sem leitor",
+                                unit_price_cents: 120000,
+                                quantity: 1,
+                                subtotal_cents: 120000,
+                                screenCutoutMm: "",
+                                customizationNotes: "",
+                                itemAttachments: [],
+                              },
+                            ],
+                          })
+                        }
+                        className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-bold text-xs flex items-center gap-1 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Adicionar Item ao Pedido</span>
+                      </button>
                     </div>
-                    <div className="sm:col-span-2">
-                      <label className="block text-slate-400 font-semibold mb-1">Rua / Logradouro</label>
-                      <input
-                        type="text"
-                        value={editOrderForm.street}
-                        onChange={(e) => setEditOrderForm({ ...editOrderForm, street: e.target.value })}
-                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <label className="block text-slate-400 font-semibold mb-1">Número</label>
-                      <input
-                        type="text"
-                        value={editOrderForm.number}
-                        onChange={(e) => setEditOrderForm({ ...editOrderForm, number: e.target.value })}
-                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-slate-400 font-semibold mb-1">Complemento</label>
-                      <input
-                        type="text"
-                        value={editOrderForm.complement}
-                        onChange={(e) => setEditOrderForm({ ...editOrderForm, complement: e.target.value })}
-                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-5 gap-2">
-                    <div className="col-span-2">
-                      <label className="block text-slate-400 font-semibold mb-1">Bairro</label>
-                      <input
-                        type="text"
-                        value={editOrderForm.neighborhood}
-                        onChange={(e) => setEditOrderForm({ ...editOrderForm, neighborhood: e.target.value })}
-                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-slate-400 font-semibold mb-1">Cidade</label>
-                      <input
-                        type="text"
-                        value={editOrderForm.city}
-                        onChange={(e) => setEditOrderForm({ ...editOrderForm, city: e.target.value })}
-                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-400 font-semibold mb-1">UF</label>
-                      <input
-                        type="text"
-                        maxLength={2}
-                        value={editOrderForm.state}
-                        onChange={(e) => setEditOrderForm({ ...editOrderForm, state: e.target.value.toUpperCase() })}
-                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white uppercase font-mono"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
 
-              {/* 3. Método de Entrega & Valores Financeiros */}
-              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h4 className="font-black text-cyan-400 uppercase text-[11px] tracking-wider">
-                    2. Método de Entrega & Valores Financeiros
-                  </h4>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const itemsSum = editOrderForm.items.reduce((acc, i) => acc + (Number(i.subtotal_cents) || 0), 0);
-                      const disc = Number(editOrderForm.discount_cents) || 0;
-                      const ship = Number(editOrderForm.shipping_cents) || 0;
-                      setEditOrderForm({
-                        ...editOrderForm,
-                        subtotal_cents: itemsSum,
-                        total_cents: Math.max(0, itemsSum - disc + ship),
-                      });
-                    }}
-                    className="px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 font-bold text-[10px] cursor-pointer"
-                  >
-                    Recalcular Total pelos Itens + Frete
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                  <div className="lg:col-span-2">
-                    <label className="block text-slate-400 font-semibold mb-1">Modalidade de Frete (PAC, SEDEX, etc.)</label>
-                    <input
-                      type="text"
-                      value={editOrderForm.shipping_name}
-                      onChange={(e) => setEditOrderForm({ ...editOrderForm, shipping_name: e.target.value })}
-                      placeholder="Ex: PAC (Correios) ou SEDEX (Correios)"
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-slate-400 font-semibold mb-1">Subtotal Gabinetes (R$)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={(editOrderForm.subtotal_cents / 100).toFixed(2)}
-                      onChange={(e) =>
-                        setEditOrderForm({
-                          ...editOrderForm,
-                          subtotal_cents: Math.round((parseFloat(e.target.value) || 0) * 100),
-                        })
-                      }
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-slate-400 font-semibold mb-1">Valor do Frete (R$)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={(editOrderForm.shipping_cents / 100).toFixed(2)}
-                      onChange={(e) =>
-                        setEditOrderForm({
-                          ...editOrderForm,
-                          shipping_cents: Math.round((parseFloat(e.target.value) || 0) * 100),
-                        })
-                      }
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-cyan-300 font-mono font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-emerald-400 font-bold mb-1">Total Pago (R$)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={(editOrderForm.total_cents / 100).toFixed(2)}
-                      onChange={(e) =>
-                        setEditOrderForm({
-                          ...editOrderForm,
-                          total_cents: Math.round((parseFloat(e.target.value) || 0) * 100),
-                        })
-                      }
-                      className="w-full px-3 py-2 bg-emerald-950/40 border border-emerald-500/40 rounded-xl text-emerald-300 font-mono font-black"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* 4. Itens do Pedido, Equipamentos (Monitor/Impressora) e Observações por Gabinete */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-black text-emerald-400 uppercase text-[11px] tracking-wider">
-                    3. Itens do Pedido, Monitor, Impressora & Especificações Fora do Padrão ({editOrderForm.items.length})
-                  </h4>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setEditOrderForm({
-                        ...editOrderForm,
-                        items: [
-                          ...editOrderForm.items,
-                          {
-                            cabinet_name: "Gabinete de Balcão Compacto",
-                            color_name: "Branco TX",
-                            monitor_name: 'Touch 21.5" Full HD — Mais Vendido',
-                            printer_name: "Elgin i9",
-                            reader_name: "Sem leitor",
-                            unit_price_cents: 120000,
-                            quantity: 1,
-                            subtotal_cents: 120000,
-                            screenCutoutMm: "",
-                            customizationNotes: "",
-                          },
-                        ],
-                      })
-                    }
-                    className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-bold text-xs flex items-center gap-1 cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Adicionar Item ao Pedido</span>
-                  </button>
-                </div>
-
-                <div className="space-y-3">
-                  {editOrderForm.items.map((it, idx) => (
-                    <div
-                      key={it.$id || idx}
-                      className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3"
-                    >
-                      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                        <span className="font-black text-white text-xs">
-                          Item #{idx + 1} — {it.cabinet_name}
-                        </span>
-                        {editOrderForm.items.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const next = editOrderForm.items.filter((_, i) => i !== idx);
-                              setEditOrderForm({ ...editOrderForm, items: next });
-                            }}
-                            className="text-rose-400 hover:text-rose-300 font-bold text-[11px] flex items-center gap-1 cursor-pointer"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                            <span>Remover Item</span>
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                        <div className="lg:col-span-2">
-                          <label className="block text-slate-400 font-semibold mb-1">Modelo do Gabinete</label>
-                          <input
-                            type="text"
-                            value={it.cabinet_name}
-                            onChange={(e) => {
-                              const next = [...editOrderForm.items];
-                              next[idx] = { ...next[idx], cabinet_name: e.target.value };
-                              setEditOrderForm({ ...editOrderForm, items: next });
-                            }}
-                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-slate-400 font-semibold mb-1">Acabamento / Cor</label>
-                          <input
-                            type="text"
-                            value={it.color_name}
-                            onChange={(e) => {
-                              const next = [...editOrderForm.items];
-                              next[idx] = { ...next[idx], color_name: e.target.value };
-                              setEditOrderForm({ ...editOrderForm, items: next });
-                            }}
-                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="block text-slate-400 font-semibold mb-1">Qtd</label>
-                            <input
-                              type="number"
-                              min={1}
-                              value={it.quantity}
-                              onChange={(e) => {
-                                const q = Math.max(1, parseInt(e.target.value, 10) || 1);
-                                const next = [...editOrderForm.items];
-                                next[idx] = {
-                                  ...next[idx],
-                                  quantity: q,
-                                  subtotal_cents: q * (next[idx].unit_price_cents || 0),
-                                };
-                                setEditOrderForm({ ...editOrderForm, items: next });
-                              }}
-                              className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono"
-                            />
+                    <div className="space-y-3">
+                      {editOrderForm.items.map((it, idx) => (
+                        <div
+                          key={it.$id || idx}
+                          className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3"
+                        >
+                          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                            <span className="font-black text-white text-xs">
+                              Item #{idx + 1} — {it.cabinet_name}
+                            </span>
+                            {editOrderForm.items.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const next = editOrderForm.items.filter((_, i) => i !== idx);
+                                  setEditOrderForm({ ...editOrderForm, items: next });
+                                }}
+                                className="text-rose-400 hover:text-rose-300 font-bold text-[11px] flex items-center gap-1 cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span>Remover Item</span>
+                              </button>
+                            )}
                           </div>
-                          <div>
-                            <label className="block text-slate-400 font-semibold mb-1">Subtotal (R$)</label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={(it.subtotal_cents / 100).toFixed(2)}
-                              onChange={(e) => {
-                                const sub = Math.round((parseFloat(e.target.value) || 0) * 100);
-                                const next = [...editOrderForm.items];
-                                next[idx] = {
-                                  ...next[idx],
-                                  subtotal_cents: sub,
-                                  unit_price_cents: Math.round(sub / Math.max(1, next[idx].quantity)),
-                                };
-                                setEditOrderForm({ ...editOrderForm, items: next });
-                              }}
-                              className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-indigo-300 font-mono font-bold"
-                            />
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                            <div className="lg:col-span-2">
+                              <label className="block text-slate-400 font-semibold mb-1">Modelo do Gabinete</label>
+                              <input
+                                type="text"
+                                value={it.cabinet_name}
+                                onChange={(e) => {
+                                  const next = [...editOrderForm.items];
+                                  next[idx] = { ...next[idx], cabinet_name: e.target.value };
+                                  setEditOrderForm({ ...editOrderForm, items: next });
+                                }}
+                                className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-slate-400 font-semibold mb-1">Acabamento / Cor</label>
+                              <input
+                                type="text"
+                                value={it.color_name}
+                                onChange={(e) => {
+                                  const next = [...editOrderForm.items];
+                                  next[idx] = { ...next[idx], color_name: e.target.value };
+                                  setEditOrderForm({ ...editOrderForm, items: next });
+                                }}
+                                className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-slate-400 font-semibold mb-1">Qtd</label>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  value={it.quantity}
+                                  onChange={(e) => {
+                                    const q = Math.max(1, parseInt(e.target.value, 10) || 1);
+                                    const next = [...editOrderForm.items];
+                                    next[idx] = {
+                                      ...next[idx],
+                                      quantity: q,
+                                      subtotal_cents: q * (next[idx].unit_price_cents || 0),
+                                    };
+                                    setEditOrderForm({ ...editOrderForm, items: next });
+                                  }}
+                                  className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-slate-400 font-semibold mb-1">Subtotal (R$)</label>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={(it.subtotal_cents / 100).toFixed(2)}
+                                  onChange={(e) => {
+                                    const sub = Math.round((parseFloat(e.target.value) || 0) * 100);
+                                    const next = [...editOrderForm.items];
+                                    next[idx] = {
+                                      ...next[idx],
+                                      subtotal_cents: sub,
+                                      unit_price_cents: Math.round(sub / Math.max(1, next[idx].quantity)),
+                                    };
+                                    setEditOrderForm({ ...editOrderForm, items: next });
+                                  }}
+                                  className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-indigo-300 font-mono font-bold"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                            <div>
+                              <label className="block text-cyan-300 font-bold mb-1">Monitor Escolhido</label>
+                              <input
+                                type="text"
+                                value={it.monitor_name}
+                                onChange={(e) => {
+                                  const next = [...editOrderForm.items];
+                                  next[idx] = { ...next[idx], monitor_name: e.target.value };
+                                  setEditOrderForm({ ...editOrderForm, items: next });
+                                }}
+                                placeholder='Ex: Touch 21.5" Full HD ou Monitor Sob Medida'
+                                className="w-full px-3 py-2 bg-cyan-950/30 border border-cyan-500/40 rounded-xl text-white font-bold"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-indigo-300 font-bold mb-1">Impressora Escolhida</label>
+                              <input
+                                type="text"
+                                value={it.printer_name}
+                                onChange={(e) => {
+                                  const next = [...editOrderForm.items];
+                                  next[idx] = { ...next[idx], printer_name: e.target.value };
+                                  setEditOrderForm({ ...editOrderForm, items: next });
+                                }}
+                                placeholder="Ex: Elgin i9, Epson TM-T20X..."
+                                className="w-full px-3 py-2 bg-indigo-950/30 border border-indigo-500/40 rounded-xl text-white font-bold"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-purple-300 font-bold mb-1">Leitor 2D / QR Code</label>
+                              <input
+                                type="text"
+                                value={it.reader_name}
+                                onChange={(e) => {
+                                  const next = [...editOrderForm.items];
+                                  next[idx] = { ...next[idx], reader_name: e.target.value };
+                                  setEditOrderForm({ ...editOrderForm, items: next });
+                                }}
+                                placeholder="Ex: Sem leitor ou Leitor 2D Fixo"
+                                className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                            <div>
+                              <label className="block text-slate-400 font-semibold mb-1">
+                                Especificação de Corte CNC da Tela / Medidas do Monitor
+                              </label>
+                              <input
+                                type="text"
+                                value={it.screenCutoutMm}
+                                onChange={(e) => {
+                                  const next = [...editOrderForm.items];
+                                  next[idx] = { ...next[idx], screenCutoutMm: e.target.value };
+                                  setEditOrderForm({ ...editOrderForm, items: next });
+                                }}
+                                placeholder="Ex: Monitor Inteiro: 49.6x30cm | Tela: 47.6x27cm..."
+                                className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 font-mono text-[11px]"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-amber-300 font-extrabold mb-1">
+                                ⚠️ Observação Especial / Alerta Fora do Padrão deste Item
+                              </label>
+                              <input
+                                type="text"
+                                value={it.customizationNotes}
+                                onChange={(e) => {
+                                  const next = [...editOrderForm.items];
+                                  next[idx] = { ...next[idx], customizationNotes: e.target.value };
+                                  setEditOrderForm({ ...editOrderForm, items: next });
+                                }}
+                                placeholder="Qualquer observação escrita aqui ficará em destaque amarelo/vermelho no card!"
+                                className="w-full px-3 py-2 bg-amber-950/30 border border-amber-500/50 rounded-xl text-amber-100 placeholder-slate-500 font-bold"
+                              />
+                            </div>
+                          </div>
+
+                          {/* ANEXOS TÉCNICOS DESTE ITEM (FOTOS E VÍDEOS ESPECÍFICOS DO GABINETE) */}
+                          <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2.5">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="text-[11px] font-black text-cyan-300 uppercase tracking-wider flex items-center gap-1.5">
+                                <Upload className="w-3.5 h-3.5" />
+                                <span>
+                                  Fotos & Vídeos Técnicos deste Item ({it.itemAttachments?.length || 0})
+                                </span>
+                              </span>
+                              <label className="px-3 py-1.5 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/40 font-bold text-[11px] flex items-center gap-1.5 cursor-pointer transition-colors">
+                                {uploadingItemIdx === idx ? (
+                                  <>
+                                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                    <span>Enviando mídia...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Upload className="w-3.5 h-3.5" />
+                                    <span>Anexar Foto ou Vídeo neste Item</span>
+                                  </>
+                                )}
+                                <input
+                                  type="file"
+                                  multiple
+                                  accept="image/*,video/*"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    if (e.target.files) {
+                                      handleUploadItemMedia(idx, e.target.files);
+                                    }
+                                    e.target.value = "";
+                                  }}
+                                />
+                              </label>
+                            </div>
+
+                            {it.itemAttachments && it.itemAttachments.length > 0 && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
+                                {it.itemAttachments.map((att, attIdx) => (
+                                  <div
+                                    key={att.id}
+                                    className="rounded-xl overflow-hidden bg-slate-950 border border-slate-800 flex flex-col"
+                                  >
+                                    <div className="relative h-28 bg-black flex items-center justify-center">
+                                      {att.type === "video" ? (
+                                        <video
+                                          src={att.url}
+                                          controls
+                                          preload="metadata"
+                                          className="w-full h-full object-cover"
+                                        />
+                                      ) : (
+                                        <img
+                                          src={att.url}
+                                          alt={att.caption || att.fileName}
+                                          className="w-full h-full object-cover"
+                                        />
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const next = [...editOrderForm.items];
+                                          next[idx] = {
+                                            ...next[idx],
+                                            itemAttachments: (next[idx].itemAttachments || []).filter(
+                                              (a) => a.id !== att.id
+                                            ),
+                                          };
+                                          setEditOrderForm({ ...editOrderForm, items: next });
+                                        }}
+                                        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-lg bg-rose-600/90 hover:bg-rose-500 text-white flex items-center justify-center text-xs cursor-pointer"
+                                        title="Remover anexo"
+                                      >
+                                        ✕
+                                      </button>
+                                    </div>
+                                    <div className="p-2">
+                                      <input
+                                        type="text"
+                                        value={att.caption || ""}
+                                        onChange={(e) => {
+                                          const next = [...editOrderForm.items];
+                                          const nextAtts = [...(next[idx].itemAttachments || [])];
+                                          nextAtts[attIdx] = { ...nextAtts[attIdx], caption: e.target.value };
+                                          next[idx] = { ...next[idx], itemAttachments: nextAtts };
+                                          setEditOrderForm({ ...editOrderForm, items: next });
+                                        }}
+                                        placeholder="Legenda técnica (ex: Foto traseira do monitor)..."
+                                        className="w-full px-2 py-1 bg-slate-900 border border-slate-800 rounded-lg text-[10px] text-white"
+                                      />
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                        <div>
-                          <label className="block text-cyan-300 font-bold mb-1">Monitor Escolhido</label>
-                          <input
-                            type="text"
-                            value={it.monitor_name}
-                            onChange={(e) => {
-                              const next = [...editOrderForm.items];
-                              next[idx] = { ...next[idx], monitor_name: e.target.value };
-                              setEditOrderForm({ ...editOrderForm, items: next });
-                            }}
-                            placeholder='Ex: Touch 21.5" Full HD ou Monitor Sob Medida'
-                            className="w-full px-3 py-2 bg-cyan-950/30 border border-cyan-500/40 rounded-xl text-white font-bold"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-indigo-300 font-bold mb-1">Impressora Escolhida</label>
-                          <input
-                            type="text"
-                            value={it.printer_name}
-                            onChange={(e) => {
-                              const next = [...editOrderForm.items];
-                              next[idx] = { ...next[idx], printer_name: e.target.value };
-                              setEditOrderForm({ ...editOrderForm, items: next });
-                            }}
-                            placeholder="Ex: Elgin i9, Epson TM-T20X..."
-                            className="w-full px-3 py-2 bg-indigo-950/30 border border-indigo-500/40 rounded-xl text-white font-bold"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-purple-300 font-bold mb-1">Leitor 2D / QR Code</label>
-                          <input
-                            type="text"
-                            value={it.reader_name}
-                            onChange={(e) => {
-                              const next = [...editOrderForm.items];
-                              next[idx] = { ...next[idx], reader_name: e.target.value };
-                              setEditOrderForm({ ...editOrderForm, items: next });
-                            }}
-                            placeholder="Ex: Sem leitor ou Leitor 2D Fixo"
-                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                        <div>
-                          <label className="block text-slate-400 font-semibold mb-1">
-                            Especificação de Corte CNC da Tela / Medidas do Monitor
-                          </label>
-                          <input
-                            type="text"
-                            value={it.screenCutoutMm}
-                            onChange={(e) => {
-                              const next = [...editOrderForm.items];
-                              next[idx] = { ...next[idx], screenCutoutMm: e.target.value };
-                              setEditOrderForm({ ...editOrderForm, items: next });
-                            }}
-                            placeholder="Ex: Monitor Inteiro: 49.6x30cm | Tela: 47.6x27cm..."
-                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 font-mono text-[11px]"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-amber-300 font-extrabold mb-1">
-                            ⚠️ Observação Especial / Alerta Fora do Padrão deste Item
-                          </label>
-                          <input
-                            type="text"
-                            value={it.customizationNotes}
-                            onChange={(e) => {
-                              const next = [...editOrderForm.items];
-                              next[idx] = { ...next[idx], customizationNotes: e.target.value };
-                              setEditOrderForm({ ...editOrderForm, items: next });
-                            }}
-                            placeholder="Qualquer observação escrita aqui ficará em destaque amarelo/vermelho no card!"
-                            className="w-full px-3 py-2 bg-amber-950/30 border border-amber-500/50 rounded-xl text-amber-100 placeholder-slate-500 font-bold"
-                          />
-                        </div>
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Rodapé Fixo de Ações */}
@@ -3093,12 +3487,12 @@ export default function AdminPage() {
                 {isSavingOrderEdit ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Salvando no Appwrite...</span>
+                    <span>Salvando Ordem de Execução & Pedido...</span>
                   </>
                 ) : (
                   <>
                     <Save className="w-4 h-4" />
-                    <span>Salvar Alterações do Pedido</span>
+                    <span>Salvar Ordem de Execução & Pedido</span>
                   </>
                 )}
               </button>
