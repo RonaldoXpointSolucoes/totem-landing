@@ -329,7 +329,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                 Configurador Pro
               </span>
               <span className="text-slate-300 dark:text-slate-700">•</span>
-              <span className="text-xs text-slate-500 font-medium">Totem Industrial de Autoatendimento</span>
+              <span className="text-xs text-slate-500 font-medium">Gabinete Industrial de Autoatendimento</span>
               {editingItem && (
                 <Badge variant="warning" className="text-[10px]">
                   Editando Item
@@ -348,7 +348,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                   });
                 }}
                 className="lg:hidden px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-indigo-950/40 hover:bg-blue-100 border border-blue-200 dark:border-indigo-800 text-[#0071e3] dark:text-cyan-300 text-[11px] font-bold flex items-center gap-1 active:scale-95 transition-all shadow-sm cursor-pointer"
-                title="Ver Fotos e Vídeos do Totem"
+                title="Ver Fotos e Vídeos do Gabinete"
               >
                 <ImageIcon className="w-3 h-3 text-[#0071e3] dark:text-cyan-300" />
                 <span>Ver Fotos</span>
@@ -433,7 +433,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
 
         {/* Layout Desktop e Notebook em Duas Colunas com Rolagem Livre */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-start">
-          {/* Coluna Esquerda: Preview Visual Permanente do Totem */}
+          {/* Coluna Esquerda: Preview Visual Permanente do Gabinete */}
           <div className="hidden lg:flex lg:col-span-4 lg:sticky lg:top-20 flex-col justify-between lg:h-[calc(100vh-11.5rem)] lg:min-h-[480px] lg:max-h-[680px] overflow-hidden">
             <Card className="p-3 sm:p-3.5 border-black/10 dark:border-slate-800 bg-white/95 dark:bg-slate-900/70 backdrop-blur-xl shadow-md rounded-2xl flex flex-col justify-between h-full space-y-2.5 overflow-hidden">
               <div className="flex items-center justify-between shrink-0">
@@ -444,7 +444,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                     ? "Visualização da Impressora"
                     : step === 5
                     ? "Visualização do Leitor"
-                    : "Visualização do Totem"}
+                    : "Visualização do Gabinete"}
                 </span>
                 <Badge variant={isKitSelected ? "primary" : "secondary"} className="text-[9px]">
                   {isKitSelected && step === 3 ? "Pacote Hardware" : step >= 3 && step <= 5 ? "Item Selecionado" : "Fotos Reais"}
@@ -653,7 +653,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
       <Modal
         isOpen={isCartSuccessModalOpen}
         onClose={() => setIsCartSuccessModalOpen(false)}
-        title={editingItem ? "Totem Atualizado com Sucesso!" : "Totem Adicionado ao Carrinho!"}
+        title={editingItem ? "Gabinete Atualizado com Sucesso!" : "Gabinete Adicionado ao Carrinho!"}
         description="A configuração foi salva com sucesso e está pronta para compra ou duplicação."
       >
         <div className="py-2 space-y-3 text-xs sm:text-sm text-slate-600 dark:text-slate-300">
@@ -677,7 +677,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
             </div>
           </div>
           <p className="text-slate-600 dark:text-slate-400">
-            Você pode montar outro totem com configuração diferente ou ir para o carrinho para duplicar em lote e finalizar via Pix.
+            Você pode montar outro gabinete com configuração diferente ou ir para o carrinho para duplicar em lote e finalizar via Pix.
           </p>
         </div>
         <div className="mt-5 flex flex-col sm:flex-row justify-end gap-2">
@@ -687,7 +687,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
             onClick={handleResetForNewTotem}
           >
             <RotateCcw className="w-3.5 h-3.5 mr-1" />
-            Configurar Outro Totem
+            Configurar Outro Gabinete
           </Button>
           <Button
             variant="primary"

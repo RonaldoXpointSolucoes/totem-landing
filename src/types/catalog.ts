@@ -79,10 +79,24 @@ export interface EquipmentOption {
   priceAdjustmentCents?: number;
 }
 
+export interface CustomMonitorDimensions {
+  outerWidthCm: number;
+  outerHeightCm: number;
+  depthCm?: number;
+  screenWidthCm: number;
+  screenHeightCm: number;
+  bezelTopCm: number;
+  bezelBottomCm: number;
+  bezelLeftCm: number;
+  bezelRightCm: number;
+  productUrl?: string;
+}
+
 export interface MonitorOption extends EquipmentOption {
   sizeInches?: number;
   vesaPattern?: string;
   isCustom?: boolean;
+  customDimensions?: CustomMonitorDimensions;
 }
 
 export interface PrinterOption extends EquipmentOption {

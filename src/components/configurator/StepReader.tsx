@@ -28,7 +28,7 @@ export const StepReader: React.FC<StepReaderProps> = ({
       <div className="text-center sm:text-left space-y-1">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg sm:text-2xl font-black text-[#1d1d1f] dark:text-white tracking-tight">
-            Seu Totem utilizará leitor de código de barras?
+            Seu Gabinete utilizará leitor de código de barras?
           </h2>
           <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-500/20">
             {useReader && selectedReader && (selectedReader.priceAdjustmentCents || 0) > 0

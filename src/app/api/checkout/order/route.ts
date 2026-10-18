@@ -6,6 +6,7 @@ import { findUserByCoupon, updateWhitelistUser } from "@/lib/auth/whitelistStore
 import { recordVoucherUsage } from "@/lib/vouchers/voucherStore";
 import { CampaignTrackingData } from "@/types/voucher";
 import { CustomerInfo, DeliveryAddress, OrderDetails, ManufacturingSpec, CartItem } from "@/types/order";
+import { MonitorOption } from "@/types/catalog";
 import { saveOrderWithSnapshot, getAppwriteCatalog } from "@/lib/appwrite/server";
 import { checkoutStatusToken, createMercadoPagoPayment, requirePaymentConfiguration } from "@/lib/payments/mercadoPago";
 import { updateMercadoPagoPayment } from "@/lib/payments/mercadoPagoStore";
@@ -27,6 +28,7 @@ interface RequestBody {
     modelId: string;
     colorId: string;
     monitorId?: string | null;
+    customMonitor?: Partial<MonitorOption>;
     printerId?: string | null;
     readerId?: string | null;
     hasScanner?: boolean;
@@ -113,8 +115,22 @@ export async function POST(req: Request) {
       const color =
         catalogColors.find((c: any) => c.id === rawItem.colorId || c.slug === rawItem.colorId);
       if (!color) return NextResponse.json({ error: "Acabamento inválido no carrinho." }, { status: 400 });
-      const monitor = rawItem.monitorId
-        ? catalogMonitors.find((m: any) => m.id === rawItem.monitorId) || null
+      const monitor: MonitorOption | null = rawItem.monitorId
+        ? (catalogMonitors.find((m: any) => m.id === rawItem.monitorId) as MonitorOption | undefined) ||
+          (String(rawItem.monitorId).startsWith("custom-mon-") || rawItem.customMonitor
+            ? {
+                id: String(rawItem.monitorId),
+                brand: String(rawItem.customMonitor?.brand || "Sob Medida"),
+                model: String(rawItem.customMonitor?.model || "Custom"),
+                displayName: String(rawItem.customMonitor?.displayName || "Monitor Sob Medida"),
+                sizeInches: Number(rawItem.customMonitor?.sizeInches) || 21.5,
+                vesaPattern: rawItem.customMonitor?.vesaPattern || "100x100",
+                active: true,
+                isCustom: true,
+                priceAdjustmentCents: 0,
+                customDimensions: rawItem.customMonitor?.customDimensions,
+              }
+            : null)
         : null;
       const printer = rawItem.printerId
         ? catalogPrinters.find((p: any) => p.id === rawItem.printerId) || null
@@ -165,11 +181,14 @@ export async function POST(req: Request) {
       validatedCartItems.push(cartItem);
 
       // 3. Montar Ficha Técnica de Fabricação para a Router CNC
+      const customDims = monitor?.customDimensions;
       const screenSpecs = monitor
         ? {
             monitorName: monitor.displayName,
-            screenCutoutMm: `Abertura usinada para tela ${monitor.sizeInches || 21.5}" (tolerância de precisão CNC +1.5mm)`,
-            vesaPattern: `Padrão VESA ${monitor.vesaPattern || "100x100"} mm com insertos roscados M4`,
+            screenCutoutMm: customDims
+              ? `Monitor Inteiro: ${customDims.outerWidthCm}x${customDims.outerHeightCm}cm | Tela Visível (Corte): ${customDims.screenWidthCm}x${customDims.screenHeightCm}cm | Barras (Cima:${customDims.bezelTopCm}cm, Baixo:${customDims.bezelBottomCm}cm, Esq:${customDims.bezelLeftCm}cm, Dir:${customDims.bezelRightCm}cm)`
+              : `Abertura usinada para tela ${monitor.sizeInches || 21.5}" (tolerância de precisão CNC +1.5mm)`,
+            vesaPattern: `Padrão VESA ${monitor.vesaPattern || "100x100"} mm com insertos roscados M4${customDims?.productUrl ? ` | Link: ${customDims.productUrl}` : ""}`,
           }
         : {
             monitorName: "Não especificado (Painel cego / Pré-disposição)",

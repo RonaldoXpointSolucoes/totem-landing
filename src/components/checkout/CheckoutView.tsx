@@ -470,6 +470,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           modelId: i.configuration.model.id,
           colorId: i.configuration.color.id,
           monitorId: i.configuration.monitor?.id || null,
+          customMonitor: i.configuration.monitor?.isCustom ? i.configuration.monitor : undefined,
           printerId: i.configuration.printer?.id || null,
           readerId: i.configuration.barcodeReader?.id || null,
           hasScanner: !!i.configuration.barcodeReader,

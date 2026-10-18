@@ -31,7 +31,7 @@ export const StepModel: React.FC<StepModelProps> = ({
       {/* Cabeçalho da Etapa 1 */}
       <div className="text-center sm:text-left space-y-1">
         <h2 className="text-lg sm:text-2xl font-black text-[#1d1d1f] dark:text-white tracking-tight">
-          Qual formato de Totem você precisa?
+          Qual formato de Gabinete você precisa?
         </h2>
         <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
           Selecione o formato estrutural que melhor se adapta ao espaço da sua operação.

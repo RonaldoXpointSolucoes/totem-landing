@@ -131,7 +131,7 @@ export const StepReview: React.FC<StepReviewProps> = ({
 
       <div className="text-center sm:text-left space-y-1">
         <h2 className="text-lg sm:text-2xl font-black text-[#1d1d1f] dark:text-white tracking-tight">
-          Confira as especificações do seu Totem
+          Confira as especificações do seu Gabinete
         </h2>
         <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
           Esta será a ficha técnica exata de cortes e encaixes utilizada na Router CNC.
@@ -153,6 +153,70 @@ export const StepReview: React.FC<StepReviewProps> = ({
             {model.dimensions ? `${model.dimensions.heightMm}×${model.dimensions.widthMm}×${model.dimensions.depthMm} mm` : ""}
           </span>
         </div>
+
+        {/* DETALHAMENTO DO MONITOR SOB MEDIDA (QUANDO CONFIGURADO) */}
+        {monitor?.isCustom && monitor?.customDimensions && (
+          <div className="p-3 sm:p-4 rounded-xl bg-gradient-to-r from-indigo-50/80 to-blue-50/70 dark:from-indigo-950/40 dark:to-slate-900 border border-indigo-200 dark:border-indigo-800/80 space-y-2.5">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div>
+                <h4 className="text-xs sm:text-sm font-black text-[#1d1d1f] dark:text-white">
+                  Gabarito CNC — Monitor Sob Medida ({monitor.displayName})
+                </h4>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                  {monitor.sizeInches}&quot; • VESA {monitor.vesaPattern}
+                  {monitor.customDimensions.productUrl ? ` • Link informado` : ""}
+                </p>
+              </div>
+              <button
+                onClick={() => onEditStep(3)}
+                className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-slate-700 border border-black/10 dark:border-slate-700 text-indigo-600 dark:text-indigo-300 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-xs"
+              >
+                <Edit3 className="w-3 h-3" />
+                <span>Editar Medidas</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1.5 border-t border-indigo-100 dark:border-indigo-900/60 text-[11px]">
+              <div className="p-2 rounded-lg bg-white/90 dark:bg-slate-900/90 border border-indigo-200/70 dark:border-indigo-900">
+                <span className="text-[10px] font-extrabold uppercase text-indigo-600 dark:text-indigo-400 block">
+                  1. Monitor Inteiro (Carcaça)
+                </span>
+                <strong className="text-slate-900 dark:text-white font-mono">
+                  {monitor.customDimensions.outerWidthCm} × {monitor.customDimensions.outerHeightCm} cm
+                </strong>
+                {monitor.customDimensions.depthCm ? (
+                  <span className="text-[10px] text-slate-500 block">
+                    Espessura: {monitor.customDimensions.depthCm} cm
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="p-2 rounded-lg bg-white/90 dark:bg-slate-900/90 border border-cyan-200/70 dark:border-cyan-900">
+                <span className="text-[10px] font-extrabold uppercase text-cyan-600 dark:text-cyan-400 block">
+                  2. Medida da Tela (Área de Corte)
+                </span>
+                <strong className="text-slate-900 dark:text-white font-mono">
+                  {monitor.customDimensions.screenWidthCm} × {monitor.customDimensions.screenHeightCm} cm
+                </strong>
+                <span className="text-[10px] text-slate-500 block">
+                  Janela visual na porta frontal
+                </span>
+              </div>
+
+              <div className="p-2 rounded-lg bg-white/90 dark:bg-slate-900/90 border border-amber-200/70 dark:border-amber-900">
+                <span className="text-[10px] font-extrabold uppercase text-amber-600 dark:text-amber-400 block">
+                  3. Altura das 4 Barras (Moldura)
+                </span>
+                <strong className="text-slate-900 dark:text-white font-mono block">
+                  Cima: {monitor.customDimensions.bezelTopCm}cm • Baixo: {monitor.customDimensions.bezelBottomCm}cm
+                </strong>
+                <span className="text-[10px] text-slate-500 font-mono block">
+                  Esq: {monitor.customDimensions.bezelLeftCm}cm • Dir: {monitor.customDimensions.bezelRightCm}cm
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* DETALHAMENTO DO KIT DE MONTAGEM SELECIONADO */}
         {isKit && (
