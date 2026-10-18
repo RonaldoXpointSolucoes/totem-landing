@@ -16,6 +16,11 @@ export interface CustomerAccount {
   loginMethod: "whatsapp" | "google" | "checkout";
   totalSpentCents?: number;
   totalOrdersCount?: number;
+  notes?: string;
+  lastOrderNumber?: string;
+  lastOrderDate?: string;
+  lastOrderStatus?: string;
+  lastOrderTotalCents?: number;
 }
 
 export interface CustomerSessionPayload {

@@ -12,6 +12,7 @@ import {
   updateLocalOrderAdmin,
   deleteLocalOrder,
 } from "@/lib/orders/orderStore";
+import { logEcosystemEvent } from "@/lib/logging/ecosystemLogger";
 
 async function verifyAuth(): Promise<boolean> {
   const session = await getAuthSession();
@@ -120,6 +121,27 @@ export async function PATCH(
       }
     }
 
+    try {
+      const orderNumber = (updated as any)?.order_number || body.order_number || id;
+      logEcosystemEvent({
+        category: "orders",
+        level: "info",
+        action: isStatusOnly ? "Status Alterado" : "Pedido Atualizado",
+        target: `Pedido #${orderNumber}`,
+        details: isStatusOnly
+          ? `Status do pedido #${orderNumber} atualizado para "${body.status}" no painel administrativo.`
+          : `Dados cadastrais e ficha técnica do pedido #${orderNumber} atualizados no painel.`,
+        actor: "Admin",
+        metadata: {
+          orderId: id,
+          orderNumber,
+          status: body.status,
+          isStatusOnly,
+          updatedFields: Object.keys(body),
+        },
+      });
+    } catch {}
+
     return NextResponse.json({
       ok: true,
       message: isStatusOnly
@@ -162,6 +184,18 @@ export async function DELETE(
     }
 
     deleteLocalOrder(id, orderNumber);
+
+    try {
+      logEcosystemEvent({
+        category: "orders",
+        level: "warn",
+        action: "Pedido Excluído",
+        target: `Pedido #${orderNumber || id}`,
+        details: `Pedido #${orderNumber || id} removido permanentemente do painel administrativo.`,
+        actor: "Admin",
+        metadata: { orderId: id, orderNumber },
+      });
+    } catch {}
 
     return NextResponse.json({
       ok: true,

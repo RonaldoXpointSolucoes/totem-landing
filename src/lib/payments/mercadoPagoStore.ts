@@ -4,6 +4,7 @@ import { getOrderWithDetails, getServerDatabases } from "@/lib/appwrite/server";
 import { APPWRITE_CONFIG } from "@/lib/appwrite/config";
 import { findOrderByNumber, saveLocalOrder } from "@/lib/orders/orderStore";
 import { syncOrderStatusToVoucherUsage } from "@/lib/vouchers/voucherStore";
+import { logEcosystemEvent } from "@/lib/logging/ecosystemLogger";
 import { mercadoPagoRequest, MercadoPagoPayment, paymentMatchesOrder } from "./mercadoPago";
 
 export async function updateMercadoPagoPayment(orderId: string, data: Record<string, unknown>) {
@@ -86,6 +87,27 @@ export async function reconcileMercadoPagoPayment(paymentId: string) {
     await syncOrderStatusToVoucherUsage(order.order_number, nextStatus);
     await syncOrderStatusToVoucherUsage(order.$id, nextStatus);
   }
+
+  try {
+    logEcosystemEvent({
+      category: "payments",
+      level: approved ? "success" : reversed ? "warn" : "info",
+      action: approved ? "Pagamento Aprovado" : reversed ? "Pagamento Estornado" : "Pagamento Sincronizado",
+      target: `Pedido #${order.order_number || order.$id}`,
+      details: `Mercado Pago (ID ${paymentId}) para o pedido #${order.order_number || order.$id}. Status: ${status}`,
+      actor: "Webhook Mercado Pago",
+      metadata: {
+        paymentId,
+        gatewayStatus: payment.status,
+        status,
+        orderStatus: nextStatus,
+        orderNumber: order.order_number,
+        totalCents: order.total_cents,
+        method,
+      },
+    });
+  } catch {}
+
   return { orderId: order.$id, status: nextStatus, paymentStatus: status };
 }
 

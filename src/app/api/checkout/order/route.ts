@@ -14,6 +14,7 @@ import { calculateShippingQuotes } from "@/modules/shipping";
 import { findOrCreateCustomerFromCheckout } from "@/lib/customers/customerStore";
 import { saveLocalOrder } from "@/lib/orders/orderStore";
 import { setCustomerSession } from "@/lib/customers/customerSession";
+import { logEcosystemEvent } from "@/lib/logging/ecosystemLogger";
 
 interface RequestBody {
   paymentMethod?: "pix" | "credit_card";
@@ -463,6 +464,23 @@ export async function POST(req: Request) {
       saveLocalOrder(orderDetails);
       const customerAccount = findOrCreateCustomerFromCheckout(customer, deliveryAddress, totalCents);
       await setCustomerSession(customerAccount);
+
+      logEcosystemEvent({
+        category: "orders",
+        level: "info",
+        action: "Novo Pedido Gerado",
+        target: `Pedido #${orderNumber}`,
+        details: `Pedido de ${customer.name} no valor de R$ ${(totalCents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} (${paymentMethod.toUpperCase()}).`,
+        actor: "Cliente (Checkout)",
+        metadata: {
+          orderNumber,
+          customerName: customer.name,
+          email: customer.email,
+          paymentMethod,
+          totalCents,
+          itemsCount: validatedCartItems.length,
+        },
+      });
     } catch (custErr) {
       console.warn("Aviso ao vincular conta de cliente:", custErr);
     }

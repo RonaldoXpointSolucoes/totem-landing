@@ -8,6 +8,7 @@ import { MarketingSettingsManager } from "@/components/admin/MarketingSettingsMa
 import { TeamManager } from "@/components/admin/TeamManager";
 import { VoucherManager } from "@/components/admin/VoucherManager";
 import { CustomersManager } from "@/components/admin/CustomersManager";
+import { SystemLogsManager } from "@/components/admin/SystemLogsManager";
 import {
   OrderExecutionEditor,
   OrderExecutionViewer,
@@ -2076,39 +2077,7 @@ export default function AdminPage() {
         {/* ======================================================== */}
         {/* ABA 3: AUDITORIA E LOGS */}
         {/* ======================================================== */}
-        {activeTab === "logs" && (
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div>
-                <h3 className="font-extrabold text-white text-base">Registro de Auditoria Administrativa</h3>
-                <p className="text-xs text-slate-400">Rastreabilidade completa de ações e alterações comerciais.</p>
-              </div>
-              <span className="text-xs px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-bold">
-                {auditLogs.length} Registros
-              </span>
-            </div>
-
-            <div className="space-y-3">
-              {auditLogs.map((log) => (
-                <div
-                  key={log.id}
-                  className="p-3.5 bg-slate-950/80 border border-slate-800/70 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded font-bold text-[10px] bg-slate-800 text-slate-200">
-                        {log.action}
-                      </span>
-                      <span className="font-bold text-indigo-400">{log.target}</span>
-                    </div>
-                    <p className="text-slate-400 text-[11px]">{log.details}</p>
-                  </div>
-                  <span className="text-[11px] text-slate-500 font-mono shrink-0">{log.timestamp}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {activeTab === "logs" && <SystemLogsManager />}
 
         {/* ======================================================== */}
         {/* ABA 4: CONFIGURAÇÃO DE SEO, MARKETING & TRÁFEGO PAGO */}
