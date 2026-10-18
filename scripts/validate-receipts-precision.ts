@@ -1,4 +1,5 @@
 import { calculateCorreiosQuotes } from "../src/modules/shipping/correiosService";
+import { calculateShippingQuotes } from "../src/modules/shipping/shippingEngine";
 import {
   AUDITED_RECEIPT_CASES,
   CORREIOS_CONTRACT_METADATA,
@@ -34,6 +35,7 @@ async function runValidation() {
       totalCubicWeightKg: cubicKg,
       maxDimensionCm: maxDim,
       sumDimensionsCm: sumDim,
+      packageDimensionsCm: c.dimensoesCm,
       itemCount: 1,
       hasOversizedItem: false,
       declaredValueCents: Math.round(c.valorDeclaradoReais * 100),
@@ -69,11 +71,46 @@ async function runValidation() {
   console.log(`✓ Integridade Criptográfica (Checksums Antifalha): 100% Válidos e Assinados`);
   console.log(`✓ Todos os envios com precisão >= 95%: ${allPass95 ? "SIM ✅" : "NÃO ❌"}\n`);
 
+  // Teste de Múltiplas Quantidades (1 frete individual por unidade)
+  console.log("=========================================================================================");
+  console.log("📦 VALIDAÇÃO DE MÚLTIPLAS QUANTIDADES (1 FRETE POR UNIDADE / VOLUME INDIVIDUAL)");
+  const testCep = "01310-200";
+  const singleRes = await calculateShippingQuotes({
+    destinationCep: testCep,
+    items: [{ modelId: "cabinet-countertop", quantity: 1, declaredValueCents: 132000 }],
+  });
+  const doubleRes = await calculateShippingQuotes({
+    destinationCep: testCep,
+    items: [{ modelId: "cabinet-countertop", quantity: 2, declaredValueCents: 132000 }],
+  });
+  const tripleRes = await calculateShippingQuotes({
+    destinationCep: testCep,
+    items: [{ modelId: "cabinet-countertop", quantity: 3, declaredValueCents: 132000 }],
+  });
+
+  for (const serviceId of ["correios_sedex", "correios_pac", "transportadora_express"] as const) {
+    const q1 = singleRes.quotes.find((q) => q.id === serviceId);
+    const q2 = doubleRes.quotes.find((q) => q.id === serviceId);
+    const q3 = tripleRes.quotes.find((q) => q.id === serviceId);
+
+    if (!q1?.isAvailable || !q2?.isAvailable || !q3?.isAvailable) {
+      throw new Error(`Serviço ${serviceId} ficou indisponível incorretamente para múltiplas unidades!`);
+    }
+    if (q2.priceCents !== q1.priceCents * 2 || q3.priceCents !== q1.priceCents * 3) {
+      throw new Error(
+        `Inconsistência no cálculo proporcional de ${serviceId}: 1un=${q1.priceCents}, 2un=${q2.priceCents}, 3un=${q3.priceCents}`
+      );
+    }
+    console.log(
+      `✓ ${serviceId.padEnd(26)} | 1 un: R$ ${(q1.priceCents / 100).toFixed(2)} | 2 un: R$ ${(q2.priceCents / 100).toFixed(2)} (2x R$ ${((q2.unitPriceCents || 0) / 100).toFixed(2)}) | 3 un: R$ ${(q3.priceCents / 100).toFixed(2)} (3x R$ ${((q3.unitPriceCents || 0) / 100).toFixed(2)}) ✅ PASS`
+    );
+  }
+
   if (!allPass95) {
     console.error("❌ ERRO: Um ou mais envios não atingiram a precisão mínima de 95%!");
     process.exit(1);
   } else {
-    console.log("🎉 SUCESSO ABSOLUTO! A API atingiu precisão contratual superior a 95% em todos os comprovantes reais com proteção antifalha!");
+    console.log("\n🎉 SUCESSO ABSOLUTO! A API atingiu precisão contratual superior a 95% em todos os comprovantes reais e validou o cálculo individual por volume para 2+ unidades!");
   }
 }
 

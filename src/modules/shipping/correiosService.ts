@@ -12,6 +12,7 @@ export interface CorreiosPackageInput {
   itemCount: number;
   hasOversizedItem: boolean;
   declaredValueCents?: number;
+  packageDimensionsCm?: [number, number, number];
 }
 
 interface RegionalContractRate {
@@ -52,8 +53,8 @@ function getContractRate(cepClean: string, billableWeightKg: number): {
 } {
   const prefix2 = parseInt(cepClean.substring(0, 2), 10);
   const prefix3 = parseInt(cepClean.substring(0, 3), 10);
-  const prefix5 = parseInt(cepClean.substring(0, 5), 10);
-  const extraKg = Math.max(0, billableWeightKg - 1);
+  const roundedBilledKg = Math.max(1, Math.round(billableWeightKg));
+  const extraKg = Math.max(0, roundedBilledKg - 1);
 
   // 1. ESTADO DE SÃO PAULO (CEP 01000 a 19999)
   // Comprovantes reais: Paulínia (13140-610), Cajamar (07792-820), Guarulhos (07084-220), Santana de Parnaíba (06544-300)
@@ -67,15 +68,14 @@ function getContractRate(cepClean: string, billableWeightKg: number): {
 
     // Faixa até 22kg possui tarifa consolidada estadual (R$ 45,89 / R$ 47,96)
     // Acima de 22kg até 30kg: progressão até R$ 99,64 em 30kg (ex: Santana de Parnaíba)
-    const roundedBilledKg = Math.round(billableWeightKg);
     if (roundedBilledKg > 22) {
       const over22 = roundedBilledKg - 22;
       sedexFreightCents = Math.round(4589 + over22 * 671.875);
     }
 
-    const pacFreightCents = billableWeightKg <= 20
+    const pacFreightCents = roundedBilledKg <= 20
       ? 3200
-      : Math.round(3200 + (billableWeightKg - 20) * 450);
+      : Math.round(3200 + (roundedBilledKg - 20) * 450);
 
     return {
       pacFreightCents,

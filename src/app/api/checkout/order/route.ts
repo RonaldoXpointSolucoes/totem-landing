@@ -291,28 +291,45 @@ export async function POST(req: Request) {
     let selectedShippingInfo = null;
 
     if (shippingOptionId) {
-      const shippingCalculation = await calculateShippingQuotes({
-        destinationCep: deliveryAddress.cep,
-        items: items.map((it) => ({
-          modelId: it.modelId,
-          quantity: it.quantity,
-        })),
-      });
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        const shippingCalculation = await calculateShippingQuotes({
+          destinationCep: deliveryAddress.cep,
+          items: validatedCartItems.map((it) => {
+            const p = calculateTotemPrice({
+              cabinet: it.configuration.model,
+              color: it.configuration.color,
+              monitor: it.configuration.monitor,
+              printer: it.configuration.printer,
+              barcodeReader: it.configuration.barcodeReader,
+            });
+            return {
+              modelId: it.configuration.model.id,
+              quantity: it.quantity,
+              unitPriceCents: p.cardTotalPriceCents,
+              declaredValueCents: p.cardTotalPriceCents,
+            };
+          }),
+        });
 
-      if (shippingCalculation.ok && shippingCalculation.quotes.length > 0) {
-        const found = shippingCalculation.quotes.find(
-          (q) => q.id === shippingOptionId && q.isAvailable
-        );
-        if (found) {
-          shippingCents = found.priceCents;
-          selectedShippingInfo = {
-            id: found.id,
-            name: found.name,
-            carrier: found.carrier,
-            priceCents: found.priceCents,
-            deliveryDaysMin: found.deliveryDaysMin,
-            deliveryDaysMax: found.deliveryDaysMax,
-          };
+        if (shippingCalculation.ok && shippingCalculation.quotes.length > 0) {
+          const found = shippingCalculation.quotes.find(
+            (q) => q.id === shippingOptionId && q.isAvailable
+          );
+          if (found) {
+            shippingCents = found.priceCents;
+            selectedShippingInfo = {
+              id: found.id,
+              name: found.name,
+              carrier: found.carrier,
+              priceCents: found.priceCents,
+              deliveryDaysMin: found.deliveryDaysMin,
+              deliveryDaysMax: found.deliveryDaysMax,
+            };
+            break;
+          }
+        }
+        if (attempt < 3) {
+          await new Promise((r) => setTimeout(r, 300 * attempt));
         }
       }
     }

@@ -2,16 +2,44 @@ import { CABINET_MODELS } from "@/modules/catalog/catalogData";
 import {
   ShippingCalculationRequest,
   ShippingCalculationResponse,
+  ShippingProvenanceSource,
   ShippingQuote,
 } from "@/types/shipping";
 import { assertAndStampQuote, validateShippingInput } from "./antiFailureGuard";
 import { calculateCarrierQuote } from "./carrierService";
 import { calculateCorreiosQuotes } from "./correiosService";
+import { MAX_CORREIOS_RETRY_ATTEMPTS } from "./correiosOnlineService";
 import { CORREIOS_CONTRACT_METADATA } from "./receiptGroundTruth";
 
 const DEFAULT_ORIGIN_CEP = "06754-000";
 const DEFAULT_PICKUP_ADDRESS =
   "Av. Industrial, Galpão 04 - X-Point Engenharia, Taboão da Serra - SP";
+
+function formatCentsToBRL(cents: number): string {
+  return (cents / 100).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
+}
+
+function resolveCabinetModel(modelIdRaw: string) {
+  const idLower = String(modelIdRaw || "").trim().toLowerCase();
+  const exact = CABINET_MODELS.find(
+    (m) => m.id.toLowerCase() === idLower || m.slug.toLowerCase() === idLower
+  );
+  if (exact) return exact;
+
+  if (idLower.includes("wall") || idLower.includes("parede")) {
+    return CABINET_MODELS.find((m) => m.id === "cabinet-wall");
+  }
+  if (idLower.includes("countertop") || idLower.includes("balcao") || idLower.includes("balcão")) {
+    return CABINET_MODELS.find((m) => m.id === "cabinet-countertop");
+  }
+  if (idLower.includes("floor") || idLower.includes("piso") || idLower.includes("chao") || idLower.includes("chão")) {
+    return CABINET_MODELS.find((m) => m.id === "cabinet-floor");
+  }
+  return undefined;
+}
 
 export async function calculateShippingQuotes(
   request: ShippingCalculationRequest
@@ -39,55 +67,132 @@ export async function calculateShippingQuotes(
       totalGrossWeightKg: 0,
       totalCubicWeightKg: 0,
       quotes: [],
-      error: "O carrinho está vazio. Adicione ao menos um totem para calcular o frete.",
+      error: "O carrinho está vazio. Adicione ao menos um gabinete para calcular o frete.",
     };
   }
 
   let totalGrossWeightKg = 0;
   let totalVolumeM3 = 0;
-  let maxDimensionCm = 0;
-  let sumDimensionsCm = 0;
-  let hasOversizedItem = false;
-  let totalDeclaredValueCents = 0;
   let totalItemCount = 0;
 
-  for (const item of items) {
-    const qty = Math.max(1, item.quantity || 1);
-    totalItemCount += qty;
+  // Acumuladores por modalidade (soma de 1 frete individual para cada unidade/volume)
+  let totalSedexPriceCents = 0;
+  let totalPacPriceCents = 0;
+  let totalCarrierPriceCents = 0;
 
-    const model = CABINET_MODELS.find((m) => m.id === item.modelId);
+  let sedexMinDays = 1;
+  let sedexMaxDays = 2;
+  let pacMinDays = 3;
+  let pacMaxDays = 6;
+  let carrierMinDays = 3;
+  let carrierMaxDays = 6;
+
+  let correiosAllUnitsAvailable = true;
+  let correiosUnavailableReason = "";
+  let correiosSource: ShippingProvenanceSource = "correios_contract_ground_truth";
+  let correiosSourceLabel = `Matriz Contratual Auditada (Contrato ECT ${CORREIOS_CONTRACT_METADATA.contractNumber} — 99.93% Precisão)`;
+
+  let carrierSourceLabel = "Tabela Rodoviária Fracionada Especial";
+
+  for (const item of items) {
+    const qty = Math.max(1, Math.floor(Number(item.quantity) || 1));
+    const model = resolveCabinetModel(item.modelId);
+
     if (!model) {
-      continue;
+      return {
+        ok: false,
+        destination: { cep: destinationCep },
+        originCep: process.env.SHIPPING_ORIGIN_CEP || DEFAULT_ORIGIN_CEP,
+        totalGrossWeightKg: 0,
+        totalCubicWeightKg: 0,
+        quotes: [],
+        error: `Modelo de gabinete inválido para cálculo de frete: ${item.modelId}`,
+      };
     }
 
-    totalDeclaredValueCents += model.basePriceCents * qty;
+    totalItemCount += qty;
 
     const pkg = model.package || {
-      heightCm: 100,
-      widthCm: 50,
-      depthCm: 30,
-      grossWeightKg: 20,
+      heightCm: 90,
+      widthCm: 48,
+      depthCm: 25,
+      grossWeightKg: 16.0,
     };
 
-    totalGrossWeightKg += pkg.grossWeightKg * qty;
+    const unitGrossWeightKg = pkg.grossWeightKg;
+    const unitVolumeM3 = (pkg.heightCm * pkg.widthCm * pkg.depthCm) / 1_000_000;
+    const unitCarrierCubicKg = Number((unitVolumeM3 * 300).toFixed(2));
+    const unitCorreiosCubicKg = Number((unitVolumeM3 * 166.667).toFixed(2));
+    const unitMaxDimensionCm = Math.max(pkg.heightCm, pkg.widthCm, pkg.depthCm);
+    const unitSumDimensionsCm = pkg.heightCm + pkg.widthCm + pkg.depthCm;
+    const unitHasOversized =
+      model.id === "cabinet-floor" || unitMaxDimensionCm > 100 || unitGrossWeightKg > 30;
 
-    const itemVolumeM3 =
-      ((pkg.heightCm * pkg.widthCm * pkg.depthCm) / 1_000_000) * qty;
-    totalVolumeM3 += itemVolumeM3;
+    // Valor declarado real da unidade (nunca inferior ao preço base de tabela do gabinete)
+    const unitDeclaredValueCents = Math.max(
+      model.basePriceCents,
+      Number(item.declaredValueCents || item.unitPriceCents) || model.basePriceCents
+    );
 
-    if (pkg.heightCm > maxDimensionCm) maxDimensionCm = pkg.heightCm;
-    if (pkg.widthCm > maxDimensionCm) maxDimensionCm = pkg.widthCm;
-    if (pkg.depthCm > maxDimensionCm) maxDimensionCm = pkg.depthCm;
+    totalGrossWeightKg += unitGrossWeightKg * qty;
+    totalVolumeM3 += unitVolumeM3 * qty;
 
-    sumDimensionsCm += (pkg.heightCm + pkg.widthCm + pkg.depthCm) * qty;
+    // 1. Calcula o frete INDIVIDUAL de 1 unidade nos Correios (1 caixa = 1 etiqueta de envio)
+    const unitCorreiosQuotes = await calculateCorreiosQuotes({
+      destinationCep: cepClean,
+      totalGrossWeightKg: unitGrossWeightKg,
+      totalCubicWeightKg: unitCorreiosCubicKg,
+      maxDimensionCm: unitMaxDimensionCm,
+      sumDimensionsCm: unitSumDimensionsCm,
+      itemCount: 1,
+      hasOversizedItem: unitHasOversized,
+      declaredValueCents: unitDeclaredValueCents,
+      packageDimensionsCm: [pkg.heightCm, pkg.widthCm, pkg.depthCm],
+    });
 
-    // Gabinete de piso (170cm de embalagem) ou qualquer item com dimensão > 100cm
-    if (model.id === "cabinet-floor" || pkg.heightCm > 100 || pkg.grossWeightKg > 30) {
-      hasOversizedItem = true;
+    const unitSedex = unitCorreiosQuotes.find((q) => q.id === "correios_sedex");
+    const unitPac = unitCorreiosQuotes.find((q) => q.id === "correios_pac");
+
+    if (!unitSedex || !unitSedex.isAvailable || !unitPac || !unitPac.isAvailable) {
+      correiosAllUnitsAvailable = false;
+      correiosUnavailableReason =
+        unitSedex?.unavailableReason ||
+        unitPac?.unavailableReason ||
+        "Um ou mais itens excedem os limites operacionais dos Correios. Utilize Transportadora ou Retirada.";
+    } else {
+      // Multiplica pela quantidade: cada unidade paga seu próprio frete integral
+      totalSedexPriceCents += unitSedex.priceCents * qty;
+      totalPacPriceCents += unitPac.priceCents * qty;
+      sedexMinDays = Math.max(sedexMinDays, unitSedex.deliveryDaysMin);
+      sedexMaxDays = Math.max(sedexMaxDays, unitSedex.deliveryDaysMax);
+      pacMinDays = Math.max(pacMinDays, unitPac.deliveryDaysMin);
+      pacMaxDays = Math.max(pacMaxDays, unitPac.deliveryDaysMax);
+
+      if (unitSedex.provenance?.source === "correios_live_cws_api") {
+        correiosSource = "correios_live_cws_api";
+        correiosSourceLabel = unitSedex.provenance.sourceLabel;
+      }
+    }
+
+    // 2. Calcula o frete INDIVIDUAL de 1 unidade na Transportadora Rodoviária Especial
+    const unitCarrierQuote = calculateCarrierQuote({
+      destinationCep: cepClean,
+      totalGrossWeightKg: unitGrossWeightKg,
+      totalCubicWeightKg: unitCarrierCubicKg,
+      declaredValueCents: unitDeclaredValueCents,
+      itemCount: 1,
+    });
+
+    // Multiplica pela quantidade: cada unidade paga seu próprio frete integral
+    totalCarrierPriceCents += unitCarrierQuote.priceCents * qty;
+    carrierMinDays = Math.max(carrierMinDays, unitCarrierQuote.deliveryDaysMin);
+    carrierMaxDays = Math.max(carrierMaxDays, unitCarrierQuote.deliveryDaysMax);
+    if (unitCarrierQuote.provenance?.sourceLabel) {
+      carrierSourceLabel = unitCarrierQuote.provenance.sourceLabel;
     }
   }
 
-  // Validação antifalha de integridade da carga
+  // Validação antifalha de integridade da carga total
   const inputCheck = validateShippingInput({
     destinationCep: cepClean,
     totalGrossWeightKg,
@@ -106,30 +211,107 @@ export async function calculateShippingQuotes(
     };
   }
 
-  // Fator rodoviário padrão: 300 kg por m³
   const totalCubicWeightKg = Number((totalVolumeM3 * 300).toFixed(2));
-  // Fator oficial Correios: divisor 6000 (equivale a 166.67 kg/m³)
-  const totalCorreiosCubicKg = Number((totalVolumeM3 * 166.667).toFixed(2));
+  const avgSedexUnitCents = Math.round(totalSedexPriceCents / totalItemCount);
+  const avgPacUnitCents = Math.round(totalPacPriceCents / totalItemCount);
+  const avgCarrierUnitCents = Math.round(totalCarrierPriceCents / totalItemCount);
 
-  // 1. Cotação Correios (SEDEX + PAC com Seguro Postal Oficial e Antifalha)
-  const correiosQuotes = await calculateCorreiosQuotes({
-    destinationCep: cepClean,
-    totalGrossWeightKg,
-    totalCubicWeightKg: totalCorreiosCubicKg,
-    maxDimensionCm,
-    sumDimensionsCm,
-    itemCount: totalItemCount,
-    hasOversizedItem,
-    declaredValueCents: totalDeclaredValueCents,
-  });
+  // Construção das cotações consolidadas (soma exata dos fretes individuais de cada volume)
+  const rawCorreiosQuotes: ShippingQuote[] = correiosAllUnitsAvailable
+    ? [
+        {
+          id: "correios_sedex",
+          name: "SEDEX Contrato AG (Correios)",
+          carrier: "Correios",
+          priceCents: totalSedexPriceCents,
+          unitPriceCents: avgSedexUnitCents,
+          packageCount: totalItemCount,
+          deliveryDaysMin: sedexMinDays,
+          deliveryDaysMax: sedexMaxDays,
+          description:
+            totalItemCount > 1
+              ? `Frete calculado para ${totalItemCount} volumes individuais (${formatCentsToBRL(avgSedexUnitCents)} por unidade) • Seguro incluso (Contrato 9912722993)`
+              : `Entrega expressa prioritária com seguro de carga incluso (Contrato 9912722993)`,
+          isAvailable: true,
+          badge: "Mais Rápido",
+        },
+        {
+          id: "correios_pac",
+          name: "PAC Contrato AG (Correios)",
+          carrier: "Correios",
+          priceCents: totalPacPriceCents,
+          unitPriceCents: avgPacUnitCents,
+          packageCount: totalItemCount,
+          deliveryDaysMin: pacMinDays,
+          deliveryDaysMax: pacMaxDays,
+          description:
+            totalItemCount > 1
+              ? `Frete calculado para ${totalItemCount} volumes individuais (${formatCentsToBRL(avgPacUnitCents)} por unidade) • Seguro incluso (Contrato 9912722993)`
+              : `Entrega econômica oficial com seguro de carga incluso (Contrato 9912722993)`,
+          isAvailable: true,
+          badge: "Econômico",
+        },
+      ]
+    : [
+        {
+          id: "correios_sedex",
+          name: "SEDEX Contrato AG (Correios)",
+          carrier: "Correios",
+          priceCents: 0,
+          unitPriceCents: 0,
+          packageCount: totalItemCount,
+          deliveryDaysMin: 0,
+          deliveryDaysMax: 0,
+          description: "Entrega expressa dos Correios com seguro total",
+          isAvailable: false,
+          unavailableReason: correiosUnavailableReason,
+        },
+        {
+          id: "correios_pac",
+          name: "PAC Contrato AG (Correios)",
+          carrier: "Correios",
+          priceCents: 0,
+          unitPriceCents: 0,
+          packageCount: totalItemCount,
+          deliveryDaysMin: 0,
+          deliveryDaysMax: 0,
+          description: "Entrega econômica dos Correios com seguro",
+          isAvailable: false,
+          unavailableReason: correiosUnavailableReason,
+        },
+      ];
 
-  // 2. Cotação Transportadora Rodoviária Especial
-  const carrierQuote = calculateCarrierQuote({
+  const correiosQuotes = rawCorreiosQuotes.map((q) =>
+    assertAndStampQuote(q, {
+      source: correiosAllUnitsAvailable ? correiosSource : "correios_contract_ground_truth",
+      sourceLabel: correiosAllUnitsAvailable
+        ? correiosSourceLabel
+        : "Limites Operacionais Correios ECT",
+      destinationCep: cepClean,
+    })
+  );
+
+  const rawCarrierQuote: ShippingQuote = {
+    id: "transportadora_express",
+    name: "Transportadora Rodoviária Especial",
+    carrier: "X-Point Cargo Industrial",
+    priceCents: totalCarrierPriceCents,
+    unitPriceCents: avgCarrierUnitCents,
+    packageCount: totalItemCount,
+    deliveryDaysMin: carrierMinDays,
+    deliveryDaysMax: carrierMaxDays,
+    description:
+      totalItemCount > 1
+        ? `Frete calculado para ${totalItemCount} volumes individuais (${formatCentsToBRL(avgCarrierUnitCents)} por unidade) • Transporte especializado com seguro total`
+        : `Transporte especializado para cargas volumétricas, com seguro total e proteção paletizada`,
+    isAvailable: true,
+    badge: "Carga Segura",
+  };
+
+  const carrierQuote = assertAndStampQuote(rawCarrierQuote, {
+    source: "carrier_road_freight",
+    sourceLabel: carrierSourceLabel,
     destinationCep: cepClean,
-    totalGrossWeightKg,
-    totalCubicWeightKg,
-    declaredValueCents: totalDeclaredValueCents,
-    itemCount: totalItemCount,
   });
 
   // 3. Retirada na Fábrica (Gratuita)
@@ -140,6 +322,8 @@ export async function calculateShippingQuotes(
     name: "Retirada na Fábrica",
     carrier: "X-Point Engenharia (SP)",
     priceCents: 0,
+    unitPriceCents: 0,
+    packageCount: totalItemCount,
     deliveryDaysMin: 5,
     deliveryDaysMax: 8,
     description: `Coleta direta sem custo após produção e usinagem CNC no galpão industrial (${pickupAddress})`,
@@ -174,6 +358,7 @@ export async function calculateShippingQuotes(
     originCep: process.env.SHIPPING_ORIGIN_CEP || DEFAULT_ORIGIN_CEP,
     totalGrossWeightKg: Number(totalGrossWeightKg.toFixed(2)),
     totalCubicWeightKg,
+    packageCount: totalItemCount,
     quotes: allQuotes,
     antiFailureStatus: {
       isActive: true,
@@ -181,7 +366,9 @@ export async function calculateShippingQuotes(
       receiptsVerifiedCount: CORREIOS_CONTRACT_METADATA.auditedReceiptsCount,
       contractNumber: CORREIOS_CONTRACT_METADATA.contractNumber,
       agency: CORREIOS_CONTRACT_METADATA.agency,
+      maxRetryAttempts: MAX_CORREIOS_RETRY_ATTEMPTS,
     },
   };
 }
+
 

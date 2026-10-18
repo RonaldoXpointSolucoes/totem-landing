@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { calculateShippingQuotes } from "@/modules/shipping";
 
+const MAX_ROUTE_ATTEMPTS = 3;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -21,22 +27,48 @@ export async function POST(req: Request) {
       );
     }
 
-    const calculation = await calculateShippingQuotes({
-      destinationCep: String(destinationCep),
-      items: items.map((item) => ({
-        modelId: String(item.modelId),
-        quantity: Math.max(1, Number(item.quantity) || 1),
-      })),
-    });
+    const normalizedItems = items.map((item) => ({
+      modelId: String(item.modelId),
+      quantity: Math.max(1, Math.floor(Number(item.quantity) || 1)),
+      unitPriceCents: Number(item.unitPriceCents) || undefined,
+      declaredValueCents: Number(item.declaredValueCents) || undefined,
+    }));
 
-    if (!calculation.ok) {
-      return NextResponse.json(
-        { ok: false, error: calculation.error },
-        { status: 400 }
-      );
+    let lastError: string | undefined;
+
+    for (let attempt = 1; attempt <= MAX_ROUTE_ATTEMPTS; attempt++) {
+      try {
+        const calculation = await calculateShippingQuotes({
+          destinationCep: String(destinationCep),
+          items: normalizedItems,
+        });
+
+        if (calculation.ok && calculation.quotes.length > 0) {
+          return NextResponse.json(calculation, { status: 200 });
+        }
+
+        // Erros de validação de CEP / parâmetros inválidos não precisam repetir
+        if (calculation.error && calculation.error.includes("CEP")) {
+          return NextResponse.json(
+            { ok: false, error: calculation.error },
+            { status: 400 }
+          );
+        }
+
+        lastError = calculation.error || "Falha ao calcular frete.";
+      } catch (err: any) {
+        lastError = err?.message || "Erro transitório ao calcular frete.";
+      }
+
+      if (attempt < MAX_ROUTE_ATTEMPTS) {
+        await sleep(300 * attempt);
+      }
     }
 
-    return NextResponse.json(calculation, { status: 200 });
+    return NextResponse.json(
+      { ok: false, error: lastError || "Não foi possível calcular o frete após 3 tentativas." },
+      { status: 400 }
+    );
   } catch (error: any) {
     console.error("Erro ao calcular cotação de frete:", error);
     return NextResponse.json(
@@ -48,3 +80,4 @@ export async function POST(req: Request) {
     );
   }
 }
+

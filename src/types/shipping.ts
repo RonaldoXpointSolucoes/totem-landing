@@ -28,6 +28,8 @@ export interface ShippingQuote {
   name: string;
   carrier: string;
   priceCents: number;
+  unitPriceCents?: number;
+  packageCount?: number;
   deliveryDaysMin: number;
   deliveryDaysMax: number;
   description: string;
@@ -40,6 +42,8 @@ export interface ShippingQuote {
 export interface ShippingItemInput {
   modelId: string;
   quantity: number;
+  unitPriceCents?: number;
+  declaredValueCents?: number;
 }
 
 export interface ShippingCalculationRequest {
@@ -57,6 +61,7 @@ export interface ShippingCalculationResponse {
   originCep: string;
   totalGrossWeightKg: number;
   totalCubicWeightKg: number;
+  packageCount?: number;
   quotes: ShippingQuote[];
   antiFailureStatus?: {
     isActive: boolean;
@@ -64,7 +69,9 @@ export interface ShippingCalculationResponse {
     receiptsVerifiedCount: number;
     contractNumber: string;
     agency: string;
+    maxRetryAttempts?: number;
   };
   error?: string;
 }
+
 

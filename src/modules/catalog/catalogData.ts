@@ -72,7 +72,7 @@ export const CABINET_MODELS: CabinetModel[] = [
       heightCm: 65,
       widthCm: 45,
       depthCm: 32,
-      grossWeightKg: 12.5,
+      grossWeightKg: 16.0,
     },
     dimensions: {
       heightMm: 620,

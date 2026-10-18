@@ -62,7 +62,100 @@ export const CartView: React.FC<CartViewProps> = ({
   const [shippingQuotes, setShippingQuotes] = useState<any[]>([]);
   const [selectedShippingId, setSelectedShippingId] = useState<string | null>(null);
   const [isLoadingShipping, setIsLoadingShipping] = useState(false);
+  const [shippingRetryAttempt, setShippingRetryAttempt] = useState(0);
   const [shippingError, setShippingError] = useState<string | null>(null);
+
+  const calculateShippingForCep = React.useCallback(
+    async (rawCep: string) => {
+      const cleanCep = rawCep.replace(/\D/g, "");
+      if (cleanCep.length !== 8 || items.length === 0) return;
+
+      setIsLoadingShipping(true);
+      setShippingError(null);
+      setShippingRetryAttempt(0);
+
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("totem_shipping_cep", cleanCep);
+      }
+
+      const payloadItems = items.map((i) => {
+        const p = calculateTotemPrice({
+          cabinet: i.configuration.model,
+          color: i.configuration.color,
+          monitor: i.configuration.monitor,
+          printer: i.configuration.printer,
+          barcodeReader: i.configuration.barcodeReader,
+        });
+        return {
+          modelId: i.configuration.model.id,
+          quantity: i.quantity,
+          unitPriceCents: p.cardTotalPriceCents,
+          declaredValueCents: p.cardTotalPriceCents,
+        };
+      });
+
+      const MAX_ATTEMPTS = 3;
+      let lastErr = "Serviço dos Correios temporariamente indisponível.";
+
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        setShippingRetryAttempt(attempt);
+        try {
+          const res = await fetch("/api/shipping/quote", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              destinationCep: cleanCep,
+              items: payloadItems,
+            }),
+          });
+
+          const data = await res.json();
+          if (res.ok && data.ok && Array.isArray(data.quotes) && data.quotes.length > 0) {
+            setShippingQuotes(data.quotes);
+            setShippingError(null);
+            setShippingRetryAttempt(0);
+            const available = data.quotes.filter((q: any) => q.isAvailable);
+            if (available.length > 0) {
+              setSelectedShippingId((prev) => {
+                const savedOpt =
+                  typeof window !== "undefined"
+                    ? sessionStorage.getItem("totem_shipping_option_id")
+                    : null;
+                const preferred = prev || savedOpt;
+                const stillValid = available.find((q: any) => q.id === preferred);
+                const chosen = stillValid ? stillValid.id : available[0].id;
+                if (typeof window !== "undefined") {
+                  sessionStorage.setItem("totem_shipping_option_id", chosen);
+                }
+                return chosen;
+              });
+            }
+            setIsLoadingShipping(false);
+            return;
+          }
+
+          lastErr = data?.error || "Serviço de cotação temporariamente indisponível.";
+          // Se for erro de CEP inválido (400), não precisa tentar 3 vezes
+          if (res.status === 400 && lastErr.toLowerCase().includes("cep")) {
+            break;
+          }
+        } catch {
+          lastErr = "Erro de comunicação ao consultar os Correios.";
+        }
+
+        if (attempt < MAX_ATTEMPTS) {
+          await new Promise((resolve) => setTimeout(resolve, 600 * attempt));
+        }
+      }
+
+      setShippingError(`${lastErr} (Tentamos ${MAX_ATTEMPTS} vezes)`);
+      setShippingQuotes([]);
+      setSelectedShippingId(null);
+      setShippingRetryAttempt(0);
+      setIsLoadingShipping(false);
+    },
+    [items]
+  );
 
   // Recupera CEP persistido em sessão
   React.useEffect(() => {
@@ -74,6 +167,14 @@ export const CartView: React.FC<CartViewProps> = ({
       }
     }
   }, []);
+
+  // Recalcula automaticamente o frete sempre que a quantidade ou itens mudarem e já houver CEP válido
+  React.useEffect(() => {
+    const cleanCep = shippingCep.replace(/\D/g, "");
+    if (cleanCep.length === 8 && items.length > 0) {
+      calculateShippingForCep(cleanCep);
+    }
+  }, [items, shippingCep, calculateShippingForCep]);
 
   const handleCepChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let raw = e.target.value.replace(/\D/g, "");
@@ -91,50 +192,7 @@ export const CartView: React.FC<CartViewProps> = ({
       setShippingError("Digite um CEP válido com 8 dígitos.");
       return;
     }
-
-    setIsLoadingShipping(true);
-    setShippingError(null);
-
-    try {
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem("totem_shipping_cep", cleanCep);
-      }
-
-      const res = await fetch("/api/shipping/quote", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          destinationCep: cleanCep,
-          items: items.map((i) => ({
-            modelId: i.configuration.model.id,
-            quantity: i.quantity,
-          })),
-        }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.ok && Array.isArray(data.quotes) && data.quotes.length > 0) {
-        setShippingQuotes(data.quotes);
-        const available = data.quotes.filter((q: any) => q.isAvailable);
-        if (available.length > 0) {
-          const chosen = available[0].id;
-          setSelectedShippingId(chosen);
-          if (typeof window !== "undefined") {
-            sessionStorage.setItem("totem_shipping_option_id", chosen);
-          }
-        }
-      } else {
-        setShippingError(data?.error || "Serviço de cotação temporariamente indisponível.");
-        setShippingQuotes([]);
-        setSelectedShippingId(null);
-      }
-    } catch {
-      setShippingError("Erro de comunicação ao calcular frete.");
-      setShippingQuotes([]);
-      setSelectedShippingId(null);
-    } finally {
-      setIsLoadingShipping(false);
-    }
+    await calculateShippingForCep(cleanCep);
   };
 
   const selectedShippingQuote = shippingQuotes.find(
@@ -423,15 +481,20 @@ export const CartView: React.FC<CartViewProps> = ({
               )}
 
               <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
-                <span>Frete Especial:</span>
-                {shippingCents > 0 && selectedShippingQuote ? (
+                <span>Frete ({totalItems} {totalItems === 1 ? "volume" : "volumes"}):</span>
+                {selectedShippingQuote ? (
                   <div className="text-right">
                     <span className="font-bold text-slate-900 dark:text-slate-100">
-                      {formatBRL(shippingCents)}
+                      {shippingCents === 0 ? "Grátis" : formatBRL(shippingCents)}
                     </span>
                     <span className="block text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
-                      {selectedShippingQuote.serviceName || selectedShippingQuote.carrier}
+                      {selectedShippingQuote.name || selectedShippingQuote.serviceName || selectedShippingQuote.carrier}
                     </span>
+                    {totalItems > 1 && shippingCents > 0 && selectedShippingQuote.unitPriceCents > 0 && (
+                      <span className="block text-[10px] text-slate-500 dark:text-slate-400">
+                        {totalItems}× {formatBRL(selectedShippingQuote.unitPriceCents)} (1 frete por unidade)
+                      </span>
+                    )}
                   </div>
                 ) : (
                   <span className="text-slate-400 dark:text-slate-500 italic text-[11px]">
@@ -449,7 +512,7 @@ export const CartView: React.FC<CartViewProps> = ({
                   </span>
                   {shippingQuotes.length > 0 && (
                     <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
-                      {shippingQuotes.filter((q) => q.isAvailable).length} opções
+                      {shippingQuotes.filter((q) => q.isAvailable).length} opções ({totalItems} {totalItems === 1 ? "vol." : "vols."})
                     </span>
                   )}
                 </div>
@@ -479,7 +542,7 @@ export const CartView: React.FC<CartViewProps> = ({
                     {isLoadingShipping ? (
                       <span className="flex items-center gap-1">
                         <Loader2 className="w-3 h-3 animate-spin" />
-                        Cotando
+                        {shippingRetryAttempt > 1 ? `Tentativa ${shippingRetryAttempt}/3` : "Cotando"}
                       </span>
                     ) : (
                       "Calcular"
@@ -491,13 +554,17 @@ export const CartView: React.FC<CartViewProps> = ({
                   <p className="text-[11px] text-rose-500 font-semibold">{shippingError}</p>
                 )}
 
-                {/* Lista de Opções de Frete da Transportadora */}
+                {/* Lista de Opções de Frete (Correios, Transportadora e Retirada) */}
                 {shippingQuotes.length > 0 && (
                   <div className="space-y-1.5 pt-1">
                     {shippingQuotes
                       .filter((q) => q.isAvailable)
                       .map((quote) => {
                         const isSelected = selectedShippingId === quote.id;
+                        const daysText =
+                          quote.deliveryDaysMin && quote.deliveryDaysMax
+                            ? `${quote.deliveryDaysMin} a ${quote.deliveryDaysMax} dias úteis`
+                            : `${quote.deliveryDays || quote.deliveryDaysMax || 5} dias úteis`;
                         return (
                           <div
                             key={quote.id}
@@ -508,13 +575,13 @@ export const CartView: React.FC<CartViewProps> = ({
                               }
                             }}
                             className={cn(
-                              "p-2.5 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition-all",
+                              "p-2.5 rounded-xl border text-xs cursor-pointer flex items-center justify-between gap-2 transition-all",
                               isSelected
                                 ? "border-[#0071e3] bg-blue-50/70 dark:bg-blue-950/40 text-slate-900 dark:text-white font-semibold ring-1 ring-[#0071e3]/30"
                                 : "border-black/10 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-slate-600 dark:text-slate-400 hover:border-black/20"
                             )}
                           >
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
                               <div
                                 className={cn(
                                   "w-4 h-4 rounded-full border flex items-center justify-center shrink-0",
@@ -525,17 +592,20 @@ export const CartView: React.FC<CartViewProps> = ({
                               >
                                 {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
                               </div>
-                              <div>
-                                <div className="font-bold text-[#1d1d1f] dark:text-white leading-tight">
-                                  {quote.serviceName || quote.carrier}
+                              <div className="min-w-0">
+                                <div className="font-bold text-[#1d1d1f] dark:text-white leading-tight truncate">
+                                  {quote.name || quote.serviceName || quote.carrier}
                                 </div>
                                 <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                                  Entrega em até {quote.deliveryDays} {quote.deliveryDays === 1 ? "dia útil" : "dias úteis"}
+                                  Prazo: {daysText}
+                                  {totalItems > 1 && quote.priceCents > 0 && quote.unitPriceCents
+                                    ? ` • ${totalItems}× ${formatBRL(quote.unitPriceCents)}`
+                                    : ""}
                                 </div>
                               </div>
                             </div>
                             <span className="font-black text-[#0071e3] dark:text-cyan-400 shrink-0">
-                              {formatBRL(quote.priceCents)}
+                              {quote.priceCents === 0 ? "Grátis" : formatBRL(quote.priceCents)}
                             </span>
                           </div>
                         );

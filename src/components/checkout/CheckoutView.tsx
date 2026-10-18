@@ -213,7 +213,9 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  // Cotação unificada de frete (Correios, Transportadora e Retirada)
+  const [shippingRetryAttempt, setShippingRetryAttempt] = useState(0);
+
+  // Cotação unificada de frete (Correios, Transportadora e Retirada) com 3 tentativas antes de desistir
   const fetchShippingQuotes = async (targetCep: string, isBackgroundAuto = false) => {
     const cleanCep = targetCep.replace(/\D/g, "");
     if (cleanCep.length !== 8 || items.length === 0) return;
@@ -223,50 +225,86 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     } else {
       setIsLoadingShipping(true);
       setShippingError(null);
+      setShippingRetryAttempt(0);
     }
 
-    try {
-      const res = await fetch("/api/shipping/quote", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          destinationCep: cleanCep,
-          items: items.map((i) => ({
-            modelId: i.configuration.model.id,
-            quantity: i.quantity,
-          })),
-        }),
+    const payloadItems = items.map((i) => {
+      const p = calculateTotemPrice({
+        cabinet: i.configuration.model,
+        color: i.configuration.color,
+        monitor: i.configuration.monitor,
+        printer: i.configuration.printer,
+        barcodeReader: i.configuration.barcodeReader,
       });
+      return {
+        modelId: i.configuration.model.id,
+        quantity: i.quantity,
+        unitPriceCents: p.cardTotalPriceCents,
+        declaredValueCents: p.cardTotalPriceCents,
+      };
+    });
 
-      const data = await res.json();
-      if (res.ok && data.ok && Array.isArray(data.quotes) && data.quotes.length > 0) {
-        setShippingQuotes(data.quotes);
-        setShippingError(null);
-        setIsCorreiosDown(false);
-        setShippingCooldown(0);
+    const MAX_ATTEMPTS = 3;
+    let lastErrorMessage = "Serviço dos Correios temporariamente indisponível.";
 
-        setSelectedShippingId((prev) => {
-          const currentValid = data.quotes.find((q: ShippingQuote) => q.id === prev && q.isAvailable);
-          if (currentValid) return prev;
-          const firstAvailable = data.quotes.find((q: ShippingQuote) => q.isAvailable);
-          return firstAvailable ? firstAvailable.id : null;
-        });
-      } else {
-        const errMsg = data?.error || "Serviço dos Correios temporariamente indisponível.";
-        setShippingError(errMsg);
-        setIsCorreiosDown(true);
-        setShippingQuotes([]);
-        setShippingCooldown((prev) => (prev > 0 ? prev : 20));
+    try {
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        if (!isBackgroundAuto) {
+          setShippingRetryAttempt(attempt);
+        }
+
+        try {
+          const res = await fetch("/api/shipping/quote", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              destinationCep: cleanCep,
+              items: payloadItems,
+            }),
+          });
+
+          const data = await res.json();
+          if (res.ok && data.ok && Array.isArray(data.quotes) && data.quotes.length > 0) {
+            setShippingQuotes(data.quotes);
+            setShippingError(null);
+            setIsCorreiosDown(false);
+            setShippingCooldown(0);
+            setShippingRetryAttempt(0);
+
+            setSelectedShippingId((prev) => {
+              const currentValid = data.quotes.find((q: ShippingQuote) => q.id === prev && q.isAvailable);
+              if (currentValid) return prev;
+              const firstAvailable = data.quotes.find((q: ShippingQuote) => q.isAvailable);
+              return firstAvailable ? firstAvailable.id : null;
+            });
+            return;
+          }
+
+          lastErrorMessage = data?.error || "Serviço dos Correios temporariamente indisponível.";
+          if (res.status === 400 && lastErrorMessage.toLowerCase().includes("cep")) {
+            setShippingError(lastErrorMessage);
+            setIsCorreiosDown(false);
+            setShippingQuotes([]);
+            return;
+          }
+        } catch (err: any) {
+          console.warn(`[FRETE] Tentativa ${attempt}/${MAX_ATTEMPTS} falhou:`, err);
+          lastErrorMessage = "Erro de comunicação com a API dos Correios.";
+        }
+
+        if (attempt < MAX_ATTEMPTS) {
+          await new Promise((resolve) => setTimeout(resolve, 600 * attempt));
+        }
       }
-    } catch (err: any) {
-      console.error("Erro ao cotar frete:", err);
-      setShippingError("Erro de comunicação com a API dos Correios.");
+
+      setShippingError(`${lastErrorMessage} (Tentamos ${MAX_ATTEMPTS} vezes)`);
       setIsCorreiosDown(true);
       setShippingQuotes([]);
       setShippingCooldown((prev) => (prev > 0 ? prev : 20));
     } finally {
       setIsLoadingShipping(false);
       setIsAutoPollingShipping(false);
+      setShippingRetryAttempt(0);
     }
   };
 
@@ -319,7 +357,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   const effectiveSubtotalCents = paymentMethod === "credit_card" ? cardSubtotalCents : pixSubtotalCents;
   const finalTotalCents = effectiveSubtotalCents + shippingCents;
 
-  // Busca automática de CEP com alta resiliência (Timeout ViaCEP + Fallback BrasilAPI)
+  // Busca automática de CEP com alta resiliência (3 tentativas entre ViaCEP, BrasilAPI e OpenCEP)
   const lookupCep = async (cleanCep: string) => {
     if (cleanCep.length !== 8) return;
     setIsLoadingCep(true);
@@ -331,32 +369,33 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     try {
       let foundData: { logradouro?: string; bairro?: string; localidade?: string; uf?: string } | null = null;
 
-      // 1. Tentativa ViaCEP com timeout de 2.5s via AbortController
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2500);
+      for (let attempt = 1; attempt <= 3 && !foundData; attempt++) {
+        // 1. Tentativa ViaCEP com timeout de 2.5s via AbortController
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
 
-      try {
-        const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`, {
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-        if (res.ok) {
-          const data = await res.json();
-          if (!data.erro) {
-            foundData = {
-              logradouro: data.logradouro || "",
-              bairro: data.bairro || "",
-              localidade: data.localidade || "",
-              uf: data.uf || "",
-            };
+        try {
+          const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`, {
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+          if (res.ok) {
+            const data = await res.json();
+            if (!data.erro) {
+              foundData = {
+                logradouro: data.logradouro || "",
+                bairro: data.bairro || "",
+                localidade: data.localidade || "",
+                uf: data.uf || "",
+              };
+              break;
+            }
           }
+        } catch {
+          clearTimeout(timeoutId);
         }
-      } catch {
-        clearTimeout(timeoutId);
-      }
 
-      // 2. Fallback imediato: BrasilAPI se o ViaCEP demorar ou falhar
-      if (!foundData) {
+        // 2. Fallback: BrasilAPI
         try {
           const resFallback = await fetch(`https://brasilapi.com.br/api/cep/v1/${cleanCep}`);
           if (resFallback.ok) {
@@ -367,9 +406,33 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
               localidade: dataFallback.city || "",
               uf: dataFallback.state || "",
             };
+            break;
           }
         } catch {
-          // Falha silenciosa no fallback
+          // Prossegue para OpenCEP / próxima tentativa
+        }
+
+        // 3. Fallback adicional: OpenCEP
+        try {
+          const resOpenCep = await fetch(`https://opencep.com/v1/${cleanCep}`);
+          if (resOpenCep.ok) {
+            const dataOpen = await resOpenCep.json();
+            if (!dataOpen.erro) {
+              foundData = {
+                logradouro: dataOpen.logradouro || "",
+                bairro: dataOpen.bairro || "",
+                localidade: dataOpen.localidade || "",
+                uf: dataOpen.uf || "",
+              };
+              break;
+            }
+          }
+        } catch {
+          // Prossegue para próxima tentativa se attempt < 3
+        }
+
+        if (attempt < 3 && !foundData) {
+          await new Promise((r) => setTimeout(r, 400 * attempt));
         }
       }
 
@@ -380,7 +443,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
         setState(foundData.uf || "");
         setCepSuccess(true);
       } else {
-        setErrorMsg("CEP não encontrado nas bases oficiais. Por favor, preencha o endereço manualmente.");
+        setErrorMsg("CEP não encontrado automaticamente após 3 tentativas. Preencha rua, bairro e cidade manualmente (o frete já foi calculado).");
       }
     } catch (err) {
       console.error("Erro na consulta de CEP:", err);
@@ -1160,7 +1223,11 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
               {isLoadingShipping && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-[#0071e3] text-xs font-semibold animate-pulse">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Calculando opções oficiais...</span>
+                  <span>
+                    {shippingRetryAttempt > 1
+                      ? `Tentativa ${shippingRetryAttempt} de 3...`
+                      : "Calculando opções oficiais..."}
+                  </span>
                 </span>
               )}
             </div>
@@ -1194,7 +1261,11 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between flex-wrap gap-1">
                         <span className="text-xs sm:text-sm font-bold text-[#1d1d1f] dark:text-white flex items-center gap-2">
-                          <span>Consultando API Oficial dos Correios</span>
+                          <span>
+                            {shippingRetryAttempt > 1
+                              ? `Consultando API Oficial dos Correios (Tentativa ${shippingRetryAttempt}/3)`
+                              : "Consultando API Oficial dos Correios"}
+                          </span>
                           <span className="w-2 h-2 rounded-full bg-[#0071e3] animate-ping" />
                         </span>
                         <span className="text-[10px] font-bold text-[#0071e3] dark:text-cyan-400 bg-white dark:bg-slate-900 px-2.5 py-0.5 rounded-full border border-blue-200 dark:border-indigo-800 shadow-sm">
@@ -1202,7 +1273,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
-                        Avaliando peso cubado, embalagens industriais e tabelas contratuais para o CEP <strong className="text-[#0071e3] dark:text-cyan-300 font-mono">{cep}</strong>...
+                        Avaliando peso individual por gabinete, embalagens industriais e tabelas contratuais para o CEP <strong className="text-[#0071e3] dark:text-cyan-300 font-mono">{cep}</strong>...
                       </p>
                     </div>
                   </div>
@@ -1438,6 +1509,11 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                           >
                             {quote.priceCents === 0 ? "Grátis" : formatBRL(quote.priceCents)}
                           </span>
+                          {quote.packageCount && quote.packageCount > 1 && quote.unitPriceCents && quote.priceCents > 0 ? (
+                            <span className="block text-[10px] text-[#0071e3] dark:text-indigo-300 font-bold">
+                              {quote.packageCount}× {formatBRL(quote.unitPriceCents)} / un.
+                            </span>
+                          ) : null}
                           <span className="block text-[10px] text-slate-400 uppercase font-mono">
                             {quote.carrier}
                           </span>
@@ -1526,8 +1602,13 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                 </div>
               )}
               <div className="flex justify-between text-slate-600 dark:text-slate-400 items-center">
-                <span>Frete / Entrega:</span>
-                <span className="font-semibold">
+                <span>
+                  Frete / Entrega
+                  {selectedShippingQuote?.packageCount && selectedShippingQuote.packageCount > 1
+                    ? ` (${selectedShippingQuote.packageCount} volumes)`
+                    : ""}:
+                </span>
+                <span className="font-semibold text-right">
                   {isLoadingShipping ? (
                     <span className="inline-flex items-center gap-1.5 text-xs text-[#0071e3] font-semibold animate-pulse">
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1539,7 +1620,15 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                     ) : (
                       <span className="text-slate-900 dark:text-slate-200">
                         {formatBRL(selectedShippingQuote.priceCents)}{" "}
-                        <span className="text-[10px] text-slate-500 font-normal">({selectedShippingQuote.carrier})</span>
+                        {selectedShippingQuote.packageCount &&
+                        selectedShippingQuote.packageCount > 1 &&
+                        selectedShippingQuote.unitPriceCents ? (
+                          <span className="text-[10px] text-[#0071e3] dark:text-indigo-300 font-bold">
+                            ({selectedShippingQuote.packageCount}× {formatBRL(selectedShippingQuote.unitPriceCents)})
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-500 font-normal">({selectedShippingQuote.carrier})</span>
+                        )}
                       </span>
                     )
                   ) : (
