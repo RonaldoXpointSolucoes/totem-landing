@@ -61,6 +61,8 @@ import {
   Film,
   ClipboardCheck,
   Upload,
+  Sun,
+  Moon,
 } from "lucide-react";
 
 interface OrderItem {
@@ -202,6 +204,26 @@ export default function AdminPage() {
   const [passwordInput, setPasswordInput] = useState("");
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  // Tema do Painel (Escuro / Claro)
+  const [adminTheme, setAdminTheme] = useState<"dark" | "light">("dark");
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("totem_admin_theme");
+      if (saved === "light" || saved === "dark") {
+        setAdminTheme(saved);
+      }
+    } catch {}
+  }, []);
+
+  const toggleAdminTheme = () => {
+    const next = adminTheme === "dark" ? "light" : "dark";
+    setAdminTheme(next);
+    try {
+      localStorage.setItem("totem_admin_theme", next);
+    } catch {}
+  };
 
   // Navegação do painel
   const [activeTab, setActiveTab] = useState<"orders" | "catalog" | "vouchers" | "customers" | "analytics" | "marketing" | "team" | "logs">("orders");
@@ -915,7 +937,7 @@ export default function AdminPage() {
   // Tela de Carregamento inicial da Auth
   if (isAuthenticated === null) {
     return (
-      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4">
+      <div className={`min-h-screen ${adminTheme === "light" ? "admin-light bg-slate-50 text-slate-900" : "bg-slate-950 text-white"} flex items-center justify-center p-4 transition-colors duration-200`}>
         <div className="flex flex-col items-center gap-3">
           <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
           <p className="text-slate-400 text-sm">Validando credenciais do painel...</p>
@@ -927,7 +949,32 @@ export default function AdminPage() {
   // 1. Tela de Login Administrativo
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center px-4 relative overflow-hidden">
+      <div className={`min-h-screen ${adminTheme === "light" ? "admin-light bg-slate-50 text-slate-900" : "bg-slate-950 text-slate-100"} flex flex-col justify-center items-center px-4 relative overflow-hidden transition-colors duration-200`}>
+        {/* Alternador de Tema na tela de login */}
+        <div className="absolute top-6 right-6 z-20">
+          <button
+            onClick={toggleAdminTheme}
+            className={`px-3 py-2 rounded-xl text-xs flex items-center gap-2 transition-all border shadow-sm ${
+              adminTheme === "light"
+                ? "bg-white hover:bg-slate-100 text-slate-700 border-slate-300"
+                : "bg-slate-900/90 hover:bg-slate-800 text-slate-300 border-slate-700/60"
+            }`}
+            title={adminTheme === "light" ? "Alternar para Tema Escuro" : "Alternar para Tema Claro"}
+          >
+            {adminTheme === "light" ? (
+              <>
+                <Moon className="w-3.5 h-3.5 text-indigo-600" />
+                <span className="font-medium">Tema Escuro</span>
+              </>
+            ) : (
+              <>
+                <Sun className="w-3.5 h-3.5 text-amber-400" />
+                <span className="font-medium">Tema Claro</span>
+              </>
+            )}
+          </button>
+        </div>
+
         {/* Glow de fundo */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-indigo-600/15 rounded-full blur-[140px] pointer-events-none" />
 
@@ -1024,7 +1071,7 @@ export default function AdminPage() {
 
   // 2. Painel Administrativo Autenticado
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col antialiased">
+    <div className={`min-h-screen ${adminTheme === "light" ? "admin-light bg-slate-50 text-slate-900" : "bg-slate-950 text-slate-100"} flex flex-col antialiased transition-colors duration-200`}>
       {/* Topo / Header Administrativo */}
       <header className="sticky top-0 z-40 bg-slate-900/90 border-b border-slate-800 backdrop-blur-md px-4 sm:px-8 py-3.5">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1051,6 +1098,29 @@ export default function AdminPage() {
           </div>
 
           <div className="flex items-center gap-2 self-end sm:self-auto">
+            {/* Alternador de Tema Claro / Escuro */}
+            <button
+              onClick={toggleAdminTheme}
+              className={`p-2 rounded-lg text-xs flex items-center gap-1.5 transition-all border ${
+                adminTheme === "light"
+                  ? "bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 border-amber-300"
+                  : "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700/60"
+              }`}
+              title={adminTheme === "light" ? "Alternar para Tema Escuro" : "Alternar para Tema Claro"}
+            >
+              {adminTheme === "light" ? (
+                <>
+                  <Moon className="w-3.5 h-3.5 text-indigo-600" />
+                  <span className="hidden sm:inline font-medium">Tema Escuro</span>
+                </>
+              ) : (
+                <>
+                  <Sun className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="hidden sm:inline font-medium">Tema Claro</span>
+                </>
+              )}
+            </button>
+
             <button
               onClick={() => {
                 loadOrders();

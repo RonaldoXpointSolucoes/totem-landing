@@ -152,3 +152,261 @@ body {
   animation: totemOutgoingPrev 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* ==========================================================================
+   ADMIN LIGHT THEME - SAAS MODERN REFINEMENT
+   ========================================================================== */
+.admin-light {
+  color-scheme: light;
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+/* Backgrounds principais e cartões */
+.admin-light .bg-slate-950,
+.admin-light .bg-slate-950\/90,
+.admin-light .bg-slate-950\/80,
+.admin-light .bg-slate-950\/60,
+.admin-light .bg-slate-950\/40 {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+.admin-light .bg-slate-900,
+.admin-light .bg-slate-900\/95,
+.admin-light .bg-slate-900\/90,
+.admin-light .bg-slate-900\/80,
+.admin-light .bg-slate-900\/70,
+.admin-light .bg-slate-900\/60,
+.admin-light .bg-slate-900\/50,
+.admin-light .bg-slate-900\/40 {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+.admin-light .bg-slate-800,
+.admin-light .bg-slate-800\/90,
+.admin-light .bg-slate-800\/80,
+.admin-light .bg-slate-800\/60,
+.admin-light .bg-slate-800\/50,
+.admin-light .bg-slate-800\/40 {
+  background-color: #f1f5f9 !important;
+  color: #1e293b !important;
+}
+
+/* Hover states */
+.admin-light .hover\:bg-slate-800:hover,
+.admin-light .hover\:bg-slate-800\/60:hover,
+.admin-light .hover\:bg-slate-700:hover {
+  background-color: #e2e8f0 !important;
+}
+
+.admin-light .hover\:bg-slate-900:hover {
+  background-color: #f8fafc !important;
+}
+
+/* Bordas sutis e limpas */
+.admin-light .border-slate-800,
+.admin-light .border-slate-800\/80,
+.admin-light .border-slate-800\/60,
+.admin-light .border-slate-800\/50,
+.admin-light .border-slate-800\/40,
+.admin-light .border-slate-700,
+.admin-light .border-slate-700\/60,
+.admin-light .border-slate-700\/40 {
+  border-color: #e2e8f0 !important;
+}
+
+/* Sombras suaves de cards */
+.admin-light .rounded-3xl.border,
+.admin-light .rounded-2xl.border,
+.admin-light .rounded-xl.border {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+}
+
+/* Tipografia de alto contraste */
+.admin-light .text-white {
+  color: #0f172a !important;
+}
+
+.admin-light .text-slate-100,
+.admin-light .text-slate-200 {
+  color: #1e293b !important;
+}
+
+.admin-light .text-slate-300 {
+  color: #334155 !important;
+}
+
+.admin-light .text-slate-400 {
+  color: #64748b !important;
+}
+
+.admin-light .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+/* Elementos ativos e botões que DEVEM manter o texto branco */
+.admin-light .bg-indigo-600,
+.admin-light .bg-indigo-600 *,
+.admin-light .bg-indigo-700,
+.admin-light .bg-indigo-700 *,
+.admin-light .bg-emerald-600,
+.admin-light .bg-emerald-600 *,
+.admin-light .bg-rose-600,
+.admin-light .bg-rose-600 *,
+.admin-light .bg-blue-600,
+.admin-light .bg-blue-600 *,
+.admin-light button[class*="bg-indigo-600"],
+.admin-light button[class*="bg-indigo-600"] *,
+.admin-light button[class*="from-indigo-600"],
+.admin-light button[class*="from-indigo-600"] *,
+.admin-light [class*="bg-gradient-to-tr"] svg,
+.admin-light [class*="bg-gradient-to-r"] svg,
+.admin-light [class*="bg-gradient-to-tr"] span,
+.admin-light [class*="bg-gradient-to-r"] span {
+  color: #ffffff !important;
+}
+
+/* Formulários: Inputs, Textareas e Selects */
+.admin-light input,
+.admin-light textarea,
+.admin-light select {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+.admin-light input::placeholder,
+.admin-light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+.admin-light input:focus,
+.admin-light textarea:focus,
+.admin-light select:focus {
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
+}
+
+/* Cabeçalho administrativo e barra de abas */
+.admin-light header {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-bottom-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+}
+
+.admin-light .border-b.bg-slate-900\/40 {
+  background-color: rgba(248, 250, 252, 0.9) !important;
+  border-bottom-color: #e2e8f0 !important;
+}
+
+/* Abas inativas */
+.admin-light button.text-slate-400:not([class*="bg-indigo"]) {
+  color: #475569 !important;
+}
+.admin-light button.text-slate-400:not([class*="bg-indigo"]):hover {
+  color: #0f172a !important;
+  background-color: #e2e8f0 !important;
+}
+
+/* Tabelas */
+.admin-light thead,
+.admin-light thead tr,
+.admin-light thead th {
+  background-color: #f1f5f9 !important;
+  color: #475569 !important;
+  border-bottom-color: #e2e8f0 !important;
+}
+
+.admin-light tbody tr {
+  border-bottom-color: #f1f5f9 !important;
+}
+
+.admin-light tbody tr:hover {
+  background-color: #f8fafc !important;
+}
+
+/* Badges e Pílulas */
+.admin-light .bg-emerald-500\/10,
+.admin-light .bg-emerald-500\/15,
+.admin-light .bg-emerald-500\/20 {
+  background-color: #ecfdf5 !important;
+  color: #047857 !important;
+  border-color: #a7f3d0 !important;
+}
+.admin-light .text-emerald-400 {
+  color: #059669 !important;
+}
+
+.admin-light .bg-indigo-500\/10,
+.admin-light .bg-indigo-500\/15,
+.admin-light .bg-indigo-500\/20 {
+  background-color: #eef2ff !important;
+  color: #4338ca !important;
+  border-color: #c7d2fe !important;
+}
+.admin-light .text-indigo-400 {
+  color: #4f46e5 !important;
+}
+
+.admin-light .bg-amber-500\/10,
+.admin-light .bg-amber-500\/15,
+.admin-light .bg-amber-500\/20 {
+  background-color: #fffbeb !important;
+  color: #b45309 !important;
+  border-color: #fde68a !important;
+}
+.admin-light .text-amber-400 {
+  color: #d97706 !important;
+}
+
+.admin-light .bg-rose-500\/10,
+.admin-light .bg-rose-500\/15,
+.admin-light .bg-rose-500\/20 {
+  background-color: #fff1f2 !important;
+  color: #be123c !important;
+  border-color: #fecdd3 !important;
+}
+.admin-light .text-rose-400 {
+  color: #e11d48 !important;
+}
+
+.admin-light .bg-cyan-500\/10,
+.admin-light .bg-cyan-500\/20 {
+  background-color: #ecfeff !important;
+  color: #0e7490 !important;
+  border-color: #a5f3fc !important;
+}
+.admin-light .text-cyan-400 {
+  color: #0891b2 !important;
+}
+
+.admin-light .bg-blue-500\/10,
+.admin-light .bg-blue-500\/20 {
+  background-color: #eff6ff !important;
+  color: #1d4ed8 !important;
+  border-color: #bfdbfe !important;
+}
+.admin-light .text-blue-400 {
+  color: #2563eb !important;
+}
+
+/* Modais e Overlays */
+.admin-light .fixed.inset-0.bg-slate-950\/80,
+.admin-light .fixed.inset-0.bg-black\/60 {
+  background-color: rgba(15, 23, 42, 0.45) !important;
+}
+
+.admin-light .fixed .bg-slate-900,
+.admin-light .fixed .bg-slate-950 {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Terminal de logs / JSON inspection em light mode */
+.admin-light pre.bg-slate-950 {
+  background-color: #0f172a !important;
+  color: #34d399 !important;
+}
+
