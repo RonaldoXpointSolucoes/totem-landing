@@ -174,11 +174,13 @@ body {
 .admin-light .bg-slate-900,
 .admin-light .bg-slate-900\/95,
 .admin-light .bg-slate-900\/90,
+.admin-light .bg-slate-900\/85,
 .admin-light .bg-slate-900\/80,
 .admin-light .bg-slate-900\/70,
 .admin-light .bg-slate-900\/60,
 .admin-light .bg-slate-900\/50,
-.admin-light .bg-slate-900\/40 {
+.admin-light .bg-slate-900\/40,
+.admin-light [class*="bg-slate-900"] {
   background-color: #ffffff !important;
   color: #0f172a !important;
 }
