@@ -262,10 +262,12 @@ body {
 .admin-light button[class*="bg-indigo-600"] *,
 .admin-light button[class*="from-indigo-600"],
 .admin-light button[class*="from-indigo-600"] *,
-.admin-light [class*="bg-gradient-to-tr"] svg,
-.admin-light [class*="bg-gradient-to-r"] svg,
-.admin-light [class*="bg-gradient-to-tr"] span,
-.admin-light [class*="bg-gradient-to-r"] span {
+.admin-light button[class*="bg-gradient-to-tr"] svg,
+.admin-light button[class*="bg-gradient-to-r"] svg,
+.admin-light button[class*="bg-gradient-to-tr"] span,
+.admin-light button[class*="bg-gradient-to-r"] span,
+.admin-light a[class*="bg-gradient-to-tr"] span,
+.admin-light a[class*="bg-gradient-to-r"] span {
   color: #ffffff !important;
 }
 
@@ -328,73 +330,232 @@ body {
   background-color: #f8fafc !important;
 }
 
-/* Badges e Pílulas */
+/* Badges, Pílulas e Caixas Periféricas (Monitor, Impressora, Leitor, Customizações) */
 .admin-light .bg-emerald-500\/10,
 .admin-light .bg-emerald-500\/15,
-.admin-light .bg-emerald-500\/20 {
+.admin-light .bg-emerald-500\/20,
+.admin-light [class*="bg-emerald-950"] {
   background-color: #ecfdf5 !important;
   color: #047857 !important;
   border-color: #a7f3d0 !important;
 }
+.admin-light [class*="bg-emerald-950"] p,
+.admin-light [class*="bg-emerald-950"] strong {
+  color: #0f172a !important;
+}
+.admin-light .text-emerald-300,
 .admin-light .text-emerald-400 {
-  color: #059669 !important;
+  color: #047857 !important;
 }
 
 .admin-light .bg-indigo-500\/10,
 .admin-light .bg-indigo-500\/15,
-.admin-light .bg-indigo-500\/20 {
+.admin-light .bg-indigo-500\/20,
+.admin-light [class*="bg-indigo-950"] {
   background-color: #eef2ff !important;
   color: #4338ca !important;
   border-color: #c7d2fe !important;
 }
+.admin-light [class*="bg-indigo-950"] p,
+.admin-light [class*="bg-indigo-950"] strong {
+  color: #0f172a !important;
+}
+.admin-light .text-indigo-300,
 .admin-light .text-indigo-400 {
-  color: #4f46e5 !important;
+  color: #4338ca !important;
 }
 
 .admin-light .bg-amber-500\/10,
 .admin-light .bg-amber-500\/15,
-.admin-light .bg-amber-500\/20 {
+.admin-light .bg-amber-500\/20,
+.admin-light [class*="bg-amber-950"] {
   background-color: #fffbeb !important;
   color: #b45309 !important;
   border-color: #fde68a !important;
 }
+.admin-light [class*="bg-amber-950"] p,
+.admin-light [class*="bg-amber-950"] strong {
+  color: #0f172a !important;
+}
+.admin-light .text-amber-200,
+.admin-light .text-amber-300,
 .admin-light .text-amber-400 {
-  color: #d97706 !important;
+  color: #b45309 !important;
 }
 
 .admin-light .bg-rose-500\/10,
 .admin-light .bg-rose-500\/15,
-.admin-light .bg-rose-500\/20 {
+.admin-light .bg-rose-500\/20,
+.admin-light [class*="bg-rose-950"] {
   background-color: #fff1f2 !important;
   color: #be123c !important;
   border-color: #fecdd3 !important;
 }
+.admin-light [class*="bg-rose-950"] p,
+.admin-light [class*="bg-rose-950"] strong {
+  color: #0f172a !important;
+}
+.admin-light .text-rose-300,
 .admin-light .text-rose-400 {
-  color: #e11d48 !important;
+  color: #be123c !important;
 }
 
 .admin-light .bg-cyan-500\/10,
-.admin-light .bg-cyan-500\/20 {
+.admin-light .bg-cyan-500\/15,
+.admin-light .bg-cyan-500\/20,
+.admin-light [class*="bg-cyan-950"] {
   background-color: #ecfeff !important;
   color: #0e7490 !important;
   border-color: #a5f3fc !important;
 }
+.admin-light [class*="bg-cyan-950"] p,
+.admin-light [class*="bg-cyan-950"] strong {
+  color: #0f172a !important;
+}
+.admin-light .text-cyan-300,
 .admin-light .text-cyan-400 {
-  color: #0891b2 !important;
+  color: #0e7490 !important;
+}
+
+.admin-light .bg-purple-500\/10,
+.admin-light .bg-purple-500\/15,
+.admin-light .bg-purple-500\/20,
+.admin-light [class*="bg-purple-950"] {
+  background-color: #faf5ff !important;
+  color: #7e22ce !important;
+  border-color: #e9d5ff !important;
+}
+.admin-light [class*="bg-purple-950"] p,
+.admin-light [class*="bg-purple-950"] strong {
+  color: #0f172a !important;
+}
+.admin-light .text-purple-300,
+.admin-light .text-purple-400 {
+  color: #7e22ce !important;
 }
 
 .admin-light .bg-blue-500\/10,
-.admin-light .bg-blue-500\/20 {
+.admin-light .bg-blue-500\/15,
+.admin-light .bg-blue-500\/20,
+.admin-light [class*="bg-blue-950"] {
   background-color: #eff6ff !important;
   color: #1d4ed8 !important;
   border-color: #bfdbfe !important;
 }
+.admin-light .text-blue-300,
 .admin-light .text-blue-400 {
-  color: #2563eb !important;
+  color: #1d4ed8 !important;
+}
+
+/* Botões Secundários e Botões Escuros convertidos para Light SaaS */
+.admin-light button[class*="bg-slate-800"],
+.admin-light button[class*="bg-slate-900"],
+.admin-light [role="button"][class*="bg-slate-800"],
+.admin-light [role="button"][class*="bg-slate-900"] {
+  background-color: #f1f5f9 !important;
+  color: #1e293b !important;
+  border-color: #cbd5e1 !important;
+}
+.admin-light button[class*="bg-slate-800"]:hover,
+.admin-light button[class*="bg-slate-900"]:hover,
+.admin-light [role="button"][class*="bg-slate-800"]:hover,
+.admin-light [role="button"][class*="bg-slate-900"]:hover {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+  border-color: #94a3b8 !important;
+}
+.admin-light button[class*="bg-slate-800"] svg,
+.admin-light button[class*="bg-slate-900"] svg {
+  color: #475569 !important;
+}
+.admin-light button[class*="bg-slate-800"]:hover svg,
+.admin-light button[class*="bg-slate-900"]:hover svg {
+  color: #0f172a !important;
+}
+
+/* Botões de Ação Especiais (Ordem de Execução, Editar, Excluir) */
+.admin-light button[class*="bg-emerald-500"],
+.admin-light [role="button"][class*="bg-emerald-500"] {
+  background-color: #ecfdf5 !important;
+  color: #047857 !important;
+  border-color: #a7f3d0 !important;
+}
+.admin-light button[class*="bg-emerald-500"]:hover,
+.admin-light [role="button"][class*="bg-emerald-500"]:hover {
+  background-color: #d1fae5 !important;
+  color: #065f46 !important;
+  border-color: #6ee7b7 !important;
+}
+.admin-light button[class*="bg-emerald-500"] *,
+.admin-light [role="button"][class*="bg-emerald-500"] * {
+  color: #047857 !important;
+}
+
+.admin-light button[class*="bg-amber-500"],
+.admin-light [role="button"][class*="bg-amber-500"] {
+  background-color: #fffbeb !important;
+  color: #b45309 !important;
+  border-color: #fde68a !important;
+}
+.admin-light button[class*="bg-amber-500"]:hover,
+.admin-light [role="button"][class*="bg-amber-500"]:hover {
+  background-color: #fef3c7 !important;
+  color: #92400e !important;
+  border-color: #fcd34d !important;
+}
+.admin-light button[class*="bg-amber-500"] *,
+.admin-light [role="button"][class*="bg-amber-500"] * {
+  color: #b45309 !important;
+}
+
+.admin-light button[class*="bg-rose-500"],
+.admin-light [role="button"][class*="bg-rose-500"] {
+  background-color: #fff1f2 !important;
+  color: #be123c !important;
+  border-color: #fecdd3 !important;
+}
+.admin-light button[class*="bg-rose-500"]:hover,
+.admin-light [role="button"][class*="bg-rose-500"]:hover {
+  background-color: #ffe4e6 !important;
+  color: #9f1239 !important;
+  border-color: #fda4af !important;
+}
+.admin-light button[class*="bg-rose-500"] *,
+.admin-light [role="button"][class*="bg-rose-500"] * {
+  color: #be123c !important;
+}
+
+/* Badges de Contagem e Tags em Light Mode */
+.admin-light span[class*="bg-slate-950"] {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Dropdowns / Select Options */
+.admin-light select,
+.admin-light select.bg-slate-950 {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+.admin-light select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* Caixas de Alerta e Detalhes Especiais (Ex: Medidas CNC) */
+.admin-light div.bg-black\/50,
+.admin-light div[class*="bg-black/50"] {
+  background-color: #fffbeb !important;
+  border-color: #fde68a !important;
+  color: #78350f !important;
 }
 
 /* Modais e Overlays */
 .admin-light .fixed.inset-0.bg-slate-950\/80,
+.admin-light .fixed.inset-0.bg-black\/85,
+.admin-light .fixed.inset-0.bg-black\/80,
 .admin-light .fixed.inset-0.bg-black\/60 {
   background-color: rgba(15, 23, 42, 0.45) !important;
 }
