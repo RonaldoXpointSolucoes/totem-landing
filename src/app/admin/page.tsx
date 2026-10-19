@@ -38,6 +38,10 @@ import {
   ArrowRight,
   Lock,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  List,
+  Maximize2,
   Database,
   ExternalLink,
   BarChart3,
@@ -234,6 +238,39 @@ export default function AdminPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
+
+  // Modo de Exibição de Pedidos: "simplified" (lista compacta executiva) ou "detailed" (visão 3 colunas completa)
+  const [ordersViewMode, setOrdersViewMode] = useState<"simplified" | "detailed">("simplified");
+  // Conjunto de IDs de pedidos expandidos individualmente na lista simplificada
+  const [expandedOrderIds, setExpandedOrderIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    try {
+      const savedMode = localStorage.getItem("totem_admin_orders_view_mode");
+      if (savedMode === "simplified" || savedMode === "detailed") {
+        setOrdersViewMode(savedMode);
+      }
+    } catch {}
+  }, []);
+
+  const toggleOrdersViewMode = (mode: "simplified" | "detailed") => {
+    setOrdersViewMode(mode);
+    try {
+      localStorage.setItem("totem_admin_orders_view_mode", mode);
+    } catch {}
+  };
+
+  const toggleOrderExpanded = (orderId: string) => {
+    setExpandedOrderIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderId)) {
+        next.delete(orderId);
+      } else {
+        next.add(orderId);
+      }
+      return next;
+    });
+  };
 
   // Analytics de Funil
   const [funnelData, setFunnelData] = useState<any>(null);
@@ -1286,10 +1323,10 @@ export default function AdminPage() {
         {/* ======================================================== */}
         {activeTab === "orders" && (
           <div className="space-y-5">
-            {/* Barra de Filtros e Busca */}
-            <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+            {/* Barra de Filtros, Busca e Modo de Visualização */}
+            <div className="flex flex-col xl:flex-row gap-3 items-stretch xl:items-center justify-between">
               {/* Filtros por Status */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-2 md:pb-0 scrollbar-none">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-2 xl:pb-0 scrollbar-none">
                 <button
                   onClick={() => {
                     setStatusFilter("all");
@@ -1321,16 +1358,48 @@ export default function AdminPage() {
                 ))}
               </div>
 
-              {/* Campo de Busca */}
-              <div className="relative min-w-[260px]">
-                <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Buscar pedido, cliente, CPF/CNPJ..."
-                  className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                />
+              <div className="flex flex-wrap items-center gap-2.5">
+                {/* Alternador de Modo de Visualização: Simplificada vs Detalhada */}
+                <div className="inline-flex items-center p-1 bg-slate-900 border border-slate-800 rounded-xl shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => toggleOrdersViewMode("simplified")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                      ordersViewMode === "simplified"
+                        ? "bg-indigo-600 text-white shadow-sm"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                    title="Visualização em lista simplificada e ágil"
+                  >
+                    <List className="w-3.5 h-3.5" />
+                    <span>Lista Simplificada</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleOrdersViewMode("detailed")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                      ordersViewMode === "detailed"
+                        ? "bg-indigo-600 text-white shadow-sm"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                    title="Visualização completa com todas as 3 colunas de produção abertas"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5" />
+                    <span>Visão Detalhada</span>
+                  </button>
+                </div>
+
+                {/* Campo de Busca */}
+                <div className="relative min-w-[240px] flex-1 sm:flex-none">
+                  <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Buscar pedido, cliente, CPF/CNPJ..."
+                    className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
               </div>
             </div>
 
@@ -1371,77 +1440,261 @@ export default function AdminPage() {
                     Boolean(addr?.executionOrder?.priority === "urgent") ||
                     (order.items || []).some((it, idx) => getItemAlertInfo(order, it, sheets[idx], idx).hasDeviation);
 
+                  const isExpanded = ordersViewMode === "detailed" || expandedOrderIds.has(order.$id);
+                  const firstItem = order.items?.[0];
+                  const firstSheet = sheets[0] || null;
+                  const firstItemThumb = firstItem ? getItemCabinetImage(firstItem, firstSheet) : "";
+                  const totalItemsQty = (order.items || []).reduce((acc, curr) => acc + (curr.quantity || 1), 0) || 1;
+
                   return (
                     <div
                       key={order.$id}
-                      className={`bg-slate-900/85 border rounded-3xl p-4 sm:p-6 transition-all shadow-xl space-y-4 ${
+                      className={`bg-slate-900/85 border transition-all shadow-xl ${
+                        isExpanded ? "rounded-3xl p-4 sm:p-6 space-y-4" : "rounded-2xl p-4 sm:p-5 hover:border-indigo-500/50"
+                      } ${
                         orderHasAnyDeviation
                           ? "border-amber-400/70 hover:border-amber-400 shadow-amber-500/10"
-                          : "border-slate-800 hover:border-indigo-500/40"
+                          : "border-slate-800"
                       }`}
                     >
-                      {/* Topo do Card: Número do Pedido, Status, Pagamento, Método de Entrega e Ações (Editar / Excluir / Ver) */}
-                      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 pb-3.5 border-b border-slate-800/80">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-extrabold text-white text-base sm:text-lg font-mono tracking-tight">
-                            {order.order_number}
-                          </span>
-                          <span
-                            className={`px-2.5 py-1 rounded-full text-[11px] font-bold border flex items-center gap-1.5 ${statusInfo.color}`}
-                          >
-                            <StatusIcon className="w-3.5 h-3.5" />
-                            <span>{statusInfo.label}</span>
-                          </span>
+                      {!isExpanded ? (
+                        /* ======================================================== */
+                        /* MODO: LISTA SIMPLIFICADA (RESUMO EXECUTIVO ÁGIL)        */
+                        /* ======================================================== */
+                        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+                          {/* Bloco 1: Pedido, Status, Pagamento e Data */}
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
+                              <Package className="w-5 h-5" />
+                            </div>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-extrabold text-white text-base font-mono tracking-tight">
+                                  {order.order_number}
+                                </span>
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border flex items-center gap-1 ${statusInfo.color}`}>
+                                  <StatusIcon className="w-3 h-3" />
+                                  <span>{statusInfo.label}</span>
+                                </span>
+                                {orderHasAnyDeviation && (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-400 flex items-center gap-1 animate-pulse">
+                                    <AlertTriangle className="w-3 h-3" />
+                                    <span>Atenção Fábrica</span>
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
+                                <span>{new Date(order.$createdAt).toLocaleString("pt-BR")}</span>
+                                <span>•</span>
+                                <span className="text-slate-300 font-bold">{payMethod === "credit_card" ? "Cartão de Crédito" : "Pix à Vista"}</span>
+                                <span>•</span>
+                                <span className="text-cyan-400">{shipping.name}</span>
+                              </div>
+                            </div>
+                          </div>
 
-                          {/* Badge Forma de Pagamento */}
-                          <span
-                            className={`px-2.5 py-1 rounded-full text-[11px] font-extrabold border flex items-center gap-1.5 ${
-                              payMethod === "credit_card"
-                                ? "bg-indigo-500/15 text-indigo-300 border-indigo-500/30"
-                                : "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-                            }`}
-                          >
-                            {payMethod === "credit_card" ? (
-                              <CreditCard className="w-3.5 h-3.5" />
-                            ) : (
-                              <QrCode className="w-3.5 h-3.5" />
+                          {/* Bloco 2: Cliente */}
+                          <div className="flex items-center gap-3 xl:border-l xl:border-slate-800/80 xl:pl-4 shrink-0 min-w-[190px]">
+                            <div className="space-y-0.5 text-xs">
+                              <p className="font-bold text-white text-sm truncate max-w-[200px]">
+                                {order.customer_name || "Cliente não informado"}
+                              </p>
+                              <p className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
+                                <span>{order.customer_document || "—"}</span>
+                                {addr?.city && (
+                                  <span className="text-slate-500">
+                                    • {addr.city}/{addr.state}
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                            {waHref && (
+                              <a
+                                href={waHref}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition-colors shrink-0"
+                                title="Falar com o cliente no WhatsApp"
+                              >
+                                <MessageCircle className="w-4 h-4" />
+                              </a>
                             )}
-                            <span>{payMethod === "credit_card" ? "CARTÃO DE CRÉDITO" : "PIX À VISTA"}</span>
-                          </span>
+                          </div>
 
-                          {/* Badge Método de Entrega */}
-                          <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 flex items-center gap-1.5">
-                            <Truck className="w-3.5 h-3.5" />
-                            <span>
-                              {shipping.name}{" "}
-                              {order.shipping_cents > 0 ? `(${formatBRL(order.shipping_cents)})` : "(Isento)"}
+                          {/* Bloco 3: Totens e Equipamentos */}
+                          <div className="flex items-center gap-3 xl:border-l xl:border-slate-800/80 xl:pl-4 flex-1 min-w-[200px]">
+                            {firstItemThumb && (
+                              <div className="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center p-0.5 shrink-0">
+                                <img src={firstItemThumb} alt="Totem" className="w-full h-full object-contain" />
+                              </div>
+                            )}
+                            <div className="text-xs space-y-0.5">
+                              <p className="font-extrabold text-slate-200">
+                                {totalItemsQty} {totalItemsQty > 1 ? "gabinetes" : "gabinete"}{" "}
+                                <span className="font-normal text-slate-400">
+                                  ({order.items?.map((it) => it.cabinet_name).join(", ") || "Configuração Padrão"})
+                                </span>
+                              </p>
+                              <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
+                                {firstItem?.color_name && (
+                                  <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                                    {firstItem.color_name}
+                                  </span>
+                                )}
+                                {firstItem?.monitor_name && (
+                                  <span className="px-1.5 py-0.5 rounded bg-cyan-950/40 text-cyan-300 border border-cyan-800/30">
+                                    Monitor: {firstItem.monitor_name}
+                                  </span>
+                                )}
+                                {firstItem?.printer_name && (
+                                  <span className="px-1.5 py-0.5 rounded bg-indigo-950/40 text-indigo-300 border border-indigo-800/30">
+                                    Impressora: {firstItem.printer_name}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Bloco 4: Financeiro */}
+                          <div className="xl:border-l xl:border-slate-800/80 xl:pl-4 text-left xl:text-right shrink-0 min-w-[130px]">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                              Total do Pedido
                             </span>
-                          </span>
-
-                          {/* Badge Ordem de Execução Ativa */}
-                          {hasExecOrder && (
-                            <span className="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-400/50 flex items-center gap-1.5">
-                              <ClipboardCheck className="w-3.5 h-3.5 text-indigo-300" />
-                              <span>
-                                O.S. Técnica ({addr?.executionOrder?.attachments?.length || 0} mídia/s)
-                              </span>
+                            <span className="text-base sm:text-lg font-black text-emerald-400 font-mono block">
+                              {formatBRL(order.total_cents)}
                             </span>
-                          )}
-
-                          {/* Badge Alerta Fora do Padrão / Observação no Topo */}
-                          {orderHasAnyDeviation && (
-                            <span className="px-2.5 py-1 rounded-full text-[11px] font-black bg-amber-500/20 text-amber-300 border-2 border-amber-400 flex items-center gap-1.5 animate-pulse">
-                              <AlertTriangle className="w-3.5 h-3.5 text-amber-300" />
-                              <span>ATENÇÃO: FORA DO PADRÃO / OBSERVAÇÃO</span>
+                            <span className="text-[10px] text-slate-500 block">
+                              Frete: {order.shipping_cents > 0 ? formatBRL(order.shipping_cents) : "Isento"}
                             </span>
-                          )}
+                          </div>
 
-                          <span className="text-xs text-slate-500 font-mono">
-                            {new Date(order.$createdAt).toLocaleString("pt-BR")}
-                          </span>
+                          {/* Bloco 5: Botões de Ação com 'Ver em Detalhes' */}
+                          <div className="flex items-center gap-2 flex-wrap shrink-0 xl:border-l xl:border-slate-800/80 xl:pl-4">
+                            {/* Botão de Ver em Detalhes */}
+                            <button
+                              type="button"
+                              onClick={() => toggleOrderExpanded(order.$id)}
+                              className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-600/25 transition-all cursor-pointer shrink-0"
+                              title="Ver dados completos deste pedido em 3 colunas"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Ver em Detalhes</span>
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Seletor rápido de Status */}
+                            <select
+                              value={order.status}
+                              onChange={(e) => handleUpdateOrderStatus(order.$id, e.target.value)}
+                              className="bg-slate-950 border border-slate-800 text-xs rounded-xl px-2.5 py-2 text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer shrink-0"
+                            >
+                              {Object.entries(STATUS_CONFIG).map(([k, cfg]) => (
+                                <option key={k} value={k}>
+                                  Mudar: {cfg.label}
+                                </option>
+                              ))}
+                            </select>
+
+                            {/* Botão Editar Pedido */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditOrder(order, "all")}
+                              className="p-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 border border-amber-500/30 transition-all cursor-pointer shrink-0"
+                              title="Editar dados deste pedido"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Botão Excluir Pedido */}
+                            <button
+                              type="button"
+                              onClick={() => setDeletingOrder(order)}
+                              className="p-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 active:scale-95 text-rose-400 border border-rose-500/30 transition-all cursor-pointer shrink-0"
+                              title="Excluir este pedido permanentemente"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
+                      ) : (
+                        /* ======================================================== */
+                        /* MODO: VISÃO DETALHADA COMPLETA (3 COLUNAS DE FÁBRICA)   */
+                        /* ======================================================== */
+                        <>
+                          {/* Topo do Card: Número do Pedido, Status, Pagamento, Método de Entrega e Ações */}
+                          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 pb-3.5 border-b border-slate-800/80">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-extrabold text-white text-base sm:text-lg font-mono tracking-tight">
+                                {order.order_number}
+                              </span>
+                              <span
+                                className={`px-2.5 py-1 rounded-full text-[11px] font-bold border flex items-center gap-1.5 ${statusInfo.color}`}
+                              >
+                                <StatusIcon className="w-3.5 h-3.5" />
+                                <span>{statusInfo.label}</span>
+                              </span>
 
-                        <div className="flex flex-wrap items-center gap-2">
+                              {/* Badge Forma de Pagamento */}
+                              <span
+                                className={`px-2.5 py-1 rounded-full text-[11px] font-extrabold border flex items-center gap-1.5 ${
+                                  payMethod === "credit_card"
+                                    ? "bg-indigo-500/15 text-indigo-300 border-indigo-500/30"
+                                    : "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                                }`}
+                              >
+                                {payMethod === "credit_card" ? (
+                                  <CreditCard className="w-3.5 h-3.5" />
+                                ) : (
+                                  <QrCode className="w-3.5 h-3.5" />
+                                )}
+                                <span>{payMethod === "credit_card" ? "CARTÃO DE CRÉDITO" : "PIX À VISTA"}</span>
+                              </span>
+
+                              {/* Badge Método de Entrega */}
+                              <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 flex items-center gap-1.5">
+                                <Truck className="w-3.5 h-3.5" />
+                                <span>
+                                  {shipping.name}{" "}
+                                  {order.shipping_cents > 0 ? `(${formatBRL(order.shipping_cents)})` : "(Isento)"}
+                                </span>
+                              </span>
+
+                              {/* Badge Ordem de Execução Ativa */}
+                              {hasExecOrder && (
+                                <span className="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-400/50 flex items-center gap-1.5">
+                                  <ClipboardCheck className="w-3.5 h-3.5 text-indigo-300" />
+                                  <span>
+                                    O.S. Técnica ({addr?.executionOrder?.attachments?.length || 0} mídia/s)
+                                  </span>
+                                </span>
+                              )}
+
+                              {/* Badge Alerta Fora do Padrão / Observação no Topo */}
+                              {orderHasAnyDeviation && (
+                                <span className="px-2.5 py-1 rounded-full text-[11px] font-black bg-amber-500/20 text-amber-300 border-2 border-amber-400 flex items-center gap-1.5 animate-pulse">
+                                  <AlertTriangle className="w-3.5 h-3.5 text-amber-300" />
+                                  <span>ATENÇÃO: FORA DO PADRÃO / OBSERVAÇÃO</span>
+                                </span>
+                              )}
+
+                              <span className="text-xs text-slate-500 font-mono">
+                                {new Date(order.$createdAt).toLocaleString("pt-BR")}
+                              </span>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2">
+                              {/* Botão Recolher Detalhes (quando aberto em modo simplificado) */}
+                              {ordersViewMode === "simplified" && (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleOrderExpanded(order.$id)}
+                                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white border border-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+                                  title="Recolher para lista simplificada"
+                                >
+                                  <ChevronUp className="w-3.5 h-3.5" />
+                                  <span>Recolher Detalhes</span>
+                                </button>
+                              )}
                           {/* Seletor rápido de Status */}
                           <select
                             value={order.status}
@@ -1927,8 +2180,10 @@ export default function AdminPage() {
                           </div>
                         </div>
                       </div>
-                    </div>
-                  );
+                    </>
+                  )}
+                </div>
+              );
                 })}
               </div>
             )}
