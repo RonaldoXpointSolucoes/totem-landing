@@ -3,15 +3,35 @@
     "id": "cust_1791759900248_3piy",
     "name": "Ronaldo Clemente",
     "email": "ronaldo.xpointsolucoes@gmail.com",
-    "whatsapp": "",
-    "whatsappFormatted": "",
+    "whatsapp": "11988887777",
+    "whatsappFormatted": "(11) 98888-7777",
     "personType": "individual",
-    "addresses": [],
+    "addresses": [
+      {
+        "cep": "06763-040",
+        "street": "Rua do Comércio",
+        "number": "100",
+        "complement": "Sala 01",
+        "neighborhood": "Parque Monte Alegre",
+        "city": "Taboão da Serra",
+        "state": "SP"
+      }
+    ],
     "createdAt": "2026-10-11T23:05:00.248Z",
     "lastLoginAt": "2026-10-11T23:05:00.248Z",
     "loginMethod": "google",
     "totalOrdersCount": 0,
-    "totalSpentCents": 0
+    "totalSpentCents": 0,
+    "document": "123.456.789-00",
+    "defaultAddress": {
+      "cep": "06763-040",
+      "street": "Rua do Comércio",
+      "number": "100",
+      "complement": "Sala 01",
+      "neighborhood": "Parque Monte Alegre",
+      "city": "Taboão da Serra",
+      "state": "SP"
+    }
   },
   {
     "id": "cust_1791759891542_c38o",

@@ -31,6 +31,12 @@ import {
   ExternalLink,
   Tag,
   Zap,
+  UserCheck,
+  ChevronDown,
+  ChevronUp,
+  Plus,
+  Edit3,
+  Save,
 } from "lucide-react";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 
@@ -120,6 +126,13 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   const [state, setState] = useState("");
   const [isLoadingCep, setIsLoadingCep] = useState(false);
   const [cepSuccess, setCepSuccess] = useState(false);
+
+  // Estados do Cliente Autenticado & Auto-Preenchimento Inteligente
+  const [loggedCustomer, setLoggedCustomer] = useState<any | null>(null);
+  const [isAutoFilled, setIsAutoFilled] = useState(false);
+  const [saveToProfile, setSaveToProfile] = useState(true);
+  const [showAddressPicker, setShowAddressPicker] = useState(false);
+  const [selectedAddressIndex, setSelectedAddressIndex] = useState<number | null>(null);
 
   // Estados Pix
   const [copied, setCopied] = useState(false);
@@ -466,22 +479,173 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     }
   };
 
-  // Pré-carrega o CEP e a transportadora previamente calculados no carrinho
+  // Carrega a sessão do cliente para auto-preenchimento instantâneo
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const savedCep = sessionStorage.getItem("totem_shipping_cep");
-    if (savedCep && savedCep.replace(/\D/g, "").length === 8 && !cep) {
-      const clean = savedCep.replace(/\D/g, "");
-      const formatted = `${clean.slice(0, 5)}-${clean.slice(5)}`;
-      setCep(formatted);
-      lookupCep(clean);
+    let isCancelled = false;
 
-      const savedOptionId = sessionStorage.getItem("totem_shipping_option_id");
-      if (savedOptionId) {
-        setSelectedShippingId(savedOptionId as any);
+    async function loadCustomerSessionAndProfile() {
+      try {
+        const res = await fetch("/api/auth/customer/session");
+        const data = await res.json();
+
+        if (!isCancelled && data.ok && data.authenticated && data.customer) {
+          const cust = data.customer;
+          setLoggedCustomer(cust);
+
+          // Auto-preenche dados do comprador
+          if (cust.name) setName(cust.name);
+          if (cust.email) setEmail(cust.email);
+          if (cust.whatsapp) setWhatsapp(cust.whatsappFormatted || maskPhone(cust.whatsapp));
+          if (cust.document) {
+            setDocument(cust.personType === "company" ? maskCNPJ(cust.document) : maskCPF(cust.document));
+          }
+          if (cust.personType) setPersonType(cust.personType);
+
+          // Auto-preenche endereço principal se cadastrado
+          const defaultAddr =
+            cust.defaultAddress ||
+            (cust.addresses && cust.addresses.length > 0 ? cust.addresses[0] : null);
+
+          if (defaultAddr && defaultAddr.cep) {
+            const cleanCep = defaultAddr.cep.replace(/\D/g, "");
+            setCep(maskCEP(defaultAddr.cep));
+            setStreet(defaultAddr.street || "");
+            setNumber(defaultAddr.number || "");
+            setComplement(defaultAddr.complement || "");
+            setNeighborhood(defaultAddr.neighborhood || "");
+            setCity(defaultAddr.city || "");
+            setState(defaultAddr.state || "");
+            setCepSuccess(true);
+            setSelectedAddressIndex(0);
+
+            // Dispara cotação automática imediata de frete
+            if (cleanCep.length === 8) {
+              lookupCep(cleanCep);
+            }
+          }
+
+          setIsAutoFilled(true);
+          return;
+        }
+      } catch (err) {
+        console.warn("Aviso ao carregar sessão no checkout:", err);
+      }
+
+      // Fallback: se não estiver autenticado ou não tiver endereço, recupera do localStorage
+      try {
+        const cached = localStorage.getItem("totem_saved_buyer_profile");
+        if (cached) {
+          const profile = JSON.parse(cached);
+          if (profile.name) setName(profile.name);
+          if (profile.email) setEmail(profile.email);
+          if (profile.whatsapp) setWhatsapp(profile.whatsapp);
+          if (profile.document) setDocument(profile.document);
+          if (profile.personType) setPersonType(profile.personType);
+
+          if (profile.address && profile.address.cep) {
+            const cleanCep = profile.address.cep.replace(/\D/g, "");
+            setCep(maskCEP(profile.address.cep));
+            setStreet(profile.address.street || "");
+            setNumber(profile.address.number || "");
+            setComplement(profile.address.complement || "");
+            setNeighborhood(profile.address.neighborhood || "");
+            setCity(profile.address.city || "");
+            setState(profile.address.state || "");
+            setCepSuccess(true);
+
+            if (cleanCep.length === 8) {
+              lookupCep(cleanCep);
+            }
+          }
+        }
+      } catch {}
+
+      // Complemento com CEP pré-calculado no carrinho caso ainda esteja vazio
+      const savedCep = sessionStorage.getItem("totem_shipping_cep");
+      if (savedCep && savedCep.replace(/\D/g, "").length === 8) {
+        const clean = savedCep.replace(/\D/g, "");
+        const formatted = `${clean.slice(0, 5)}-${clean.slice(5)}`;
+        setCep((prev) => prev || formatted);
+        lookupCep(clean);
+
+        const savedOptionId = sessionStorage.getItem("totem_shipping_option_id");
+        if (savedOptionId) {
+          setSelectedShippingId(savedOptionId as any);
+        }
       }
     }
+
+    loadCustomerSessionAndProfile();
+
+    return () => {
+      isCancelled = true;
+    };
   }, []);
+
+  // Persistência contínua e silenciosa no localStorage para total resiliência
+  useEffect(() => {
+    try {
+      if (name || email || whatsapp || document || (cep && cep.length >= 8)) {
+        const profilePayload = {
+          name,
+          email,
+          whatsapp,
+          document,
+          personType,
+          address: {
+            cep,
+            street,
+            number,
+            complement,
+            neighborhood,
+            city,
+            state,
+          },
+        };
+        localStorage.setItem("totem_saved_buyer_profile", JSON.stringify(profilePayload));
+      }
+    } catch {}
+  }, [name, email, whatsapp, document, personType, cep, street, number, complement, neighborhood, city, state]);
+
+  // Alterna para um endereço salvo na conta do cliente
+  const handleSelectAddress = (addr: DeliveryAddress, index: number) => {
+    const cleanCep = (addr.cep || "").replace(/\D/g, "");
+    setCep(maskCEP(addr.cep));
+    setStreet(addr.street || "");
+    setNumber(addr.number || "");
+    setComplement(addr.complement || "");
+    setNeighborhood(addr.neighborhood || "");
+    setCity(addr.city || "");
+    setState(addr.state || "");
+    setCepSuccess(true);
+    setSelectedAddressIndex(index);
+    setShowAddressPicker(false);
+
+    if (cleanCep.length === 8) {
+      lookupCep(cleanCep);
+    }
+  };
+
+  // Limpa os campos para permitir comprar em nome de outro comprador
+  const handleClearBuyerFields = () => {
+    setName("");
+    setDocument("");
+    setWhatsapp("");
+    setEmail("");
+    setCep("");
+    setStreet("");
+    setNumber("");
+    setComplement("");
+    setNeighborhood("");
+    setCity("");
+    setState("");
+    setCepSuccess(false);
+    setIsAutoFilled(false);
+    setSelectedAddressIndex(null);
+    try {
+      localStorage.removeItem("totem_saved_buyer_profile");
+    } catch {}
+  };
 
   // Envio do Pedido para o Backend (com recálculo server-side)
   const handleSubmitOrder = async (e: React.FormEvent) => {
@@ -566,6 +730,34 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
         state: state.trim(),
         totalPriceCents: data.order.totalCents,
       });
+
+      // Sincroniza em background o perfil atualizado do cliente para próximas compras
+      try {
+        const profilePayload = {
+          name: name.trim(),
+          document: document.trim(),
+          personType,
+          whatsapp: whatsapp.trim(),
+          address: {
+            cep: cep.trim(),
+            street: street.trim(),
+            number: number.trim(),
+            complement: complement.trim(),
+            neighborhood: neighborhood.trim(),
+            city: city.trim(),
+            state: state.trim(),
+          },
+          setAsDefaultAddress: saveToProfile,
+        };
+        localStorage.setItem("totem_saved_buyer_profile", JSON.stringify(profilePayload));
+        if (loggedCustomer) {
+          fetch("/api/customer/profile", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(profilePayload),
+          }).catch(() => {});
+        }
+      } catch {}
 
       setOrderDetails(data.order);
       setPaymentNotice("");
@@ -959,6 +1151,55 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
       <form onSubmit={handleSubmitOrder} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Coluna Esquerda: Dados do Cliente e Endereço */}
         <div className="lg:col-span-7 space-y-6">
+          {/* Banner de Reconhecimento de Conta do Cliente */}
+          {loggedCustomer && (
+            <div className="p-4 sm:p-5 rounded-2xl border border-blue-500/20 bg-gradient-to-r from-blue-500/10 via-indigo-500/5 to-cyan-500/10 dark:from-blue-900/30 dark:via-indigo-900/20 dark:to-cyan-900/20 backdrop-blur-xl shadow-sm dark:shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in-50 duration-300">
+              <div className="flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0071e3] to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/25 shrink-0 mt-0.5">
+                  <UserCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-bold text-slate-900 dark:text-white">
+                      Olá, {loggedCustomer.name ? loggedCustomer.name.split(" ")[0] : "Cliente"}!
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400">
+                      <Sparkles className="w-3 h-3" />
+                      Conta Identificada
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                    {cepSuccess && street
+                      ? "Preenchemos seus dados cadastrais e endereço automaticamente para agilizar sua compra."
+                      : "Preenchemos seus dados cadastrais automaticamente com base na sua conta TotemPro."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                {loggedCustomer.addresses && loggedCustomer.addresses.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAddressPicker(!showAddressPicker)}
+                    className="text-xs font-semibold text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/60 bg-white/80 dark:bg-slate-800/80 hover:bg-blue-50 dark:hover:bg-slate-700"
+                  >
+                    <MapPin className="w-3.5 h-3.5 mr-1 text-[#0071e3]" />
+                    {showAddressPicker ? "Ocultar Endereços" : `Meus Endereços (${loggedCustomer.addresses.length})`}
+                  </Button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleClearBuyerFields}
+                  className="text-[11px] text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white underline font-medium transition-colors cursor-pointer px-1"
+                >
+                  Limpar dados
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Card 1: Tipo de Comprador e Dados */}
           <Card className="p-5 sm:p-6 border-black/10 dark:border-slate-800 bg-white dark:bg-slate-900/60 backdrop-blur-xl space-y-5 shadow-sm dark:shadow-xl">
             <div className="flex items-center justify-between pb-3 border-b border-black/10 dark:border-slate-800">
@@ -1096,10 +1337,22 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           {/* Card 2: Endereço de Entrega */}
           <Card className="p-5 sm:p-6 border-black/10 dark:border-slate-800 bg-white dark:bg-slate-900/60 backdrop-blur-xl space-y-5 shadow-sm dark:shadow-xl">
             <div className="pb-3 border-b border-black/10 dark:border-slate-800 flex items-center justify-between flex-wrap gap-2">
-              <h2 className="text-sm font-bold text-[#1d1d1f] dark:text-white flex items-center gap-2">
-                <Truck className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-                2. Endereço de Entrega da Carga
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-[#1d1d1f] dark:text-white flex items-center gap-2">
+                  <Truck className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                  2. Endereço de Entrega da Carga
+                </h2>
+                {loggedCustomer && loggedCustomer.addresses && loggedCustomer.addresses.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddressPicker(!showAddressPicker)}
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#0071e3] hover:underline cursor-pointer ml-1"
+                  >
+                    <MapPin className="w-3 h-3" />
+                    Trocar endereço ({loggedCustomer.addresses.length})
+                  </button>
+                )}
+              </div>
               {isLoadingCep ? (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-[#0071e3] text-xs font-semibold animate-pulse">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1213,6 +1466,74 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Seletor Visual de Endereços Cadastrados */}
+              {loggedCustomer && loggedCustomer.addresses && loggedCustomer.addresses.length > 0 && showAddressPicker && (
+                <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-slate-950/60 space-y-3 animate-in fade-in-50">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-[#0071e3]" />
+                      Selecione um endereço cadastrado na sua conta:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddressPicker(false)}
+                      className="text-[11px] text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white underline cursor-pointer"
+                    >
+                      Fechar
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {loggedCustomer.addresses.map((addr: any, idx: number) => {
+                      const isSelected = selectedAddressIndex === idx || (addr.cep === cep.replace(/\D/g, "") && addr.number === number);
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => handleSelectAddress(addr, idx)}
+                          className={`p-3 rounded-lg border text-xs cursor-pointer transition-all ${
+                            isSelected
+                              ? "border-[#0071e3] bg-blue-500/10 shadow-sm"
+                              : "border-black/10 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-blue-300 dark:hover:border-slate-700"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-1 mb-1">
+                            <span className="font-bold text-slate-900 dark:text-white">
+                              {addr.street}, {addr.number}
+                            </span>
+                            {idx === 0 && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-semibold">
+                                Padrão
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-slate-500 dark:text-slate-400 text-[11px]">
+                            {addr.complement ? `${addr.complement} - ` : ""}{addr.neighborhood}
+                          </p>
+                          <p className="text-slate-500 dark:text-slate-400 text-[11px]">
+                            {addr.city}/{addr.state} — CEP {addr.cep}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Opção para Salvar/Atualizar Endereço na Conta */}
+              {loggedCustomer && (
+                <div className="pt-2 border-t border-black/5 dark:border-slate-800/80">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-600 dark:text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={saveToProfile}
+                      onChange={(e) => setSaveToProfile(e.target.checked)}
+                      className="rounded border-slate-300 dark:border-slate-700 text-[#0071e3] focus:ring-[#0071e3] h-4 w-4"
+                    />
+                    <span>Salvar ou atualizar este endereço como padrão para minhas próximas compras</span>
+                  </label>
+                </div>
+              )}
             </div>
           </Card>
 

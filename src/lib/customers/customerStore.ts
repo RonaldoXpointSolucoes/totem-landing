@@ -259,18 +259,51 @@ export function updateCustomer(
   if (index === -1) return null;
 
   const current = customers[index];
-  const updatedPhone = updates.whatsapp ? normalizePhone(updates.whatsapp) : current.whatsapp;
+  const updatedPhone = updates.whatsapp !== undefined ? normalizePhone(updates.whatsapp) : current.whatsapp;
 
   customers[index] = {
     ...current,
     ...updates,
     whatsapp: updatedPhone,
     whatsappFormatted: updatedPhone ? formatPhone(updatedPhone) : current.whatsappFormatted,
-    email: updates.email ? updates.email.trim().toLowerCase() : current.email,
+    email: updates.email !== undefined ? updates.email.trim().toLowerCase() : current.email,
   };
 
   persistCustomers(customers);
   return customers[index];
+}
+
+/**
+ * Adiciona ou atualiza um endereço na lista de endereços do cliente e opcionalmente define como padrão.
+ */
+export function addOrUpdateCustomerAddress(
+  customerId: string,
+  newAddress: DeliveryAddress,
+  setAsDefault: boolean = true
+): CustomerAccount | null {
+  const customer = findCustomerById(customerId);
+  if (!customer) return null;
+
+  const cleanCep = (newAddress.cep || "").replace(/\D/g, "");
+  const cleanNumber = (newAddress.number || "").trim().toLowerCase();
+
+  const addresses = Array.isArray(customer.addresses) ? [...customer.addresses] : [];
+  const existingIdx = addresses.findIndex(
+    (a) => (a.cep || "").replace(/\D/g, "") === cleanCep && (a.number || "").trim().toLowerCase() === cleanNumber
+  );
+
+  if (existingIdx >= 0) {
+    addresses[existingIdx] = { ...addresses[existingIdx], ...newAddress };
+  } else {
+    addresses.push(newAddress);
+  }
+
+  const updates: Partial<CustomerAccount> = {
+    addresses,
+    defaultAddress: setAsDefault ? newAddress : (customer.defaultAddress || addresses[0]),
+  };
+
+  return updateCustomer(customerId, updates);
 }
 
 /**
