@@ -16,7 +16,7 @@ import { CampaignTrackingData } from "@/types/voucher";
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (configuration: TotemConfiguration, quantity?: number) => void;
+  addItem: (configuration: TotemConfiguration, quantity?: number) => string;
   updateItem: (id: string, configuration: TotemConfiguration, quantity?: number) => void;
   duplicateItem: (id: string) => void;
   removeItem: (id: string) => void;
@@ -74,6 +74,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 monitor: item.configuration.monitor,
                 printer: item.configuration.printer,
                 barcodeReader: item.configuration.barcodeReader,
+                includeAssemblyService: item.configuration.includeAssemblyService,
               });
               const qty = Math.max(1, item.quantity || 1);
               return {
@@ -199,10 +200,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Adicionar novo item
-  const addItem = (configuration: TotemConfiguration, quantity: number = 1) => {
+  const addItem = (configuration: TotemConfiguration, quantity: number = 1): string => {
     const unitPrice = configuration.calculatedPriceCents;
+    const newItemId = "totem-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7);
     const newItem: CartItem = {
-      id: "totem-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7),
+      id: newItemId,
       configuration,
       quantity: Math.max(1, quantity),
       unitPriceCents: unitPrice,
@@ -210,6 +212,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     setItems((prev) => [...prev, newItem]);
+    return newItemId;
   };
 
   // Atualizar item existente

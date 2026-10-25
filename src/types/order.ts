@@ -8,6 +8,8 @@ export interface TotemConfiguration {
   barcodeReader?: BarcodeReaderOption | null;
   customizationNotes?: string;
   calculatedPriceCents: number;
+  includeAssemblyService?: boolean;
+  assemblyServicePriceCents?: number;
 }
 
 export interface CartItem {
@@ -76,6 +78,7 @@ export interface ManufacturingSpec {
   customizationNotes?: string;
   isCustomMonitor?: boolean;
   customDimensions?: any;
+  assemblyService?: string;
   status: "ready_for_cutting" | "machining" | "assembly" | "quality_check";
 }
 

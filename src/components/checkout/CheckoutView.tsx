@@ -235,6 +235,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
         monitor: i.configuration.monitor,
         printer: i.configuration.printer,
         barcodeReader: i.configuration.barcodeReader,
+        includeAssemblyService: i.configuration.includeAssemblyService,
       });
       return {
         modelId: i.configuration.model.id,
@@ -353,6 +354,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   const cardSubtotalCents = Math.max(0, items.reduce((acc, item) => acc + calculateTotemPrice({
     cabinet: item.configuration.model, color: item.configuration.color, monitor: item.configuration.monitor,
     printer: item.configuration.printer, barcodeReader: item.configuration.barcodeReader,
+    includeAssemblyService: item.configuration.includeAssemblyService,
   }).cardTotalPriceCents * item.quantity, 0) - couponDiscountCents);
   const effectiveSubtotalCents = paymentMethod === "credit_card" ? cardSubtotalCents : pixSubtotalCents;
   const finalTotalCents = effectiveSubtotalCents + shippingCents;
@@ -538,6 +540,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           readerId: i.configuration.barcodeReader?.id || null,
           hasScanner: !!i.configuration.barcodeReader,
           customizationNotes: i.configuration.customizationNotes || "",
+          includeAssemblyService: Boolean(i.configuration.includeAssemblyService),
           quantity: i.quantity,
         })),
       };
@@ -1544,6 +1547,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   monitor: item.configuration.monitor,
                   printer: item.configuration.printer,
                   barcodeReader: item.configuration.barcodeReader,
+                  includeAssemblyService: item.configuration.includeAssemblyService,
                 });
                 const itemPixSubtotal = itemPricing.pixTotalPriceCents * item.quantity;
                 const itemCardSubtotal = itemPricing.cardTotalPriceCents * item.quantity;
@@ -1562,6 +1566,11 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                         <p className="text-[10px] text-slate-500 dark:text-slate-400">
                           {item.configuration.color.name} • Qtd: {item.quantity}
                         </p>
+                        {item.configuration.includeAssemblyService && (
+                          <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                            🛠️ 100% Montado de Fábrica (+ R$ 999)
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="text-right shrink-0">

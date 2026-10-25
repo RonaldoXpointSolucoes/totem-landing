@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { CabinetModel, ColorOption, MonitorOption, PrinterOption, BarcodeReaderOption } from "@/types/catalog";
 import { formatBRL, PriceBreakdown } from "@/modules/pricing/pricingEngine";
 import { Card, Button, Badge } from "@/components/ui";
-import { Edit3, ShoppingCart, ShieldCheck, Boxes, Check, PackageCheck, AlertCircle, Tag, Loader2, Zap, CreditCard } from "lucide-react";
+import { Edit3, ShoppingCart, ShieldCheck, Boxes, Check, PackageCheck, AlertCircle, Tag, Loader2, Zap, CreditCard, Wrench, Package, Sparkles } from "lucide-react";
 import { isItemKit, getEffectiveKitItems, calculateKitTotalCents } from "@/modules/catalog/kitDefaults";
 import { useCart } from "@/modules/cart/CartContext";
 
@@ -16,6 +16,8 @@ interface StepReviewProps {
   reader: BarcodeReaderOption | null;
   useReader: boolean;
   pricing: PriceBreakdown;
+  includeAssemblyService?: boolean;
+  onToggleAssemblyService?: (include: boolean) => void;
   customizationNotes?: string;
   onChangeNotes?: (notes: string) => void;
   onEditStep: (stepNumber: number) => void;
@@ -30,6 +32,8 @@ export const StepReview: React.FC<StepReviewProps> = ({
   reader,
   useReader,
   pricing,
+  includeAssemblyService = false,
+  onToggleAssemblyService,
   customizationNotes = "",
   onChangeNotes,
   onEditStep,
@@ -297,6 +301,111 @@ export const StepReview: React.FC<StepReviewProps> = ({
           </div>
         )}
 
+        {/* OPÇÃO DE SERVIÇO DE MONTAGEM DO TOTEM (EXCLUSIVO PARA QUEM ESCOLHEU KIT) */}
+        {isKit && (
+          <div className="p-3.5 sm:p-4 rounded-xl bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-transparent border-2 border-amber-500/30 dark:border-amber-500/40 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <Wrench className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-black text-[#1d1d1f] dark:text-white flex items-center gap-1.5 flex-wrap">
+                    <span>Como você deseja receber o seu Totem?</span>
+                    <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/30">
+                      Gabinete + Kit ({activeKitItems.length} componentes)
+                    </span>
+                  </h4>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                    Se você não tiver tempo para montar, nossa equipe pode entregar o totem 100% montado de fábrica.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+              {/* Opção 1: Sem Montagem */}
+              <div
+                onClick={() => onToggleAssemblyService?.(false)}
+                className={`p-3 rounded-xl border-2 transition-all cursor-pointer relative flex flex-col justify-between ${
+                  !includeAssemblyService
+                    ? "bg-white dark:bg-slate-900 border-[#0071e3] shadow-sm ring-2 ring-[#0071e3]/20"
+                    : "bg-slate-50/80 dark:bg-slate-950/40 border-black/10 dark:border-slate-800 hover:border-black/20 opacity-80"
+                }`}
+              >
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-[#1d1d1f] dark:text-white flex items-center gap-1.5">
+                      <Package className="w-3.5 h-3.5 text-slate-500" />
+                      Montar por Conta Própria
+                    </span>
+                    <div
+                      className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                        !includeAssemblyService
+                          ? "bg-[#0071e3] text-white"
+                          : "border border-slate-400 dark:border-slate-600"
+                      }`}
+                    >
+                      {!includeAssemblyService && "✓"}
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-snug">
+                    Você recebe o gabinete usinado e todos os componentes do kit em caixas lacradas para você mesmo montar no seu estabelecimento.
+                  </p>
+                </div>
+                <div className="pt-2 mt-2 border-t border-black/5 dark:border-slate-800/80 flex items-center justify-between text-[11px]">
+                  <span className="font-semibold text-slate-500">Mão de obra:</span>
+                  <span className="font-black text-emerald-600 dark:text-emerald-400">Incluso (R$ 0,00)</span>
+                </div>
+              </div>
+
+              {/* Opção 2: Com Montagem de Fábrica */}
+              <div
+                onClick={() => onToggleAssemblyService?.(true)}
+                className={`p-3 rounded-xl border-2 transition-all cursor-pointer relative flex flex-col justify-between ${
+                  includeAssemblyService
+                    ? "bg-gradient-to-br from-amber-500/15 via-orange-500/10 to-amber-500/5 dark:from-amber-950/40 dark:to-slate-900 border-amber-500 shadow-md ring-2 ring-amber-500/30"
+                    : "bg-slate-50/80 dark:bg-slate-950/40 border-black/10 dark:border-slate-800 hover:border-amber-400/60"
+                }`}
+              >
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-[#1d1d1f] dark:text-white flex items-center gap-1.5">
+                      <Wrench className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                      Totem 100% Montado de Fábrica
+                    </span>
+                    <div
+                      className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                        includeAssemblyService
+                          ? "bg-amber-500 text-white"
+                          : "border border-slate-400 dark:border-slate-600"
+                      }`}
+                    >
+                      {includeAssemblyService && "✓"}
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-snug">
+                    Nossa equipe técnica monta tudo, organiza chicote elétrico e testa em bancada. <strong>É só ligar na tomada e usar!</strong>
+                  </p>
+                </div>
+                <div className="pt-2 mt-2 border-t border-black/5 dark:border-slate-800/80 flex items-center justify-between text-[11px]">
+                  <span className="font-extrabold text-amber-700 dark:text-amber-300 bg-amber-500/20 px-1.5 py-0.5 rounded text-[10px] uppercase">
+                    Plug & Play
+                  </span>
+                  <div className="text-right">
+                    <span className="font-black text-amber-600 dark:text-amber-400 text-xs">
+                      + R$ 999,00
+                    </span>
+                    <span className="text-[10px] text-slate-500 block leading-tight">
+                      ou até 10x de R$ 99,90
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Grid de 2 Colunas com as Especificações de Montagem */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-xs">
           {/* Modelo */}
@@ -419,6 +528,33 @@ export const StepReview: React.FC<StepReviewProps> = ({
               <span>Garantido de Fábrica</span>
             </div>
           </div>
+
+          {/* Opção de Montagem (Apenas se Kit) */}
+          {isKit && (
+            <div className="py-1.5 flex items-center justify-between gap-2 border-b border-black/5 dark:border-slate-800/60 sm:col-span-2">
+              <span className="text-slate-500 font-medium">Serviço de Montagem:</span>
+              <div className="flex items-center gap-1.5 min-w-0">
+                {includeAssemblyService ? (
+                  <span className="font-extrabold text-amber-600 dark:text-amber-400 flex items-center gap-1 truncate text-[11px] sm:text-xs">
+                    <Wrench className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">Totem 100% Montado de Fábrica (+ R$ 999,00)</span>
+                  </span>
+                ) : (
+                  <span className="text-slate-600 dark:text-slate-400 font-semibold truncate text-[11px] sm:text-xs">
+                    Montagem própria (Gabinete + Kit em peças avulsas)
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onToggleAssemblyService?.(!includeAssemblyService)}
+                  className="p-1 rounded-lg hover:bg-black/5 text-[#0071e3] transition-colors shrink-0"
+                  title="Alterar opção de montagem"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Campo Opcional de Observações do Cliente para a Produção CNC */}
@@ -463,6 +599,13 @@ export const StepReview: React.FC<StepReviewProps> = ({
                 no cartão
               </span>
             </div>
+
+            {isKit && includeAssemblyService && (
+              <div className="text-[11px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                <Wrench className="w-3 h-3 shrink-0" />
+                <span>Serviço de Montagem de Fábrica Incluso: + R$ 999,00 (Totem 100% montado e testado)</span>
+              </div>
+            )}
 
             {itemDiscountCents > 0 && (
               <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">

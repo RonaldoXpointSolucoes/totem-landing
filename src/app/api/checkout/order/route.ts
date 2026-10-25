@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { calculateTotemPrice } from "@/modules/pricing/pricingEngine";
+import { isItemKit } from "@/modules/catalog/kitDefaults";
 import { calculateSelectiveCouponDiscount, CouponDiscountCalculation } from "@/modules/pricing/couponEngine";
 import { findUserByCoupon, updateWhitelistUser } from "@/lib/auth/whitelistStore";
 import { recordVoucherUsage } from "@/lib/vouchers/voucherStore";
@@ -34,6 +35,7 @@ interface RequestBody {
     readerId?: string | null;
     hasScanner?: boolean;
     customizationNotes?: string;
+    includeAssemblyService?: boolean;
     quantity: number;
   }[];
 }
@@ -150,6 +152,10 @@ export async function POST(req: Request) {
       }
       const quantity = rawItem.quantity;
 
+      // Validação do serviço de montagem: exclusivo para quem escolheu kit de montagem
+      const isKit = isItemKit(monitor);
+      const includeAssemblyService = Boolean(rawItem.includeAssemblyService && isKit);
+
       // Cálculo server-side inegociável
       const pricing = calculateTotemPrice({
         cabinet: model,
@@ -157,6 +163,7 @@ export async function POST(req: Request) {
         monitor,
         printer,
         barcodeReader,
+        includeAssemblyService,
       });
       const unitPriceCents = paymentMethod === "credit_card" ? pricing.cardTotalPriceCents : pricing.pixTotalPriceCents;
       const itemSubtotalCents = unitPriceCents * quantity;
@@ -173,6 +180,8 @@ export async function POST(req: Request) {
           barcodeReader,
           customizationNotes: rawItem.customizationNotes || "",
           calculatedPriceCents: unitPriceCents,
+          includeAssemblyService,
+          assemblyServicePriceCents: includeAssemblyService ? 99900 : 0,
         },
         quantity,
         unitPriceCents,
@@ -235,6 +244,9 @@ export async function POST(req: Request) {
         customizationNotes: rawItem.customizationNotes || "",
         isCustomMonitor: Boolean(monitor?.isCustom || customDims),
         customDimensions: customDims || null,
+        assemblyService: includeAssemblyService
+          ? "Serviço de Montagem Especializada Contratado (+ R$ 999,00) — Entregar Totem 100% montado, cabeado e testado em bancada (Pronto para ligar na tomada)"
+          : "Montagem Própria pelo Cliente (Enviar gabinete usinado e periféricos do kit em embalagens originais lacradas)",
         status: "ready_for_cutting",
       };
 
@@ -302,6 +314,7 @@ export async function POST(req: Request) {
               monitor: it.configuration.monitor,
               printer: it.configuration.printer,
               barcodeReader: it.configuration.barcodeReader,
+              includeAssemblyService: it.configuration.includeAssemblyService,
             });
             return {
               modelId: it.configuration.model.id,
@@ -412,7 +425,9 @@ export async function POST(req: Request) {
         items: validatedCartItems.map((item) => ({
           cabinetName: item.configuration.model.name,
           colorName: item.configuration.color.name,
-          monitorName: item.configuration.monitor?.displayName || "Nenhum",
+          monitorName:
+            (item.configuration.monitor?.displayName || "Nenhum") +
+            (item.configuration.includeAssemblyService ? " (100% Montado de Fábrica)" : ""),
           printerName: item.configuration.printer?.displayName || "Nenhum",
           readerName: item.configuration.barcodeReader?.displayName || "Nenhum",
           unitPriceCents: item.unitPriceCents,

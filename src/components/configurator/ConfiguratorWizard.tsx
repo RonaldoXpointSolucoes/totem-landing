@@ -36,6 +36,8 @@ import {
   QrCode,
   Check,
   Boxes,
+  Wrench,
+  Sparkles,
 } from "lucide-react";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 
@@ -124,6 +126,19 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     return "";
   });
 
+  // Serviço Opcional de Montagem Especializada de Fábrica (+ R$ 999,00)
+  const [includeAssemblyService, setIncludeAssemblyService] = useState<boolean>(() => {
+    if (editingItem) return Boolean(editingItem.configuration.includeAssemblyService);
+    return false;
+  });
+  const [lastAddedItemId, setLastAddedItemId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (editingItem) {
+      setIncludeAssemblyService(Boolean(editingItem.configuration.includeAssemblyService));
+    }
+  }, [editingItem]);
+
   // Passo atual
   const [step, setStep] = useState<number>(() => {
     if (initialStep && initialStep >= 1 && initialStep <= 6) return initialStep;
@@ -170,8 +185,9 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
       barcodeReader: useReader ? selectedReader : null,
       customization: null,
       kitAdjustmentCents: isKitSelected ? kitAdjustmentCents : undefined,
+      includeAssemblyService: isKitSelected && includeAssemblyService,
     });
-  }, [selectedModel, selectedColor, selectedMonitor, selectedPrinter, useReader, selectedReader, isKitSelected, kitAdjustmentCents]);
+  }, [selectedModel, selectedColor, selectedMonitor, selectedPrinter, useReader, selectedReader, isKitSelected, kitAdjustmentCents, includeAssemblyService]);
 
   const isNextDisabled =
     (step === 3 && !selectedMonitor) ||
@@ -281,24 +297,63 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
       barcodeReader: useReader ? selectedReader : null,
       customizationNotes: customizationNotes.trim() || undefined,
       calculatedPriceCents: pricing.pixTotalPriceCents,
+      includeAssemblyService: isKitSelected ? includeAssemblyService : false,
+      assemblyServicePriceCents: isKitSelected && includeAssemblyService ? 99900 : 0,
     };
 
+    let targetId: string;
     if (editingItem) {
       // Atualiza o item existente sem criar duplicata
       updateItem(editingItem.id, configuration, editingItem.quantity);
+      targetId = editingItem.id;
     } else {
-      // Adiciona novo item ao carrinho
-      addItem(configuration, 1);
+      // Adiciona novo item ao carrinho e memoriza o ID gerado
+      targetId = addItem(configuration, 1);
     }
+    setLastAddedItemId(targetId);
 
     trackEvent(ANALYTICS_EVENTS.ADD_TO_CART, {
       modelId: selectedModel.id,
       modelName: selectedModel.name,
       totalPriceCents: pricing.totalPriceCents,
       isEditing: !!editingItem,
+      includeAssemblyService: isKitSelected ? includeAssemblyService : false,
     });
 
     setIsCartSuccessModalOpen(true);
+  };
+
+  // Alterna o serviço de montagem dinamicamente mesmo com o modal de sucesso aberto
+  const handleToggleAssemblyInModal = () => {
+    const nextVal = !includeAssemblyService;
+    setIncludeAssemblyService(nextVal);
+
+    const updatedPricing = calculateTotemPrice({
+      cabinet: selectedModel,
+      color: selectedColor,
+      monitor: selectedMonitor,
+      printer: selectedPrinter,
+      barcodeReader: useReader ? selectedReader : null,
+      customization: null,
+      kitAdjustmentCents: isKitSelected ? kitAdjustmentCents : undefined,
+      includeAssemblyService: isKitSelected && nextVal,
+    });
+
+    const targetId = editingItem ? editingItem.id : lastAddedItemId;
+    if (targetId) {
+      const updatedConfig: TotemConfiguration = {
+        model: selectedModel,
+        color: selectedColor,
+        monitor: selectedMonitor,
+        printer: selectedPrinter,
+        barcodeReader: useReader ? selectedReader : null,
+        customizationNotes: customizationNotes.trim() || undefined,
+        calculatedPriceCents: updatedPricing.pixTotalPriceCents,
+        includeAssemblyService: isKitSelected ? nextVal : false,
+        assemblyServicePriceCents: isKitSelected && nextVal ? 99900 : 0,
+      };
+      updateItem(targetId, updatedConfig);
+    }
   };
 
   const handleResetForNewTotem = () => {
@@ -311,6 +366,8 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     setSelectedReader(null);
     setReaderConfigured(false);
     setCustomizationNotes("");
+    setIncludeAssemblyService(false);
+    setLastAddedItemId(null);
     setStep(1);
     setIsCartSuccessModalOpen(false);
   };
@@ -540,6 +597,18 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                   </div>
                 )}
 
+                {isKitSelected && includeAssemblyService && (
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="shrink-0 font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                      <Wrench className="w-3 h-3" />
+                      Montagem:
+                    </span>
+                    <span className="font-extrabold text-amber-600 dark:text-amber-400 text-right leading-tight text-[11px]">
+                      100% Montado (+ R$ 999)
+                    </span>
+                  </div>
+                )}
+
                 <div className="pt-2 border-t border-black/10 dark:border-slate-800 space-y-1">
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-1.5">
@@ -619,6 +688,8 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                 reader={selectedReader}
                 useReader={useReader}
                 pricing={pricing}
+                includeAssemblyService={includeAssemblyService}
+                onToggleAssemblyService={setIncludeAssemblyService}
                 customizationNotes={customizationNotes}
                 onChangeNotes={setCustomizationNotes}
                 onEditStep={(stepNum) => setStep(stepNum)}
@@ -671,6 +742,12 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
             <p className="text-slate-500 dark:text-slate-400">
               Monitor: {selectedMonitor?.displayName || "Sob Medida"} • Impressora: {selectedPrinter?.displayName}
             </p>
+            {isKitSelected && includeAssemblyService && (
+              <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 font-bold pt-0.5">
+                <Wrench className="w-3.5 h-3.5 shrink-0" />
+                <span>Serviço de Montagem de Fábrica Incluso (+ R$ 999,00)</span>
+              </div>
+            )}
             <div className="pt-1.5 space-y-0.5">
               <div className="flex items-baseline gap-2 flex-wrap">
                 <span className="text-emerald-600 dark:text-emerald-400 font-black text-lg">
@@ -685,6 +762,82 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
               </p>
             </div>
           </div>
+
+          {/* OFERTA / CONTROLE DO SERVIÇO DE MONTAGEM NO MODAL DE CARRINHO (EXCLUSIVO PARA QUEM ESCOLHEU KIT) */}
+          {isKitSelected && (
+            <div
+              className={`p-3.5 rounded-2xl border transition-all ${
+                includeAssemblyService
+                  ? "bg-emerald-500/10 dark:bg-emerald-500/15 border-emerald-500/30"
+                  : "bg-gradient-to-br from-amber-500/15 via-orange-500/10 to-transparent border-amber-500/30 dark:border-amber-500/40"
+              }`}
+            >
+              {includeAssemblyService ? (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                      <Check className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="font-extrabold text-xs text-emerald-800 dark:text-emerald-300">
+                        Totem 100% Montado de Fábrica (+ R$ 999,00)
+                      </p>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                        Enviamos montado, cabeado e testado em bancada. É só ligar na tomada e usar!
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleToggleAssemblyInModal}
+                    className="text-[11px] text-rose-500 hover:text-rose-600 underline font-semibold cursor-pointer shrink-0 self-start sm:self-auto"
+                  >
+                    Remover montagem
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+                      <Wrench className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-black text-xs text-[#1d1d1f] dark:text-white flex items-center gap-1.5 flex-wrap">
+                        <span>Quer que a gente mande o Totem já montado?</span>
+                        <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300">
+                          Serviço Especializado
+                        </span>
+                      </p>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-snug mt-0.5">
+                        Nesse pedido você escolheu Gabinete + Kit para você mesmo montar. Mas se preferir, nossos técnicos montam tudo aqui e mandam o totem pronto para só ligar na tomada e usar!
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-amber-500/20">
+                    <div className="text-xs">
+                      <span className="font-black text-amber-600 dark:text-amber-400 text-sm">
+                        + R$ 999,00
+                      </span>
+                      <span className="text-[10px] text-slate-500 ml-1">
+                        ou em até 10x de R$ 99,90
+                      </span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="sm"
+                      onClick={handleToggleAssemblyInModal}
+                      className="bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs py-1 px-3 shadow-md shadow-amber-500/25 border-transparent cursor-pointer"
+                    >
+                      <Wrench className="w-3.5 h-3.5 mr-1" />
+                      Incluir Montagem de Fábrica
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <p className="text-slate-600 dark:text-slate-400">
             Você pode montar outro gabinete com configuração diferente ou ir para o carrinho para duplicar em lote e finalizar via Pix.
           </p>

@@ -8,6 +8,8 @@ export interface CustomizationAdjustment {
   description?: string;
 }
 
+export const ASSEMBLY_SERVICE_PRICE_CENTS = 99900; // R$ 999,00 serviço de montagem completa do totem
+
 export interface PriceCalculationInput {
   cabinet: CabinetModel;
   color: ColorOption;
@@ -16,6 +18,7 @@ export interface PriceCalculationInput {
   barcodeReader?: BarcodeReaderOption | null;
   customization?: CustomizationAdjustment | null;
   kitAdjustmentCents?: number;
+  includeAssemblyService?: boolean;
 }
 
 export interface PriceBreakdown {
@@ -25,6 +28,8 @@ export interface PriceBreakdown {
   colorAdjustmentCents: number;
   equipmentAdjustmentCents: number;
   customizationAdjustmentCents: number;
+  assemblyServiceAdjustmentCents: number;
+  includeAssemblyService: boolean;
   totalPriceCents: number;
   pixTotalPriceCents: number;
   cardTotalPriceCents: number;
@@ -85,17 +90,23 @@ export function calculateTotemPrice(input: PriceCalculationInput): PriceBreakdow
       ? Math.max(0, input.customization.priceAdjustmentCents || 0)
       : 0;
 
+  // Serviço opcional de montagem completa do Totem de fábrica (+ R$ 999,00)
+  const includeAssembly = Boolean(input.includeAssemblyService);
+  const assemblyServiceAdjustmentCents = includeAssembly ? ASSEMBLY_SERVICE_PRICE_CENTS : 0;
+
   const pixTotalPriceCents =
     pixBasePriceCents +
     colorAdjustmentCents +
     equipmentAdjustmentCents +
-    customizationAdjustmentCents;
+    customizationAdjustmentCents +
+    assemblyServiceAdjustmentCents;
 
   const cardTotalPriceCents =
     cardBasePriceCents +
     colorAdjustmentCents +
     equipmentAdjustmentCents +
-    customizationAdjustmentCents;
+    customizationAdjustmentCents +
+    assemblyServiceAdjustmentCents;
 
   return {
     basePriceCents: cardBasePriceCents,
@@ -104,6 +115,8 @@ export function calculateTotemPrice(input: PriceCalculationInput): PriceBreakdow
     colorAdjustmentCents,
     equipmentAdjustmentCents,
     customizationAdjustmentCents,
+    assemblyServiceAdjustmentCents,
+    includeAssemblyService: includeAssembly,
     // O valor exibido como total do Totem no configurador passa a ser o PIX
     totalPriceCents: pixTotalPriceCents,
     pixTotalPriceCents,

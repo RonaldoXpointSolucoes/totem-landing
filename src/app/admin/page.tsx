@@ -1551,6 +1551,12 @@ export default function AdminPage() {
                                     Impressora: {firstItem.printer_name}
                                   </span>
                                 )}
+                                {Boolean(firstSheet?.assemblyService?.includes("Montagem Especializada") || firstItem?.monitor_name?.includes("100% Montado")) && (
+                                  <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold flex items-center gap-1">
+                                    <Wrench className="w-2.5 h-2.5" />
+                                    Montagem de Fábrica (+R$ 999)
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -2092,6 +2098,24 @@ export default function AdminPage() {
                                           {it.reader_name || "Sem leitor"}
                                         </p>
                                       </div>
+
+                                      {/* SERVIÇO DE MONTAGEM DE FÁBRICA (SE CONTRATADO) */}
+                                      {Boolean(sheet?.assemblyService?.includes("Montagem Especializada") || it.monitor_name?.includes("100% Montado")) && (
+                                        <div className="p-2.5 rounded-xl border bg-amber-500/15 border-amber-400 text-amber-200 space-y-1 sm:col-span-2">
+                                          <div className="flex items-center justify-between gap-1">
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                                              <Wrench className="w-3.5 h-3.5 shrink-0" />
+                                              <span>Serviço Especializado de Montagem de Fábrica Contratado</span>
+                                            </span>
+                                            <span className="text-[9px] font-black px-2 py-0.5 rounded bg-amber-400 text-slate-950 uppercase">
+                                              + R$ 999,00
+                                            </span>
+                                          </div>
+                                          <p className="font-bold text-white text-xs leading-snug">
+                                            ⚙️ ATENÇÃO PRODUÇÃO / BANCADA: O cliente contratou a montagem completa deste totem. Entregar 100% montado de fábrica, com componentes fixados, fiação travada e testado em bancada. Não despachar em caixas desmontadas!
+                                          </p>
+                                        </div>
+                                      )}
                                     </div>
 
                                     {/* 🚨 CAIXA DE ALTA EVIDÊNCIA: ITEM FORA DO PADRÃO / MEDIDAS ESPECIAIS / OBSERVAÇÃO DO CLIENTE / FOTOS & VÍDEOS DO ITEM */}

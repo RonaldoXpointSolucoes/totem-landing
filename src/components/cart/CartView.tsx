@@ -22,6 +22,7 @@ import {
   Loader2,
   Check,
   CreditCard,
+  Wrench,
 } from "lucide-react";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 import { cn } from "@/lib/utils";
@@ -85,6 +86,7 @@ export const CartView: React.FC<CartViewProps> = ({
           monitor: i.configuration.monitor,
           printer: i.configuration.printer,
           barcodeReader: i.configuration.barcodeReader,
+          includeAssemblyService: i.configuration.includeAssemblyService,
         });
         return {
           modelId: i.configuration.model.id,
@@ -207,6 +209,7 @@ export const CartView: React.FC<CartViewProps> = ({
       monitor: it.configuration.monitor,
       printer: it.configuration.printer,
       barcodeReader: it.configuration.barcodeReader,
+      includeAssemblyService: it.configuration.includeAssemblyService,
     });
     return acc + p.pixTotalPriceCents * it.quantity;
   }, 0);
@@ -218,6 +221,7 @@ export const CartView: React.FC<CartViewProps> = ({
       monitor: it.configuration.monitor,
       printer: it.configuration.printer,
       barcodeReader: it.configuration.barcodeReader,
+      includeAssemblyService: it.configuration.includeAssemblyService,
     });
     return acc + p.cardTotalPriceCents * it.quantity;
   }, 0);
@@ -287,6 +291,7 @@ export const CartView: React.FC<CartViewProps> = ({
               monitor,
               printer,
               barcodeReader,
+              includeAssemblyService: configuration.includeAssemblyService,
             });
             const itemPixUnitCents = itemPricing.pixTotalPriceCents;
             const itemPixSubtotalCents = itemPixUnitCents * quantity;
@@ -355,6 +360,12 @@ export const CartView: React.FC<CartViewProps> = ({
                       <div className="truncate">
                         Leitor: <strong className="text-slate-900 dark:text-slate-200">{barcodeReader ? barcodeReader.displayName : "Sem leitor"}</strong>
                       </div>
+                      {configuration.includeAssemblyService && (
+                        <div className="col-span-full flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400 pt-1">
+                          <Wrench className="w-3.5 h-3.5 shrink-0" />
+                          <span>Totem 100% Montado de Fábrica (+ R$ 999,00)</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
