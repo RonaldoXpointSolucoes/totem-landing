@@ -352,13 +352,13 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     fetchShippingQuotes(cleanCep, false);
   };
 
-  // Recota automaticamente se itens do carrinho forem modificados e já houver CEP
+  // Recota automaticamente se itens do carrinho forem modificados ou se houver CEP válido preenchido
   useEffect(() => {
     const cleanCep = cep.replace(/\D/g, "");
     if (cleanCep.length === 8 && items.length > 0) {
       fetchShippingQuotes(cleanCep);
     }
-  }, [items]);
+  }, [items, cep]);
 
   const selectedShippingQuote =
     shippingQuotes.find((q) => q.id === selectedShippingId && q.isAvailable) || null;
@@ -1731,7 +1731,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   </button>
                 </div>
               </div>
-            ) : (
+            ) : shippingQuotes.length > 0 ? (
               /* Estado 4: Cotações Carregadas com Sucesso */
               <div className="space-y-3">
                 {isLoadingShipping && shippingQuotes.length > 0 && (
@@ -1848,6 +1848,22 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                     </div>
                   );
                 })}
+              </div>
+            ) : (
+              /* Estado 5: CEP preenchido aguardando cotação */
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center space-y-3">
+                <Truck className="w-6 h-6 mx-auto text-[#0071e3] animate-pulse" />
+                <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Calcular opções de frete para o CEP {cep}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => fetchShippingQuotes(cep.replace(/\D/g, ""), false)}
+                  className="px-4 py-2 rounded-xl bg-[#0071e3] hover:bg-blue-600 text-white text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Calcular Frete Agora</span>
+                </button>
               </div>
             )}
           </Card>
