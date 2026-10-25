@@ -1,14 +1,12 @@
 {
   "exportFormatVersion": 2,
-  "exportTime": "2026-10-25 16:00:00",
+  "exportTime": "2026-10-25 17:30:00",
   "containerVersion": {
-    "path": "accounts/6000000000/containers/70000000/versions/0",
-    "accountId": "6000000000",
-    "containerId": "70000000",
+    "path": "accounts/6225983440/containers/99999999/versions/0",
+    "accountId": "6225983440",
+    "containerId": "99999999",
     "container": {
-      "name": "[WEB] xpointsolucoes.com.br — Totem Pro",
-      "publicId": "GTM-TCZRNPTK",
-      "notes": "Contêiner oficial de Alta Performance para Google Ads, GA4 E-commerce e Conversões Otimizadas da Totem Pro (X-Point Soluções).",
+      "name": "Totem Pro Web",
       "timeZoneId": "America/Sao_Paulo",
       "usageContext": [
         "WEB"
@@ -16,10 +14,10 @@
     },
     "tag": [
       {
-        "accountId": "6000000000",
-        "containerId": "70000000",
+        "accountId": "6225983440",
+        "containerId": "99999999",
         "tagId": "1",
-        "name": "Google Ads — Vinculador de Conversões (Conversion Linker)",
+        "name": "Google Ads - Vinculador de Conversoes",
         "type": "gclidw",
         "liveOnly": false,
         "firingTriggerId": [
@@ -34,10 +32,10 @@
         ]
       },
       {
-        "accountId": "6000000000",
-        "containerId": "70000000",
+        "accountId": "6225983440",
+        "containerId": "99999999",
         "tagId": "2",
-        "name": "Google Tag (GA4 & Google Ads Core)",
+        "name": "Google Tag - GA4 e Google Ads Core",
         "type": "googtag",
         "liveOnly": false,
         "firingTriggerId": [
@@ -73,10 +71,10 @@
         ]
       },
       {
-        "accountId": "6000000000",
-        "containerId": "70000000",
+        "accountId": "6225983440",
+        "containerId": "99999999",
         "tagId": "3",
-        "name": "Google Ads — Conversão: [Totem Pro] Compra Aprovada (Purchase)",
+        "name": "Google Ads - Conversao Compra Aprovada Purchase",
         "type": "awct",
         "liveOnly": false,
         "firingTriggerId": [
@@ -126,10 +124,10 @@
         ]
       },
       {
-        "accountId": "6000000000",
-        "containerId": "70000000",
+        "accountId": "6225983440",
+        "containerId": "99999999",
         "tagId": "4",
-        "name": "Google Ads — Conversão: [Totem Pro] Início de Checkout (Begin Checkout)",
+        "name": "Google Ads - Conversao Inicio de Checkout",
         "type": "awct",
         "liveOnly": false,
         "firingTriggerId": [
@@ -159,10 +157,10 @@
         ]
       },
       {
-        "accountId": "6000000000",
-        "containerId": "70000000",
+        "accountId": "6225983440",
+        "containerId": "99999999",
         "tagId": "5",
-        "name": "Google Ads — Conversão: [Totem Pro] Adicionar ao Carrinho (Add to Cart)",
+        "name": "Google Ads - Conversao Adicionar ao Carrinho",
         "type": "awct",
         "liveOnly": false,
         "firingTriggerId": [
@@ -192,10 +190,10 @@
         ]
       },
       {
-        "accountId": "6000000000",
-        "containerId": "70000000",
+        "accountId": "6225983440",
+        "containerId": "99999999",
         "tagId": "6",
-        "name": "Google Ads — Conversão: [Totem Pro] Lead Cadastro Checkout",
+        "name": "Google Ads - Conversao Lead Cadastro Checkout",
         "type": "awct",
         "liveOnly": false,
         "firingTriggerId": [
@@ -235,10 +233,10 @@
         ]
       },
       {
-        "accountId": "6000000000",
-        "containerId": "70000000",
+        "accountId": "6225983440",
+        "containerId": "99999999",
         "tagId": "7",
-        "name": "Google Ads — Conversão: [Totem Pro] WhatsApp Consultor Engenharia",
+        "name": "Google Ads - Conversao WhatsApp Consultor",
         "type": "awct",
         "liveOnly": false,
         "firingTriggerId": [
@@ -268,10 +266,10 @@
         ]
       },
       {
-        "accountId": "6000000000",
-        "containerId": "70000000",
+        "accountId": "6225983440",
+        "containerId": "99999999",
         "tagId": "8",
-        "name": "Google Ads — Tag de Remarketing Dinâmico",
+        "name": "Google Ads - Tag de Remarketing Dinamico",
         "type": "sp",
         "liveOnly": false,
         "firingTriggerId": [
@@ -293,10 +291,10 @@
     ],
     "trigger": [
       {
-        "accountId": "6000000000",
-        "containerId": "70000000",
+        "accountId": "6225983440",
+        "containerId": "99999999",
         "triggerId": "101",
-        "name": "Evento Personalizado — purchase",
+        "name": "Evento Personalizado - purchase",
         "type": "CUSTOM_EVENT",
         "customEventFilter": [
           {
@@ -317,10 +315,10 @@
         ]
       },
       {
-        "accountId": "6000000000",
-        "containerId": "70000000",
+        "accountId": "6225983440",
+        "containerId": "99999999",
         "triggerId": "102",
-        "name": "Evento Personalizado — begin_checkout",
+        "name": "Evento Personalizado - begin_checkout",
         "type": "CUSTOM_EVENT",
         "customEventFilter": [
           {
@@ -341,10 +339,10 @@
         ]
       },
       {
-        "accountId": "6000000000",
-        "containerId": "70000000",
+        "accountId": "6225983440",
+        "containerId": "99999999",
         "triggerId": "103",
-        "name": "Evento Personalizado — add_to_cart",
+        "name": "Evento Personalizado - add_to_cart",
         "type": "CUSTOM_EVENT",
         "customEventFilter": [
           {
@@ -365,10 +363,10 @@
         ]
       },
       {
-        "accountId": "6000000000",
-        "containerId": "70000000",
+        "accountId": "6225983440",
+        "containerId": "99999999",
         "triggerId": "104",
-        "name": "Evento Personalizado — generate_lead",
+        "name": "Evento Personalizado - generate_lead",
         "type": "CUSTOM_EVENT",
         "customEventFilter": [
           {
@@ -389,10 +387,10 @@
         ]
       },
       {
-        "accountId": "6000000000",
-        "containerId": "70000000",
+        "accountId": "6225983440",
+        "containerId": "99999999",
         "triggerId": "105",
-        "name": "Evento Personalizado — contact_whatsapp",
+        "name": "Evento Personalizado - contact_whatsapp",
         "type": "CUSTOM_EVENT",
         "customEventFilter": [
           {
@@ -415,8 +413,8 @@
     ],
     "variable": [
       {
-        "accountId": "6000000000",
-        "containerId": "70000000",
+        "accountId": "6225983440",
+        "containerId": "99999999",
         "variableId": "201",
         "name": "dlv - ecommerce.value",
         "type": "v",
@@ -434,8 +432,8 @@
         ]
       },
       {
-        "accountId": "6000000000",
-        "containerId": "70000000",
+        "accountId": "6225983440",
+        "containerId": "99999999",
         "variableId": "202",
         "name": "dlv - ecommerce.transaction_id",
         "type": "v",
@@ -453,8 +451,8 @@
         ]
       },
       {
-        "accountId": "6000000000",
-        "containerId": "70000000",
+        "accountId": "6225983440",
+        "containerId": "99999999",
         "variableId": "203",
         "name": "dlv - ecommerce.currency",
         "type": "v",
@@ -472,8 +470,8 @@
         ]
       },
       {
-        "accountId": "6000000000",
-        "containerId": "70000000",
+        "accountId": "6225983440",
+        "containerId": "99999999",
         "variableId": "204",
         "name": "dlv - ecommerce.items",
         "type": "v",
@@ -491,8 +489,8 @@
         ]
       },
       {
-        "accountId": "6000000000",
-        "containerId": "70000000",
+        "accountId": "6225983440",
+        "containerId": "99999999",
         "variableId": "205",
         "name": "dlv - user_data",
         "type": "v",
@@ -512,26 +510,26 @@
     ],
     "builtInVariable": [
       {
-        "accountId": "6000000000",
-        "containerId": "70000000",
+        "accountId": "6225983440",
+        "containerId": "99999999",
         "type": "PAGE_URL",
         "name": "Page URL"
       },
       {
-        "accountId": "6000000000",
-        "containerId": "70000000",
+        "accountId": "6225983440",
+        "containerId": "99999999",
         "type": "PAGE_HOSTNAME",
         "name": "Page Hostname"
       },
       {
-        "accountId": "6000000000",
-        "containerId": "70000000",
+        "accountId": "6225983440",
+        "containerId": "99999999",
         "type": "PAGE_PATH",
         "name": "Page Path"
       },
       {
-        "accountId": "6000000000",
-        "containerId": "70000000",
+        "accountId": "6225983440",
+        "containerId": "99999999",
         "type": "EVENT",
         "name": "Event"
       }
