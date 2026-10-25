@@ -216,6 +216,15 @@ function dispatchToAdPlatforms(
       });
       if (typeof window.gtag === "function") {
         window.gtag("event", "add_to_cart", { currency, value: valueNumber, items: cartItems });
+
+        const atcLabel = pixelConfig.googleAdsAddToCartLabel || "xAc_CPHtqakdEJ2cmMID";
+        if (pixelConfig.googleAdsId && atcLabel) {
+          window.gtag("event", "conversion", {
+            send_to: `${pixelConfig.googleAdsId}/${atcLabel}`,
+            value: valueNumber || 1.0,
+            currency,
+          });
+        }
       }
       break;
     }
@@ -251,6 +260,15 @@ function dispatchToAdPlatforms(
           value: valueNumber,
           items_count: data.totalItems || data.numItems,
         });
+
+        const bcLabel = pixelConfig.googleAdsBeginCheckoutLabel || "JjgUCKfrqakdEJ2cmMID";
+        if (pixelConfig.googleAdsId && bcLabel) {
+          window.gtag("event", "conversion", {
+            send_to: `${pixelConfig.googleAdsId}/${bcLabel}`,
+            value: valueNumber || 1.0,
+            currency,
+          });
+        }
       }
       break;
 
@@ -269,7 +287,7 @@ function dispatchToAdPlatforms(
         });
 
         // Google Ads Conversion Oficial para Lead
-        const leadLabel = pixelConfig.googleAdsLeadLabel || "wfA1CIiPpfkaEJ2cmMID";
+        const leadLabel = pixelConfig.googleAdsLeadLabel || "VumdCIjzqakdEJ2cmMID";
         if (pixelConfig.googleAdsId && leadLabel) {
           window.gtag("event", "conversion", {
             send_to: `${pixelConfig.googleAdsId}/${leadLabel}`,
@@ -319,9 +337,10 @@ function dispatchToAdPlatforms(
         });
 
         // Google Ads Conversion Oficial para Venda
-        if (pixelConfig.googleAdsId && pixelConfig.googleAdsPurchaseLabel) {
+        const purchaseLabel = pixelConfig.googleAdsPurchaseLabel || "IR8ZCPThqakdEJ2cmMID";
+        if (pixelConfig.googleAdsId && purchaseLabel) {
           window.gtag("event", "conversion", {
-            send_to: `${pixelConfig.googleAdsId}/${pixelConfig.googleAdsPurchaseLabel}`,
+            send_to: `${pixelConfig.googleAdsId}/${purchaseLabel}`,
             value: valueNumber,
             currency,
             transaction_id: orderId,
@@ -345,7 +364,7 @@ function dispatchToAdPlatforms(
         });
 
         // Google Ads Conversion Oficial para WhatsApp (ConvWhatsApp)
-        const waLabel = pixelConfig.googleAdsWhatsappLabel || "NpfaCKn1tYkbEJ2cmMID";
+        const waLabel = pixelConfig.googleAdsWhatsappLabel || "2vTuCKyvo6kdEJ2cmMID";
         if (pixelConfig.googleAdsId && waLabel) {
           window.gtag("event", "conversion", {
             send_to: `${pixelConfig.googleAdsId}/${waLabel}`,

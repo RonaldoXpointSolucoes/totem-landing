@@ -10,9 +10,11 @@ export const pixelConfig = {
   
   // Google Ads (Conta AW-944115229)
   googleAdsId: process.env.NEXT_PUBLIC_GOOGLE_ADS_ID || "AW-944115229",
-  googleAdsPurchaseLabel: process.env.NEXT_PUBLIC_GOOGLE_ADS_PURCHASE_LABEL || "",
-  googleAdsLeadLabel: process.env.NEXT_PUBLIC_GOOGLE_ADS_LEAD_LABEL || "wfA1CIiPpfkaEJ2cmMID",
-  googleAdsWhatsappLabel: process.env.NEXT_PUBLIC_GOOGLE_ADS_WHATSAPP_LABEL || "NpfaCKn1tYkbEJ2cmMID",
+  googleAdsPurchaseLabel: process.env.NEXT_PUBLIC_GOOGLE_ADS_PURCHASE_LABEL || "IR8ZCPThqakdEJ2cmMID",
+  googleAdsBeginCheckoutLabel: process.env.NEXT_PUBLIC_GOOGLE_ADS_BEGIN_CHECKOUT_LABEL || "JjgUCKfrqakdEJ2cmMID",
+  googleAdsAddToCartLabel: process.env.NEXT_PUBLIC_GOOGLE_ADS_ADD_TO_CART_LABEL || "xAc_CPHtqakdEJ2cmMID",
+  googleAdsLeadLabel: process.env.NEXT_PUBLIC_GOOGLE_ADS_LEAD_LABEL || "VumdCIjzqakdEJ2cmMID",
+  googleAdsWhatsappLabel: process.env.NEXT_PUBLIC_GOOGLE_ADS_WHATSAPP_LABEL || "2vTuCKyvo6kdEJ2cmMID",
   
   // Google Tag Manager (GTM Container)
   gtmId: process.env.NEXT_PUBLIC_GTM_ID || "",

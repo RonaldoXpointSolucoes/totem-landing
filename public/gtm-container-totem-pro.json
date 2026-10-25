@@ -1,6 +1,6 @@
 {
   "exportFormatVersion": 2,
-  "exportTime": "2026-10-25 15:50:00",
+  "exportTime": "2026-10-25 16:00:00",
   "containerVersion": {
     "path": "accounts/6000000000/containers/70000000/versions/0",
     "accountId": "6000000000",
@@ -54,12 +54,13 @@
         "accountId": "6000000000",
         "containerId": "70000000",
         "tagId": "3",
-        "name": "Google Ads — Conversão: Compra (Purchase) com Conversões Otimizadas",
+        "name": "Google Ads — Conversão: [Totem Pro] Compra Aprovada (Purchase)",
         "type": "awct",
         "liveOnly": false,
         "firingTriggerId": ["101"],
         "parameter": [
           { "type": "TEMPLATE", "key": "conversionId", "value": "944115229" },
+          { "type": "TEMPLATE", "key": "conversionLabel", "value": "IR8ZCPThqakdEJ2cmMID" },
           { "type": "TEMPLATE", "key": "conversionValue", "value": "{{dlv - ecommerce.value}}" },
           { "type": "TEMPLATE", "key": "currencyCode", "value": "{{dlv - ecommerce.currency}}" },
           { "type": "TEMPLATE", "key": "orderId", "value": "{{dlv - ecommerce.transaction_id}}" },
@@ -72,13 +73,43 @@
         "accountId": "6000000000",
         "containerId": "70000000",
         "tagId": "4",
-        "name": "Google Ads — Conversão: Lead Cadastro (Checkout)",
+        "name": "Google Ads — Conversão: [Totem Pro] Início de Checkout (Begin Checkout)",
+        "type": "awct",
+        "liveOnly": false,
+        "firingTriggerId": ["102"],
+        "parameter": [
+          { "type": "TEMPLATE", "key": "conversionId", "value": "944115229" },
+          { "type": "TEMPLATE", "key": "conversionLabel", "value": "JjgUCKfrqakdEJ2cmMID" },
+          { "type": "TEMPLATE", "key": "conversionValue", "value": "{{dlv - ecommerce.value}}" },
+          { "type": "TEMPLATE", "key": "currencyCode", "value": "BRL" }
+        ]
+      },
+      {
+        "accountId": "6000000000",
+        "containerId": "70000000",
+        "tagId": "5",
+        "name": "Google Ads — Conversão: [Totem Pro] Adicionar ao Carrinho (Add to Cart)",
+        "type": "awct",
+        "liveOnly": false,
+        "firingTriggerId": ["103"],
+        "parameter": [
+          { "type": "TEMPLATE", "key": "conversionId", "value": "944115229" },
+          { "type": "TEMPLATE", "key": "conversionLabel", "value": "xAc_CPHtqakdEJ2cmMID" },
+          { "type": "TEMPLATE", "key": "conversionValue", "value": "{{dlv - ecommerce.value}}" },
+          { "type": "TEMPLATE", "key": "currencyCode", "value": "BRL" }
+        ]
+      },
+      {
+        "accountId": "6000000000",
+        "containerId": "70000000",
+        "tagId": "6",
+        "name": "Google Ads — Conversão: [Totem Pro] Lead Cadastro Checkout",
         "type": "awct",
         "liveOnly": false,
         "firingTriggerId": ["104"],
         "parameter": [
           { "type": "TEMPLATE", "key": "conversionId", "value": "944115229" },
-          { "type": "TEMPLATE", "key": "conversionLabel", "value": "wfA1CIiPpfkaEJ2cmMID" },
+          { "type": "TEMPLATE", "key": "conversionLabel", "value": "VumdCIjzqakdEJ2cmMID" },
           { "type": "TEMPLATE", "key": "conversionValue", "value": "{{dlv - ecommerce.value}}" },
           { "type": "TEMPLATE", "key": "currencyCode", "value": "BRL" },
           { "type": "BOOLEAN", "key": "enableEnhancedConversions", "value": "true" },
@@ -88,14 +119,14 @@
       {
         "accountId": "6000000000",
         "containerId": "70000000",
-        "tagId": "5",
-        "name": "Google Ads — Conversão: Contato WhatsApp Engenharia",
+        "tagId": "7",
+        "name": "Google Ads — Conversão: [Totem Pro] WhatsApp Consultor Engenharia",
         "type": "awct",
         "liveOnly": false,
         "firingTriggerId": ["105"],
         "parameter": [
           { "type": "TEMPLATE", "key": "conversionId", "value": "944115229" },
-          { "type": "TEMPLATE", "key": "conversionLabel", "value": "NpfaCKn1tYkbEJ2cmMID" },
+          { "type": "TEMPLATE", "key": "conversionLabel", "value": "2vTuCKyvo6kdEJ2cmMID" },
           { "type": "TEMPLATE", "key": "conversionValue", "value": "1.0" },
           { "type": "TEMPLATE", "key": "currencyCode", "value": "BRL" }
         ]
@@ -103,7 +134,7 @@
       {
         "accountId": "6000000000",
         "containerId": "70000000",
-        "tagId": "6",
+        "tagId": "8",
         "name": "Google Ads — Tag de Remarketing Dinâmico",
         "type": "sp",
         "liveOnly": false,
