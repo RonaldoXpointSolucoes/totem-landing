@@ -9,6 +9,7 @@ import { TeamManager } from "@/components/admin/TeamManager";
 import { VoucherManager } from "@/components/admin/VoucherManager";
 import { CustomersManager } from "@/components/admin/CustomersManager";
 import { SystemLogsManager } from "@/components/admin/SystemLogsManager";
+import { TelemetryErrorsManager } from "@/components/admin/TelemetryErrorsManager";
 import {
   OrderExecutionEditor,
   OrderExecutionViewer,
@@ -20,6 +21,7 @@ import {
 import { GoogleLoginButton } from "@/components/auth/GoogleLoginButton";
 import {
   ShieldCheck,
+  ShieldAlert,
   Package,
   Layers,
   FileText,
@@ -230,7 +232,7 @@ export default function AdminPage() {
   };
 
   // Navegação do painel
-  const [activeTab, setActiveTab] = useState<"orders" | "catalog" | "vouchers" | "customers" | "analytics" | "marketing" | "team" | "logs">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "catalog" | "vouchers" | "customers" | "analytics" | "marketing" | "team" | "logs" | "telemetry">("orders");
   const [catalogSubTab, setCatalogSubTab] = useState<"models" | "colors" | "peripherals">("models");
 
   // Dados
@@ -1304,6 +1306,18 @@ export default function AdminPage() {
             <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-black/30 text-white font-bold">
               {auditLogs.length}
             </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("telemetry")}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all shrink-0 ${
+              activeTab === "telemetry"
+                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25"
+                : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+            }`}
+          >
+            <ShieldAlert className="w-4 h-4 text-rose-400" />
+            <span>Erros & Diagnósticos</span>
           </button>
         </div>
       </div>
@@ -2427,6 +2441,11 @@ export default function AdminPage() {
         {/* ABA 3: AUDITORIA E LOGS */}
         {/* ======================================================== */}
         {activeTab === "logs" && <SystemLogsManager />}
+
+        {/* ======================================================== */}
+        {/* ABA: TELEMETRIA DE ERROS E DIAGNÓSTICO IA */}
+        {/* ======================================================== */}
+        {activeTab === "telemetry" && <TelemetryErrorsManager />}
 
         {/* ======================================================== */}
         {/* ABA 4: CONFIGURAÇÃO DE SEO, MARKETING & TRÁFEGO PAGO */}

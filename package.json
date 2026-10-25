@@ -1,6 +1,6 @@
 {
   "name": "totem-landing",
-  "version": "3.1.0",
+  "version": "3.1.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -9,7 +9,9 @@
     "lint": "next lint",
     "test": "npx tsx scripts/validate-receipts-precision.ts",
     "test:shipping": "npx tsx scripts/validate-receipts-precision.ts",
-    "test:payments": "npx tsx scripts/validate-mercadopago.ts"
+    "test:payments": "npx tsx scripts/validate-mercadopago.ts",
+    "telemetry:check": "npx tsx scripts/check-telemetry.ts",
+    "telemetry:remote": "npx tsx scripts/check-telemetry.ts --remote"
   },
 
   "dependencies": {

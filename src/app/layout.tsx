@@ -3,6 +3,8 @@ import { siteConfig } from "@/config/site";
 import { ThemeProvider } from "@/lib/theme/ThemeContext";
 import { CartProvider } from "@/modules/cart/CartContext";
 import { MarketingPixels } from "@/components/analytics/MarketingPixels";
+import { SiteTelemetryWatcher } from "@/components/telemetry/SiteTelemetryWatcher";
+import { TelemetryErrorBoundary } from "@/components/telemetry/TelemetryErrorBoundary";
 import { FAQ_DATA } from "@/config/faqData";
 import "./globals.css";
 
@@ -295,9 +297,12 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-white dark:bg-[#090a0f] text-[#1d1d1f] dark:text-slate-100 antialiased selection:bg-[#0071e3] selection:text-white transition-colors duration-300">
         <MarketingPixels />
+        <SiteTelemetryWatcher />
         <ThemeProvider>
           <CartProvider>
-            {children}
+            <TelemetryErrorBoundary>
+              {children}
+            </TelemetryErrorBoundary>
           </CartProvider>
         </ThemeProvider>
       </body>
