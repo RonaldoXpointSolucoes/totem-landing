@@ -16,8 +16,8 @@ export const pixelConfig = {
   googleAdsLeadLabel: process.env.NEXT_PUBLIC_GOOGLE_ADS_LEAD_LABEL || "VumdCIjzqakdEJ2cmMID",
   googleAdsWhatsappLabel: process.env.NEXT_PUBLIC_GOOGLE_ADS_WHATSAPP_LABEL || "2vTuCKyvo6kdEJ2cmMID",
   
-  // Google Tag Manager (GTM Container)
-  gtmId: process.env.NEXT_PUBLIC_GTM_ID || "",
+  // Google Tag Manager (GTM Container Oficial X-Point)
+  gtmId: process.env.NEXT_PUBLIC_GTM_ID || "GTM-TCZRNPTK",
 
   // Ativação de Conversões Otimizadas (Enhanced Conversions)
   enhancedConversions: true,

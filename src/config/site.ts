@@ -1,6 +1,6 @@
 export const siteConfig = {
   name: "Totem Pro — Gabinetes para Autoatendimento",
-  version: "3.0.5",
+  version: "3.0.6",
   description:
     "Configurador sob medida de gabinetes de piso, parede e balcão para totens de autoatendimento. Precisão milimétrica para seus equipamentos homologados.",
   url: "https://totem.xpointsolucoes.com.br",
