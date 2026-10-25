@@ -96,7 +96,7 @@ export const CartView: React.FC<CartViewProps> = ({
         };
       });
 
-      const MAX_ATTEMPTS = 3;
+      const MAX_ATTEMPTS = 2; // Exatamente 2 tentativas com transparência
       let lastErr = "Serviço dos Correios temporariamente indisponível.";
 
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -150,7 +150,7 @@ export const CartView: React.FC<CartViewProps> = ({
         }
       }
 
-      setShippingError(`${lastErr} (Tentamos ${MAX_ATTEMPTS} vezes)`);
+      setShippingError(`${lastErr} (Tentamos ${MAX_ATTEMPTS} vezes automaticamente)`);
       setShippingQuotes([]);
       setSelectedShippingId(null);
       setShippingRetryAttempt(0);
@@ -553,7 +553,7 @@ export const CartView: React.FC<CartViewProps> = ({
                     {isLoadingShipping ? (
                       <span className="flex items-center gap-1">
                         <Loader2 className="w-3 h-3 animate-spin" />
-                        {shippingRetryAttempt > 1 ? `Tentativa ${shippingRetryAttempt}/3` : "Cotando"}
+                        {shippingRetryAttempt === 2 ? "Tentativa 2/2" : "Cotando (1/2)"}
                       </span>
                     ) : (
                       "Calcular"

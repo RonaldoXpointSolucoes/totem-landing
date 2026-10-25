@@ -10,8 +10,8 @@ interface CachedToken {
 let inMemoryToken: CachedToken | null = null;
 
 const CWS_BASE_URL = "https://api.correios.com.br";
-const REQUEST_TIMEOUT_MS = 2800; // 2.8s timeout por tentativa
-export const MAX_CORREIOS_RETRY_ATTEMPTS = 3;
+const REQUEST_TIMEOUT_MS = 2500; // 2.5s timeout por tentativa
+export const MAX_CORREIOS_RETRY_ATTEMPTS = 2; // 2 tentativas com proteção antifalha
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

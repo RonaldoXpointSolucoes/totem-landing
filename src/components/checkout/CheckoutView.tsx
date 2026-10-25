@@ -258,7 +258,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
       };
     });
 
-    const MAX_ATTEMPTS = 3;
+    const MAX_ATTEMPTS = 2; // Exatamente 2 tentativas com comunicação transparente
     let lastErrorMessage = "Serviço dos Correios temporariamente indisponível.";
 
     try {
@@ -303,15 +303,15 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           }
         } catch (err: any) {
           console.warn(`[FRETE] Tentativa ${attempt}/${MAX_ATTEMPTS} falhou:`, err);
-          lastErrorMessage = "Erro de comunicação com a API dos Correios.";
+          lastErrorMessage = "Erro de conexão ao consultar os Correios.";
         }
 
         if (attempt < MAX_ATTEMPTS) {
-          await new Promise((resolve) => setTimeout(resolve, 600 * attempt));
+          await new Promise((resolve) => setTimeout(resolve, 800));
         }
       }
 
-      setShippingError(`${lastErrorMessage} (Tentamos ${MAX_ATTEMPTS} vezes)`);
+      setShippingError(`${lastErrorMessage} (Tentamos ${MAX_ATTEMPTS} vezes automaticamente)`);
       setIsCorreiosDown(true);
       setShippingQuotes([]);
       setShippingCooldown((prev) => (prev > 0 ? prev : 20));
@@ -1548,9 +1548,9 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-[#0071e3] text-xs font-semibold animate-pulse">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   <span>
-                    {shippingRetryAttempt > 1
-                      ? `Tentativa ${shippingRetryAttempt} de 3...`
-                      : "Calculando opções oficiais..."}
+                    {shippingRetryAttempt === 2
+                      ? "Conectando Rota Segura (Tentativa 2 de 2)..."
+                      : "Consultando Correios (Tentativa 1 de 2)..."}
                   </span>
                 </span>
               )}
@@ -1586,18 +1586,20 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                       <div className="flex items-center justify-between flex-wrap gap-1">
                         <span className="text-xs sm:text-sm font-bold text-[#1d1d1f] dark:text-white flex items-center gap-2">
                           <span>
-                            {shippingRetryAttempt > 1
-                              ? `Consultando API Oficial dos Correios (Tentativa ${shippingRetryAttempt}/3)`
-                              : "Consultando API Oficial dos Correios"}
+                            {shippingRetryAttempt === 2
+                              ? "Servidores da ECT oscilaram. Conectando via Rota Segura (Tentativa 2 de 2)..."
+                              : "Consultando cotação oficial dos Correios (Tentativa 1 de 2)..."}
                           </span>
                           <span className="w-2 h-2 rounded-full bg-[#0071e3] animate-ping" />
                         </span>
                         <span className="text-[10px] font-bold text-[#0071e3] dark:text-cyan-400 bg-white dark:bg-slate-900 px-2.5 py-0.5 rounded-full border border-blue-200 dark:border-indigo-800 shadow-sm">
-                          Auditando Rotas ECT
+                          Garantia Contrato ECT
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
-                        Avaliando peso individual por gabinete, embalagens industriais e tabelas contratuais para o CEP <strong className="text-[#0071e3] dark:text-cyan-300 font-mono">{cep}</strong>...
+                        {shippingRetryAttempt === 2
+                          ? "Garantindo tarifa oficial e prazos com base no Contrato AG 9912722993 da fábrica (AC Taboão da Serra)..."
+                          : `Calculando cubagem oficial por unidade, seguro postal de valor declarado e tarifas contratuais para o CEP ${cep}...`}
                       </p>
                     </div>
                   </div>
