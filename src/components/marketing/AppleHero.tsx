@@ -248,26 +248,30 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
 
         {/* Subtítulo no Estilo Apple Intelligence (Gradiente Azul -> Roxo -> Laranja) */}
         <div
-          className={`mt-6 space-y-3 max-w-xl mx-auto transition-all duration-800 ease-out ${
+          className={`mt-6 space-y-3 max-w-2xl mx-auto transition-all duration-800 ease-out ${
             isLoaded
               ? "opacity-100 translate-y-0 filter-none"
               : "opacity-0 translate-y-4 blur-[4px]"
           }`}
           style={{ transitionDelay: isLoaded ? "420ms" : "0ms" }}
         >
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs sm:text-sm font-bold">
+            <Check className="w-3.5 h-3.5 stroke-[3]" />
+            <span>Monte seu próprio Totem e economize mais de 50%</span>
+          </div>
+
           <p className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-[#0071e3] via-[#af52de] to-[#ff9500] bg-clip-text text-transparent tracking-tight">
-            Feito para alta precisão industrial.
+            Você mesmo monta seu Totem de Autoatendimento. Simples e sob medida.
           </p>
 
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
-            Escolha o modelo, o padrão e selecione seus equipamentos homologados. Nós fabricamos o
-            gabinete em MaDeFibra BP 15mm de alta densidade com cortes e encaixes exatos na Router CNC.
+            Compre <strong>apenas o gabinete</strong> (usinado na Router CNC com encaixe exato para as peças que você já tem) ou leve o <strong>Gabinete + Kit Completo</strong> com tudo o que você precisa pronto para instalar.
           </p>
         </div>
 
-        {/* Botão Pill Azul Apple, Ver Vídeos no Instagram & Link Secundário */}
+        {/* Botão Pill Azul Apple, Passo a Passo, Ver Vídeos no Instagram & Link Secundário */}
         <div
-          className={`mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 transition-all duration-800 ease-out ${
+          className={`mt-8 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 sm:gap-4 transition-all duration-800 ease-out ${
             isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
           }`}
           style={{ transitionDelay: isLoaded ? "540ms" : "0ms" }}
@@ -276,9 +280,17 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
             onClick={onStartConfigurator}
             className="w-full sm:w-auto px-7 py-3.5 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white font-semibold text-sm sm:text-base transition-all duration-200 shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/35 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
           >
-            <span>Configurar meu Totem</span>
+            <span>Montar Meu Totem Agora</span>
             <ArrowRight className="w-4 h-4" />
           </button>
+
+          <a
+            href="#como-funciona"
+            className="w-full sm:w-auto px-5 py-3 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+          >
+            <span>Ver Passo a Passo (-50%)</span>
+            <ChevronRight className="w-4 h-4" />
+          </a>
 
           <button
             onClick={() => setIsVideoModalOpen(true)}
@@ -306,15 +318,15 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
         >
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span>MaDeFibra BP 15mm Premium</span>
+            <span>Economia Acima de 50%</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-indigo-500" />
-            <span>Corte Router CNC Sem Arrepiamento</span>
+            <span>Só o Gabinete ou Gabinete + Kit</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-cyan-500" />
-            <span>Branco TX, Preto TX ou Sob Medida</span>
+            <span>MaDeFibra BP 15mm • Router CNC</span>
           </div>
         </div>
       </div>

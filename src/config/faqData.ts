@@ -12,6 +12,12 @@ export interface FaqItem {
 export const FAQ_DATA: FaqItem[] = [
   {
     category: "Produto",
+    question: "Como posso montar meu próprio Totem de Autoatendimento e economizar mais de 50%?",
+    answer:
+      "É muito simples: seguindo o nosso passo a passo, você pode comprar apenas o gabinete usinado sob medida na Router CNC (a partir de R$ 950 no PIX) para encaixar as peças que você já possui, ou escolher o Gabinete + Kit Completo de Montagem (com Computador All-in-One Touch 23.8\", Impressora Térmica 80mm e Leitor 2D). Como o gabinete já chega pronto com furação VESA e encaixes exatos, você mesmo instala em poucos minutos e economiza mais de 50% em relação aos totens fechados do mercado.",
+  },
+  {
+    category: "Produto",
     question: "O que é um Gabinete para Totem de Autoatendimento e para que serve?",
     answer:
       "O gabinete para totem é a estrutura física e estrutural usinada em Router CNC que protege e organiza todos os equipamentos de autoatendimento (monitor touchscreen, impressora térmica de cupom fiscal, leitor de código de barras/QR code, mini PC e nobreak). Ele transforma seus periféricos em uma estação interativa comercial profissional, segura e atraente para clientes no varejo, restaurantes, clínicas e eventos.",
@@ -26,7 +32,7 @@ export const FAQ_DATA: FaqItem[] = [
     category: "Compatibilidade",
     question: "Posso utilizar meus próprios monitores, impressoras e leitores?",
     answer:
-      "Sim! Você pode usar os equipamentos que já possui ou deseja homologar. Durante a configuração no site, selecione os modelos dos seus periféricos (monitores de 15.6\", 18.5\" ou 21.5\", impressoras Elgin, Epson, Bematech ou Daruma, e leitores Honeywell, Zebra, etc.) e usinamos os recortes exatos sem custo adicional.",
+      "Sim! Você pode usar os equipamentos que já possui ou deseja homologar. Durante a configuração no site, selecione os modelos dos seus periféricos (monitores de 15.6\", 18.5\", 21.5\" ou 23.8\", impressoras Elgin, Epson, Bematech ou Daruma, e leitores Honeywell, Zebra, etc.) e usinamos os recortes exatos sem custo adicional.",
   },
   {
     category: "Compatibilidade",
