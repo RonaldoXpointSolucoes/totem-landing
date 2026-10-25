@@ -16,6 +16,7 @@ import { findOrCreateCustomerFromCheckout } from "@/lib/customers/customerStore"
 import { saveLocalOrder } from "@/lib/orders/orderStore";
 import { setCustomerSession } from "@/lib/customers/customerSession";
 import { logEcosystemEvent } from "@/lib/logging/ecosystemLogger";
+import { notifyNewOrderOnWhatsApp } from "@/lib/notifications/whatsappNotifier";
 
 interface RequestBody {
   paymentMethod?: "pix" | "credit_card";
@@ -499,6 +500,12 @@ export async function POST(req: Request) {
     } catch (custErr) {
       console.warn("Aviso ao vincular conta de cliente:", custErr);
     }
+
+    // 9. Notificação imediata no WhatsApp (Ronaldo e Daniela) via API FooodNext
+    await notifyNewOrderOnWhatsApp(orderDetails, {
+      couponCode: appliedCouponCode,
+      discountCents,
+    });
 
     return NextResponse.json({
       ok: true,

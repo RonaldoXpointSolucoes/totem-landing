@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { saveOrderWithSnapshot, getServerDatabases } from "@/lib/appwrite/server";
+import { getServerDatabases } from "@/lib/appwrite/server";
 import { APPWRITE_CONFIG } from "@/lib/appwrite/config";
 import {
   CABINET_MODELS,
   COLOR_OPTIONS,
 } from "@/modules/catalog/catalogData";
 import { ID, Query } from "node-appwrite";
+import { notifyCustomRequestOnWhatsApp } from "@/lib/notifications/whatsappNotifier";
 
 interface CustomizationRequestBody {
   customer: {
@@ -106,6 +107,21 @@ export async function POST(req: Request) {
       unit_price_cents: basePriceCents,
       quantity: 1,
       subtotal_cents: basePriceCents,
+    });
+
+    // Notifica Ronaldo e Daniela no WhatsApp sobre a nova solicitação sob medida
+    await notifyCustomRequestOnWhatsApp({
+      orderNumber,
+      customerName: customer.name,
+      customerWhatsapp: customer.whatsapp,
+      customerEmail: customer.email,
+      cabinetName: model.name,
+      colorName: color.name,
+      equipmentType,
+      equipmentBrand,
+      equipmentModel,
+      notes,
+      basePriceCents,
     });
 
     return NextResponse.json({

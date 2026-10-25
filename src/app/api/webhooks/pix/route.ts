@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerDatabases } from "@/lib/appwrite/server";
 import { APPWRITE_CONFIG } from "@/lib/appwrite/config";
 import { Query } from "node-appwrite";
+import { notifyPaymentConfirmedOnWhatsApp } from "@/lib/notifications/whatsappNotifier";
 
 const WEBHOOK_SECRET = process.env.PIX_WEBHOOK_SECRET;
 
@@ -118,6 +119,14 @@ export async function POST(req: Request) {
     }
 
     console.log(`[Webhook Pix] Pedido ${orderDoc.order_number} compensado com sucesso!`);
+
+    await notifyPaymentConfirmedOnWhatsApp({
+      orderNumber: orderDoc.order_number || orderDoc.$id,
+      customerName: orderDoc.customer_name || "Cliente",
+      customerWhatsapp: orderDoc.customer_whatsapp || "",
+      totalCents: orderDoc.total_cents || 0,
+      method: "pix",
+    });
 
     // Sincroniza voucher e libera comissão para repasse ao influenciador
     try {
