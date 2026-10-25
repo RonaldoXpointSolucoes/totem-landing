@@ -1,10 +1,11 @@
 /**
  * Tracker Client-Side de Analytics & Telemetria do Funil com Bridge de Tráfego Pago
  * Dispara simultaneamente para:
- * 1. Google Analytics 4 (GA4) & Google Ads Conversion Tracking (gtag.js)
- * 2. Meta Ads / Facebook Pixel (fbq)
- * 3. TikTok Ads Pixel (ttq)
- * 4. Banco de Dados Interno X-Point (/api/analytics/track)
+ * 1. Google Tag Manager (GTM) - dataLayer oficial com schema GA4 E-commerce & Enhanced Conversions
+ * 2. Google Analytics 4 (GA4) & Google Ads Conversion Tracking (gtag.js com Conversões Otimizadas)
+ * 3. Meta Ads / Facebook Pixel (fbq)
+ * 4. TikTok Ads Pixel (ttq)
+ * 5. Telemetria Interna X-Point (/api/analytics/track)
  */
 
 import { ANALYTICS_EVENTS, AnalyticsEventType } from "./events";
@@ -27,7 +28,70 @@ export function getOrCreateSessionId(): string {
 }
 
 /**
- * Encaminha o evento para os Pixels de Marketing (Google, Meta, TikTok)
+ * Normaliza número de telefone para o padrão internacional E.164 (+5511999999999)
+ */
+function formatE164Phone(phoneRaw?: string): string | undefined {
+  if (!phoneRaw) return undefined;
+  const digits = phoneRaw.replace(/\D/g, "");
+  if (!digits) return undefined;
+  if (digits.startsWith("55") && digits.length >= 12) return `+${digits}`;
+  if (digits.length >= 10) return `+55${digits}`;
+  return `+${digits}`;
+}
+
+/**
+ * Extrai e estrutura dados do comprador para o Google Ads Enhanced Conversions
+ */
+function extractUserData(data: Record<string, unknown>) {
+  const email = (data.email as string)?.trim().toLowerCase() || undefined;
+  const rawPhone = (data.whatsapp || data.phone || data.telephone) as string | undefined;
+  const phone_number = formatE164Phone(rawPhone);
+
+  const fullName = (data.name as string)?.trim() || "";
+  let first_name: string | undefined;
+  let last_name: string | undefined;
+  if (fullName) {
+    const parts = fullName.split(/\s+/);
+    first_name = parts[0];
+    last_name = parts.slice(1).join(" ") || undefined;
+  }
+
+  const postal_code = (data.cep as string)?.replace(/\D/g, "") || undefined;
+
+  if (!email && !phone_number && !first_name) return null;
+
+  return {
+    email,
+    phone_number,
+    address: {
+      first_name,
+      last_name,
+      postal_code,
+      country: "BR",
+    },
+  };
+}
+
+/**
+ * Disparo padronizado para o dataLayer do Google Tag Manager
+ */
+function pushToGtmDataLayer(gtmEvent: string, eventData: Record<string, unknown>): void {
+  if (typeof window === "undefined") return;
+  window.dataLayer = window.dataLayer || [];
+
+  // Se houver objeto e-commerce, limpa o anterior conforme padrão oficial GA4/GTM
+  if (eventData.ecommerce) {
+    window.dataLayer.push({ ecommerce: null });
+  }
+
+  window.dataLayer.push({
+    event: gtmEvent,
+    ...eventData,
+  });
+}
+
+/**
+ * Encaminha o evento para as plataformas de tráfego pago (Google, Meta, TikTok)
  */
 function dispatchToAdPlatforms(
   eventName: AnalyticsEventType,
@@ -46,141 +110,259 @@ function dispatchToAdPlatforms(
       : undefined;
 
   const currency = (data.currency as string) || "BRL";
+  const userData = extractUserData(data);
 
-  // --- 1. GOOGLE ANALYTICS 4 & GOOGLE ADS ---
-  if (typeof window.gtag === "function") {
-    switch (eventName) {
-      case ANALYTICS_EVENTS.VIEW_HOME:
+  // Aplica Conversões Otimizadas (Enhanced Conversions) se houver dados do comprador
+  if (userData && typeof window.gtag === "function") {
+    try {
+      window.gtag("set", "user_data", userData);
+    } catch (e) {
+      console.debug("[Analytics] Failed to set user_data:", e);
+    }
+  }
+
+  // --- 1. GOOGLE TAG MANAGER (dataLayer) & GOOGLE ADS / GA4 (gtag.js) ---
+  switch (eventName) {
+    case ANALYTICS_EVENTS.VIEW_HOME:
+      pushToGtmDataLayer("page_view", {
+        page_title: document.title,
+        page_location: window.location.href,
+      });
+      if (typeof window.gtag === "function") {
         window.gtag("event", "page_view", {
           page_title: document.title,
           page_location: window.location.href,
         });
-        break;
+      }
+      break;
 
-      case ANALYTICS_EVENTS.START_CONFIGURATOR:
+    case ANALYTICS_EVENTS.START_CONFIGURATOR:
+      pushToGtmDataLayer("select_content", {
+        content_type: "configurator",
+        item_id: data.modelId,
+      });
+      if (typeof window.gtag === "function") {
         window.gtag("event", "select_content", {
           content_type: "configurator",
           item_id: data.modelId,
         });
-        break;
+      }
+      break;
 
-      case ANALYTICS_EVENTS.SELECT_CABINET_MODEL:
-        window.gtag("event", "view_item", {
-          currency,
-          value: valueNumber,
-          items: [
-            {
-              item_id: data.modelId || data.id,
-              item_name: data.modelName || data.name || "Gabinete para Totem",
-              item_category: "Gabinete Totem",
-              price: valueNumber,
-            },
-          ],
-        });
-        break;
+    case ANALYTICS_EVENTS.SELECT_CABINET_MODEL: {
+      const items = [
+        {
+          item_id: String(data.modelId || data.id || "cabinet"),
+          item_name: String(data.modelName || data.name || "Gabinete para Totem"),
+          item_category: "Gabinete Totem",
+          price: valueNumber,
+          quantity: 1,
+        },
+      ];
+      pushToGtmDataLayer("view_item", {
+        ecommerce: { currency, value: valueNumber, items },
+      });
+      if (typeof window.gtag === "function") {
+        window.gtag("event", "view_item", { currency, value: valueNumber, items });
+      }
+      break;
+    }
 
-      case ANALYTICS_EVENTS.VIEW_3D_MODEL:
-      case ANALYTICS_EVENTS.INTERACT_3D:
+    case ANALYTICS_EVENTS.VIEW_3D_MODEL:
+    case ANALYTICS_EVENTS.INTERACT_3D:
+      pushToGtmDataLayer("interact_3d", {
+        video_title: `Totem 3D - ${data.modelName || data.modelId || "Gabinete"}`,
+        video_provider: "ThreeJS WebGL",
+        action: data.action || "interaction",
+      });
+      if (typeof window.gtag === "function") {
         window.gtag("event", "video_view", {
           video_title: `Totem 3D - ${data.modelName || data.modelId || "Gabinete"}`,
           video_provider: "ThreeJS WebGL",
           action: data.action || "interaction",
         });
-        break;
+      }
+      break;
 
-      case ANALYTICS_EVENTS.VIEW_CART:
+    case ANALYTICS_EVENTS.VIEW_CART:
+      pushToGtmDataLayer("view_cart", {
+        ecommerce: {
+          currency,
+          value: valueNumber,
+          items_count: data.itemsCount,
+        },
+      });
+      if (typeof window.gtag === "function") {
         window.gtag("event", "view_cart", {
           currency,
           value: valueNumber,
           items_count: data.itemsCount,
         });
-        break;
+      }
+      break;
 
-      case ANALYTICS_EVENTS.ADD_TO_CART:
-        window.gtag("event", "add_to_cart", {
+    case ANALYTICS_EVENTS.ADD_TO_CART: {
+      const cartItems = [
+        {
+          item_id: String(data.modelId || data.itemId || "totem"),
+          item_name: String(data.modelName || "Gabinete Totem"),
+          item_category: "Gabinete Totem",
+          price: valueNumber,
+          quantity: (data.quantity as number) || 1,
+        },
+      ];
+      pushToGtmDataLayer("add_to_cart", {
+        ecommerce: { currency, value: valueNumber, items: cartItems },
+      });
+      if (typeof window.gtag === "function") {
+        window.gtag("event", "add_to_cart", { currency, value: valueNumber, items: cartItems });
+      }
+      break;
+    }
+
+    case ANALYTICS_EVENTS.REMOVE_FROM_CART:
+      pushToGtmDataLayer("remove_from_cart", {
+        ecommerce: {
           currency,
           value: valueNumber,
-          items: [
-            {
-              item_id: data.modelId || data.itemId,
-              item_name: data.modelName || "Gabinete para Totem",
-              item_category: "Gabinete Totem",
-              price: valueNumber,
-              quantity: (data.quantity as number) || 1,
-            },
-          ],
-        });
-        break;
-
-      case ANALYTICS_EVENTS.REMOVE_FROM_CART:
+          items: [{ item_id: String(data.itemId || "totem") }],
+        },
+      });
+      if (typeof window.gtag === "function") {
         window.gtag("event", "remove_from_cart", {
           currency,
           value: valueNumber,
-          items: [{ item_id: data.itemId }],
+          items: [{ item_id: String(data.itemId || "totem") }],
         });
-        break;
+      }
+      break;
 
-      case ANALYTICS_EVENTS.BEGIN_CHECKOUT:
+    case ANALYTICS_EVENTS.BEGIN_CHECKOUT:
+      pushToGtmDataLayer("begin_checkout", {
+        ecommerce: {
+          currency,
+          value: valueNumber,
+          items_count: data.totalItems || data.numItems,
+        },
+      });
+      if (typeof window.gtag === "function") {
         window.gtag("event", "begin_checkout", {
           currency,
           value: valueNumber,
           items_count: data.totalItems || data.numItems,
         });
-        break;
+      }
+      break;
 
-      case ANALYTICS_EVENTS.LEAD_SUBMITTED:
+    case ANALYTICS_EVENTS.LEAD_SUBMITTED:
+      pushToGtmDataLayer("generate_lead", {
+        currency,
+        value: valueNumber,
+        lead_type: "checkout_registration",
+        user_data: userData,
+      });
+      if (typeof window.gtag === "function") {
         window.gtag("event", "generate_lead", {
           currency,
           value: valueNumber,
           lead_type: "checkout_registration",
         });
-        // Google Ads Conversion para Lead
-        if (pixelConfig.googleAdsId && pixelConfig.googleAdsLeadLabel) {
+
+        // Google Ads Conversion Oficial para Lead
+        const leadLabel = pixelConfig.googleAdsLeadLabel || "wfA1CIiPpfkaEJ2cmMID";
+        if (pixelConfig.googleAdsId && leadLabel) {
           window.gtag("event", "conversion", {
-            send_to: `${pixelConfig.googleAdsId}/${pixelConfig.googleAdsLeadLabel}`,
-            value: valueNumber,
+            send_to: `${pixelConfig.googleAdsId}/${leadLabel}`,
+            value: valueNumber || 1.0,
             currency,
           });
         }
-        break;
+      }
+      break;
 
-      case ANALYTICS_EVENTS.PIX_GENERATED:
+    case ANALYTICS_EVENTS.PIX_GENERATED:
+      pushToGtmDataLayer("add_payment_info", {
+        ecommerce: {
+          payment_type: "PIX",
+          currency,
+          value: valueNumber,
+          order_id: data.orderId || data.orderNumber,
+        },
+        user_data: userData,
+      });
+      if (typeof window.gtag === "function") {
         window.gtag("event", "add_payment_info", {
           payment_type: "PIX",
           currency,
           value: valueNumber,
         });
-        break;
+      }
+      break;
 
-      case ANALYTICS_EVENTS.PURCHASE:
+    case ANALYTICS_EVENTS.PURCHASE: {
+      const orderId = String(data.orderId || data.transactionId || data.orderNumber || Date.now());
+      pushToGtmDataLayer("purchase", {
+        ecommerce: {
+          transaction_id: orderId,
+          value: valueNumber,
+          currency,
+          items_count: data.itemCount,
+        },
+        user_data: userData,
+      });
+      if (typeof window.gtag === "function") {
         window.gtag("event", "purchase", {
-          transaction_id: data.orderId || data.transactionId,
+          transaction_id: orderId,
           value: valueNumber,
           currency,
           items_count: data.itemCount,
         });
-        // Google Ads Conversion para Venda
+
+        // Google Ads Conversion Oficial para Venda
         if (pixelConfig.googleAdsId && pixelConfig.googleAdsPurchaseLabel) {
           window.gtag("event", "conversion", {
             send_to: `${pixelConfig.googleAdsId}/${pixelConfig.googleAdsPurchaseLabel}`,
             value: valueNumber,
             currency,
-            transaction_id: data.orderId || data.transactionId,
+            transaction_id: orderId,
           });
         }
-        break;
+      }
+      break;
+    }
 
-      case ANALYTICS_EVENTS.WHATSAPP_CLICK:
+    case ANALYTICS_EVENTS.WHATSAPP_CLICK: {
+      pushToGtmDataLayer("contact_whatsapp", {
+        method: "WhatsApp",
+        source: data.source || "button",
+        value: 1.0,
+        currency: "BRL",
+      });
+      if (typeof window.gtag === "function") {
         window.gtag("event", "contact", {
           method: "WhatsApp",
           source: data.source || "button",
         });
-        break;
 
-      default:
-        window.gtag("event", eventName, data);
-        break;
+        // Google Ads Conversion Oficial para WhatsApp (ConvWhatsApp)
+        const waLabel = pixelConfig.googleAdsWhatsappLabel || "NpfaCKn1tYkbEJ2cmMID";
+        if (pixelConfig.googleAdsId && waLabel) {
+          window.gtag("event", "conversion", {
+            send_to: `${pixelConfig.googleAdsId}/${waLabel}`,
+            value: 1.0,
+            currency: "BRL",
+          });
+        }
+      }
+      break;
     }
+
+    default:
+      pushToGtmDataLayer(eventName, data);
+      if (typeof window.gtag === "function") {
+        window.gtag("event", eventName, data);
+      }
+      break;
   }
 
   // --- 2. META PIXEL (FACEBOOK & INSTAGRAM) ---
@@ -361,11 +543,13 @@ function dispatchToAdPlatforms(
 
   // Debug local em desenvolvimento
   if (pixelConfig.debug) {
-    console.debug(`[Marketing Pixels] [${eventName}]`, {
+    console.debug(`[Marketing Pixels & GTM dataLayer] [${eventName}]`, {
       metadata: data,
       value: valueNumber,
       currency,
+      userDataPresent: !!userData,
       gtagReady: typeof window.gtag === "function",
+      dataLayerLength: window.dataLayer?.length || 0,
       fbqReady: typeof window.fbq === "function",
       ttqReady: !!window.ttq,
     });
@@ -373,7 +557,7 @@ function dispatchToAdPlatforms(
 }
 
 /**
- * Disparador central de eventos de Analytics e Pixels
+ * Disparador central de eventos de Analytics, Pixels e GTM dataLayer
  */
 export function trackEvent(
   eventName: AnalyticsEventType,
@@ -394,7 +578,7 @@ export function trackEvent(
     },
   };
 
-  // 1. Dispara para as plataformas de tráfego pago (Google, Meta, TikTok)
+  // 1. Dispara para as plataformas de tráfego pago (GTM dataLayer, Google Ads, GA4, Meta, TikTok)
   try {
     dispatchToAdPlatforms(eventName, metadata);
   } catch (adErr) {

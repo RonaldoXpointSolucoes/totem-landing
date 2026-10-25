@@ -187,6 +187,11 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
             orderNumber: orderDetails.orderNumber,
             totalPriceCents: orderDetails.totalCents,
             totalCents: orderDetails.totalCents,
+            itemCount: orderDetails.items?.length || 1,
+            name: orderDetails.customer?.name || name,
+            email: orderDetails.customer?.email || email,
+            whatsapp: orderDetails.customer?.whatsapp || whatsapp,
+            cep: orderDetails.deliveryAddress?.cep || cep,
             source: "webhook_polling",
           });
           setOrderDetails((prev) =>
@@ -725,6 +730,8 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
         name: name.trim(),
         email: email.trim().toLowerCase(),
         whatsapp: whatsapp.trim(),
+        phone: whatsapp.trim(),
+        cep: cep.trim(),
         personType,
         city: city.trim(),
         state: state.trim(),
@@ -773,6 +780,11 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
         totalPriceCents: data.order.totalCents,
         totalCents: data.order.totalCents,
         itemCount: data.order.items.length,
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        whatsapp: whatsapp.trim(),
+        phone: whatsapp.trim(),
+        cep: cep.trim(),
         paymentMethod: "pix",
       });
       setStep("awaiting_pix");

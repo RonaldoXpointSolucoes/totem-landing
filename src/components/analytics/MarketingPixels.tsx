@@ -35,6 +35,7 @@ export const MarketingPixels: React.FC = () => {
             googleAdsId: data.googleAdsId || prev.googleAdsId,
             googleAdsPurchaseLabel: data.googleAdsPurchaseLabel || prev.googleAdsPurchaseLabel,
             googleAdsLeadLabel: data.googleAdsLeadLabel || prev.googleAdsLeadLabel,
+            googleAdsWhatsappLabel: data.googleAdsWhatsappLabel || prev.googleAdsWhatsappLabel,
             gtmId: data.gtmId || prev.gtmId,
             metaPixelId: data.metaPixelId || prev.metaPixelId,
             tiktokPixelId: data.tiktokPixelId || prev.tiktokPixelId,
@@ -51,24 +52,34 @@ export const MarketingPixels: React.FC = () => {
 
   return (
     <>
-      {/* 1. Google Tag Manager (opcional) */}
+      {/* 1. Google Tag Manager (Script e NoScript) */}
       {gtmId && (
-        <Script
-          id="gtm-script"
-          strategy="afterInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-              new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-              j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-              'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-              })(window,document,'script','dataLayer','${gtmId}');
-            `,
-          }}
-        />
+        <>
+          <Script
+            id="gtm-script"
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `
+                (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+                new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+                j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+                'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+                })(window,document,'script','dataLayer','${gtmId}');
+              `,
+            }}
+          />
+          <noscript>
+            <iframe
+              src={`https://www.googletagmanager.com/ns.html?id=${gtmId}`}
+              height="0"
+              width="0"
+              style={{ display: "none", visibility: "hidden" }}
+            />
+          </noscript>
+        </>
       )}
 
-      {/* 2. Google Analytics 4 & Google Ads (gtag.js) */}
+      {/* 2. Google Analytics 4 & Google Ads (gtag.js) com Vinculador de Conversões e Conversões Otimizadas */}
       {primaryGoogleId && (
         <>
           <Script
@@ -85,7 +96,14 @@ export const MarketingPixels: React.FC = () => {
                 window.gtag = gtag;
                 gtag('js', new Date());
                 ${gaMeasurementId ? `gtag('config', '${gaMeasurementId}', { send_page_view: true });` : ""}
-                ${googleAdsId && googleAdsId !== gaMeasurementId ? `gtag('config', '${googleAdsId}');` : ""}
+                ${
+                  googleAdsId
+                    ? `gtag('config', '${googleAdsId}', {
+                        conversion_linker: true,
+                        allow_enhanced_conversions: true
+                      });`
+                    : ""
+                }
               `,
             }}
           />
