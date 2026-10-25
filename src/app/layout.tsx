@@ -11,35 +11,35 @@ import "./globals.css";
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
   title: {
-    default: "Totem Pro | Gabinete para Totem de Autoatendimento, Piso, Parede e Balcão",
+    default: "Totem de Autoatendimento e Gabinete Sob Medida | Economize +50% | Totem Pro",
     template: `%s | ${siteConfig.name}`,
   },
   description:
-    "Fabricante industrial de Gabinete para Totem de Autoatendimento. Modelos Gabinete Totem de Piso, Totem de Parede e Totem de Balcão com usinagem Router CNC sob medida para seus monitores e impressoras. Compre direto da fábrica.",
+    "Fabricante de Totem de Autoatendimento e Gabinetes Sob Medida (Piso, Parede e Balcão) usinados em Router CNC. Compre só o gabinete a partir de R$ 950 ou Gabinete + Kit Completo e economize mais de 50%. Envio para todo o Brasil.",
   keywords: [
-    "totem",
+    "totem de autoatendimento",
     "gabinete para totem",
     "gabinete para totem de autoatendimento",
-    "totem de autoatendimento",
+    "totem autoatendimento preço",
+    "totem para restaurante",
+    "totem para lanchonete",
+    "totem de senha para clínica",
+    "totem self checkout mercado",
     "gabinete totem de piso",
     "gabinete totem de parede",
     "gabinete totem de balcão",
-    "fabricante de totem",
-    "totem sob medida",
+    "fabricante de totem de autoatendimento",
+    "monte seu proprio totem",
+    "kit totem de autoatendimento",
     "quiosque autoatendimento",
-    "kiosk self checkout gabinete",
     "usinagem router cnc totem",
-    "gabinete mdf bp totem",
-    "totem touch screen industrial",
-    "totem para restaurantes",
-    "totem para varejo",
-    "totem interativo comercial",
+    "totem touch screen comercial",
     "totem pro x-point",
   ],
   authors: [{ name: "X-Point Soluções em Autoatendimento", url: siteConfig.url }],
   creator: "X-Point Soluções",
   publisher: "X-Point Soluções",
-  category: "Equipamentos Comerciais e Totens",
+  category: "Equipamentos Comerciais e Totens de Autoatendimento",
   alternates: {
     canonical: siteConfig.url,
   },
@@ -54,25 +54,25 @@ export const metadata: Metadata = {
     locale: "pt_BR",
     url: siteConfig.url,
     siteName: "Totem Pro — X-Point Soluções",
-    title: "Gabinete para Totem de Autoatendimento | Piso, Parede e Balcão",
+    title: "Totem de Autoatendimento e Gabinetes Sob Medida | Economize +50%",
     description:
-      "Configure e adquira seu Gabinete de Totem de Autoatendimento sob medida. Usinagem Router CNC milimétrica para monitores touchscreen, impressoras térmicas e leitores de código de barras.",
+      "Monte seu próprio Totem de Autoatendimento e economize mais de 50%. Gabinetes de Piso, Parede e Balcão em Router CNC para monitores touch e impressoras térmicas, ou Kit Completo pronto para instalar.",
     images: [
       {
         url: `${siteConfig.url}/images/og-totem.jpg`,
         secureUrl: `${siteConfig.url}/images/og-totem.jpg`,
         width: 1200,
         height: 630,
-        alt: "Totem Pro — Gabinetes Industriais para Totens de Autoatendimento",
+        alt: "Totem Pro — Totens de Autoatendimento e Gabinetes Sob Medida",
         type: "image/jpeg",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Gabinete para Totem de Autoatendimento | Piso, Parede e Balcão",
+    title: "Totem de Autoatendimento e Gabinetes Sob Medida | Economize +50%",
     description:
-      "Configurador industrial sob medida de Gabinetes para Totem de Autoatendimento com usinagem Router CNC milimétrica.",
+      "Compre só o gabinete usinado em Router CNC (a partir de R$ 950) ou Gabinete + Kit Completo de Autoatendimento.",
     images: [`${siteConfig.url}/images/og-totem.jpg`],
   },
   robots: {
@@ -92,7 +92,7 @@ export const metadata: Metadata = {
     "geo.region": "BR-SP",
     "geo.placename": "São Paulo",
     "geo.position": "-23.55052;-46.633308",
-    "ICBM": "-23.55052, -46.633308",
+    ICBM: "-23.55052, -46.633308",
     "format-detection": "telephone=no",
   },
 };
@@ -113,8 +113,8 @@ const schemaOrgJsonLd = {
     {
       "@type": "Organization",
       "@id": `${siteConfig.url}/#organization`,
-      name: "X-Point Soluções em Autoatendimento",
-      alternateName: "Totem Pro",
+      name: "Totem Pro — X-Point Soluções em Autoatendimento",
+      alternateName: ["Totem Pro", "X-Point Engenharia de Totens"],
       url: siteConfig.url,
       logo: {
         "@type": "ImageObject",
@@ -124,7 +124,7 @@ const schemaOrgJsonLd = {
       },
       image: `${siteConfig.url}/images/og-totem.jpg`,
       description:
-        "Fabricação industrial sob medida de gabinetes para totens de autoatendimento com usinagem Router CNC de alta precisão em MaDeFibra BP 15mm.",
+        "Fabricante industrial de totens de autoatendimento e gabinetes sob medida (piso, parede e balcão) com usinagem Router CNC de alta precisão em MaDeFibra BP 15mm.",
       address: {
         "@type": "PostalAddress",
         addressLocality: "São Paulo",
@@ -134,7 +134,7 @@ const schemaOrgJsonLd = {
       contactPoint: {
         "@type": "ContactPoint",
         telephone: "+55-11-99164-9959",
-        contactType: "customer service",
+        contactType: "sales",
         areaServed: "BR",
         availableLanguage: ["Portuguese"],
       },
@@ -152,31 +152,37 @@ const schemaOrgJsonLd = {
       inLanguage: "pt-BR",
       potentialAction: {
         "@type": "SearchAction",
-        target: `${siteConfig.url}/#modelos?q={search_term_string}`,
+        target: `${siteConfig.url}/monte-seu-totem?modelo={search_term_string}`,
         "query-input": "required name=search_term_string",
       },
     },
     {
       "@type": "Product",
       "@id": `${siteConfig.url}/#product-cabinet`,
-      name: "Gabinete para Totem de Autoatendimento",
+      name: "Totem de Autoatendimento e Gabinete Sob Medida (Piso, Parede e Balcão)",
       description:
-        "Gabinete industrial sob medida para totens de autoatendimento. Modelos Gabinete Totem de Piso, Gabinete Totem de Parede e Gabinete Totem de Balcão com usinagem Router CNC milimétrica para monitores touchscreen, impressoras térmicas e leitores de código de barras.",
+        "Totem de autoatendimento e gabinete industrial sob medida usinado em Router CNC. Disponível nas versões de Piso, Parede e Balcão. Compre apenas o gabinete para montar com suas peças ou o Gabinete + Kit Completo com Computador Touch, Impressora Térmica 80mm e Leitor 2D.",
       brand: {
         "@type": "Brand",
-        name: "Totem Pro / X-Point Soluções",
+        name: "Totem Pro",
       },
       manufacturer: {
         "@id": `${siteConfig.url}/#organization`,
       },
-      sku: "TOTEM-PRO-CABINET-2026",
+      sku: "TOTEM-PRO-CNC-2026",
       mpn: "XPT-TOTEM-PRO",
-      category: "Equipamentos Comerciais > Gabinetes e Totens de Autoatendimento",
-      image: `${siteConfig.url}/images/og-totem.jpg`,
+      category: "Equipamentos Comerciais > Totens de Autoatendimento",
+      image: [
+        `${siteConfig.url}/images/og-totem.jpg`,
+        `${siteConfig.url}/images/totems/floor/floor-white-1.webp`,
+        `${siteConfig.url}/images/totems/floor/floor-black-31.webp`,
+        `${siteConfig.url}/images/totems/wall/wall-white-1.webp`,
+        `${siteConfig.url}/images/totems/countertop/countertop-white-1.webp`,
+      ],
       aggregateRating: {
         "@type": "AggregateRating",
         ratingValue: "4.9",
-        reviewCount: "48",
+        reviewCount: "64",
         bestRating: "5",
         worstRating: "1",
       },
@@ -189,7 +195,22 @@ const schemaOrgJsonLd = {
           },
           datePublished: "2026-08-15",
           reviewBody:
-            "Excelente acabamento no corte da Router CNC. Nossos monitores de 21.5 e impressoras térmicas couberam perfeitamente sem folgas.",
+            "Excelente acabamento no corte da Router CNC. Nossos monitores touch de 21.5 e impressoras térmicas Epson couberam perfeitamente sem folgas. Economizamos mais da metade do valor.",
+          reviewRating: {
+            "@type": "Rating",
+            ratingValue: "5",
+            bestRating: "5",
+          },
+        },
+        {
+          "@type": "Review",
+          author: {
+            "@type": "Person",
+            name: "Roberto Alencar",
+          },
+          datePublished: "2026-09-20",
+          reviewBody:
+            "Compramos 3 totens de piso com o kit completo para nossa rede de hamburguerias. Chegou rápido e já pronto para rodar o cardápio digital.",
           reviewRating: {
             "@type": "Rating",
             ratingValue: "5",
@@ -200,12 +221,13 @@ const schemaOrgJsonLd = {
       offers: {
         "@type": "AggregateOffer",
         priceCurrency: "BRL",
-        lowPrice: "990.00",
-        highPrice: "3490.00",
-        offerCount: "3",
+        lowPrice: "950.00",
+        highPrice: "5880.00",
+        offerCount: "6",
         priceValidUntil: "2027-12-31",
         availability: "https://schema.org/InStock",
         itemCondition: "https://schema.org/NewCondition",
+        url: `${siteConfig.url}/monte-seu-totem`,
         seller: {
           "@id": `${siteConfig.url}/#organization`,
         },
@@ -214,33 +236,79 @@ const schemaOrgJsonLd = {
     {
       "@type": "ItemList",
       "@id": `${siteConfig.url}/#modelos-list`,
-      name: "Modelos de Gabinete para Totem de Autoatendimento",
-      description: "Linha de gabinetes industriais de piso, parede e balcão usinados em Router CNC.",
+      name: "Modelos de Totem de Autoatendimento",
+      description: "Linha de totens e gabinetes industriais de piso, parede e balcão usinados em Router CNC.",
       numberOfItems: 3,
       itemListElement: [
         {
           "@type": "ListItem",
           position: 1,
-          name: "Gabinete Totem de Piso Pedestal Pro",
-          url: `${siteConfig.url}/#modelos`,
-          image: `${siteConfig.url}/models/cabinet-floor.svg`,
-          description: "Gabinete de piso auto-sustentável para grandes fluxos, self-checkout e controle de acesso.",
+          name: "Totem de Autoatendimento de Piso Pedestal Pro",
+          url: `${siteConfig.url}/monte-seu-totem?modelo=cabinet-floor`,
+          image: `${siteConfig.url}/images/totems/floor/floor-white-1.webp`,
+          description:
+            "Gabinete de piso imponente e auto-sustentável para restaurantes, fast-food, self-checkout e clínicas. A partir de R$ 1.590 no PIX.",
         },
         {
           "@type": "ListItem",
           position: 2,
-          name: "Gabinete Totem de Balcão Expresso",
-          url: `${siteConfig.url}/#modelos`,
-          image: `${siteConfig.url}/models/cabinet-countertop.svg`,
-          description: "Gabinete compacto para balcão, caixas e checkout expresso.",
+          name: "Totem de Autoatendimento de Parede Slim",
+          url: `${siteConfig.url}/monte-seu-totem?modelo=cabinet-wall`,
+          image: `${siteConfig.url}/images/totems/wall/wall-white-1.webp`,
+          description:
+            "Gabinete compacto fixado na parede para máxima economia de espaço físico. A partir de R$ 990 no PIX.",
         },
         {
           "@type": "ListItem",
           position: 3,
-          name: "Gabinete Totem de Parede Slim",
-          url: `${siteConfig.url}/#modelos`,
-          image: `${siteConfig.url}/models/cabinet-wall.svg`,
-          description: "Gabinete ultrafino fixado na parede para economia de espaço de circulação.",
+          name: "Totem de Autoatendimento de Balcão Expresso",
+          url: `${siteConfig.url}/monte-seu-totem?modelo=cabinet-countertop`,
+          image: `${siteConfig.url}/images/totems/countertop/countertop-white-1.webp`,
+          description:
+            "Gabinete ergonômico de balcão para atendimento rápido, recepção de clínicas, senhas e checkouts. A partir de R$ 950 no PIX.",
+        },
+      ],
+    },
+    {
+      "@type": "HowTo",
+      "@id": `${siteConfig.url}/#howto-montar-totem`,
+      name: "Como montar seu próprio Totem de Autoatendimento economizando mais de 50%",
+      description:
+        "Veja como configurar e montar um Totem de Autoatendimento profissional em 4 passos simples usando o configurador Totem Pro.",
+      totalTime: "PT30M",
+      estimatedCost: {
+        "@type": "MonetaryAmount",
+        currency: "BRL",
+        value: "950.00",
+      },
+      step: [
+        {
+          "@type": "HowToStep",
+          position: 1,
+          name: "Escolha o Modelo e a Cor do Gabinete",
+          text: "Selecione entre o Gabinete de Piso, Parede ou Balcão e escolha o acabamento em MaDeFibra BP 15mm (Branco, Preto ou Dual-Tone).",
+          url: `${siteConfig.url}/monte-seu-totem`,
+        },
+        {
+          "@type": "HowToStep",
+          position: 2,
+          name: "Informe suas Peças ou Escolha o Kit Completo",
+          text: "Informe o monitor touchscreen, impressora térmica 80mm e leitor que você já possui para corte exato na Router CNC, ou selecione o Kit Completo homologado.",
+          url: `${siteConfig.url}/monte-seu-totem`,
+        },
+        {
+          "@type": "HowToStep",
+          position: 3,
+          name: "Usinagem Computadorizada em Router CNC",
+          text: "Nossa fábrica realiza o corte submilimétrico com furações VESA 75/100 e berço exato para cada periférico.",
+          url: `${siteConfig.url}/como-funciona`,
+        },
+        {
+          "@type": "HowToStep",
+          position: 4,
+          name: "Encaixe Rápido ou Receba Montado",
+          text: "Encaixe seus periféricos em menos de 30 minutos ou selecione a opção de montagem na fábrica para receber o totem pronto para ligar na tomada.",
+          url: `${siteConfig.url}/como-funciona`,
         },
       ],
     },
@@ -269,8 +337,14 @@ const schemaOrgJsonLd = {
         {
           "@type": "ListItem",
           position: 2,
-          name: "Gabinete para Totem de Autoatendimento",
-          item: `${siteConfig.url}/#modelos`,
+          name: "Modelos de Totem de Autoatendimento",
+          item: `${siteConfig.url}/modelos`,
+        },
+        {
+          "@type": "ListItem",
+          position: 3,
+          name: "Monte seu Totem Online",
+          item: `${siteConfig.url}/monte-seu-totem`,
         },
       ],
     },
@@ -287,9 +361,8 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link rel="dns-prefetch" href="https://connect.facebook.net" />
         <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
-        <link rel="dns-prefetch" href="https://analytics.tiktok.com" />
+        <link rel="preload" as="image" href="/models/cabinet-floor.svg" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaOrgJsonLd) }}

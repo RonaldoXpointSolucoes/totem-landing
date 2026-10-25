@@ -191,10 +191,31 @@ export async function getOrderWithDetails(orderId: string) {
   }
 }
 
+let cachedCatalogData: any = null;
+let cachedCatalogTimestamp = 0;
+const CATALOG_CACHE_TTL_MS = 60 * 1000; // 60s de cache ultrarrápido em memória
+
+export function invalidateCatalogCache() {
+  cachedCatalogData = null;
+  cachedCatalogTimestamp = 0;
+}
+
+function toFastWebp(url: string): string {
+  if (typeof url !== "string") return url;
+  const trimmed = url.trim();
+  if (trimmed.startsWith("/images/totems/") && trimmed.endsWith(".png")) {
+    return trimmed.replace(/\.png$/i, ".webp");
+  }
+  return trimmed;
+}
+
 /**
- * Carrega o catálogo dinâmico completo do Appwrite.
+ * Carrega o catálogo dinâmico completo do Appwrite com cache em memória e imagens WebP.
  */
 export async function getAppwriteCatalog() {
+  if (cachedCatalogData && Date.now() - cachedCatalogTimestamp < CATALOG_CACHE_TTL_MS) {
+    return cachedCatalogData;
+  }
   const db = getServerDatabases();
   const dbId = APPWRITE_CONFIG.databaseId;
   const cols = APPWRITE_CONFIG.collections;
@@ -211,7 +232,7 @@ export async function getAppwriteCatalog() {
       db.listDocuments(dbId, cols.barcodeReaders, [Query.equal("active", true)]),
     ]);
 
-  return {
+  const result = {
     cabinetModels: modelsRes.documents.map((doc: any) => {
       let dims: any = undefined;
       try {
@@ -258,8 +279,8 @@ export async function getAppwriteCatalog() {
         maxInstallments: maxInst,
         active: doc.active,
         sortOrder: doc.sort_order,
-        mainImage: effectiveMainImage,
-        images: galleryImages,
+        mainImage: toFastWebp(effectiveMainImage),
+        images: galleryImages.map((img: string) => toFastWebp(img)),
         videoUrls: videoList,
         instagramVideos: videoList,
         dimensions: dims,
@@ -344,6 +365,9 @@ export async function getAppwriteCatalog() {
       priceAdjustmentCents: typeof doc.price_adjustment_cents === "number" ? doc.price_adjustment_cents : (parseInt(doc.price_adjustment_cents, 10) || 0),
     })).sort((a: any, b: any) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999)),
   };
+  cachedCatalogData = result;
+  cachedCatalogTimestamp = Date.now();
+  return result;
 }
 
 /**
@@ -378,7 +402,9 @@ export async function getAllCatalogAdmin() {
 export async function updateCatalogItemAdmin(collection: string, docId: string, data: Record<string, any>) {
   const db = getServerDatabases();
   const dbId = APPWRITE_CONFIG.databaseId;
-  return await db.updateDocument(dbId, collection, docId, data);
+  const res = await db.updateDocument(dbId, collection, docId, data);
+  invalidateCatalogCache();
+  return res;
 }
 
 /**
@@ -387,7 +413,9 @@ export async function updateCatalogItemAdmin(collection: string, docId: string, 
 export async function createCatalogItemAdmin(collection: string, data: Record<string, any>) {
   const db = getServerDatabases();
   const dbId = APPWRITE_CONFIG.databaseId;
-  return await db.createDocument(dbId, collection, ID.unique(), data);
+  const res = await db.createDocument(dbId, collection, ID.unique(), data);
+  invalidateCatalogCache();
+  return res;
 }
 
 /**
@@ -396,7 +424,9 @@ export async function createCatalogItemAdmin(collection: string, data: Record<st
 export async function deleteCatalogItemAdmin(collection: string, docId: string) {
   const db = getServerDatabases();
   const dbId = APPWRITE_CONFIG.databaseId;
-  return await db.deleteDocument(dbId, collection, docId);
+  const res = await db.deleteDocument(dbId, collection, docId);
+  invalidateCatalogCache();
+  return res;
 }
 
 /**

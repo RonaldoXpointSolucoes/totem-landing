@@ -2,29 +2,54 @@ import { MetadataRoute } from "next";
 import { siteConfig } from "@/config/site";
 
 export default function robots(): MetadataRoute.Robots {
+  const disallowedPrivatePaths = [
+    "/admin",
+    "/admin/*",
+    "/api/*",
+    "/carrinho",
+    "/cart",
+    "/checkout",
+    "/checkout/*",
+    "/cliente",
+    "/minha-conta",
+    "/vendedor",
+    "/influenciador",
+  ];
+
   return {
     rules: [
       {
         userAgent: "*",
         allow: [
           "/",
+          "/modelos",
+          "/monte-seu-totem",
+          "/como-funciona",
+          "/diferenciais",
+          "/faq",
           "/images/*",
           "/models/*",
           "/icon.svg",
           "/site.webmanifest",
+          "/llms.txt",
           "/*.txt",
         ],
-        disallow: ["/admin", "/admin/*", "/api/*"],
+        disallow: disallowedPrivatePaths,
       },
       {
         userAgent: "Googlebot",
         allow: [
           "/",
+          "/modelos",
+          "/monte-seu-totem",
+          "/como-funciona",
+          "/diferenciais",
+          "/faq",
           "/images/*",
           "/models/*",
           "/icon.svg",
         ],
-        disallow: ["/admin", "/admin/*", "/api/*"],
+        disallow: disallowedPrivatePaths,
       },
       {
         userAgent: "Googlebot-Image",
@@ -32,8 +57,8 @@ export default function robots(): MetadataRoute.Robots {
       },
       {
         userAgent: "Bingbot",
-        allow: ["/", "/images/*", "/models/*"],
-        disallow: ["/admin", "/admin/*", "/api/*"],
+        allow: ["/", "/modelos", "/monte-seu-totem", "/images/*", "/models/*"],
+        disallow: disallowedPrivatePaths,
       },
     ],
     sitemap: `${siteConfig.url}/sitemap.xml`,

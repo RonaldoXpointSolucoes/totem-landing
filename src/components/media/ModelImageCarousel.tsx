@@ -41,16 +41,18 @@ export function ModelImageCarousel({
   onImageChange,
   priority = false,
 }: ModelImageCarouselProps) {
-  // Limpa lista de imagens e remove duplicatas ou valores vazios
+  // Limpa lista de imagens, converte para WebP otimizado e remove duplicatas
   const cleanImages = useMemo(() => {
-    const valid = (images || []).filter(
-      (img) => typeof img === "string" && img.trim().length > 0
-    );
+    const valid = (images || [])
+      .filter((img) => typeof img === "string" && img.trim().length > 0)
+      .map((img) => getOptimizedImageUrl(img.trim()));
     return Array.from(new Set(valid));
   }, [images]);
 
   const total = cleanImages.length;
 
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [isInViewport, setIsInViewport] = useState(priority);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [outgoingIndex, setOutgoingIndex] = useState<number | null>(null);
   const [direction, setDirection] = useState<"next" | "prev">("next");
@@ -70,14 +72,37 @@ export function ModelImageCarousel({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const transitionTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 1. Pré-carregamento prioritário inteligente via imageCache
+  // Observa visibilidade no viewport para priorizar LCP da dobra principal e economizar CPU/rede fora da tela
   useEffect(() => {
-    if (total === 0) return;
+    if (priority || typeof window === "undefined" || !("IntersectionObserver" in window)) {
+      setIsInViewport(true);
+      return;
+    }
 
-    // Pré-carrega de imediato a foto atual e a próxima na GPU
+    const el = containerRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setIsInViewport(true);
+          }
+        });
+      },
+      { rootMargin: "350px 0px" }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [priority]);
+
+  // 1. Pré-carregamento inteligente via imageCache apenas quando próximo ao viewport (ou priority)
+  useEffect(() => {
+    if (total === 0 || !isInViewport) return;
+
     preloadCarouselImages(cleanImages, currentIndex);
 
-    // Registra listeners de prontidão para cada imagem
     const unsubscribes = cleanImages.map((url) =>
       onImageReady(url, () => {
         setLoadedUrls((prev) => {
@@ -92,7 +117,7 @@ export function ModelImageCarousel({
     return () => {
       unsubscribes.forEach((unsub) => unsub());
     };
-  }, [cleanImages, total, currentIndex]);
+  }, [cleanImages, total, currentIndex, isInViewport]);
 
   // Garante que o currentIndex não estoure se a lista mudar dinamicamente
   useEffect(() => {
@@ -163,9 +188,9 @@ export function ModelImageCarousel({
     [total, currentIndex, triggerTransition]
   );
 
-  // Troca automática periódica (10s padrão) com pausa em hover
+  // Troca automática periódica (10s padrão) com pausa em hover ou fora do viewport
   useEffect(() => {
-    if (total <= 1 || isHovered) {
+    if (total <= 1 || isHovered || !isInViewport) {
       if (timerRef.current) clearInterval(timerRef.current);
       return;
     }
@@ -177,7 +202,7 @@ export function ModelImageCarousel({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [total, isHovered, intervalMs, goToNext]);
+  }, [total, isHovered, isInViewport, intervalMs, goToNext]);
 
   // Limpeza de timers na desmontagem
   useEffect(() => {
@@ -221,6 +246,7 @@ export function ModelImageCarousel({
 
   return (
     <div
+      ref={containerRef}
       className={`relative w-full h-full select-none overflow-hidden group flex items-center justify-center ${className}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -228,7 +254,7 @@ export function ModelImageCarousel({
       onTouchEnd={handleTouchEnd}
     >
       {/* Barra de Progresso Superior (Timeline do Carrossel de 10s) */}
-      {showProgressBar && total > 1 && (
+      {showProgressBar && total > 1 && isInViewport && (
         <div className="absolute top-0 left-0 right-0 h-1 bg-black/5 dark:bg-white/5 z-20 overflow-hidden pointer-events-none">
           <div
             key={`progress-${currentIndex}-${isHovered}`}
@@ -260,8 +286,10 @@ export function ModelImageCarousel({
             style={{ willChange: "transform, opacity" }}
           >
             <img
-              src={getOptimizedImageUrl(outgoingSrc)}
+              src={outgoingSrc}
               alt={`${alt} - Foto ${outgoingIndex! + 1}`}
+              width={1080}
+              height={1080}
               className={`w-full h-full ${
                 objectFit === "contain" ? "object-contain" : "object-cover"
               } ${imageClassName}`}
@@ -291,10 +319,12 @@ export function ModelImageCarousel({
           )}
 
           <img
-            src={getOptimizedImageUrl(currentSrc)}
+            src={currentSrc}
             alt={`${alt} - Foto ${currentIndex + 1} de ${total}`}
-            loading={priority || currentIndex === 0 ? "eager" : "lazy"}
-            fetchPriority={priority || currentIndex === 0 ? "high" : "auto"}
+            width={1080}
+            height={1080}
+            loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : "auto"}
             onLoad={() => {
               setLoadedUrls((prev) => new Set(prev).add(currentSrc));
             }}

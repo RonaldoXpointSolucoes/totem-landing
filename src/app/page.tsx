@@ -9,23 +9,23 @@ import {
   HowItWorks,
   Differentials,
   FaqSection,
+  SeoAuthoritySection,
   Footer,
 } from "@/components/marketing";
 import { Navbar } from "@/components/layout";
 import { Badge } from "@/components/ui";
-import { useTheme } from "@/lib/theme/ThemeContext";
 import { Sparkles } from "lucide-react";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 
-function HomeContent() {
+/**
+ * Componente isolado apenas para redirecionamento de links legados (?view=),
+ * permitindo que 100% do conteúdo da Home seja pré-renderizado no servidor (SSR) para SEO e LCP!
+ */
+function LegacyViewRedirect() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { theme } = useTheme();
 
   useEffect(() => {
-    trackEvent(ANALYTICS_EVENTS.VIEW_HOME, { page: "landing" });
-
-    // Retrocompatibilidade para quem acessar com ?view=
     const legacyView = searchParams.get("view");
     if (legacyView === "configurator") {
       router.replace("/monte-seu-totem");
@@ -35,6 +35,16 @@ function HomeContent() {
       router.replace("/checkout");
     }
   }, [searchParams, router]);
+
+  return null;
+}
+
+export default function Home() {
+  const router = useRouter();
+
+  useEffect(() => {
+    trackEvent(ANALYTICS_EVENTS.VIEW_HOME, { page: "landing" });
+  }, []);
 
   const handleStartConfigurator = (modelId?: string) => {
     trackEvent(ANALYTICS_EVENTS.START_CONFIGURATOR, {
@@ -54,22 +64,26 @@ function HomeContent() {
 
   return (
     <div className="min-h-screen flex flex-col bg-white dark:bg-[#090a0f] text-[#1d1d1f] dark:text-slate-100 transition-colors duration-300">
+      <Suspense fallback={null}>
+        <LegacyViewRedirect />
+      </Suspense>
+
       {/* Top Navbar Compartilhado */}
       <Navbar />
 
       <main className="flex-1">
-        {/* Hero Apple iMac com Animação de Abertura Fan-Out e Suporte Completo Claro/Escuro */}
+        {/* Hero Principal com H1 Semântico e LCP Instantâneo */}
         <AppleHero
           onStartConfigurator={() => handleStartConfigurator("cabinet-wall")}
           onExploreModels={handleExploreModels}
         />
 
-        {/* Bento Section Apple (Cards arredondados e busca de periféricos) */}
+        {/* Bento Section Apple (Cards de segmentos e busca de periféricos) */}
         <AppleBentoSection
           onStartConfigurator={() => handleStartConfigurator("cabinet-wall")}
         />
 
-        {/* Modelos de Totem */}
+        {/* Modelos de Totem de Autoatendimento */}
         <ModelsSection
           onSelectModelToConfigure={(modelId) => handleStartConfigurator(modelId)}
         />
@@ -85,6 +99,9 @@ function HomeContent() {
         <div id="faq">
           <FaqSection />
         </div>
+
+        {/* Guia de Autoridade Semântica SEO, Tabela Comparativa de Preços e Silo de Links */}
+        <SeoAuthoritySection />
 
         {/* CTA Final da Landing Page */}
         <section className="py-16 md:py-24 border-t border-black/5 dark:border-slate-800 bg-gradient-to-b from-transparent to-blue-50/50 dark:to-indigo-950/20 transition-colors">
@@ -114,13 +131,5 @@ function HomeContent() {
 
       <Footer />
     </div>
-  );
-}
-
-export default function Home() {
-  return (
-    <Suspense fallback={null}>
-      <HomeContent />
-    </Suspense>
   );
 }

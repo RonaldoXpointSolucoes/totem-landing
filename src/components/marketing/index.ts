@@ -5,5 +5,6 @@ export * from "./ModelsSection";
 export * from "./HowItWorks";
 export * from "./Differentials";
 export * from "./FaqSection";
+export * from "./SeoAuthoritySection";
 export * from "./Footer";
 export * from "./FloatingWhatsAppButton";

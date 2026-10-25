@@ -50,6 +50,7 @@ export interface DeliveryAddress {
   neighborhood: string;
   city: string;
   state: string;
+  customerNotes?: string;
 }
 
 export interface ManufacturingSpec {

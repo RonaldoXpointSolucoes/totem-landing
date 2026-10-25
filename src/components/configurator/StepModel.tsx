@@ -18,7 +18,7 @@ const getModelThumbnail = (model: CabinetModel): string => {
   const realPhoto = images.find(
     (img) => !img.toLowerCase().endsWith(".svg") && !img.includes("data:image/svg")
   );
-  return realPhoto || model.mainImage || "/images/totems/wall/wall-white-1.png";
+  return realPhoto || model.mainImage || ".webp";
 };
 
 export const StepModel: React.FC<StepModelProps> = ({

@@ -1,8 +1,8 @@
 /**
  * Utilitário de Cache e Pré-carregamento Inteligente de Imagens para Carrossel
+ * - Converte automaticamente caminhos locais /images/totems/*.png para .webp (~95% menor)
  * - Cache em memória com persistência de texturas na GPU via img.decode()
- * - Pré-carregamento prioritário inteligente (atual + próxima em alta prioridade)
- * - Mantém a URL estável entre pré-carregamento e renderização para evitar net::ERR_ABORTED
+ * - Pré-carregamento just-in-time (atual + próxima imediata) sem congestionar o LCP
  */
 
 // Cache em memória de elementos Image decodificados para retenção na GPU
@@ -13,30 +13,44 @@ const pendingRequests = new Set<string>();
 const listeners = new Map<string, Set<() => void>>();
 
 /**
+ * Converte automaticamente imagens locais de totens .png para .webp otimizado (~80KB vs 1.7MB)
+ */
+export function getOptimizedImageUrl(url: string): string {
+  if (typeof url !== "string") return url;
+  const trimmed = url.trim();
+  if (trimmed.startsWith("/images/totems/") && trimmed.endsWith(".png")) {
+    return trimmed.replace(/\.png$/i, ".webp");
+  }
+  return trimmed;
+}
+
+/**
  * Registra um callback para ser notificado quando a imagem estiver pronta
  */
 export function onImageReady(url: string, callback: () => void): () => void {
-  if (!listeners.has(url)) {
-    listeners.set(url, new Set());
+  const optUrl = getOptimizedImageUrl(url);
+  if (!listeners.has(optUrl)) {
+    listeners.set(optUrl, new Set());
   }
-  listeners.get(url)!.add(callback);
+  listeners.get(optUrl)!.add(callback);
 
   // Se já estiver no cache, notifica imediatamente
-  if (memoryImageCache.has(url)) {
+  if (memoryImageCache.has(optUrl)) {
     callback();
   }
 
   return () => {
-    const list = listeners.get(url);
+    const list = listeners.get(optUrl);
     if (list) {
       list.delete(callback);
-      if (list.size === 0) listeners.delete(url);
+      if (list.size === 0) listeners.delete(optUrl);
     }
   };
 }
 
 function notifyReady(url: string) {
-  const list = listeners.get(url);
+  const optUrl = getOptimizedImageUrl(url);
+  const list = listeners.get(optUrl);
   if (list) {
     list.forEach((cb) => {
       try {
@@ -52,14 +66,7 @@ function notifyReady(url: string) {
  * Retorna true se a imagem já estiver pronta e decodificada na memória
  */
 export function isImagePreloaded(url: string): boolean {
-  return memoryImageCache.has(url);
-}
-
-/**
- * Retorna a URL higienizada mantendo a URL estável para evitar cancelamento de requisição em voo
- */
-export function getOptimizedImageUrl(url: string): string {
-  return typeof url === "string" ? url.trim() : url;
+  return memoryImageCache.has(getOptimizedImageUrl(url));
 }
 
 /**
@@ -70,7 +77,7 @@ export async function preloadSingleImage(url: string): Promise<string> {
     return url;
   }
 
-  const cleanUrl = url.trim();
+  const cleanUrl = getOptimizedImageUrl(url);
   if (!cleanUrl) return "";
 
   // Se já está na memória decodificada, retorna imediatamente
@@ -91,7 +98,6 @@ export async function preloadSingleImage(url: string): Promise<string> {
   pendingRequests.add(cleanUrl);
 
   try {
-    // Instancia objeto Image do navegador e força decodificação GPU mantendo a mesma URL do DOM
     await new Promise<void>((resolve) => {
       const img = new Image();
       img.decoding = "async";
@@ -131,9 +137,8 @@ export async function preloadSingleImage(url: string): Promise<string> {
 }
 
 /**
- * Pré-carrega um conjunto de imagens com escalonamento prioritário:
- * 1. Prioridade Máxima: primeira imagem e próxima imagem imediata
- * 2. Prioridade de Background: demais imagens da sequência em momentos de ociosidade
+ * Pré-carrega de forma enxuta apenas a imagem atual e a próxima imediata:
+ * Evita congestionamento de banda no carregamento inicial (melhora LCP e TTI)
  */
 export function preloadCarouselImages(urls: string[], currentIndex: number = 0) {
   if (typeof window === "undefined" || !Array.isArray(urls) || urls.length === 0) return;
@@ -142,41 +147,21 @@ export function preloadCarouselImages(urls: string[], currentIndex: number = 0) 
   if (validUrls.length === 0) return;
 
   const total = validUrls.length;
-  const currentUrl = validUrls[currentIndex % total];
+  const currentUrl = getOptimizedImageUrl(validUrls[currentIndex % total]);
   const nextIdx = (currentIndex + 1) % total;
-  const nextUrl = validUrls[nextIdx];
-  const prevIdx = (currentIndex - 1 + total) % total;
-  const prevUrl = validUrls[prevIdx];
+  const nextUrl = getOptimizedImageUrl(validUrls[nextIdx]);
 
-  // 1. Prioridade Alta: Atual e Próxima
+  // Carrega a atual imediatamente
   preloadSingleImage(currentUrl);
+
+  // Agenda a próxima imagem para momentos ociosos após o LCP inicial
   if (nextUrl && nextUrl !== currentUrl) {
-    preloadSingleImage(nextUrl);
-  }
-  if (prevUrl && prevUrl !== currentUrl && prevUrl !== nextUrl) {
-    preloadSingleImage(prevUrl);
-  }
-
-  // 2. Prioridade Média/Baixa: As restantes são agendadas para não travar a rede
-  const remaining = validUrls.filter(
-    (u) => u !== currentUrl && u !== nextUrl && u !== prevUrl
-  );
-
-  if (remaining.length > 0) {
-    const scheduleRemaining = () => {
-      let delay = 150;
-      remaining.forEach((u) => {
-        setTimeout(() => {
-          preloadSingleImage(u);
-        }, delay);
-        delay += 250;
-      });
-    };
-
     if ("requestIdleCallback" in window) {
-      (window as unknown as { requestIdleCallback: (cb: () => void) => void }).requestIdleCallback(scheduleRemaining);
+      (window as unknown as { requestIdleCallback: (cb: () => void) => void }).requestIdleCallback(
+        () => preloadSingleImage(nextUrl)
+      );
     } else {
-      setTimeout(scheduleRemaining, 300);
+      setTimeout(() => preloadSingleImage(nextUrl), 400);
     }
   }
 }

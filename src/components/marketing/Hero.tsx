@@ -85,7 +85,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartConfigurator, onExploreModels
 
             <div className="relative w-full h-full flex flex-col items-center justify-center">
               <img
-                src="/images/totems/floor/floor-white-1.png"
+                src=".webp"
                 alt="Gabinete de Piso para Totem de Autoatendimento"
                 className="w-full h-full object-cover rounded-2xl drop-shadow-[0_20px_40px_rgba(79,70,229,0.35)] transition-transform duration-500 group-hover:scale-105"
               />

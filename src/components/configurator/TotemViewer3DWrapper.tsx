@@ -45,7 +45,7 @@ export const TotemViewer3DWrapper: React.FC<TotemViewer3DWrapperProps> = ({
       : valid;
 
     const unique = Array.from(new Set(filtered));
-    return unique.length > 0 ? unique : [selectedModel.mainImage || "/images/totems/wall/wall-white-1.png"];
+    return unique.length > 0 ? unique : [selectedModel.mainImage || ".webp"];
   }, [selectedModel]);
 
   // Lista de vídeos do Instagram extraídos do modelo

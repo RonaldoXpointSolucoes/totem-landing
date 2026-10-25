@@ -33,7 +33,7 @@ export const DEFAULT_KIT_SUB_ITEMS: KitSubItem[] = [
     name: "Kit de Conexões, Cabos Blindados & Filtro Industrial",
     category: "accessory",
     description: "Filtro de linha com aterramento, cabos blindados HDMI/USB, chave geral e fixadores CNC.",
-    image: "/images/totems/wall/wall-white-1.png",
+    image: ".webp",
     priceCents: 18000, // R$ 180,00
     selected: true,
   },

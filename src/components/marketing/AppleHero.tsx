@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Sparkles, ArrowRight, ChevronRight, Check } from "lucide-react";
 import { InstagramVideoModal, InstagramGlyph } from "@/components/media";
 
@@ -21,27 +21,23 @@ const COLOR_STICKS = [
 ];
 
 export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroProps) {
-  const [isLoaded, setIsLoaded] = useState(false);
+  // Inicia visível imediatamente no SSR para garantir LCP < 1.0s no Google Core Web Vitals
+  const [isLoaded] = useState(true);
   const [activeStick, setActiveStick] = useState<number | null>(null);
   const [hoveredTotem, setHoveredTotem] = useState<number | null>(null);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
 
-  useEffect(() => {
-    // Gatilho imediato pós-hidratação com easing cinemático Apple
-    const timer = setTimeout(() => {
-      setIsLoaded(true);
-    }, 60);
-    return () => clearTimeout(timer);
-  }, []);
-
   return (
-    <section className="relative overflow-hidden pt-8 pb-16 md:pt-14 md:pb-24 bg-white dark:bg-[#090a0f] text-[#1d1d1f] dark:text-white transition-colors duration-300">
+    <section
+      aria-label="Apresentação Totem Pro — Totem de Autoatendimento Sob Medida"
+      className="relative overflow-hidden pt-8 pb-16 md:pt-14 md:pb-24 bg-white dark:bg-[#090a0f] text-[#1d1d1f] dark:text-white transition-colors duration-300"
+    >
       {/* Glow suave superior estilo Apple */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-5xl h-[320px] bg-gradient-to-b from-indigo-50/70 dark:from-indigo-950/25 via-transparent to-transparent pointer-events-none -z-10" />
 
-      {/* Aura Periférica Apple Intelligence Glow que expande na abertura */}
+      {/* Aura Periférica Apple Intelligence Glow */}
       <div
-        className={`absolute top-[42%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[110%] max-w-5xl h-[380px] pointer-events-none transition-all duration-1000 ease-[cubic-bezier(0.16,1,0.3,1)] -z-10 ${
+        className={`absolute top-[42%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[110%] max-w-5xl h-[380px] pointer-events-none transition-all duration-700 ease-out -z-10 ${
           isLoaded ? "opacity-100 scale-100" : "opacity-0 scale-75"
         }`}
         style={{
@@ -52,26 +48,19 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
       />
 
       <div className="max-w-6xl mx-auto px-4 text-center">
-        {/* Eyebrow / Nome da Linha com revelação suave */}
-        <span
-          className={`text-xs sm:text-sm font-semibold tracking-wider text-slate-500 dark:text-slate-400 uppercase mb-2 block transition-all duration-700 ease-out ${
-            isLoaded ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-3"
-          }`}
-        >
-          Totem Pro
+        {/* Eyebrow / Nome da Linha */}
+        <span className="text-xs sm:text-sm font-semibold tracking-wider text-slate-500 dark:text-slate-400 uppercase mb-2 block">
+          Totem Pro • Fábrica de Gabinetes & Totens
         </span>
 
-        {/* Título Principal Fiel: "Bri[|||||||]lhante." com animação em onda sequencial */}
+        {/* Título Visual Fiel: "Bri[|||||||]lhante." */}
         <div
-          className={`flex items-center justify-center tracking-tight font-black text-5xl sm:text-7xl lg:text-8xl select-none my-2 transition-all duration-800 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-            isLoaded
-              ? "opacity-100 translate-y-0 filter-none"
-              : "opacity-0 translate-y-4 blur-[8px]"
-          }`}
+          aria-hidden="true"
+          className="flex items-center justify-center tracking-tight font-black text-5xl sm:text-7xl lg:text-8xl select-none my-2"
         >
           <span>Bri</span>
 
-          {/* Bastões Verticais Coloridos com Fan/Wave Stagger estilo piano Apple */}
+          {/* Bastões Verticais Coloridos estilo piano Apple */}
           <div className="inline-flex items-center gap-[3px] sm:gap-[5px] mx-1 sm:mx-1.5 self-center h-12 sm:h-16 lg:h-20 overflow-visible">
             {COLOR_STICKS.map((stick, index) => {
               const isStickActive =
@@ -84,11 +73,8 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
                   onMouseLeave={() => setActiveStick(null)}
                   style={{
                     backgroundColor: stick.color,
-                    transitionDelay: isLoaded ? "0ms" : `${index * 60 + 100}ms`,
                   }}
-                  className={`w-[6px] sm:w-[9px] lg:w-[11px] h-full rounded-full cursor-pointer shadow-sm origin-bottom transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-                    isLoaded ? "scale-y-100 opacity-100" : "scale-y-0 opacity-0"
-                  } ${
+                  className={`w-[6px] sm:w-[9px] lg:w-[11px] h-full rounded-full cursor-pointer shadow-sm origin-bottom transition-all duration-300 ${
                     isStickActive
                       ? "scale-y-110 shadow-lg brightness-115 -translate-y-1"
                       : "opacity-95 hover:opacity-100"
@@ -109,21 +95,19 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
             <div
               onMouseEnter={() => setHoveredTotem(0)}
               onMouseLeave={() => setHoveredTotem(null)}
-              className={`w-[28%] sm:w-[26%] max-w-[220px] -mr-6 sm:-mr-10 z-10 filter drop-shadow-xl transition-all duration-1000 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer ${
-                isLoaded
-                  ? "translate-x-0 opacity-100 scale-100 rotate-0"
-                  : "translate-x-[90%] opacity-0 scale-90 -rotate-6"
-              } ${
+              className={`w-[28%] sm:w-[26%] max-w-[220px] -mr-6 sm:-mr-10 z-10 filter drop-shadow-xl transition-all duration-500 cursor-pointer ${
                 hoveredTotem === 0 || activeStick === 0
                   ? "-translate-y-4 scale-105 z-40 brightness-110"
                   : "hover:-translate-y-2"
               }`}
-              style={{ transitionDelay: isLoaded && !hoveredTotem ? "280ms" : "0ms" }}
             >
               <div className="relative p-2 rounded-2xl bg-gradient-to-b from-emerald-500/10 to-transparent border border-emerald-500/20 backdrop-blur-sm transition-shadow duration-300">
                 <img
                   src="/models/cabinet-wall.svg"
-                  alt="Totem de Parede Verde Menta"
+                  alt="Gabinete para Totem de Autoatendimento de Parede Slim"
+                  width={220}
+                  height={310}
+                  decoding="async"
                   className="w-full h-auto object-contain filter hue-rotate-[90deg] transition-transform duration-500"
                 />
                 <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 block mt-1">
@@ -136,21 +120,19 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
             <div
               onMouseEnter={() => setHoveredTotem(1)}
               onMouseLeave={() => setHoveredTotem(null)}
-              className={`w-[26%] sm:w-[24%] max-w-[190px] -mr-4 sm:-mr-6 z-20 filter drop-shadow-xl transition-all duration-1000 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer ${
-                isLoaded
-                  ? "translate-x-0 opacity-100 scale-100 rotate-0"
-                  : "translate-x-[45%] opacity-0 scale-92 -rotate-3"
-              } ${
+              className={`w-[26%] sm:w-[24%] max-w-[190px] -mr-4 sm:-mr-6 z-20 filter drop-shadow-xl transition-all duration-500 cursor-pointer ${
                 hoveredTotem === 1 || activeStick === 1 || activeStick === 2
                   ? "-translate-y-4 scale-105 z-40 brightness-110"
                   : "hover:-translate-y-2"
               }`}
-              style={{ transitionDelay: isLoaded && !hoveredTotem ? "180ms" : "0ms" }}
             >
               <div className="relative p-2 rounded-2xl bg-gradient-to-b from-amber-500/10 to-transparent border border-amber-500/20 backdrop-blur-sm transition-shadow duration-300">
                 <img
                   src="/models/cabinet-countertop.svg"
-                  alt="Totem de Balcão Amarelo Canário"
+                  alt="Totem de Autoatendimento de Balcão Expresso"
+                  width={190}
+                  height={260}
+                  decoding="async"
                   className="w-full h-auto object-contain filter hue-rotate-[45deg] transition-transform duration-500"
                 />
                 <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 block mt-1">
@@ -163,16 +145,11 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
             <div
               onMouseEnter={() => setHoveredTotem(2)}
               onMouseLeave={() => setHoveredTotem(null)}
-              className={`w-[34%] sm:w-[32%] max-w-[260px] z-30 filter drop-shadow-2xl transition-all duration-1000 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer ${
-                isLoaded
-                  ? "translate-y-0 opacity-100 scale-100"
-                  : "translate-y-8 opacity-0 scale-95"
-              } ${
+              className={`w-[34%] sm:w-[32%] max-w-[260px] z-30 filter drop-shadow-2xl transition-all duration-500 cursor-pointer ${
                 hoveredTotem === 2 || activeStick === 5 || activeStick === 3
                   ? "-translate-y-4 scale-105 z-40 brightness-110"
                   : "hover:-translate-y-3"
               }`}
-              style={{ transitionDelay: isLoaded && !hoveredTotem ? "80ms" : "0ms" }}
             >
               <div className="relative p-3 rounded-3xl bg-gradient-to-b from-indigo-500/15 dark:from-indigo-600/30 via-white/80 dark:via-slate-900/80 to-transparent border-2 border-indigo-500/40 shadow-2xl transition-all duration-300">
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-[#0071e3] text-white text-[9px] font-black tracking-wider uppercase shadow-md flex items-center gap-1">
@@ -181,7 +158,11 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
                 </div>
                 <img
                   src="/models/cabinet-floor.svg"
-                  alt="Totem de Piso Premium Azul Cobalto"
+                  alt="Totem de Autoatendimento de Piso Pedestal Pro"
+                  width={260}
+                  height={380}
+                  fetchPriority="high"
+                  decoding="async"
                   className="w-full h-auto object-contain transition-transform duration-500"
                 />
                 <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 block mt-1.5">
@@ -194,21 +175,19 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
             <div
               onMouseEnter={() => setHoveredTotem(3)}
               onMouseLeave={() => setHoveredTotem(null)}
-              className={`w-[26%] sm:w-[24%] max-w-[190px] -ml-4 sm:-ml-6 z-20 filter drop-shadow-xl transition-all duration-1000 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer ${
-                isLoaded
-                  ? "translate-x-0 opacity-100 scale-100 rotate-0"
-                  : "-translate-x-[45%] opacity-0 scale-92 rotate-3"
-              } ${
+              className={`w-[26%] sm:w-[24%] max-w-[190px] -ml-4 sm:-ml-6 z-20 filter drop-shadow-xl transition-all duration-500 cursor-pointer ${
                 hoveredTotem === 3 || activeStick === 4
                   ? "-translate-y-4 scale-105 z-40 brightness-110"
                   : "hover:-translate-y-2"
               }`}
-              style={{ transitionDelay: isLoaded && !hoveredTotem ? "180ms" : "0ms" }}
             >
               <div className="relative p-2 rounded-2xl bg-gradient-to-b from-purple-500/10 to-transparent border border-purple-500/20 backdrop-blur-sm transition-shadow duration-300">
                 <img
                   src="/models/cabinet-wall.svg"
-                  alt="Totem de Parede Roxo Lavanda"
+                  alt="Gabinete de Parede para Totem Touch Screen"
+                  width={190}
+                  height={260}
+                  decoding="async"
                   className="w-full h-auto object-contain filter hue-rotate-[240deg] transition-transform duration-500"
                 />
                 <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 block mt-1">
@@ -221,21 +200,19 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
             <div
               onMouseEnter={() => setHoveredTotem(4)}
               onMouseLeave={() => setHoveredTotem(null)}
-              className={`w-[28%] sm:w-[26%] max-w-[220px] -ml-6 sm:-ml-10 z-10 filter drop-shadow-xl transition-all duration-1000 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer ${
-                isLoaded
-                  ? "translate-x-0 opacity-100 scale-100 rotate-0"
-                  : "-translate-x-[90%] opacity-0 scale-90 rotate-6"
-              } ${
+              className={`w-[28%] sm:w-[26%] max-w-[220px] -ml-6 sm:-ml-10 z-10 filter drop-shadow-xl transition-all duration-500 cursor-pointer ${
                 hoveredTotem === 4 || activeStick === 6
                   ? "-translate-y-4 scale-105 z-40 brightness-110"
                   : "hover:-translate-y-2"
               }`}
-              style={{ transitionDelay: isLoaded && !hoveredTotem ? "280ms" : "0ms" }}
             >
               <div className="relative p-2 rounded-2xl bg-gradient-to-b from-slate-500/10 to-transparent border border-slate-400/30 backdrop-blur-sm transition-shadow duration-300">
                 <img
                   src="/models/cabinet-countertop.svg"
-                  alt="Totem de Balcão Prata Titânio"
+                  alt="Gabinete de Balcão para Autoatendimento Comercial"
+                  width={220}
+                  height={310}
+                  decoding="async"
                   className="w-full h-auto object-contain filter grayscale transition-transform duration-500"
                 />
                 <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 block mt-1">
@@ -246,36 +223,24 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
           </div>
         </div>
 
-        {/* Subtítulo no Estilo Apple Intelligence (Gradiente Azul -> Roxo -> Laranja) */}
-        <div
-          className={`mt-6 space-y-3 max-w-2xl mx-auto transition-all duration-800 ease-out ${
-            isLoaded
-              ? "opacity-100 translate-y-0 filter-none"
-              : "opacity-0 translate-y-4 blur-[4px]"
-          }`}
-          style={{ transitionDelay: isLoaded ? "420ms" : "0ms" }}
-        >
+        {/* H1 Principal Otimizado para SEO Orgânico + Subtítulo Apple Intelligence */}
+        <div className="mt-6 space-y-3 max-w-2xl mx-auto">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs sm:text-sm font-bold">
             <Check className="w-3.5 h-3.5 stroke-[3]" />
             <span>Monte seu próprio Totem e economize mais de 50%</span>
           </div>
 
-          <p className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-[#0071e3] via-[#af52de] to-[#ff9500] bg-clip-text text-transparent tracking-tight">
+          <h1 className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-[#0071e3] via-[#af52de] to-[#ff9500] bg-clip-text text-transparent tracking-tight">
             Você mesmo monta seu Totem de Autoatendimento. Simples e sob medida.
-          </p>
+          </h1>
 
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
-            Compre <strong>apenas o gabinete</strong> (usinado na Router CNC com encaixe exato para as peças que você já tem) ou leve o <strong>Gabinete + Kit Completo</strong> com tudo o que você precisa pronto para instalar.
+            Compre <strong>apenas o gabinete para totem</strong> (usinado na Router CNC com encaixe exato para as peças que você já tem) ou leve o <strong>Gabinete + Kit Completo de Autoatendimento</strong> pronto para instalar em restaurantes, clínicas e varejo.
           </p>
         </div>
 
         {/* Botão Pill Azul Apple, Passo a Passo, Ver Vídeos no Instagram & Link Secundário */}
-        <div
-          className={`mt-8 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 sm:gap-4 transition-all duration-800 ease-out ${
-            isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-          }`}
-          style={{ transitionDelay: isLoaded ? "540ms" : "0ms" }}
-        >
+        <div className="mt-8 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 sm:gap-4">
           <button
             onClick={onStartConfigurator}
             className="w-full sm:w-auto px-7 py-3.5 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white font-semibold text-sm sm:text-base transition-all duration-200 shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/35 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
@@ -309,13 +274,8 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
           </button>
         </div>
 
-        {/* Especificações Rápidas em Pílula (Oculto no Mobile) */}
-        <div
-          className={`mt-12 pt-8 border-t border-black/5 dark:border-white/10 hidden sm:flex sm:flex-wrap items-center justify-center gap-6 sm:gap-12 text-xs sm:text-sm text-slate-500 dark:text-slate-400 transition-all duration-800 ease-out ${
-            isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-          }`}
-          style={{ transitionDelay: isLoaded ? "660ms" : "0ms" }}
-        >
+        {/* Especificações Rápidas em Pílula */}
+        <div className="mt-12 pt-8 border-t border-black/5 dark:border-white/10 hidden sm:flex sm:flex-wrap items-center justify-center gap-6 sm:gap-12 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
             <span>Economia Acima de 50%</span>
