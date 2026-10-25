@@ -6,7 +6,8 @@
     "accountId": "6225983440",
     "containerId": "99999999",
     "container": {
-      "name": "Totem Pro Web",
+      "name": "[WEB] totem.xpointsolucoes.com.br",
+      "publicId": "GTM-W4N3KKL7",
       "timeZoneId": "America/Sao_Paulo",
       "usageContext": [
         "WEB"
