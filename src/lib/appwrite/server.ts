@@ -11,6 +11,13 @@ export function getServerDatabases(): Databases {
       .setProject(APPWRITE_CONFIG.projectId)
       .setKey(APPWRITE_CONFIG.apiKey);
 
+    const rawHeaders = (client as any).headers;
+    if (rawHeaders && typeof rawHeaders === 'object') {
+      delete rawHeaders['X-Appwrite-Response-Format'];
+      delete rawHeaders['x-sdk-version'];
+      rawHeaders['x-appwrite-response-format'] = '1.6.0';
+    }
+
     serverDatabases = new Databases(client);
   }
   return serverDatabases;

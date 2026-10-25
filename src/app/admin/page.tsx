@@ -1407,6 +1407,9 @@ export default function AdminPage() {
                 <div className="relative min-w-[240px] flex-1 sm:flex-none">
                   <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
+                    id="admin-order-search"
+                    name="orderSearch"
+                    aria-label="Buscar pedido, cliente ou CPF/CNPJ"
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -1604,6 +1607,9 @@ export default function AdminPage() {
 
                             {/* Seletor rápido de Status */}
                             <select
+                              id={`order-status-simplified-${order.$id}`}
+                              name={`orderStatus-${order.$id}`}
+                              aria-label={`Mudar status do pedido ${order.order_number}`}
                               value={order.status}
                               onChange={(e) => handleUpdateOrderStatus(order.$id, e.target.value)}
                               className="bg-slate-950 border border-slate-800 text-xs rounded-xl px-2.5 py-2 text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer shrink-0"
@@ -1717,6 +1723,9 @@ export default function AdminPage() {
                               )}
                           {/* Seletor rápido de Status */}
                           <select
+                            id={`order-status-detailed-${order.$id}`}
+                            name={`orderStatus-${order.$id}`}
+                            aria-label={`Mudar status do pedido ${order.order_number}`}
                             value={order.status}
                             onChange={(e) => handleUpdateOrderStatus(order.$id, e.target.value)}
                             className="bg-slate-950 border border-slate-800 text-xs rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"

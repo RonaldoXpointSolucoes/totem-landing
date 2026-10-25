@@ -24,6 +24,13 @@ function getServerStorage(): Storage {
     .setProject(APPWRITE_CONFIG.projectId)
     .setKey(APPWRITE_CONFIG.apiKey);
 
+  const rawHeaders = (client as any).headers;
+  if (rawHeaders && typeof rawHeaders === "object") {
+    delete rawHeaders["X-Appwrite-Response-Format"];
+    delete rawHeaders["x-sdk-version"];
+    rawHeaders["x-appwrite-response-format"] = "1.6.0";
+  }
+
   return new Storage(client);
 }
 
@@ -78,7 +85,7 @@ export async function POST(req: Request) {
     const isVideo =
       mime.startsWith("video/") || [".mp4", ".webm", ".mov", ".m4v", ".ogg"].includes(ext);
     const isImage =
-      mime.startsWith("image/") || [".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"].includes(ext);
+      mime.startsWith("image/") || [".jpg", ".jpeg", "png", ".webp", ".gif", ".svg"].includes(ext);
     const mediaType: "image" | "video" | "document" = isVideo
       ? "video"
       : isImage

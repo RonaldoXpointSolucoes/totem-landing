@@ -530,6 +530,9 @@ export const CartView: React.FC<CartViewProps> = ({
 
                 <div className="flex gap-2">
                   <input
+                    id="cart-shipping-cep"
+                    name="shippingCep"
+                    aria-label="CEP para cálculo de frete"
                     type="text"
                     inputMode="numeric"
                     placeholder="00000-000"
@@ -663,6 +666,9 @@ export const CartView: React.FC<CartViewProps> = ({
                   <div className="space-y-1.5">
                     <div className="flex gap-2">
                       <input
+                        id="cart-coupon-code"
+                        name="couponCode"
+                        aria-label="Código do cupom de desconto"
                         type="text"
                         placeholder="Código do cupom..."
                         value={couponInput}

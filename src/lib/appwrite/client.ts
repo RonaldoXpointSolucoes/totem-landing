@@ -9,6 +9,13 @@ export function getAppwriteClient(): Client {
     clientInstance = new Client()
       .setEndpoint(APPWRITE_CONFIG.endpoint)
       .setProject(APPWRITE_CONFIG.projectId);
+
+    const rawHeaders = (clientInstance as any).headers;
+    if (rawHeaders && typeof rawHeaders === "object") {
+      delete rawHeaders["X-Appwrite-Response-Format"];
+      delete rawHeaders["x-sdk-version"];
+      rawHeaders["x-appwrite-response-format"] = "1.6.0";
+    }
   }
   return clientInstance;
 }
