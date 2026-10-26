@@ -126,88 +126,80 @@ export const ModelsSection: React.FC<ModelsSectionProps> = ({
                 interactive
                 className="flex flex-col justify-between p-6 rounded-[28px] border border-black/5 dark:border-slate-800 bg-white dark:bg-slate-900/70 shadow-lg dark:shadow-2xl transition-all hover:shadow-xl dark:hover:border-slate-700"
               >
-                <div>
-                  {/* Imagem do Modelo com Carrossel de Fotos Reais */}
-                  <div className="relative aspect-[3/4] w-full rounded-2xl bg-[#f5f5f7] dark:bg-slate-950/70 border border-black/5 dark:border-slate-800/80 p-3 sm:p-5 flex items-center justify-center mb-6 overflow-hidden group">
-                    <ModelImageCarousel
-                      images={
-                        Array.isArray(model.images) && model.images.length > 0
-                          ? model.images
-                          : [model.mainImage]
-                      }
-                      alt={model.name}
-                      intervalMs={10000}
-                      className="h-full w-full"
-                      showDots={true}
-                      showArrows={true}
-                      showCounter={true}
-                    />
+                {/* Imagem do Modelo com Carrossel de Fotos Reais */}
+                <div className="relative aspect-[3/4] w-full rounded-2xl bg-[#f5f5f7] dark:bg-slate-950/70 border border-black/5 dark:border-slate-800/80 p-3 sm:p-5 flex items-center justify-center mb-6 overflow-hidden group">
+                  <ModelImageCarousel
+                    images={
+                      Array.isArray(model.images) && model.images.length > 0
+                        ? model.images
+                        : [model.mainImage]
+                    }
+                    alt={model.name}
+                    intervalMs={10000}
+                    className="h-full w-full"
+                    showDots={true}
+                    showArrows={true}
+                    showCounter={true}
+                  />
 
-                    <div className="absolute top-3 right-3 z-20 pointer-events-none">
-                      <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200 bg-white/95 dark:bg-slate-900/95 border border-black/10 dark:border-slate-700 px-2.5 py-0.5 rounded-full shadow-sm">
-                        {model.slug === "floor" || model.id === "cabinet-floor" ? "Mais Popular" : "Sob Medida"}
-                      </span>
-                    </div>
+                  <span className="absolute top-3 right-3 z-20 pointer-events-none text-[11px] font-bold text-slate-800 dark:text-slate-200 bg-white/95 dark:bg-slate-900/95 border border-black/10 dark:border-slate-700 px-2.5 py-0.5 rounded-full shadow-sm">
+                    {model.slug === "floor" || model.id === "cabinet-floor" ? "Mais Popular" : "Sob Medida"}
+                  </span>
 
-                    {/* Botão de Ver Vídeo Real do Instagram */}
-                    {videoUrl && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenVideo(model.name, videoUrl);
-                        }}
-                        className="absolute bottom-2.5 left-3 px-3 py-1.5 rounded-full bg-slate-950/90 hover:bg-slate-900 text-white text-[11px] font-bold shadow-lg flex items-center gap-1.5 border border-rose-500/40 backdrop-blur-md transition-all hover:scale-105 active:scale-95 z-20 cursor-pointer"
-                        title="Assistir Reels do Produto"
-                      >
-                        <InstagramGlyph className="w-3.5 h-3.5 text-rose-400" />
-                        <span>Ver Vídeo Real</span>
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Título e Descrição */}
-                  <h3 className="text-xl font-bold text-[#1d1d1f] dark:text-white mb-2">{model.name}</h3>
-                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
-                    {model.description}
-                  </p>
-
-                  {/* Especificações Rápidas */}
-                  {model.dimensions && (
-                    <div className="flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-400 py-2 border-y border-black/5 dark:border-slate-800/60 mb-4">
-                      <Maximize2 className="w-3.5 h-3.5 text-[#0058b6] dark:text-indigo-400" />
-                      <span>
-                        {model.dimensions.heightMm}mm (A) × {model.dimensions.widthMm}mm (L) ×{" "}
-                        {model.dimensions.depthMm}mm (P)
-                      </span>
-                    </div>
+                  {/* Botão de Ver Vídeo Real do Instagram */}
+                  {videoUrl && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenVideo(model.name, videoUrl);
+                      }}
+                      className="absolute bottom-2.5 left-3 px-3 py-1.5 rounded-full bg-slate-950/90 hover:bg-slate-900 text-white text-[11px] font-bold shadow-lg flex items-center gap-1.5 border border-rose-500/40 transition-all hover:scale-105 active:scale-95 z-20 cursor-pointer"
+                      title="Assistir Reels do Produto"
+                    >
+                      <InstagramGlyph className="w-3.5 h-3.5 text-rose-400" />
+                      Ver Vídeo Real
+                    </button>
                   )}
                 </div>
 
-                {/* Preço e Botão de Ação */}
-                <div className="pt-2">
-                  <div className="mb-4">
-                    <PriceTag
-                      pixPriceCents={
-                        model.pixPriceCents ||
-                        (model.basePriceCents >= 120000
-                          ? Math.round(model.basePriceCents * 0.825)
-                          : model.basePriceCents)
-                      }
-                      cardPriceCents={model.basePriceCents}
-                      anchorPriceCents={model.anchorPriceCents}
-                      installments={model.maxInstallments || 10}
-                      size="md"
-                    />
+                {/* Título e Descrição */}
+                <h3 className="text-xl font-bold text-[#1d1d1f] dark:text-white mb-2">{model.name}</h3>
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
+                  {model.description}
+                </p>
+
+                {/* Especificações Rápidas */}
+                {model.dimensions && (
+                  <div className="flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-400 py-2 border-y border-black/5 dark:border-slate-800/60 mb-4">
+                    <Maximize2 className="w-3.5 h-3.5 text-[#0058b6] dark:text-indigo-400" />
+                    {model.dimensions.heightMm}mm (A) × {model.dimensions.widthMm}mm (L) ×{" "}
+                    {model.dimensions.depthMm}mm (P)
                   </div>
-                  <button
-                    className="w-full py-3 px-4 rounded-full bg-[#0062cc] hover:bg-[#0051a8] text-white text-xs font-bold flex items-center justify-between transition-all duration-200 shadow-md shadow-blue-500/20 active:scale-95 group cursor-pointer"
-                    onClick={() => onSelectModelToConfigure(model.id)}
-                  >
-                    <span>Configurar Este</span>
-                    <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                  </button>
-                </div>
+                )}
+
+                {/* Preço e Botão de Ação */}
+                <PriceTag
+                  pixPriceCents={
+                    model.pixPriceCents ||
+                    (model.basePriceCents >= 120000
+                      ? Math.round(model.basePriceCents * 0.825)
+                      : model.basePriceCents)
+                  }
+                  cardPriceCents={model.basePriceCents}
+                  anchorPriceCents={model.anchorPriceCents}
+                  installments={model.maxInstallments || 10}
+                  size="md"
+                  className="mt-auto mb-4 pt-2"
+                />
+
+                <button
+                  className="w-full py-3 px-4 rounded-full bg-[#0062cc] hover:bg-[#0051a8] text-white text-xs font-bold flex items-center justify-between transition-all duration-200 shadow-md shadow-blue-500/20 active:scale-95 group cursor-pointer"
+                  onClick={() => onSelectModelToConfigure(model.id)}
+                >
+                  Configurar Este
+                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                </button>
               </Card>
             );
           })}

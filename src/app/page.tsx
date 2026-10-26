@@ -88,17 +88,9 @@ export default function Home() {
           onSelectModelToConfigure={(modelId) => handleStartConfigurator(modelId)}
         />
 
-        <div id="como-funciona">
-          <HowItWorks />
-        </div>
-
-        <div id="diferenciais">
-          <Differentials />
-        </div>
-
-        <div id="faq">
-          <FaqSection />
-        </div>
+        <HowItWorks />
+        <Differentials />
+        <FaqSection />
 
         {/* Guia de Autoridade Semântica SEO, Tabela Comparativa de Preços e Silo de Links */}
         <SeoAuthoritySection />
@@ -116,15 +108,13 @@ export default function Home() {
               Escolha o gabinete, personalize a cor e informe os equipamentos que você já utiliza.
               Calculamos o orçamento em tempo real sem surpresas.
             </p>
-            <div className="pt-2">
-              <button
-                onClick={() => handleStartConfigurator("cabinet-wall")}
-                className="px-8 py-3.5 rounded-full bg-[#0062cc] hover:bg-[#0051a8] text-white font-bold text-sm sm:text-base shadow-xl shadow-blue-500/25 active:scale-95 transition-all inline-flex items-center gap-2 cursor-pointer"
-              >
-                <Sparkles className="w-5 h-5" />
-                <span>Abrir o Configurador Agora</span>
-              </button>
-            </div>
+            <button
+              onClick={() => handleStartConfigurator("cabinet-wall")}
+              className="mt-2 px-8 py-3.5 rounded-full bg-[#0062cc] hover:bg-[#0051a8] text-white font-bold text-sm sm:text-base shadow-xl shadow-blue-500/25 active:scale-95 transition-all inline-flex items-center gap-2 cursor-pointer"
+            >
+              <Sparkles className="w-5 h-5" />
+              Abrir o Configurador Agora
+            </button>
           </div>
         </section>
       </main>

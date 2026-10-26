@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Cpu, ArrowRight, ArrowLeft, ShoppingCart, User } from "lucide-react";
 import { useCart } from "@/modules/cart/CartContext";
 import { Button } from "@/components/ui";
@@ -14,7 +14,6 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ className = "" }) => {
   const pathname = usePathname();
-  const router = useRouter();
   const { totalItems } = useCart();
   const [customer, setCustomer] = useState<any>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -52,7 +51,7 @@ export const Navbar: React.FC<NavbarProps> = ({ className = "" }) => {
   };
 
   return (
-    <header className={`sticky top-0 z-30 w-full border-b border-black/5 dark:border-slate-800/80 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl transition-colors duration-300 ${className}`}>
+    <header className={`sticky top-0 z-30 w-full border-b border-black/5 dark:border-slate-800/80 bg-white/95 dark:bg-slate-950/95 transition-colors duration-300 ${className}`}>
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
         {/* Logotipo Brand */}
         <Link
@@ -157,13 +156,13 @@ export const Navbar: React.FC<NavbarProps> = ({ className = "" }) => {
             <Link href="/">
               <Button variant="outline" size="sm" className="font-semibold text-xs gap-1.5 shadow-sm">
                 <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Voltar à Página Inicial</span>
+                Voltar à Página Inicial
               </Button>
             </Link>
           ) : isCart ? (
             <Link href="/monte-seu-totem">
               <Button variant="primary" size="sm" className="font-bold text-xs gap-1.5 shadow-md shadow-blue-500/20">
-                <span>Montar Outro Totem</span>
+                Montar Outro Totem
                 <ArrowRight className="w-3.5 h-3.5" />
               </Button>
             </Link>
@@ -171,7 +170,7 @@ export const Navbar: React.FC<NavbarProps> = ({ className = "" }) => {
             <Link href="/carrinho">
               <Button variant="outline" size="sm" className="font-semibold text-xs gap-1.5 shadow-sm">
                 <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Voltar ao Carrinho</span>
+                Voltar ao Carrinho
               </Button>
             </Link>
           ) : (
@@ -180,7 +179,7 @@ export const Navbar: React.FC<NavbarProps> = ({ className = "" }) => {
               prefetch={false}
               className="px-4 py-2 rounded-full bg-[#0062cc] hover:bg-[#0051a8] text-white font-semibold text-xs transition-all duration-200 shadow-md shadow-blue-500/20 active:scale-95 flex items-center gap-1.5 cursor-pointer"
             >
-              <span>Montar meu Totem</span>
+              Montar meu Totem
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           )}
@@ -188,14 +187,16 @@ export const Navbar: React.FC<NavbarProps> = ({ className = "" }) => {
       </div>
 
       {/* Modal de Autenticação do Cliente */}
-      <CustomerAuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        onSuccess={(loggedCustomer) => {
-          setCustomer(loggedCustomer);
-          setIsAuthModalOpen(false);
-        }}
-      />
+      {isAuthModalOpen && (
+        <CustomerAuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          onSuccess={(loggedCustomer) => {
+            setCustomer(loggedCustomer);
+            setIsAuthModalOpen(false);
+          }}
+        />
+      )}
     </header>
   );
 };

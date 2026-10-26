@@ -54,19 +54,17 @@ export const FaqSection: React.FC = () => {
               >
                 <button
                   onClick={() => toggleFaq(idx)}
-                  className="w-full text-left p-5 sm:p-6 flex items-center justify-between gap-4 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3]"
+                  className="w-full text-left p-5 sm:p-6 flex items-center gap-3 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3]"
                   aria-expanded={isOpen}
                   aria-controls={`faq-answer-${idx}`}
                   id={`faq-question-${idx}`}
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-black/[0.06] dark:bg-slate-800 text-slate-700 dark:text-slate-300 shrink-0">
-                      {item.category}
-                    </span>
-                    <h3 className="text-sm sm:text-base font-bold text-[#1d1d1f] dark:text-white leading-snug">
-                      {item.question}
-                    </h3>
-                  </div>
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-black/[0.06] dark:bg-slate-800 text-slate-700 dark:text-slate-300 shrink-0">
+                    {item.category}
+                  </span>
+                  <h3 className="text-sm sm:text-base font-bold text-[#1d1d1f] dark:text-white leading-snug flex-1">
+                    {item.question}
+                  </h3>
                   <ChevronDown
                     className={`w-5 h-5 text-slate-500 shrink-0 transition-transform duration-300 ${
                       isOpen ? "rotate-180 text-[#0058b6] dark:text-cyan-400" : ""
@@ -74,18 +72,18 @@ export const FaqSection: React.FC = () => {
                   />
                 </button>
 
-                <div
-                  id={`faq-answer-${idx}`}
-                  role="region"
-                  aria-labelledby={`faq-question-${idx}`}
-                  className={`transition-all duration-300 ease-in-out px-5 sm:px-6 pb-6 pt-0 ${
-                    isOpen ? "block opacity-100" : "hidden opacity-0"
-                  }`}
-                >
-                  <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed pl-1 sm:pl-2 border-l-2 border-[#0058b6]/60 dark:border-cyan-400/60">
-                    {item.answer}
-                  </p>
-                </div>
+                {isOpen && (
+                  <div
+                    id={`faq-answer-${idx}`}
+                    role="region"
+                    aria-labelledby={`faq-question-${idx}`}
+                    className="px-5 sm:px-6 pb-6 pt-0"
+                  >
+                    <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed pl-1 sm:pl-2 border-l-2 border-[#0058b6]/60 dark:border-cyan-400/60">
+                      {item.answer}
+                    </p>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -106,7 +104,7 @@ export const FaqSection: React.FC = () => {
             className="inline-flex items-center flex-wrap justify-center gap-2 px-6 py-3 rounded-full bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs sm:text-sm shadow-lg shadow-emerald-700/25 active:scale-95 transition-all group"
           >
             <MessageSquare className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
-            <span>Falar com Engenheiro no WhatsApp</span>
+            Falar com Engenheiro no WhatsApp
             <span className="font-mono text-xs px-2.5 py-0.5 rounded-full bg-emerald-950/75 border border-emerald-400/30 text-white font-bold">
               {siteConfig.links.whatsappDisplay}
             </span>

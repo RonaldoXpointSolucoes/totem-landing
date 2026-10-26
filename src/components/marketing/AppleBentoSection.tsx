@@ -26,15 +26,13 @@ export function AppleBentoSection({ onStartConfigurator }: AppleBentoSectionProp
             </strong>{" "}
             com gabaritos homologados para monitores touch, impressoras térmicas e leitores 2D.
           </p>
-          <div className="mt-6">
-            <button
-              onClick={onStartConfigurator}
-              className="inline-flex items-center gap-1.5 text-sm sm:text-base font-semibold text-[#0058b6] dark:text-[#4da3ff] hover:text-[#004494] hover:underline cursor-pointer"
-            >
-              <span>Saiba mais sobre a nossa usinagem CNC</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+          <button
+            onClick={onStartConfigurator}
+            className="mt-6 inline-flex items-center gap-1.5 text-sm sm:text-base font-semibold text-[#0058b6] dark:text-[#4da3ff] hover:text-[#004494] hover:underline cursor-pointer"
+          >
+            Saiba mais sobre a nossa usinagem CNC
+            <ArrowRight className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Bento Grid (2 Cards Pastel Superiores + 1 Card Full-Width Inferior) */}
@@ -58,26 +56,24 @@ export function AppleBentoSection({ onStartConfigurator }: AppleBentoSectionProp
             </div>
 
             {/* Mockup Visual Interno */}
-            <div className="mt-8 pt-6 bg-white/80 dark:bg-slate-950/70 backdrop-blur-md rounded-2xl p-5 border border-black/5 dark:border-white/10 shadow-inner">
-              <div className="flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300 mb-3">
+            <div className="mt-8 pt-6 bg-white/95 dark:bg-slate-950/90 rounded-2xl p-5 border border-black/5 dark:border-white/10 shadow-inner space-y-2 text-xs text-slate-600 dark:text-slate-400">
+              <div className="flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                 <span>Checklist de Usinagem CNC</span>
                 <span className="text-emerald-800 dark:text-emerald-400 flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5" /> 100% Precisão
                 </span>
               </div>
-              <div className="space-y-2 text-xs text-slate-600 dark:text-slate-400">
-                <div className="flex items-center justify-between py-1.5 px-3 rounded-lg bg-[#f5f5f7] dark:bg-slate-900">
-                  <span>Padrão VESA 75×75 / 100×100</span>
-                  <span className="font-mono text-[#1d1d1f] dark:text-white font-bold">Incluído</span>
-                </div>
-                <div className="flex items-center justify-between py-1.5 px-3 rounded-lg bg-[#f5f5f7] dark:bg-slate-900">
-                  <span>Berço para Impressora Térmica 80mm</span>
-                  <span className="font-mono text-[#1d1d1f] dark:text-white font-bold">Sob Medida</span>
-                </div>
-                <div className="flex items-center justify-between py-1.5 px-3 rounded-lg bg-[#f5f5f7] dark:bg-slate-900">
-                  <span>Janela Frontal Leitor 2D / QR Code</span>
-                  <span className="font-mono text-[#1d1d1f] dark:text-white font-bold">Homologado</span>
-                </div>
+              <div className="flex items-center justify-between py-1.5 px-3 rounded-lg bg-[#f5f5f7] dark:bg-slate-900">
+                <span>Padrão VESA 75×75 / 100×100</span>
+                <strong className="font-mono text-[#1d1d1f] dark:text-white">Incluído</strong>
+              </div>
+              <div className="flex items-center justify-between py-1.5 px-3 rounded-lg bg-[#f5f5f7] dark:bg-slate-900">
+                <span>Berço para Impressora Térmica 80mm</span>
+                <strong className="font-mono text-[#1d1d1f] dark:text-white">Sob Medida</strong>
+              </div>
+              <div className="flex items-center justify-between py-1.5 px-3 rounded-lg bg-[#f5f5f7] dark:bg-slate-900">
+                <span>Janela Frontal Leitor 2D / QR Code</span>
+                <strong className="font-mono text-[#1d1d1f] dark:text-white">Homologado</strong>
               </div>
             </div>
           </div>
@@ -113,16 +109,16 @@ export function AppleBentoSection({ onStartConfigurator }: AppleBentoSectionProp
               </div>
 
               <div className="grid grid-cols-3 gap-2.5 pt-2">
-                <div className="bg-white/80 dark:bg-slate-900/90 rounded-2xl p-3 text-center border border-black/5 dark:border-white/5">
-                  <span className="block text-xs font-bold text-[#1d1d1f] dark:text-white">Monitores</span>
+                <div className="bg-white/90 dark:bg-slate-900/90 rounded-2xl p-3 text-center border border-black/5 dark:border-white/5">
+                  <strong className="block text-xs text-[#1d1d1f] dark:text-white">Monitores</strong>
                   <span className="text-[11px] text-slate-600 dark:text-slate-400">15.6&quot; a 24&quot; Touch</span>
                 </div>
-                <div className="bg-white/80 dark:bg-slate-900/90 rounded-2xl p-3 text-center border border-black/5 dark:border-white/5">
-                  <span className="block text-xs font-bold text-[#1d1d1f] dark:text-white">Impressoras</span>
+                <div className="bg-white/90 dark:bg-slate-900/90 rounded-2xl p-3 text-center border border-black/5 dark:border-white/5">
+                  <strong className="block text-xs text-[#1d1d1f] dark:text-white">Impressoras</strong>
                   <span className="text-[11px] text-slate-600 dark:text-slate-400">Epson / Elgin / Bematech</span>
                 </div>
-                <div className="bg-white/80 dark:bg-slate-900/90 rounded-2xl p-3 text-center border border-black/5 dark:border-white/5">
-                  <span className="block text-xs font-bold text-[#1d1d1f] dark:text-white">Leitores</span>
+                <div className="bg-white/90 dark:bg-slate-900/90 rounded-2xl p-3 text-center border border-black/5 dark:border-white/5">
+                  <strong className="block text-xs text-[#1d1d1f] dark:text-white">Leitores</strong>
                   <span className="text-[11px] text-slate-600 dark:text-slate-400">1D / 2D / QR Fixo</span>
                 </div>
               </div>
@@ -145,15 +141,13 @@ export function AppleBentoSection({ onStartConfigurator }: AppleBentoSectionProp
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto shrink-0">
-            <button
-              onClick={onStartConfigurator}
-              className="w-full sm:w-auto px-8 py-4 rounded-full bg-[#0062cc] hover:bg-[#0051a8] text-white font-semibold text-sm sm:text-base transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <span>Abrir Configurador Passo a Passo</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+          <button
+            onClick={onStartConfigurator}
+            className="w-full sm:w-auto px-8 py-4 rounded-full bg-[#0062cc] hover:bg-[#0051a8] text-white font-semibold text-sm sm:text-base transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+          >
+            Abrir Configurador Passo a Passo
+            <ArrowRight className="w-4 h-4" />
+          </button>
         </div>
       </div>
     </section>

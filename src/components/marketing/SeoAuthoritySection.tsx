@@ -57,7 +57,7 @@ export function SeoAuthoritySection() {
               prefetch={false}
               className="inline-flex items-center gap-1 py-1 text-xs font-bold text-[#0058b6] dark:text-cyan-400 hover:underline pt-1"
             >
-              <span>Configurar Totem de Piso</span>
+              Configurar Totem de Piso
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </article>
@@ -78,7 +78,7 @@ export function SeoAuthoritySection() {
               prefetch={false}
               className="inline-flex items-center gap-1 py-1 text-xs font-bold text-[#0058b6] dark:text-cyan-400 hover:underline pt-1"
             >
-              <span>Configurar Totem de Balcão</span>
+              Configurar Totem de Balcão
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </article>
@@ -99,7 +99,7 @@ export function SeoAuthoritySection() {
               prefetch={false}
               className="inline-flex items-center gap-1 py-1 text-xs font-bold text-[#0058b6] dark:text-cyan-400 hover:underline pt-1"
             >
-              <span>Configurar Totem de Parede</span>
+              Configurar Totem de Parede
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </article>
@@ -119,7 +119,7 @@ export function SeoAuthoritySection() {
               href="/modelos"
               className="inline-flex items-center gap-1 py-1 text-xs font-bold text-[#0058b6] dark:text-cyan-400 hover:underline pt-1"
             >
-              <span>Ver Catálogo de Gabinetes</span>
+              Ver Catálogo de Gabinetes
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </article>
@@ -141,7 +141,7 @@ export function SeoAuthoritySection() {
               prefetch={false}
               className="px-5 py-2.5 rounded-full bg-[#0062cc] hover:bg-[#0051a8] text-white font-bold text-xs sm:text-sm inline-flex items-center justify-center gap-2 shrink-0 shadow-md shadow-blue-500/20"
             >
-              <span>Simular Orçamento Online</span>
+              Simular Orçamento Online
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -255,41 +255,35 @@ export function SeoAuthoritySection() {
         {/* Silo de Navegação Semântica para Indexação Profunda */}
         <nav
           aria-label="Links Rápidos de Modelos e Soluções de Totem de Autoatendimento"
-          className="pt-6 border-t border-black/5 dark:border-slate-800/80 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs font-semibold text-slate-600 dark:text-slate-400"
+          className="pt-6 border-t border-black/5 dark:border-slate-800/80 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs font-semibold text-slate-600 dark:text-slate-400"
         >
           <Link href="/modelos" className="py-1.5 px-1 hover:text-[#0058b6] dark:hover:text-cyan-400 transition-colors">
             Modelos de Totem de Autoatendimento
           </Link>
-          <span aria-hidden="true">•</span>
           <Link
             href="/monte-seu-totem?modelo=cabinet-floor"
             className="py-1.5 px-1 hover:text-[#0058b6] dark:hover:text-cyan-400 transition-colors"
           >
             Gabinete Totem de Piso
           </Link>
-          <span aria-hidden="true">•</span>
           <Link
             href="/monte-seu-totem?modelo=cabinet-wall"
             className="py-1.5 px-1 hover:text-[#0058b6] dark:hover:text-cyan-400 transition-colors"
           >
             Gabinete Totem de Parede
           </Link>
-          <span aria-hidden="true">•</span>
           <Link
             href="/monte-seu-totem?modelo=cabinet-countertop"
             className="py-1.5 px-1 hover:text-[#0058b6] dark:hover:text-cyan-400 transition-colors"
           >
             Gabinete Totem de Balcão
           </Link>
-          <span aria-hidden="true">•</span>
           <Link href="/como-funciona" className="py-1.5 px-1 hover:text-[#0058b6] dark:hover:text-cyan-400 transition-colors">
             Como Montar um Totem (-50%)
           </Link>
-          <span aria-hidden="true">•</span>
           <Link href="/diferenciais" className="py-1.5 px-1 hover:text-[#0058b6] dark:hover:text-cyan-400 transition-colors">
             Usinagem Router CNC
           </Link>
-          <span aria-hidden="true">•</span>
           <Link href="/faq" className="py-1.5 px-1 hover:text-[#0058b6] dark:hover:text-cyan-400 transition-colors">
             Perguntas Frequentes (FAQ)
           </Link>

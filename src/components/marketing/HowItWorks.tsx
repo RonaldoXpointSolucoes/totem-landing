@@ -8,7 +8,6 @@ import {
   Cpu,
   Wrench,
   PiggyBank,
-  CheckCircle2,
   ArrowRight,
   PackageCheck,
   Sparkles,
@@ -74,26 +73,24 @@ export const HowItWorks: React.FC = () => {
           {steps.map((st, idx) => (
             <div
               key={st.num}
-              className="relative p-6 rounded-[24px] border border-black/5 dark:border-slate-800 bg-[#f5f5f7] dark:bg-slate-900/70 backdrop-blur-sm flex flex-col justify-between group hover:border-[#0071e3]/30 dark:hover:border-slate-700 transition-all shadow-sm hover:shadow-md"
+              className="relative p-6 rounded-[24px] border border-black/5 dark:border-slate-800 bg-[#f5f5f7] dark:bg-slate-900/70 flex flex-col justify-between group hover:border-[#0071e3]/30 dark:hover:border-slate-700 transition-all shadow-sm hover:shadow-md"
             >
-              <div>
-                <div className="flex items-center justify-between mb-6">
-                  <div className="p-3 rounded-xl bg-white dark:bg-slate-800/80 border border-black/5 dark:border-slate-700 group-hover:scale-105 transition-transform shadow-sm">
-                    {st.icon}
-                  </div>
-                  <span className="text-2xl font-black text-slate-600 dark:text-slate-400 select-none">
-                    Passo {st.num}
-                  </span>
+              <div className="flex items-center justify-between mb-6">
+                <div className="p-3 rounded-xl bg-white dark:bg-slate-800/80 border border-black/5 dark:border-slate-700 group-hover:scale-105 transition-transform shadow-sm">
+                  {st.icon}
                 </div>
-                <h3 className="text-lg font-bold text-[#1d1d1f] dark:text-white mb-2">
-                  {st.title}
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                  {st.desc}
-                </p>
+                <span className="text-2xl font-black text-slate-600 dark:text-slate-400 select-none">
+                  Passo {st.num}
+                </span>
               </div>
+              <h3 className="text-lg font-bold text-[#1d1d1f] dark:text-white mb-2">
+                {st.title}
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-6">
+                {st.desc}
+              </p>
 
-              <div className="mt-6 pt-3 border-t border-black/5 dark:border-slate-800/60 flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400">
+              <div className="mt-auto pt-3 border-t border-black/5 dark:border-slate-800/60 flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400">
                 <span>Etapa {idx + 1} de 4</span>
                 <span className="text-[#0058b6] dark:text-indigo-300 font-semibold">
                   Passo homologado ✓
@@ -127,19 +124,19 @@ export const HowItWorks: React.FC = () => {
 
               <ul className="space-y-2.5 text-xs sm:text-sm text-slate-700 dark:text-slate-300 pt-2">
                 <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <span aria-hidden="true" className="text-emerald-600 dark:text-emerald-400 font-black shrink-0">✓</span>
                   <span>
                     <strong>Usinagem CNC sem custo adicional:</strong> recortamos as janelas exatas para o modelo da sua tela, impressora e leitor.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <span aria-hidden="true" className="text-emerald-600 dark:text-emerald-400 font-black shrink-0">✓</span>
                   <span>
                     <strong>Montagem DIY em 15 minutos:</strong> furação VESA pronta, suporte interno e porta traseira com chave exclusiva.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <span aria-hidden="true" className="text-emerald-600 dark:text-emerald-400 font-black shrink-0">✓</span>
                   <span>
                     <strong>Perfeito também para Software Houses:</strong> compre o gabinete White-Label para revender junto com o seu sistema PDV.
                   </span>
@@ -147,15 +144,13 @@ export const HowItWorks: React.FC = () => {
               </ul>
             </div>
 
-            <div className="mt-7 pt-5 border-t border-black/5 dark:border-slate-800">
-              <button
-                onClick={() => handleGoToConfigurator("cabinet")}
-                className="w-full py-3.5 px-5 rounded-full bg-[#0062cc] hover:bg-[#0051a8] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-500/20 transition-all cursor-pointer"
-              >
-                <span>Configurar Apenas o Gabinete</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
+            <button
+              onClick={() => handleGoToConfigurator("cabinet")}
+              className="mt-7 w-full py-3.5 px-5 rounded-full bg-[#0062cc] hover:bg-[#0051a8] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+            >
+              Configurar Apenas o Gabinete
+              <ArrowRight className="w-4 h-4" />
+            </button>
           </div>
 
           {/* Opção 2: Gabinete + Kit Completo (Você monta ou Recebe 100% Montado) */}
@@ -182,19 +177,19 @@ export const HowItWorks: React.FC = () => {
 
               <ul className="space-y-2.5 text-xs sm:text-sm text-slate-700 dark:text-slate-200 pt-2">
                 <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <span aria-hidden="true" className="text-emerald-600 dark:text-emerald-400 font-black shrink-0">✓</span>
                   <span>
                     <strong>Hardware Completo Opcional:</strong> Computador All-in-One Touch 23.8&quot;, Impressora Térmica 80mm com guilhotina, Leitor 2D QR Code e Cabos.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <span aria-hidden="true" className="text-emerald-600 dark:text-emerald-400 font-black shrink-0">✓</span>
                   <span>
                     <strong>Você escolhe os itens do Kit:</strong> marque no configurador apenas os periféricos que precisar.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <span aria-hidden="true" className="text-emerald-600 dark:text-emerald-400 font-black shrink-0">✓</span>
                   <span>
                     <strong>Quer receber 100% montado?</strong> No configurador você pode incluir o serviço opcional de{" "}
                     <strong className="text-emerald-800 dark:text-emerald-300">Montagem Industrial</strong>{" "}
@@ -204,15 +199,13 @@ export const HowItWorks: React.FC = () => {
               </ul>
             </div>
 
-            <div className="mt-7 pt-5 border-t border-emerald-500/20">
-              <button
-                onClick={() => handleGoToConfigurator("kit")}
-                className="w-full py-3.5 px-5 rounded-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-emerald-700/25 transition-all cursor-pointer"
-              >
-                <span>Montar Gabinete + Kit Completo</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
+            <button
+              onClick={() => handleGoToConfigurator("kit")}
+              className="mt-7 w-full py-3.5 px-5 rounded-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-emerald-700/25 transition-all cursor-pointer"
+            >
+              Montar Gabinete + Kit Completo
+              <ArrowRight className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </div>

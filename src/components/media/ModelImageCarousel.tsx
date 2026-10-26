@@ -5,8 +5,6 @@ import { ChevronLeft, ChevronRight, Image as ImageIcon } from "lucide-react";
 import {
   preloadCarouselImages,
   preloadSingleImage,
-  onImageReady,
-  isImagePreloaded,
   getOptimizedImageUrl,
 } from "@/lib/media/imageCache";
 
@@ -59,15 +57,6 @@ export function ModelImageCarousel({
   const [isHovered, setIsHovered] = useState(false);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [loadedUrls, setLoadedUrls] = useState<Set<string>>(() => {
-    const initial = new Set<string>();
-    if (typeof window !== "undefined") {
-      cleanImages.forEach((url) => {
-        if (isImagePreloaded(url)) initial.add(url);
-      });
-    }
-    return initial;
-  });
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const transitionTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -100,23 +89,7 @@ export function ModelImageCarousel({
   // 1. Pré-carregamento inteligente via imageCache apenas quando próximo ao viewport (ou priority)
   useEffect(() => {
     if (total === 0 || !isInViewport) return;
-
     preloadCarouselImages(cleanImages, currentIndex);
-
-    const unsubscribes = cleanImages.map((url) =>
-      onImageReady(url, () => {
-        setLoadedUrls((prev) => {
-          if (prev.has(url)) return prev;
-          const next = new Set(prev);
-          next.add(url);
-          return next;
-        });
-      })
-    );
-
-    return () => {
-      unsubscribes.forEach((unsub) => unsub());
-    };
   }, [cleanImages, total, currentIndex, isInViewport]);
 
   // Garante que o currentIndex não estoure se a lista mudar dinamicamente
@@ -261,70 +234,47 @@ export function ModelImageCarousel({
         </div>
       )}
 
-      {/* Contêiner de Visualização com Animação Suave e Elegante de Dissolve */}
-      <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
-        {/* Slide Saindo (Outgoing) durante a transição com fade out e sutil drift */}
-        {outgoingSrc && isTransitioning && (
-          <div
-            key={`outgoing-${outgoingSrc}-${outgoingIndex}`}
-            className={`absolute inset-0 w-full h-full flex items-center justify-center pointer-events-none transform-gpu ${
-              direction === "next"
-                ? "animate-totem-outgoing-next"
-                : "animate-totem-outgoing-prev"
-            }`}
-            style={{ willChange: "transform, opacity" }}
-          >
-            <img
-              src={outgoingSrc}
-              alt={`${alt} - Foto ${outgoingIndex! + 1}`}
-              width={532}
-              height={532}
-              className={`w-full h-full ${
-                objectFit === "contain" ? "object-contain" : "object-cover"
-              } ${imageClassName}`}
-              decoding="async"
-              draggable={false}
-            />
-          </div>
-        )}
+      {/* Slide Saindo (Outgoing) durante a transição com fade out e sutil drift */}
+      {outgoingSrc && isTransitioning && (
+        <img
+          key={`outgoing-${outgoingSrc}-${outgoingIndex}`}
+          src={outgoingSrc}
+          alt={`${alt} - Foto ${outgoingIndex! + 1}`}
+          width={532}
+          height={532}
+          className={`absolute inset-0 w-full h-full pointer-events-none transform-gpu ${
+            objectFit === "contain" ? "object-contain" : "object-cover"
+          } ${
+            direction === "next"
+              ? "animate-totem-outgoing-next"
+              : "animate-totem-outgoing-prev"
+          } ${imageClassName}`}
+          decoding="async"
+          draggable={false}
+        />
+      )}
 
-        {/* Slide Entrando / Ativo (Incoming / Active) com fade in e sutil aproximação */}
-        <div
-          key={`current-${currentSrc}-${currentIndex}`}
-          className={`absolute inset-0 w-full h-full flex items-center justify-center pointer-events-auto transform-gpu ${
-            isTransitioning
-              ? direction === "next"
-                ? "animate-totem-incoming-next"
-                : "animate-totem-incoming-prev"
-              : "translate-x-0 opacity-100 scale-100"
-          }`}
-          style={{ willChange: "transform, opacity" }}
-        >
-          {/* Skeleton Shimmer enquanto decodifica na memória */}
-          {!loadedUrls.has(currentSrc) && (
-            <div className="absolute inset-0 flex items-center justify-center bg-slate-200/40 dark:bg-slate-800/40 animate-pulse rounded-2xl">
-              <ImageIcon className="w-8 h-8 text-slate-400/40 animate-spin" />
-            </div>
-          )}
-
-          <img
-            src={currentSrc}
-            alt={`${alt} - Foto ${currentIndex + 1} de ${total}`}
-            width={532}
-            height={532}
-            loading={priority ? "eager" : "lazy"}
-            fetchPriority={priority ? "high" : "auto"}
-            onLoad={() => {
-              setLoadedUrls((prev) => new Set(prev).add(currentSrc));
-            }}
-            className={`w-full h-full transition-opacity duration-300 ${
-              objectFit === "contain" ? "object-contain" : "object-cover"
-            } ${loadedUrls.has(currentSrc) ? "opacity-100" : "opacity-90 blur-[0.5px]"} ${imageClassName}`}
-            decoding="async"
-            draggable={false}
-          />
-        </div>
-      </div>
+      {/* Slide Entrando / Ativo (Incoming / Active) com estrutura DOM plana */}
+      <img
+        key={`current-${currentSrc}-${currentIndex}`}
+        src={currentSrc}
+        alt={`${alt} - Foto ${currentIndex + 1} de ${total}`}
+        width={532}
+        height={532}
+        loading={priority ? "eager" : "lazy"}
+        fetchPriority={priority ? "high" : "auto"}
+        className={`w-full h-full transform-gpu ${
+          objectFit === "contain" ? "object-contain" : "object-cover"
+        } ${
+          isTransitioning
+            ? direction === "next"
+              ? "animate-totem-incoming-next"
+              : "animate-totem-incoming-prev"
+            : "translate-x-0 opacity-100 scale-100"
+        } ${imageClassName}`}
+        decoding="async"
+        draggable={false}
+      />
 
       {/* Controles Manuais: Setas Esquerda / Direita com área de toque >= 36x36px */}
       {showArrows && total > 1 && (
@@ -333,7 +283,7 @@ export function ModelImageCarousel({
             type="button"
             onClick={goToPrev}
             aria-label="Foto anterior"
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-slate-950/80 hover:bg-slate-900 text-white backdrop-blur-md border border-white/20 flex items-center justify-center opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:scale-110 active:scale-95 z-20 cursor-pointer shadow-lg shadow-black/25"
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-slate-950/90 hover:bg-slate-900 text-white border border-white/20 flex items-center justify-center opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:scale-110 active:scale-95 z-20 cursor-pointer shadow-lg"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -342,7 +292,7 @@ export function ModelImageCarousel({
             type="button"
             onClick={goToNext}
             aria-label="Próxima foto"
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-slate-950/80 hover:bg-slate-900 text-white backdrop-blur-md border border-white/20 flex items-center justify-center opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:scale-110 active:scale-95 z-20 cursor-pointer shadow-lg shadow-black/25"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-slate-950/90 hover:bg-slate-900 text-white border border-white/20 flex items-center justify-center opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:scale-110 active:scale-95 z-20 cursor-pointer shadow-lg"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -351,18 +301,18 @@ export function ModelImageCarousel({
 
       {/* Contador Numérico Estilizado à esquerda superior (evita colisão com badge Sob Medida à direita) */}
       {showCounter && total > 1 && (
-        <div className="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-slate-950/85 backdrop-blur-md border border-white/20 text-white text-[10px] font-mono font-bold tracking-wider z-20 shadow-sm pointer-events-none">
+        <span className="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-slate-950/90 border border-white/20 text-white text-[10px] font-mono font-bold tracking-wider z-20 shadow-sm pointer-events-none">
           {currentIndex + 1}/{total}
-        </div>
+        </span>
       )}
 
       {/* Indicadores de Paginação Visuais (sem conflito de touch target pequeno no mobile) */}
       {showDots && total > 1 && (
         <div
           aria-hidden="true"
-          className="absolute bottom-2.5 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-950/85 backdrop-blur-md border border-white/20 z-20 shadow-md pointer-events-none"
+          className="absolute bottom-2.5 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-950/90 border border-white/20 z-20 shadow-md pointer-events-none"
         >
-          {cleanImages.slice(0, Math.min(total, 9)).map((_, idx) => {
+          {cleanImages.slice(0, Math.min(total, 5)).map((_, idx) => {
             const isActive = currentIndex === idx;
             return (
               <span
@@ -375,9 +325,9 @@ export function ModelImageCarousel({
               />
             );
           })}
-          {total > 9 && (
+          {total > 5 && (
             <span className="text-[9px] font-mono text-white px-1 font-bold">
-              +{total - 9}
+              +{total - 5}
             </span>
           )}
         </div>

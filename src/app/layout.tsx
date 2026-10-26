@@ -49,7 +49,6 @@ export const metadata: Metadata = {
     shortcut: "/icon.svg",
     apple: "/icon.svg",
   },
-  manifest: "/site.webmanifest",
   openGraph: {
     type: "website",
     locale: "pt_BR",
@@ -360,11 +359,6 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
-
-
-        <link rel="preload" as="image" href="/models/cabinet-floor.svg" fetchPriority="high" />
-        <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
-        <link rel="preload" as="image" href="/models/cabinet-floor.svg" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaOrgJsonLd) }}

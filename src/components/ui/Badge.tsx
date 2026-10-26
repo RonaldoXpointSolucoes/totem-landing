@@ -15,21 +15,21 @@ export const Badge: React.FC<BadgeProps> = ({
     default:
       "bg-slate-100 dark:bg-slate-800/80 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700",
     primary:
-      "bg-blue-100/90 dark:bg-indigo-500/15 text-[#0051a8] dark:text-indigo-300 border-blue-200 dark:border-indigo-500/30",
+      "bg-blue-100 dark:bg-indigo-500/15 text-[#0051a8] dark:text-indigo-300 border-blue-200 dark:border-indigo-500/30",
     secondary:
       "bg-[#f5f5f7] dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-black/10 dark:border-slate-700 font-semibold",
     success:
-      "bg-emerald-100/90 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30",
+      "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30",
     warning:
-      "bg-amber-100/90 dark:bg-amber-500/15 text-amber-900 dark:text-amber-300 border-amber-200 dark:border-amber-500/30",
+      "bg-amber-100 dark:bg-amber-500/15 text-amber-900 dark:text-amber-300 border-amber-200 dark:border-amber-500/30",
     accent:
-      "bg-blue-100/90 dark:bg-cyan-500/15 text-[#0051a8] dark:text-cyan-300 border-blue-200 dark:border-cyan-500/30",
+      "bg-blue-100 dark:bg-cyan-500/15 text-[#0051a8] dark:text-cyan-300 border-blue-200 dark:border-cyan-500/30",
   };
 
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border backdrop-blur-md transition-colors",
+        "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border transition-colors",
         variantStyles[variant],
         className
       )}

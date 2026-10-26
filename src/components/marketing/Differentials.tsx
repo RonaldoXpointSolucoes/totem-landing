@@ -92,7 +92,7 @@ export const Differentials: React.FC = () => {
   ];
 
   return (
-    <section className="py-16 md:py-24 border-t border-black/5 dark:border-slate-800/80 bg-[#fbfbfd] dark:bg-[#090a0f] transition-colors duration-300">
+    <section id="diferenciais" className="py-16 md:py-24 border-t border-black/5 dark:border-slate-800/80 bg-[#fbfbfd] dark:bg-[#090a0f] transition-colors duration-300">
       <div className="max-w-6xl mx-auto px-4 space-y-20">
         {/* Bloco 1: Segmentos que utilizam e Revenda / Software Houses */}
         <div>
@@ -114,29 +114,27 @@ export const Differentials: React.FC = () => {
                 key={i}
                 className="p-6 sm:p-7 rounded-[28px] border border-black/5 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
               >
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-[#f5f5f7] dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                      {seg.badge}
-                    </span>
-                    <div className="p-2.5 rounded-xl bg-[#f5f5f7] dark:bg-slate-800/80">
-                      {seg.icon}
-                    </div>
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-[#f5f5f7] dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                    {seg.badge}
+                  </span>
+                  <div className="p-2.5 rounded-xl bg-[#f5f5f7] dark:bg-slate-800/80">
+                    {seg.icon}
                   </div>
-                  <h3 className="text-lg sm:text-xl font-bold text-[#1d1d1f] dark:text-white">
-                    {seg.title}
-                  </h3>
-                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                    {seg.desc}
-                  </p>
                 </div>
+                <h3 className="text-lg sm:text-xl font-bold text-[#1d1d1f] dark:text-white mb-2">
+                  {seg.title}
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-5">
+                  {seg.desc}
+                </p>
 
-                <div className="pt-5 mt-5 border-t border-black/5 dark:border-slate-800/60 flex items-center justify-between gap-3 flex-wrap">
+                <div className="mt-auto pt-5 border-t border-black/5 dark:border-slate-800/60 flex items-center justify-between gap-3 flex-wrap">
                   <button
                     onClick={() => router.push(`/monte-seu-totem?modelo=${seg.model}`)}
                     className="py-1 text-xs sm:text-sm font-bold text-[#0058b6] dark:text-indigo-400 hover:underline inline-flex items-center gap-1.5 cursor-pointer"
                   >
-                    <span>{seg.ctaText}</span>
+                    {seg.ctaText}
                     <ArrowRight className="w-4 h-4" />
                   </button>
 
@@ -151,7 +149,7 @@ export const Differentials: React.FC = () => {
                       className="py-1 text-xs font-bold text-emerald-800 dark:text-emerald-400 hover:underline inline-flex items-center gap-1"
                     >
                       <MessageSquare className="w-3.5 h-3.5" />
-                      <span>Falar com Comercial</span>
+                      Falar com Comercial
                     </a>
                   )}
                 </div>
@@ -178,7 +176,7 @@ export const Differentials: React.FC = () => {
             {items.map((item, idx) => (
               <div
                 key={idx}
-                className="p-6 rounded-[24px] border border-black/5 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 backdrop-blur-sm space-y-3 shadow-sm hover:shadow-md dark:hover:border-slate-700 transition-all"
+                className="p-6 rounded-[24px] border border-black/5 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 space-y-3 shadow-sm hover:shadow-md dark:hover:border-slate-700 transition-all"
               >
                 <div className="p-3 w-fit rounded-2xl bg-[#f5f5f7] dark:bg-slate-800/60 border border-black/5 dark:border-slate-700/60">
                   {item.icon}
