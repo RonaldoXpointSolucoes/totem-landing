@@ -8,7 +8,12 @@ import {
   syncCustomersFromOrders,
   findCustomerById,
 } from "@/lib/customers/customerStore";
-import { getAllLocalOrders, updateLocalOrderAdmin } from "@/lib/orders/orderStore";
+import {
+  getAllLocalOrders,
+  updateLocalOrderAdmin,
+  getOrdersByCustomer,
+  deleteLocalOrder,
+} from "@/lib/orders/orderStore";
 import { listAllOrdersAdmin, updateOrderStatusAdmin } from "@/lib/appwrite/server";
 import { logEcosystemEvent } from "@/lib/logging/ecosystemLogger";
 
@@ -161,6 +166,17 @@ export async function DELETE(req: Request) {
     if (!deleted) {
       return NextResponse.json({ ok: false, error: "Não foi possível remover o cliente." }, { status: 500 });
     }
+
+    // Remove também eventuais pedidos locais órfãos vinculados a este cliente
+    try {
+      const customerLocalOrders = getOrdersByCustomer(existing.email, existing.whatsapp);
+      for (const lo of customerLocalOrders) {
+        deleteLocalOrder(lo.id, lo.orderNumber);
+      }
+      if (existing.lastOrderNumber) {
+        deleteLocalOrder(existing.lastOrderNumber);
+      }
+    } catch {}
 
     // Registra no log de auditoria
     logEcosystemEvent({

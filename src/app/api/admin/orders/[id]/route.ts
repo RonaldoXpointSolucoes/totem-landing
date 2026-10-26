@@ -11,7 +11,9 @@ import {
   updateLocalOrderStatus,
   updateLocalOrderAdmin,
   deleteLocalOrder,
+  findOrderByNumber,
 } from "@/lib/orders/orderStore";
+import { handleOrderDeletedForCustomers } from "@/lib/customers/customerStore";
 import { logEcosystemEvent } from "@/lib/logging/ecosystemLogger";
 
 async function verifyAuth(): Promise<boolean> {
@@ -177,6 +179,13 @@ export async function DELETE(
       }
     } catch {}
 
+    if (!orderNumber) {
+      const localExisting = findOrderByNumber(id);
+      if (localExisting?.orderNumber) {
+        orderNumber = localExisting.orderNumber;
+      }
+    }
+
     try {
       await deleteOrderAdmin(id);
     } catch (appwriteErr) {
@@ -184,6 +193,7 @@ export async function DELETE(
     }
 
     deleteLocalOrder(id, orderNumber);
+    handleOrderDeletedForCustomers(orderNumber || id, id);
 
     try {
       logEcosystemEvent({
@@ -208,4 +218,3 @@ export async function DELETE(
     );
   }
 }
-

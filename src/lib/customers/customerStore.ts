@@ -5,9 +5,60 @@ import { CustomerInfo, DeliveryAddress } from "@/types/order";
 
 const DATA_DIR = path.join(process.cwd(), "src", "data");
 const CUSTOMERS_FILE = path.join(DATA_DIR, "customer_accounts.json");
+const DELETED_CUSTOMERS_FILE = path.join(DATA_DIR, "deleted_customers.json");
 
 import { normalizePhone, formatPhone } from "./phoneUtils";
 export { normalizePhone, formatPhone };
+
+interface DeletedCustomerTombstone {
+  id: string;
+  email?: string;
+  whatsapp?: string;
+  document?: string;
+  name?: string;
+  deletedAt: string;
+}
+
+function getDeletedCustomerTombstones(): DeletedCustomerTombstone[] {
+  try {
+    if (!fs.existsSync(DELETED_CUSTOMERS_FILE)) return [];
+    const raw = fs.readFileSync(DELETED_CUSTOMERS_FILE, "utf-8");
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveDeletedCustomerTombstones(list: DeletedCustomerTombstone[]): void {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    fs.writeFileSync(DELETED_CUSTOMERS_FILE, JSON.stringify(list, null, 2), "utf-8");
+  } catch (err) {
+    console.error("Erro ao salvar tombstones de clientes excluídos:", err);
+  }
+}
+
+function removeTombstoneForCustomer(email?: string, whatsapp?: string, document?: string): void {
+  const list = getDeletedCustomerTombstones();
+  if (list.length === 0) return;
+  const cleanEmail = (email || "").trim().toLowerCase();
+  const cleanPhone = normalizePhone(whatsapp || "");
+  const cleanDoc = (document || "").replace(/\D/g, "");
+
+  const filtered = list.filter((t) => {
+    if (cleanEmail && t.email && t.email === cleanEmail) return false;
+    if (cleanPhone && t.whatsapp && t.whatsapp === cleanPhone) return false;
+    if (cleanDoc && t.document && t.document === cleanDoc) return false;
+    return true;
+  });
+
+  if (filtered.length !== list.length) {
+    saveDeletedCustomerTombstones(filtered);
+  }
+}
 
 /**
  * Carrega a lista completa de clientes cadastrados do arquivo JSON local.
@@ -105,12 +156,14 @@ export function findOrCreateCustomerFromCheckout(
   const cleanEmail = customerInfo.email.trim().toLowerCase();
   const cleanPhone = normalizePhone(customerInfo.whatsapp);
 
-  let existing = findCustomerByEmail(cleanEmail) || findCustomerByWhatsapp(cleanPhone);
+  // Se o cliente fez uma nova compra no checkout, remove qualquer tombstone antigo
+  removeTombstoneForCustomer(cleanEmail, cleanPhone, customerInfo.document);
+
+  const existing = findCustomerByEmail(cleanEmail) || findCustomerByWhatsapp(cleanPhone);
 
   const now = new Date().toISOString();
 
   if (existing) {
-    // Atualiza dados e adiciona endereço se novo
     const addresses = existing.addresses || [];
     if (deliveryAddress) {
       const addressKey = `${deliveryAddress.cep}_${deliveryAddress.number}`;
@@ -172,6 +225,8 @@ export function loginOrCreateWithWhatsapp(
     throw new Error("Número de WhatsApp inválido. Digite DDD + número (ex: 11988887777).");
   }
 
+  removeTombstoneForCustomer(undefined, cleanPhone, undefined);
+
   const existing = findCustomerByWhatsapp(cleanPhone);
   const now = new Date().toISOString();
 
@@ -183,7 +238,6 @@ export function loginOrCreateWithWhatsapp(
     return saveCustomer(existing);
   }
 
-  // Cria nova conta
   const newAccount: CustomerAccount = {
     id: `cust_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
     name: name?.trim() || "Cliente WhatsApp",
@@ -215,6 +269,8 @@ export function loginOrCreateWithGoogle(
     throw new Error("E-mail Google inválido.");
   }
 
+  removeTombstoneForCustomer(cleanEmail, undefined, undefined);
+
   const existing = findCustomerByEmail(cleanEmail);
   const now = new Date().toISOString();
 
@@ -227,7 +283,6 @@ export function loginOrCreateWithGoogle(
     return saveCustomer(existing);
   }
 
-  // Cria nova conta
   const newAccount: CustomerAccount = {
     id: `cust_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
     name: name.trim() || cleanEmail.split("@")[0],
@@ -307,29 +362,77 @@ export function addOrUpdateCustomerAddress(
 }
 
 /**
- * Exclui um cliente cadastrado pelo ID.
+ * Exclui um cliente cadastrado pelo ID e registra tombstone para que a sincronização
+ * automática não o recrie a partir de pedidos antigos.
  */
 export function deleteCustomer(id: string): boolean {
   const customers = getAllCustomers();
+  const target = customers.find((c) => c.id === id);
+  if (!target) return false;
+
   const filtered = customers.filter((c) => c.id !== id);
-  if (filtered.length === customers.length) return false;
   persistCustomers(filtered);
+
+  // Registra tombstone para impedir ressurreição automática
+  const tombstones = getDeletedCustomerTombstones();
+  tombstones.push({
+    id: target.id,
+    email: (target.email || "").trim().toLowerCase(),
+    whatsapp: normalizePhone(target.whatsapp || ""),
+    document: (target.document || "").replace(/\D/g, ""),
+    name: (target.name || "").trim().toLowerCase(),
+    deletedAt: new Date().toISOString(),
+  });
+  saveDeletedCustomerTombstones(tombstones);
+
   return true;
 }
 
 /**
- * Sincroniza bidirecionalmente a lista de clientes com TODOS os pedidos (Appwrite e locais).
- * Garante que cada pedido pertença a um cliente indexado e que o nome do cliente seja
- * consistente entre pedidos e clientes.
+ * Quando um pedido é excluído no Admin, limpa referências órfãs nos clientes.
+ */
+export function handleOrderDeletedForCustomers(orderNumber?: string, orderId?: string): void {
+  if (!orderNumber && !orderId) return;
+  const customers = getAllCustomers();
+  let changed = false;
+
+  const updatedCustomers = customers.map((c) => {
+    if (
+      (orderNumber && c.lastOrderNumber === orderNumber) ||
+      (orderId && c.lastOrderNumber === orderId)
+    ) {
+      changed = true;
+      return {
+        ...c,
+        totalOrdersCount: Math.max(0, (c.totalOrdersCount || 1) - 1),
+        lastOrderNumber: undefined,
+        lastOrderDate: undefined,
+        lastOrderStatus: undefined,
+        lastOrderTotalCents: undefined,
+      };
+    }
+    return c;
+  });
+
+  if (changed) {
+    persistCustomers(updatedCustomers);
+  }
+}
+
+/**
+ * Sincroniza bidirecionalmente a lista de clientes com os pedidos ativos (Appwrite e locais).
+ * Respeita a lista de clientes excluídos (tombstones) para nunca recriar clientes deletados.
  */
 export function syncCustomersFromOrders(orders: any[]): CustomerAccount[] {
-  let customers = getAllCustomers();
+  const customers = getAllCustomers();
+  const tombstones = getDeletedCustomerTombstones();
 
   for (const o of orders) {
     const rawName = o.customer_name || o.customer?.name || "";
     const rawEmail = (o.customer_email || o.customer?.email || "").trim().toLowerCase();
     const rawPhone = normalizePhone(o.customer_whatsapp || o.customer?.whatsapp || "");
     const rawDoc = (o.customer_document || o.customer?.document || "").trim();
+    const cleanDocDigits = rawDoc.replace(/\D/g, "");
     const orderNum = o.order_number || o.orderNumber || o.$id || "";
     const orderDate = o.$createdAt || o.createdAt || new Date().toISOString();
     const orderTotal = o.total_cents !== undefined ? o.total_cents : (o.totalCents || 0);
@@ -337,16 +440,33 @@ export function syncCustomersFromOrders(orders: any[]): CustomerAccount[] {
 
     if (!rawName && !rawEmail && !rawPhone) continue;
 
+    // Verifica se este cliente foi explicitamente excluído pelo Admin após a criação deste pedido
+    const wasDeleted = tombstones.some((t) => {
+      const matchIdentity =
+        (rawEmail && t.email && t.email === rawEmail) ||
+        (rawPhone && t.whatsapp && t.whatsapp === rawPhone) ||
+        (cleanDocDigits && t.document && t.document === cleanDocDigits) ||
+        (rawName && t.name && t.name === rawName.trim().toLowerCase());
+
+      if (!matchIdentity) return false;
+      const orderTime = new Date(orderDate).getTime();
+      const deletedTime = new Date(t.deletedAt).getTime();
+      return !Number.isNaN(deletedTime) && orderTime <= deletedTime;
+    });
+
+    if (wasDeleted) {
+      continue;
+    }
+
     // Tenta encontrar cliente por e-mail, telefone ou documento
     const matchIndex = customers.findIndex((c) => {
       if (rawEmail && c.email && c.email.toLowerCase() === rawEmail) return true;
       if (rawPhone && c.whatsapp && normalizePhone(c.whatsapp) === rawPhone) return true;
-      if (rawDoc && c.document && c.document.replace(/\D/g, "") === rawDoc.replace(/\D/g, "")) return true;
+      if (cleanDocDigits && c.document && c.document.replace(/\D/g, "") === cleanDocDigits) return true;
       return false;
     });
 
     if (matchIndex === -1) {
-      // Cliente novo descoberto a partir de pedido
       const newCust: CustomerAccount = {
         id: `cust_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         name: rawName || (rawEmail ? rawEmail.split("@")[0] : "Cliente Pedido " + orderNum),
@@ -354,7 +474,7 @@ export function syncCustomersFromOrders(orders: any[]): CustomerAccount[] {
         whatsapp: rawPhone,
         whatsappFormatted: rawPhone ? formatPhone(rawPhone) : "",
         document: rawDoc,
-        personType: rawDoc.replace(/\D/g, "").length === 14 ? "company" : "individual",
+        personType: cleanDocDigits.length === 14 ? "company" : "individual",
         addresses: o.delivery_address ? [o.delivery_address] : o.deliveryAddress ? [o.deliveryAddress] : [],
         defaultAddress: o.delivery_address || o.deliveryAddress,
         createdAt: orderDate,
@@ -369,7 +489,6 @@ export function syncCustomersFromOrders(orders: any[]): CustomerAccount[] {
       };
       customers.unshift(newCust);
     } else {
-      // Atualiza o cliente existente para garantir consistência
       const existing = customers[matchIndex];
       const needsNameUpdate = rawName && (!existing.name || existing.name === "Cliente sem nome" || existing.name.startsWith("Cliente Pedido"));
       const isNewerOrder = !existing.lastOrderDate || new Date(orderDate).getTime() >= new Date(existing.lastOrderDate).getTime();
@@ -402,7 +521,7 @@ export function syncCustomersFromOrders(orders: any[]): CustomerAccount[] {
     }
   }
 
-  // Recalcula contagem e total gasto de cada cliente a partir de todos os pedidos
+  // Recalcula contagem e total gasto de cada cliente com base nos pedidos realmente existentes
   const enriched = customers.map((c) => {
     const custOrders = orders.filter((o) => {
       const orderEmail = (o.customer_email || o.customer?.email || "").trim().toLowerCase();
@@ -421,7 +540,6 @@ export function syncCustomersFromOrders(orders: any[]): CustomerAccount[] {
       .filter((o) => o.status !== "cancelled")
       .reduce((sum, o) => sum + (o.total_cents !== undefined ? o.total_cents : (o.totalCents || 0)), 0);
 
-    // Encontra o pedido mais recente
     const sortedOrders = [...custOrders].sort((a, b) => {
       const dateA = new Date(a.$createdAt || a.createdAt || 0).getTime();
       const dateB = new Date(b.$createdAt || b.createdAt || 0).getTime();
@@ -432,12 +550,12 @@ export function syncCustomersFromOrders(orders: any[]): CustomerAccount[] {
 
     return {
       ...c,
-      totalOrdersCount: Math.max(c.totalOrdersCount || 0, custOrders.length),
-      totalSpentCents: Math.max(c.totalSpentCents || 0, totalSpent),
-      lastOrderNumber: latest ? (latest.order_number || latest.orderNumber || latest.$id) : c.lastOrderNumber,
-      lastOrderDate: latest ? (latest.$createdAt || latest.createdAt) : c.lastOrderDate,
-      lastOrderStatus: latest ? latest.status : c.lastOrderStatus,
-      lastOrderTotalCents: latest ? (latest.total_cents !== undefined ? latest.total_cents : latest.totalCents) : c.lastOrderTotalCents,
+      totalOrdersCount: custOrders.length,
+      totalSpentCents: totalSpent,
+      lastOrderNumber: latest ? (latest.order_number || latest.orderNumber || latest.$id) : undefined,
+      lastOrderDate: latest ? (latest.$createdAt || latest.createdAt) : undefined,
+      lastOrderStatus: latest ? latest.status : undefined,
+      lastOrderTotalCents: latest ? (latest.total_cents !== undefined ? latest.total_cents : latest.totalCents) : undefined,
     };
   });
 
