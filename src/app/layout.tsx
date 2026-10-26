@@ -362,6 +362,7 @@ export default function RootLayout({
       <head>
 
 
+        <link rel="preload" as="image" href="/models/cabinet-floor.svg" fetchPriority="high" />
         <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
         <link rel="preload" as="image" href="/models/cabinet-floor.svg" />
         <script

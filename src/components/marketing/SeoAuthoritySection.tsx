@@ -54,6 +54,7 @@ export function SeoAuthoritySection() {
             </p>
             <Link
               href="/monte-seu-totem?modelo=cabinet-floor"
+              prefetch={false}
               className="inline-flex items-center gap-1 py-1 text-xs font-bold text-[#0058b6] dark:text-cyan-400 hover:underline pt-1"
             >
               <span>Configurar Totem de Piso</span>
@@ -74,6 +75,7 @@ export function SeoAuthoritySection() {
             </p>
             <Link
               href="/monte-seu-totem?modelo=cabinet-countertop"
+              prefetch={false}
               className="inline-flex items-center gap-1 py-1 text-xs font-bold text-[#0058b6] dark:text-cyan-400 hover:underline pt-1"
             >
               <span>Configurar Totem de Balcão</span>
@@ -94,6 +96,7 @@ export function SeoAuthoritySection() {
             </p>
             <Link
               href="/monte-seu-totem?modelo=cabinet-wall"
+              prefetch={false}
               className="inline-flex items-center gap-1 py-1 text-xs font-bold text-[#0058b6] dark:text-cyan-400 hover:underline pt-1"
             >
               <span>Configurar Totem de Parede</span>
@@ -135,6 +138,7 @@ export function SeoAuthoritySection() {
             </div>
             <Link
               href="/monte-seu-totem"
+              prefetch={false}
               className="px-5 py-2.5 rounded-full bg-[#0062cc] hover:bg-[#0051a8] text-white font-bold text-xs sm:text-sm inline-flex items-center justify-center gap-2 shrink-0 shadow-md shadow-blue-500/20"
             >
               <span>Simular Orçamento Online</span>

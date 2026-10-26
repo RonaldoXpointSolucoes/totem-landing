@@ -1,6 +1,6 @@
 {
   "name": "totem-landing",
-  "version": "3.1.9",
+  "version": "3.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -13,7 +13,12 @@
     "telemetry:check": "npx tsx scripts/check-telemetry.ts",
     "telemetry:remote": "npx tsx scripts/check-telemetry.ts --remote"
   },
-
+  "browserslist": [
+    "chrome >= 111",
+    "edge >= 111",
+    "firefox >= 111",
+    "safari >= 16.4"
+  ],
   "dependencies": {
     "@types/three": "^0.186.0",
     "appwrite": "^28.1.0",

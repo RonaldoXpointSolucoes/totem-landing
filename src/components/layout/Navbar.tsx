@@ -110,6 +110,7 @@ export const Navbar: React.FC<NavbarProps> = ({ className = "" }) => {
           {/* Botão de Carrinho com Badge Reativo */}
           <Link
             href="/carrinho"
+            prefetch={false}
             className={`relative p-2.5 rounded-full border transition-all flex items-center justify-center ${
               isCart
                 ? "border-[#0058b6] bg-blue-50 dark:bg-indigo-950/40 text-[#0058b6] dark:text-indigo-300"
@@ -176,6 +177,7 @@ export const Navbar: React.FC<NavbarProps> = ({ className = "" }) => {
           ) : (
             <Link
               href="/monte-seu-totem"
+              prefetch={false}
               className="px-4 py-2 rounded-full bg-[#0062cc] hover:bg-[#0051a8] text-white font-semibold text-xs transition-all duration-200 shadow-md shadow-blue-500/20 active:scale-95 flex items-center gap-1.5 cursor-pointer"
             >
               <span>Montar meu Totem</span>

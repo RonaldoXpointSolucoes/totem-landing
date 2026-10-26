@@ -277,8 +277,8 @@ export function ModelImageCarousel({
             <img
               src={outgoingSrc}
               alt={`${alt} - Foto ${outgoingIndex! + 1}`}
-              width={600}
-              height={600}
+              width={532}
+              height={532}
               className={`w-full h-full ${
                 objectFit === "contain" ? "object-contain" : "object-cover"
               } ${imageClassName}`}
@@ -310,8 +310,8 @@ export function ModelImageCarousel({
           <img
             src={currentSrc}
             alt={`${alt} - Foto ${currentIndex + 1} de ${total}`}
-            width={600}
-            height={600}
+            width={532}
+            height={532}
             loading={priority ? "eager" : "lazy"}
             fetchPriority={priority ? "high" : "auto"}
             onLoad={() => {
