@@ -5,6 +5,7 @@ import { CartProvider } from "@/modules/cart/CartContext";
 import { MarketingPixels } from "@/components/analytics/MarketingPixels";
 import { SiteTelemetryWatcher } from "@/components/telemetry/SiteTelemetryWatcher";
 import { TelemetryErrorBoundary } from "@/components/telemetry/TelemetryErrorBoundary";
+import { FloatingWhatsAppButton } from "@/components/marketing/FloatingWhatsAppButton";
 import { FAQ_DATA } from "@/config/faqData";
 import "./globals.css";
 
@@ -375,6 +376,7 @@ export default function RootLayout({
           <CartProvider>
             <TelemetryErrorBoundary>
               {children}
+              <FloatingWhatsAppButton />
             </TelemetryErrorBoundary>
           </CartProvider>
         </ThemeProvider>
