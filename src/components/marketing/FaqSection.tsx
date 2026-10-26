@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { Badge } from "@/components/ui";
-import { ChevronDown, HelpCircle, Sparkles, MessageSquare } from "lucide-react";
+import { ChevronDown, HelpCircle, MessageSquare } from "lucide-react";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 import { siteConfig } from "@/config/site";
 import { FAQ_DATA, FaqItem } from "@/config/faqData";
@@ -60,7 +60,7 @@ export const FaqSection: React.FC = () => {
                   id={`faq-question-${idx}`}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-black/5 dark:bg-slate-800 text-slate-500 dark:text-slate-400 shrink-0">
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-black/[0.06] dark:bg-slate-800 text-slate-700 dark:text-slate-300 shrink-0">
                       {item.category}
                     </span>
                     <h3 className="text-sm sm:text-base font-bold text-[#1d1d1f] dark:text-white leading-snug">
@@ -68,8 +68,8 @@ export const FaqSection: React.FC = () => {
                     </h3>
                   </div>
                   <ChevronDown
-                    className={`w-5 h-5 text-slate-400 shrink-0 transition-transform duration-300 ${
-                      isOpen ? "rotate-180 text-[#0071e3] dark:text-cyan-400" : ""
+                    className={`w-5 h-5 text-slate-500 shrink-0 transition-transform duration-300 ${
+                      isOpen ? "rotate-180 text-[#0058b6] dark:text-cyan-400" : ""
                     }`}
                   />
                 </button>
@@ -82,7 +82,7 @@ export const FaqSection: React.FC = () => {
                     isOpen ? "block opacity-100" : "hidden opacity-0"
                   }`}
                 >
-                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed pl-1 sm:pl-2 border-l-2 border-[#0071e3]/60 dark:border-cyan-400/60">
+                  <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed pl-1 sm:pl-2 border-l-2 border-[#0058b6]/60 dark:border-cyan-400/60">
                     {item.answer}
                   </p>
                 </div>
@@ -93,7 +93,7 @@ export const FaqSection: React.FC = () => {
 
         {/* CTA Dúvida Adicional */}
         <div className="mt-12 text-center">
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-3">
+          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mb-3">
             Ainda tem alguma dúvida específica sobre o seu projeto?
           </p>
           <a
@@ -103,11 +103,11 @@ export const FaqSection: React.FC = () => {
             onClick={() =>
               trackEvent(ANALYTICS_EVENTS.WHATSAPP_CLICK, { source: "faq_bottom_cta" })
             }
-            className="inline-flex items-center flex-wrap justify-center gap-2 px-6 py-3 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs sm:text-sm shadow-lg shadow-emerald-600/25 active:scale-95 transition-all group"
+            className="inline-flex items-center flex-wrap justify-center gap-2 px-6 py-3 rounded-full bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs sm:text-sm shadow-lg shadow-emerald-700/25 active:scale-95 transition-all group"
           >
-            <MessageSquare className="w-4 h-4 text-emerald-100 group-hover:scale-110 transition-transform" />
+            <MessageSquare className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
             <span>Falar com Engenheiro no WhatsApp</span>
-            <span className="font-mono text-xs px-2 py-0.5 rounded-full bg-emerald-700/60 border border-emerald-400/30 text-emerald-50 font-bold">
+            <span className="font-mono text-xs px-2.5 py-0.5 rounded-full bg-emerald-950/75 border border-emerald-400/30 text-white font-bold">
               {siteConfig.links.whatsappDisplay}
             </span>
           </a>

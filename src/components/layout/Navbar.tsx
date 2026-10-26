@@ -60,14 +60,14 @@ export const Navbar: React.FC<NavbarProps> = ({ className = "" }) => {
           onClick={handleLogoClick}
           className="flex items-center gap-2.5 cursor-pointer select-none group"
         >
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#0071e3] to-cyan-400 flex items-center justify-center shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#0058b6] to-cyan-500 flex items-center justify-center shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
             <Cpu className="w-4 h-4 text-white" />
           </div>
           <div className="flex flex-col">
             <span className="font-extrabold text-sm sm:text-base tracking-tight text-[#1d1d1f] dark:text-white leading-none">
-              TOTEM<span className="text-[#0071e3] dark:text-cyan-400">PRO</span>
+              TOTEM<span className="text-[#0058b6] dark:text-cyan-400">PRO</span>
             </span>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium leading-tight">
+            <span className="text-[10px] text-slate-600 dark:text-slate-400 font-medium leading-tight">
               X-Point Engenharia
             </span>
           </div>
@@ -78,28 +78,28 @@ export const Navbar: React.FC<NavbarProps> = ({ className = "" }) => {
           <Link
             href="/#modelos"
             onClick={(e) => handleNavClick(e, "modelos")}
-            className="hover:text-[#0071e3] dark:hover:text-white transition-colors"
+            className="hover:text-[#0058b6] dark:hover:text-white transition-colors"
           >
             Modelos
           </Link>
           <Link
             href="/#como-funciona"
             onClick={(e) => handleNavClick(e, "como-funciona")}
-            className="hover:text-[#0071e3] dark:hover:text-white transition-colors"
+            className="hover:text-[#0058b6] dark:hover:text-white transition-colors"
           >
             Como Funciona
           </Link>
           <Link
             href="/#diferenciais"
             onClick={(e) => handleNavClick(e, "diferenciais")}
-            className="hover:text-[#0071e3] dark:hover:text-white transition-colors"
+            className="hover:text-[#0058b6] dark:hover:text-white transition-colors"
           >
             Diferenciais
           </Link>
           <Link
             href="/#faq"
             onClick={(e) => handleNavClick(e, "faq")}
-            className="hover:text-[#0071e3] dark:hover:text-white transition-colors"
+            className="hover:text-[#0058b6] dark:hover:text-white transition-colors"
           >
             Dúvidas (FAQ)
           </Link>
@@ -112,7 +112,7 @@ export const Navbar: React.FC<NavbarProps> = ({ className = "" }) => {
             href="/carrinho"
             className={`relative p-2.5 rounded-full border transition-all flex items-center justify-center ${
               isCart
-                ? "border-[#0071e3] bg-blue-50 dark:bg-indigo-950/40 text-[#0071e3] dark:text-indigo-300"
+                ? "border-[#0058b6] bg-blue-50 dark:bg-indigo-950/40 text-[#0058b6] dark:text-indigo-300"
                 : "border-black/10 dark:border-slate-800 bg-[#f5f5f7] dark:bg-slate-900/60 text-slate-700 dark:text-slate-300 hover:text-black dark:hover:text-white hover:border-black/20 dark:hover:border-slate-700"
             }`}
             title="Visualizar Carrinho"
@@ -120,7 +120,7 @@ export const Navbar: React.FC<NavbarProps> = ({ className = "" }) => {
           >
             <ShoppingCart className="w-4 h-4" />
             {totalItems > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#0071e3] text-white text-[10px] font-bold flex items-center justify-center border-2 border-white dark:border-slate-900 shadow-md animate-in zoom-in-50">
+              <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#0058b6] text-white text-[10px] font-bold flex items-center justify-center border-2 border-white dark:border-slate-900 shadow-md animate-in zoom-in-50">
                 {totalItems}
               </span>
             )}
@@ -130,7 +130,7 @@ export const Navbar: React.FC<NavbarProps> = ({ className = "" }) => {
           {customer ? (
             <Link
               href="/cliente"
-              className="p-2 sm:px-3 sm:py-1.5 rounded-full border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/60 text-[#0071e3] dark:text-cyan-400 hover:bg-blue-100 text-xs font-bold flex items-center gap-1.5 transition-colors"
+              className="p-2 sm:px-3 sm:py-1.5 rounded-full border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/60 text-[#0058b6] dark:text-cyan-400 hover:bg-blue-100 text-xs font-bold flex items-center gap-1.5 transition-colors"
               title="Acessar Minha Conta e Compras"
             >
               <User className="w-3.5 h-3.5" />
@@ -144,8 +144,9 @@ export const Navbar: React.FC<NavbarProps> = ({ className = "" }) => {
               onClick={() => setIsAuthModalOpen(true)}
               className="p-2 sm:px-3 sm:py-1.5 rounded-full border border-black/10 dark:border-slate-800 bg-[#f5f5f7] dark:bg-slate-900/60 text-slate-700 dark:text-slate-300 hover:text-black dark:hover:text-white hover:border-black/20 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
               title="Entrar / Criar Conta"
+              aria-label="Entrar na Conta"
             >
-              <User className="w-3.5 h-3.5 text-slate-500" />
+              <User className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
               <span className="hidden sm:inline">Entrar</span>
             </button>
           )}
@@ -175,7 +176,7 @@ export const Navbar: React.FC<NavbarProps> = ({ className = "" }) => {
           ) : (
             <Link
               href="/monte-seu-totem"
-              className="px-4 py-2 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white font-semibold text-xs transition-all duration-200 shadow-md shadow-blue-500/20 active:scale-95 flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 rounded-full bg-[#0062cc] hover:bg-[#0051a8] text-white font-semibold text-xs transition-all duration-200 shadow-md shadow-blue-500/20 active:scale-95 flex items-center gap-1.5 cursor-pointer"
             >
               <span>Montar meu Totem</span>
               <ArrowRight className="w-3.5 h-3.5" />

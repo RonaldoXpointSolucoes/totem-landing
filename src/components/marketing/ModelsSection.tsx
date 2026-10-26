@@ -3,9 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { CABINET_MODELS } from "@/modules/catalog/catalogData";
 import { CabinetModel } from "@/types/catalog";
-import { formatBRL } from "@/modules/pricing/pricingEngine";
-import { Card, Button, Badge } from "@/components/ui";
-import { ArrowRight, Maximize2, Shield, Wrench, Play } from "lucide-react";
+import { Card, Badge } from "@/components/ui";
+import { ArrowRight, Maximize2 } from "lucide-react";
 import { InstagramVideoModal, InstagramGlyph, ModelImageCarousel } from "@/components/media";
 import { PriceTag } from "@/components/pricing/PriceTag";
 
@@ -144,9 +143,9 @@ export const ModelsSection: React.FC<ModelsSectionProps> = ({
                       showCounter={true}
                     />
 
-                    <div className="absolute top-3 right-3 z-10">
-                      <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 bg-white/90 dark:bg-slate-900/90 border border-black/5 dark:border-slate-800 px-2.5 py-0.5 rounded-full shadow-sm backdrop-blur-sm">
-                        {model.slug === "floor" ? "Mais Popular" : "Sob Medida"}
+                    <div className="absolute top-3 right-3 z-20 pointer-events-none">
+                      <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200 bg-white/95 dark:bg-slate-900/95 border border-black/10 dark:border-slate-700 px-2.5 py-0.5 rounded-full shadow-sm">
+                        {model.slug === "floor" || model.id === "cabinet-floor" ? "Mais Popular" : "Sob Medida"}
                       </span>
                     </div>
 
@@ -158,7 +157,7 @@ export const ModelsSection: React.FC<ModelsSectionProps> = ({
                           e.stopPropagation();
                           handleOpenVideo(model.name, videoUrl);
                         }}
-                        className="absolute bottom-3 left-3 px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-900 text-white text-[11px] font-bold shadow-lg flex items-center gap-1.5 border border-rose-500/40 backdrop-blur-md transition-all hover:scale-105 active:scale-95 z-10 cursor-pointer"
+                        className="absolute bottom-2.5 left-3 px-3 py-1.5 rounded-full bg-slate-950/90 hover:bg-slate-900 text-white text-[11px] font-bold shadow-lg flex items-center gap-1.5 border border-rose-500/40 backdrop-blur-md transition-all hover:scale-105 active:scale-95 z-20 cursor-pointer"
                         title="Assistir Reels do Produto"
                       >
                         <InstagramGlyph className="w-3.5 h-3.5 text-rose-400" />
@@ -175,8 +174,8 @@ export const ModelsSection: React.FC<ModelsSectionProps> = ({
 
                   {/* Especificações Rápidas */}
                   {model.dimensions && (
-                    <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 py-2 border-y border-black/5 dark:border-slate-800/60 mb-4">
-                      <Maximize2 className="w-3.5 h-3.5 text-[#0071e3] dark:text-indigo-400" />
+                    <div className="flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-400 py-2 border-y border-black/5 dark:border-slate-800/60 mb-4">
+                      <Maximize2 className="w-3.5 h-3.5 text-[#0058b6] dark:text-indigo-400" />
                       <span>
                         {model.dimensions.heightMm}mm (A) × {model.dimensions.widthMm}mm (L) ×{" "}
                         {model.dimensions.depthMm}mm (P)
@@ -202,7 +201,7 @@ export const ModelsSection: React.FC<ModelsSectionProps> = ({
                     />
                   </div>
                   <button
-                    className="w-full py-3 px-4 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white text-xs font-bold flex items-center justify-between transition-all duration-200 shadow-md shadow-blue-500/20 active:scale-95 group cursor-pointer"
+                    className="w-full py-3 px-4 rounded-full bg-[#0062cc] hover:bg-[#0051a8] text-white text-xs font-bold flex items-center justify-between transition-all duration-200 shadow-md shadow-blue-500/20 active:scale-95 group cursor-pointer"
                     onClick={() => onSelectModelToConfigure(model.id)}
                   >
                     <span>Configurar Este</span>
@@ -225,4 +224,3 @@ export const ModelsSection: React.FC<ModelsSectionProps> = ({
     </section>
   );
 };
-

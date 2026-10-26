@@ -177,17 +177,6 @@ export function ModelImageCarousel({
     [total, currentIndex, triggerTransition]
   );
 
-  const goToIndex = useCallback(
-    (idx: number, e?: React.MouseEvent) => {
-      if (e) e.stopPropagation();
-      if (idx >= 0 && idx < total && idx !== currentIndex) {
-        const dir = idx > currentIndex ? "next" : "prev";
-        triggerTransition(idx, dir);
-      }
-    },
-    [total, currentIndex, triggerTransition]
-  );
-
   // Troca automática periódica (10s padrão) com pausa em hover ou fora do viewport
   useEffect(() => {
     if (total <= 1 || isHovered || !isInViewport) {
@@ -233,7 +222,7 @@ export function ModelImageCarousel({
 
   if (total === 0) {
     return (
-      <div className={`flex flex-col items-center justify-center p-6 text-slate-400 ${className}`}>
+      <div className={`flex flex-col items-center justify-center p-6 text-slate-600 dark:text-slate-400 ${className}`}>
         <ImageIcon className="w-8 h-8 opacity-40 mb-2" />
         <span className="text-xs font-medium">Foto indisponível</span>
       </div>
@@ -288,8 +277,8 @@ export function ModelImageCarousel({
             <img
               src={outgoingSrc}
               alt={`${alt} - Foto ${outgoingIndex! + 1}`}
-              width={1080}
-              height={1080}
+              width={600}
+              height={600}
               className={`w-full h-full ${
                 objectFit === "contain" ? "object-contain" : "object-cover"
               } ${imageClassName}`}
@@ -321,8 +310,8 @@ export function ModelImageCarousel({
           <img
             src={currentSrc}
             alt={`${alt} - Foto ${currentIndex + 1} de ${total}`}
-            width={1080}
-            height={1080}
+            width={600}
+            height={600}
             loading={priority ? "eager" : "lazy"}
             fetchPriority={priority ? "high" : "auto"}
             onLoad={() => {
@@ -337,57 +326,57 @@ export function ModelImageCarousel({
         </div>
       </div>
 
-      {/* Controles Manuais: Setas Esquerda / Direita com Hover Glow */}
+      {/* Controles Manuais: Setas Esquerda / Direita com área de toque >= 36x36px */}
       {showArrows && total > 1 && (
         <>
           <button
             type="button"
             onClick={goToPrev}
             aria-label="Foto anterior"
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-slate-950/70 hover:bg-slate-900 text-white backdrop-blur-md border border-white/15 flex items-center justify-center opacity-85 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:scale-110 active:scale-95 z-20 cursor-pointer shadow-lg shadow-black/25"
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-slate-950/80 hover:bg-slate-900 text-white backdrop-blur-md border border-white/20 flex items-center justify-center opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:scale-110 active:scale-95 z-20 cursor-pointer shadow-lg shadow-black/25"
           >
-            <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+            <ChevronLeft className="w-5 h-5" />
           </button>
 
           <button
             type="button"
             onClick={goToNext}
             aria-label="Próxima foto"
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-slate-950/70 hover:bg-slate-900 text-white backdrop-blur-md border border-white/15 flex items-center justify-center opacity-85 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:scale-110 active:scale-95 z-20 cursor-pointer shadow-lg shadow-black/25"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-slate-950/80 hover:bg-slate-900 text-white backdrop-blur-md border border-white/20 flex items-center justify-center opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:scale-110 active:scale-95 z-20 cursor-pointer shadow-lg shadow-black/25"
           >
-            <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+            <ChevronRight className="w-5 h-5" />
           </button>
         </>
       )}
 
-      {/* Contador Numérico Estilizado (ex: 5/11) */}
+      {/* Contador Numérico Estilizado à esquerda superior (evita colisão com badge Sob Medida à direita) */}
       {showCounter && total > 1 && (
-        <div className="absolute top-2.5 right-2.5 px-2.5 py-0.5 rounded-full bg-slate-950/75 backdrop-blur-md border border-white/15 text-white text-[10px] font-mono font-bold tracking-wider z-20 shadow-sm pointer-events-none">
+        <div className="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-slate-950/85 backdrop-blur-md border border-white/20 text-white text-[10px] font-mono font-bold tracking-wider z-20 shadow-sm pointer-events-none">
           {currentIndex + 1}/{total}
         </div>
       )}
 
-      {/* Indicadores de Paginação (Bullets / Dots interativos com expansão fluida) */}
+      {/* Indicadores de Paginação Visuais (sem conflito de touch target pequeno no mobile) */}
       {showDots && total > 1 && (
-        <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex items-center gap-1.5 p-1 rounded-full bg-slate-950/65 backdrop-blur-md border border-white/15 z-20 shadow-md">
+        <div
+          aria-hidden="true"
+          className="absolute bottom-2.5 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-950/85 backdrop-blur-md border border-white/20 z-20 shadow-md pointer-events-none"
+        >
           {cleanImages.slice(0, Math.min(total, 9)).map((_, idx) => {
             const isActive = currentIndex === idx;
             return (
-              <button
+              <span
                 key={idx}
-                type="button"
-                onClick={(e) => goToIndex(idx, e)}
-                aria-label={`Ir para foto ${idx + 1}`}
-                className={`transition-all duration-300 rounded-full cursor-pointer ${
+                className={`transition-all duration-300 rounded-full ${
                   isActive
                     ? "w-5 h-1.5 bg-gradient-to-r from-blue-400 to-[#0071e3] shadow-sm scale-105"
-                    : "w-1.5 h-1.5 bg-white/40 hover:bg-white/80"
+                    : "w-1.5 h-1.5 bg-white/60"
                 }`}
               />
             );
           })}
           {total > 9 && (
-            <span className="text-[9px] font-mono text-white/70 px-1 font-semibold">
+            <span className="text-[9px] font-mono text-white px-1 font-bold">
               +{total - 9}
             </span>
           )}

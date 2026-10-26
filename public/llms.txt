@@ -1,30 +1,22 @@
 # Totem Pro — Fabricante de Gabinetes e Totens de Autoatendimento (X-Point Engenharia)
 
-> URL Oficial: https://totem.xpointsolucoes.com.br
-> Segmento: Fabricação industrial de Gabinetes para Totem de Autoatendimento (Piso, Parede e Balcão) e Kits Completos de Hardware em Router CNC.
-> Atendimento e Entrega: Todo o território nacional (Brasil) via Correios (PAC/SEDEX) e transportadoras.
+> Fabricação industrial em Router CNC de Gabinetes para Totem de Autoatendimento (Piso, Parede e Balcão) em MaDeFibra BP 15mm e Kits Completos de Hardware homologados, com envio para todo o Brasil e economia superior a 50%.
 
-## Proposta de Valor Principal
-A Totem Pro permite que qualquer empresa (restaurantes, fast-food, hamburguerias, clínicas, laboratórios, supermercados e software houses de PDV) monte seu próprio Totem de Autoatendimento economizando mais de 50% em relação aos totens fechados tradicionais.
+A Totem Pro permite que restaurantes, fast-food, hamburguerias, clínicas, laboratórios, supermercados e software houses de PDV montem seu próprio Totem de Autoatendimento economizando mais de 50% em relação aos totens fechados tradicionais.
 
-O cliente pode escolher entre duas modalidades no configurador online:
-1. **Apenas o Gabinete para Totem (a partir de R$ 950 no PIX)**: Estrutura em MaDeFibra BP 15mm usinada em Router CNC com encaixe submilimétrico exato para o monitor touchscreen, impressora térmica 80mm e leitor de código de barras que o cliente já possui.
-2. **Gabinete + Kit Completo de Autoatendimento (a partir de R$ 4.900)**: Gabinete CNC + Computador All-in-One Touch 23.8", Impressora Térmica 80mm com guilhotina, Leitor 2D QR Code/Código de Barras e cabeamento completo, com opção de receber o totem 100% montado pela fábrica pronto para ligar na tomada.
+No configurador online, o cliente pode adquirir apenas o gabinete usinado sob medida (a partir de R$ 950,00 no PIX) para encaixar seus próprios periféricos (monitor touchscreen VESA, impressora térmica 80mm e leitor 2D), ou escolher o Gabinete + Kit Completo de Autoatendimento pronto para operação.
 
-## Modelos Disponíveis e Preços Base
-- **Gabinete de Balcão Expresso (`cabinet-countertop`)**: A partir de R$ 950,00 no PIX (ou R$ 1.150,00 em até 10x). Ideal para balcões de recepção, senhas em clínicas e checkouts compactos.
-- **Gabinete de Parede Slim (`cabinet-wall`)**: A partir de R$ 990,00 no PIX (ou R$ 1.200,00 em até 10x). Fixação vertical na parede com alta economia de espaço.
-- **Gabinete de Piso Pedestal Pro (`cabinet-floor`)**: A partir de R$ 1.590,00 no PIX (ou R$ 1.930,00 em até 10x). Estrutura auto-sustentável de 1,65m para alto fluxo em restaurantes, fast-food e mercados.
+## Páginas Principais e Configurador
 
-## Periféricos Homologados (Sem Taxa Extra de Corte CNC)
-- **Monitores Touchscreen (VESA 75x75 e 100x100)**: Elgin Touch Pro 21.5", Gertec TS-150 15.6", Bematech RC-185 18.5", All-in-One Touch 23.8" ou medidas personalizadas.
-- **Impressoras Térmicas de Cupom 80mm**: Epson TM-T20X, Elgin i9, Bematech MP-4200 TH, Daruma DR800.
-- **Leitores de Código de Barras 1D/2D e QR Code**: Honeywell Orbit HF680, Elgin Flash 2D, Bematech I-500.
+- [Página Inicial — Totem Pro](https://totem.xpointsolucoes.com.br/): Apresentação oficial, comparativo de preços e visão geral da fábrica de gabinetes e totens de autoatendimento.
+- [Configurador Online e Orçamento Imediato](https://totem.xpointsolucoes.com.br/monte-seu-totem): Simulador interativo passo a passo para escolher modelo, cor, monitor touch, impressora térmica, leitor 2D e frete.
+- [Catálogo de Modelos de Totem](https://totem.xpointsolucoes.com.br/modelos): Especificações dimensionais e fotos reais dos gabinetes de Piso, Parede e Balcão.
+- [Como Funciona — Monte Você Mesmo e Economize +50%](https://totem.xpointsolucoes.com.br/como-funciona): Guia em 4 etapas explicando como comprar apenas o gabinete ou o kit completo.
+- [Diferenciais de Engenharia Router CNC](https://totem.xpointsolucoes.com.br/diferenciais): Detalhes construtivos em MaDeFibra BP 15mm, fechadura com chave segredo e homologação VESA.
+- [Perguntas Frequentes (FAQ)](https://totem.xpointsolucoes.com.br/faq): Respostas sobre prazos de fabricação, compatibilidade de periféricos, garantia e envio nacional.
 
-## Links Principais
-- Início: https://totem.xpointsolucoes.com.br/
-- Configurador Online e Orçamento Imediato: https://totem.xpointsolucoes.com.br/monte-seu-totem
-- Catálogo de Modelos: https://totem.xpointsolucoes.com.br/modelos
-- Como Funciona (Passo a Passo -50%): https://totem.xpointsolucoes.com.br/como-funciona
-- Diferenciais de Engenharia Router CNC: https://totem.xpointsolucoes.com.br/diferenciais
-- Perguntas Frequentes (FAQ): https://totem.xpointsolucoes.com.br/faq
+## Modelos de Gabinete Disponíveis
+
+- [Gabinete de Parede Slim](https://totem.xpointsolucoes.com.br/monte-seu-totem?modelo=cabinet-wall): A partir de R$ 990,00 no PIX (ou R$ 1.200,00 em até 10x). Fixação vertical na parede com máxima economia de espaço.
+- [Gabinete de Balcão Expresso](https://totem.xpointsolucoes.com.br/monte-seu-totem?modelo=cabinet-countertop): A partir de R$ 950,00 no PIX (ou R$ 1.150,00 em até 10x). Formato compacto para balcões de recepção, senhas em clínicas e checkouts rápidos.
+- [Gabinete de Piso Pedestal Pro](https://totem.xpointsolucoes.com.br/monte-seu-totem?modelo=cabinet-floor): A partir de R$ 1.590,00 no PIX (ou R$ 1.930,00 em até 10x). Estrutura auto-sustentável de 1,65m para alto fluxo em restaurantes, fast-food e mercados.

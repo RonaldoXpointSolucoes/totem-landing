@@ -2,7 +2,7 @@
 
 import React from "react";
 import { siteConfig } from "@/config/site";
-import { ShieldCheck, MessageSquare, Phone } from "lucide-react";
+import { ShieldCheck, MessageSquare } from "lucide-react";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 
 export const Footer: React.FC = () => {
@@ -11,14 +11,14 @@ export const Footer: React.FC = () => {
       <div className="max-w-6xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="space-y-1 text-center md:text-left">
           <p className="font-bold text-sm text-[#1d1d1f] dark:text-slate-200">{siteConfig.name}</p>
-          <p className="text-slate-500 dark:text-slate-400">
+          <p className="text-slate-600 dark:text-slate-400">
             Fabricação especializada em MaDeFibra (MDF) BP para totens e terminais de autoatendimento.
           </p>
         </div>
 
-        <div className="flex items-center gap-6">
+        <div className="flex flex-wrap items-center justify-center gap-6">
           <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-            <ShieldCheck className="w-4 h-4 text-emerald-500" />
+            <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             <span>Garantia Estrutural de Fábrica</span>
           </div>
           <a
@@ -28,9 +28,9 @@ export const Footer: React.FC = () => {
             onClick={() =>
               trackEvent(ANALYTICS_EVENTS.WHATSAPP_CLICK, { source: "footer_support" })
             }
-            className="flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+            className="py-1 flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
           >
-            <MessageSquare className="w-4 h-4 text-emerald-500" />
+            <MessageSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             <span>
               WhatsApp Engenharia:{" "}
               <strong className="font-semibold text-[#1d1d1f] dark:text-white">
@@ -41,18 +41,19 @@ export const Footer: React.FC = () => {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 mt-8 pt-6 border-t border-black/5 dark:border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-slate-500 text-center sm:text-left">
+      <div className="max-w-6xl mx-auto px-4 mt-8 pt-6 border-t border-black/5 dark:border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-slate-600 dark:text-slate-400 text-center sm:text-left">
         <div className="flex flex-col sm:flex-row items-center gap-3">
           <p>© {new Date().getFullYear()} X-Point Soluções. Todos os direitos reservados.</p>
-          <span className="hidden sm:inline text-slate-300 dark:text-slate-700">•</span>
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-black/[0.04] dark:bg-white/[0.06] border border-black/5 dark:border-white/10 text-[11px] font-mono text-slate-600 dark:text-slate-300">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="hidden sm:inline text-slate-400 dark:text-slate-700" aria-hidden="true">•</span>
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-black/[0.05] dark:bg-white/[0.06] border border-black/10 dark:border-white/10 text-[11px] font-mono text-slate-700 dark:text-slate-300">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
             <span className="font-semibold">v{siteConfig.version}</span>
           </div>
         </div>
-        <p className="text-[11px]">Desenvolvido com padrão Mobile-First e Usinagem Router CNC Integrada.</p>
+        <p className="text-[11px] text-slate-600 dark:text-slate-400">
+          Desenvolvido com padrão Mobile-First e Usinagem Router CNC Integrada.
+        </p>
       </div>
     </footer>
   );
 };
-

@@ -49,8 +49,8 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
 
       <div className="max-w-6xl mx-auto px-4 text-center">
         {/* Eyebrow / Nome da Linha */}
-        <span className="text-xs sm:text-sm font-semibold tracking-wider text-slate-500 dark:text-slate-400 uppercase mb-2 block">
-          Totem Pro • Fábrica de Gabinetes & Totens
+        <span className="text-xs sm:text-sm font-semibold tracking-wider text-slate-600 dark:text-slate-400 uppercase mb-2 block">
+          Totem Pro • Fábrica de Gabinetes &amp; Totens
         </span>
 
         {/* Título Visual Fiel: "Bri[|||||||]lhante." */}
@@ -108,9 +108,9 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
                   width={220}
                   height={310}
                   decoding="async"
-                  className="w-full h-auto object-contain filter hue-rotate-[90deg] transition-transform duration-500"
+                  className="w-full aspect-[22/31] object-contain filter hue-rotate-[90deg] transition-transform duration-500"
                 />
-                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 block mt-1">
+                <span className="text-[10px] font-bold text-emerald-800 dark:text-emerald-400 block mt-1">
                   Parede Slim
                 </span>
               </div>
@@ -133,9 +133,9 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
                   width={190}
                   height={260}
                   decoding="async"
-                  className="w-full h-auto object-contain filter hue-rotate-[45deg] transition-transform duration-500"
+                  className="w-full aspect-[19/26] object-contain filter hue-rotate-[45deg] transition-transform duration-500"
                 />
-                <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 block mt-1">
+                <span className="text-[10px] font-bold text-amber-800 dark:text-amber-400 block mt-1">
                   Balcão Expresso
                 </span>
               </div>
@@ -152,7 +152,7 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
               }`}
             >
               <div className="relative p-3 rounded-3xl bg-gradient-to-b from-indigo-500/15 dark:from-indigo-600/30 via-white/80 dark:via-slate-900/80 to-transparent border-2 border-indigo-500/40 shadow-2xl transition-all duration-300">
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-[#0071e3] text-white text-[9px] font-black tracking-wider uppercase shadow-md flex items-center gap-1">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-[#0058b6] text-white text-[9px] font-black tracking-wider uppercase shadow-md flex items-center gap-1 whitespace-nowrap">
                   <Sparkles className="w-2.5 h-2.5" />
                   <span>Mais Escolhido</span>
                 </div>
@@ -163,9 +163,9 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
                   height={380}
                   fetchPriority="high"
                   decoding="async"
-                  className="w-full h-auto object-contain transition-transform duration-500"
+                  className="w-full aspect-[13/19] object-contain transition-transform duration-500"
                 />
-                <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 block mt-1.5">
+                <span className="text-xs font-black text-indigo-800 dark:text-indigo-300 block mt-1.5">
                   Piso Pedestal Pro
                 </span>
               </div>
@@ -188,9 +188,9 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
                   width={190}
                   height={260}
                   decoding="async"
-                  className="w-full h-auto object-contain filter hue-rotate-[240deg] transition-transform duration-500"
+                  className="w-full aspect-[19/26] object-contain filter hue-rotate-[240deg] transition-transform duration-500"
                 />
-                <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 block mt-1">
+                <span className="text-[10px] font-bold text-purple-800 dark:text-purple-300 block mt-1">
                   Lavanda Touch
                 </span>
               </div>
@@ -213,9 +213,9 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
                   width={220}
                   height={310}
                   decoding="async"
-                  className="w-full h-auto object-contain filter grayscale transition-transform duration-500"
+                  className="w-full aspect-[22/31] object-contain filter grayscale transition-transform duration-500"
                 />
-                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 block mt-1">
+                <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 block mt-1">
                   Titanium Silver
                 </span>
               </div>
@@ -225,12 +225,12 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
 
         {/* H1 Principal Otimizado para SEO Orgânico + Subtítulo Apple Intelligence */}
         <div className="mt-6 space-y-3 max-w-2xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs sm:text-sm font-bold">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-600/30 text-emerald-800 dark:text-emerald-300 text-xs sm:text-sm font-bold">
             <Check className="w-3.5 h-3.5 stroke-[3]" />
             <span>Monte seu próprio Totem e economize mais de 50%</span>
           </div>
 
-          <h1 className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-[#0071e3] via-[#af52de] to-[#ff9500] bg-clip-text text-transparent tracking-tight">
+          <h1 className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-[#0058b6] via-[#8938b8] to-[#b35900] dark:from-[#4da3ff] dark:via-[#c77dff] dark:to-[#ffb703] bg-clip-text text-transparent tracking-tight">
             Você mesmo monta seu Totem de Autoatendimento. Simples e sob medida.
           </h1>
 
@@ -243,7 +243,7 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
         <div className="mt-8 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 sm:gap-4">
           <button
             onClick={onStartConfigurator}
-            className="w-full sm:w-auto px-7 py-3.5 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white font-semibold text-sm sm:text-base transition-all duration-200 shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/35 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full sm:w-auto px-7 py-3.5 rounded-full bg-[#0062cc] hover:bg-[#0051a8] text-white font-semibold text-sm sm:text-base transition-all duration-200 shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/35 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
           >
             <span>Montar Meu Totem Agora</span>
             <ArrowRight className="w-4 h-4" />
@@ -251,7 +251,7 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
 
           <a
             href="#como-funciona"
-            className="w-full sm:w-auto px-5 py-3 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+            className="w-full sm:w-auto px-5 py-3 rounded-full bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-800 dark:text-emerald-300 border border-emerald-600/30 font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all hover:scale-105 active:scale-95 cursor-pointer"
           >
             <span>Ver Passo a Passo (-50%)</span>
             <ChevronRight className="w-4 h-4" />
@@ -261,13 +261,13 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
             onClick={() => setIsVideoModalOpen(true)}
             className="w-full sm:w-auto px-5 py-3 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-900/90 dark:hover:bg-slate-800 text-[#1d1d1f] dark:text-white border border-rose-500/30 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
           >
-            <InstagramGlyph className="w-4 h-4 text-rose-500" />
+            <InstagramGlyph className="w-4 h-4 text-rose-600 dark:text-rose-400" />
             <span>Vídeos dos Totens</span>
           </button>
 
           <button
             onClick={onExploreModels}
-            className="w-full sm:w-auto py-2 text-sm sm:text-base font-semibold text-[#0071e3] hover:text-[#0077ed] flex items-center justify-center gap-1 transition-colors hover:underline cursor-pointer"
+            className="w-full sm:w-auto py-2.5 px-4 text-sm sm:text-base font-semibold text-[#0058b6] dark:text-[#4da3ff] hover:text-[#004494] flex items-center justify-center gap-1 transition-colors hover:underline cursor-pointer"
           >
             <span>Conhecer os modelos</span>
             <ChevronRight className="w-4 h-4" />
@@ -275,17 +275,17 @@ export function AppleHero({ onStartConfigurator, onExploreModels }: AppleHeroPro
         </div>
 
         {/* Especificações Rápidas em Pílula */}
-        <div className="mt-12 pt-8 border-t border-black/5 dark:border-white/10 hidden sm:flex sm:flex-wrap items-center justify-center gap-6 sm:gap-12 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+        <div className="mt-12 pt-8 border-t border-black/5 dark:border-white/10 hidden sm:flex sm:flex-wrap items-center justify-center gap-6 sm:gap-12 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span className="w-2 h-2 rounded-full bg-emerald-600" />
             <span>Economia Acima de 50%</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-indigo-500" />
+            <span className="w-2 h-2 rounded-full bg-indigo-600" />
             <span>Só o Gabinete ou Gabinete + Kit</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-cyan-500" />
+            <span className="w-2 h-2 rounded-full bg-cyan-600" />
             <span>MaDeFibra BP 15mm • Router CNC</span>
           </div>
         </div>

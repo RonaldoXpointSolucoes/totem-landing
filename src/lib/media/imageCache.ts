@@ -1,9 +1,34 @@
 /**
  * Utilitário de Cache e Pré-carregamento Inteligente de Imagens para Carrossel
- * - Converte automaticamente caminhos locais /images/totems/*.png para .webp (~95% menor)
+ * - Converte automaticamente caminhos locais /images/totems/*.png e URLs de catálogo legado para .webp (~98% menor)
  * - Cache em memória com persistência de texturas na GPU via img.decode()
  * - Pré-carregamento just-in-time (atual + próxima imediata) sem congestionar o LCP
  */
+
+// Mapa de imagens de catálogo remotas para versões locais WebP ultraleves (600x600 ~25KB)
+export const REMOTE_TOTEM_IMAGE_MAP: Record<string, string> = {
+  "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/PAREDE/totem%20parede%20branco%20(10).png": "/images/totems/wall/parede-branco-10.webp",
+  "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/PAREDE/totem%20parede%20branco%20(12).png": "/images/totems/wall/parede-branco-12.webp",
+  "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/PAREDE/totem%20parede%20branco%20(14).png": "/images/totems/wall/parede-branco-14.webp",
+  "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/PAREDE/totem%20parede%20branco%20(2).png": "/images/totems/wall/parede-branco-2.webp",
+  "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/PAREDE/totem%20parede%20branco%20(4).png": "/images/totems/wall/parede-branco-4.webp",
+  "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/PAREDE/totem%20parede%20preto%20(1).png": "/images/totems/wall/parede-preto-1.webp",
+  "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/PAREDE/totem%20parede%20preto%20(12).png": "/images/totems/wall/parede-preto-12.webp",
+  "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/PAREDE/totem%20parede%20preto%20(14).png": "/images/totems/wall/parede-preto-14.webp",
+  "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/PAREDE/totem%20parede%20preto%20(20).png": "/images/totems/wall/parede-preto-20.webp",
+  "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/PAREDE/totem%20parede%20preto%20(7)%20%20.png": "/images/totems/wall/parede-preto-7.webp",
+  "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/PAREDE/totem%20parede%20preto%20(8)%20%20.png": "/images/totems/wall/parede-preto-8.webp",
+  "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/BALCAO/totem%20balc%C3%A3o%20branco%20(4).png": "/images/totems/countertop/balcao-branco-4.webp",
+  "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/BALCAO/totem%20balc%C3%A3o%20branco%20(1).png": "/images/totems/countertop/balcao-branco-1.webp",
+  "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/BALCAO/totem%20balc%C3%A3o%20branco%20(10).png": "/images/totems/countertop/balcao-branco-10.webp",
+  "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/BALCAO/totem%20balc%C3%A3o%20preto%20(1).png": "/images/totems/countertop/balcao-preto-1.webp",
+  "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/BALCAO/totem%20balc%C3%A3o%20preto%20(10).png": "/images/totems/countertop/balcao-preto-10.webp",
+  "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/BALCAO/totem%20balc%C3%A3o%20preto%20(8).png": "/images/totems/countertop/balcao-preto-8.webp",
+  "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/CHAO/totem%20base%20branco%20(20).png": "/images/totems/floor/base-branco-20.webp",
+  "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/CHAO/totem%20base%20branco%20(10).png": "/images/totems/floor/base-branco-10.webp",
+  "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/CHAO/totem%20base%20branco%20(1).png": "/images/totems/floor/base-branco-1.webp",
+  "https://financial.xpointsolucoes.com.br/xpoint/arquivos/gastrofood/TOTENS/Kit%20Completo%20para%20Totem%20de%20Autoatendimento.png": "/images/totems/kit-completo.webp",
+};
 
 // Cache em memória de elementos Image decodificados para retenção na GPU
 const memoryImageCache = new Map<string, HTMLImageElement>();
@@ -13,11 +38,14 @@ const pendingRequests = new Set<string>();
 const listeners = new Map<string, Set<() => void>>();
 
 /**
- * Converte automaticamente imagens locais de totens .png para .webp otimizado (~80KB vs 1.7MB)
+ * Converte automaticamente imagens locais de totens .png ou URLs remotas legadas para .webp otimizado (~25KB vs 1.7MB)
  */
 export function getOptimizedImageUrl(url: string): string {
   if (typeof url !== "string") return url;
   const trimmed = url.trim();
+  if (REMOTE_TOTEM_IMAGE_MAP[trimmed]) {
+    return REMOTE_TOTEM_IMAGE_MAP[trimmed];
+  }
   if (trimmed.startsWith("/images/totems/") && trimmed.endsWith(".png")) {
     return trimmed.replace(/\.png$/i, ".webp");
   }

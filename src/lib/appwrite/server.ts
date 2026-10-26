@@ -200,13 +200,10 @@ export function invalidateCatalogCache() {
   cachedCatalogTimestamp = 0;
 }
 
+import { getOptimizedImageUrl } from "@/lib/media/imageCache";
+
 function toFastWebp(url: string): string {
-  if (typeof url !== "string") return url;
-  const trimmed = url.trim();
-  if (trimmed.startsWith("/images/totems/") && trimmed.endsWith(".png")) {
-    return trimmed.replace(/\.png$/i, ".webp");
-  }
-  return trimmed;
+  return getOptimizedImageUrl(url);
 }
 
 /**
@@ -331,7 +328,7 @@ export async function getAppwriteCatalog() {
         technicalCode: doc.technical_code,
         notes: doc.notes,
         active: doc.active,
-        image: doc.image,
+        image: toFastWebp(doc.image || ""),
         sortOrder: sortOrderNum,
         isKit,
         kitItems,

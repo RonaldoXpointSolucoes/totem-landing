@@ -119,7 +119,7 @@ export default function Home() {
             <div className="pt-2">
               <button
                 onClick={() => handleStartConfigurator("cabinet-wall")}
-                className="px-8 py-3.5 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white font-bold text-sm sm:text-base shadow-xl shadow-blue-500/25 active:scale-95 transition-all inline-flex items-center gap-2 cursor-pointer"
+                className="px-8 py-3.5 rounded-full bg-[#0062cc] hover:bg-[#0051a8] text-white font-bold text-sm sm:text-base shadow-xl shadow-blue-500/25 active:scale-95 transition-all inline-flex items-center gap-2 cursor-pointer"
               >
                 <Sparkles className="w-5 h-5" />
                 <span>Abrir o Configurador Agora</span>

@@ -20,8 +20,8 @@
     "createdAt": "2026-10-11T23:05:00.248Z",
     "lastLoginAt": "2026-10-11T23:05:00.248Z",
     "loginMethod": "google",
-    "totalOrdersCount": 0,
-    "totalSpentCents": 0,
+    "totalOrdersCount": 1,
+    "totalSpentCents": 701100,
     "document": "123.456.789-00",
     "defaultAddress": {
       "cep": "06763-040",
@@ -32,80 +32,5 @@
       "city": "Taboão da Serra",
       "state": "SP"
     }
-  },
-  {
-    "id": "cust_1791759891542_c38o",
-    "name": "Cliente Teste WhatsApp",
-    "whatsapp": "11988887777",
-    "whatsappFormatted": "(11) 98888-7777",
-    "email": "11988887777@cliente.totempro.com.br",
-    "personType": "individual",
-    "addresses": [],
-    "createdAt": "2026-10-11T23:04:51.542Z",
-    "lastLoginAt": "2026-10-11T23:04:51.542Z",
-    "loginMethod": "whatsapp",
-    "totalOrdersCount": 0,
-    "totalSpentCents": 0
-  },
-  {
-    "id": "cust_1791759652028_pc1d",
-    "name": "Ana Compradora",
-    "whatsapp": "11977776666",
-    "whatsappFormatted": "(11) 97777-6666",
-    "email": "ana.compradora@empresa.com.br",
-    "document": "12.345.678/0001-90",
-    "personType": "company",
-    "addresses": [
-      {
-        "cep": "01310-100",
-        "street": "Av. Paulista",
-        "number": "1000",
-        "neighborhood": "Bela Vista",
-        "city": "São Paulo",
-        "state": "SP"
-      }
-    ],
-    "defaultAddress": {
-      "cep": "01310-100",
-      "street": "Av. Paulista",
-      "number": "1000",
-      "neighborhood": "Bela Vista",
-      "city": "São Paulo",
-      "state": "SP"
-    },
-    "createdAt": "2026-10-11T23:00:52.028Z",
-    "lastLoginAt": "2026-10-11T23:00:52.028Z",
-    "loginMethod": "checkout",
-    "totalOrdersCount": 1,
-    "totalSpentCents": 450300
-  },
-  {
-    "id": "cust_1791759652024_4f0e",
-    "name": "Cliente Google Teste",
-    "email": "cliente.teste@gmail.com",
-    "whatsapp": "",
-    "whatsappFormatted": "",
-    "avatarUrl": "https://avatar.url",
-    "personType": "individual",
-    "addresses": [],
-    "createdAt": "2026-10-11T23:00:52.024Z",
-    "lastLoginAt": "2026-10-11T23:00:52.024Z",
-    "loginMethod": "google",
-    "totalOrdersCount": 0,
-    "totalSpentCents": 0
-  },
-  {
-    "id": "cust_1791759652021_vyeq",
-    "name": "Marcos Cliente",
-    "whatsapp": "11999998888",
-    "whatsappFormatted": "(11) 99999-8888",
-    "email": "11999998888@cliente.totempro.com.br",
-    "personType": "individual",
-    "addresses": [],
-    "createdAt": "2026-10-11T23:00:52.021Z",
-    "lastLoginAt": "2026-10-11T23:00:52.021Z",
-    "loginMethod": "whatsapp",
-    "totalOrdersCount": 0,
-    "totalSpentCents": 0
   }
 ]

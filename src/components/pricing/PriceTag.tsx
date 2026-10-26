@@ -39,11 +39,11 @@ export function PriceTag({
       {/* Preço Âncora "De" (se configurado) */}
       {showAnchor && anchorPriceCents && anchorPriceCents > safeCard && (
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] text-slate-400 dark:text-slate-500 line-through font-medium">
+          <span className="text-[11px] text-slate-600 dark:text-slate-400 line-through font-medium">
             De {formatBRL(anchorPriceCents)}
           </span>
           {discountPercent > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[9px] font-extrabold uppercase border border-emerald-500/20">
+            <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 text-[9px] font-extrabold uppercase border border-emerald-600/30">
               Economize {discountPercent}% no PIX
             </span>
           )}
@@ -53,7 +53,7 @@ export function PriceTag({
       {/* Destaque Principal: Preço no PIX */}
       <div className="flex items-baseline gap-2 flex-wrap">
         <span
-          className={`font-black tracking-tight text-emerald-600 dark:text-emerald-400 ${
+          className={`font-black tracking-tight text-emerald-700 dark:text-emerald-400 ${
             size === "lg"
               ? "text-2xl sm:text-3xl"
               : size === "sm"
@@ -63,19 +63,19 @@ export function PriceTag({
         >
           {formatBRL(safePix)}
         </span>
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[10px] font-extrabold border border-emerald-500/30">
-          <Zap className="w-3 h-3 fill-emerald-500" />
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 text-[10px] font-extrabold border border-emerald-600/30">
+          <Zap className="w-3 h-3 fill-current" />
           <span>no PIX à vista</span>
         </span>
       </div>
 
       {/* Linha Secundária: Parcelamento no Cartão */}
       {safeCard > 0 && (
-        <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium">
-          <CreditCard className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+        <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400 font-medium">
+          <CreditCard className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
           <span>
             ou em até{" "}
-            <strong className="text-slate-700 dark:text-slate-200 font-bold">
+            <strong className="text-slate-800 dark:text-slate-200 font-bold">
               {safeInstallments}x de {formatBRL(monthlyCents)}
             </strong>{" "}
             no cartão

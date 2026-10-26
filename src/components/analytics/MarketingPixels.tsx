@@ -112,12 +112,12 @@ export const MarketingPixels: React.FC = () => {
 
   return (
     <>
-      {/* 1. Google Tag Manager (Script e NoScript) */}
+      {/* 1. Google Tag Manager (Script e NoScript - Carregado após load para TBT zero) */}
       {gtmId && (
         <>
           <Script
             id="gtm-script"
-            strategy="afterInteractive"
+            strategy="lazyOnload"
             dangerouslySetInnerHTML={{
               __html: `
                 (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
@@ -144,11 +144,11 @@ export const MarketingPixels: React.FC = () => {
         <>
           <Script
             src={`https://www.googletagmanager.com/gtag/js?id=${primaryGoogleId}`}
-            strategy="afterInteractive"
+            strategy="lazyOnload"
           />
           <Script
             id="google-gtag-init"
-            strategy="afterInteractive"
+            strategy="lazyOnload"
             dangerouslySetInnerHTML={{
               __html: `
                 window.dataLayer = window.dataLayer || [];
@@ -175,7 +175,7 @@ export const MarketingPixels: React.FC = () => {
         <>
           <Script
             id="meta-pixel-init"
-            strategy="afterInteractive"
+            strategy="lazyOnload"
             dangerouslySetInnerHTML={{
               __html: `
                 !function(f,b,e,v,n,t,s)
@@ -207,7 +207,7 @@ export const MarketingPixels: React.FC = () => {
       {tiktokPixelId && (
         <Script
           id="tiktok-pixel-init"
-          strategy="afterInteractive"
+          strategy="lazyOnload"
           dangerouslySetInnerHTML={{
             __html: `
               !function (w, d, t) {
