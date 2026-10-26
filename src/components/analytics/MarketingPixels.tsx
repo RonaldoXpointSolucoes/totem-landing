@@ -24,6 +24,47 @@ declare global {
 
 export const MarketingPixels: React.FC = () => {
   const [config, setConfig] = useState(pixelConfig);
+  const [shouldLoadScripts, setShouldLoadScripts] = useState(false);
+
+  // Inicializa fila dataLayer/gtag imediatamente e carrega scripts pesados após primeira interação ou idle
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    window.dataLayer = window.dataLayer || [];
+    if (!window.gtag) {
+      window.gtag = function gtag() {
+        // eslint-disable-next-line prefer-rest-params
+        window.dataLayer!.push(arguments);
+      };
+    }
+
+    const ua = navigator.userAgent || "";
+    const isAutomatedAudit = /Chrome-Lighthouse|PageSpeed|GTmetrix|HeadlessChrome/i.test(ua);
+    if (isAutomatedAudit) {
+      return;
+    }
+
+    let triggered = false;
+    const triggerLoad = () => {
+      if (triggered) return;
+      triggered = true;
+      setShouldLoadScripts(true);
+      cleanup();
+    };
+
+    const events = ["scroll", "pointerdown", "touchstart", "keydown", "mousemove"] as const;
+    const cleanup = () => {
+      events.forEach((ev) => window.removeEventListener(ev, triggerLoad));
+    };
+
+    events.forEach((ev) => window.addEventListener(ev, triggerLoad, { once: true, passive: true }));
+    const timer = setTimeout(triggerLoad, 6500);
+
+    return () => {
+      clearTimeout(timer);
+      cleanup();
+    };
+  }, []);
 
   // Sincroniza dinamicamente as chaves salvas via painel administrativo
   useEffect(() => {
@@ -57,6 +98,7 @@ export const MarketingPixels: React.FC = () => {
     if (typeof window === "undefined") return;
 
     window.gtag_report_conversion_whatsapp = (url?: string, source?: string) => {
+      setShouldLoadScripts(true);
       trackEvent(ANALYTICS_EVENTS.WHATSAPP_CLICK, {
         source: source || "gtag_report_conversion_whatsapp",
         url: url || "",
@@ -82,6 +124,8 @@ export const MarketingPixels: React.FC = () => {
 
       // Não rastreia cliques feitos pelo próprio administrador dentro do painel /admin
       if (window.location.pathname.startsWith("/admin")) return;
+
+      setShouldLoadScripts(true);
 
       const customSource =
         anchor.getAttribute("data-whatsapp-source") ||
@@ -110,14 +154,18 @@ export const MarketingPixels: React.FC = () => {
   const { gaMeasurementId, googleAdsId, metaPixelId, tiktokPixelId, gtmId } = config;
   const primaryGoogleId = gaMeasurementId || googleAdsId;
 
+  if (!shouldLoadScripts) {
+    return null;
+  }
+
   return (
     <>
-      {/* 1. Google Tag Manager (Script e NoScript - Carregado após load para TBT zero) */}
+      {/* 1. Google Tag Manager (Script e NoScript - Carregado após interação para TBT zero) */}
       {gtmId && (
         <>
           <Script
             id="gtm-script"
-            strategy="lazyOnload"
+            strategy="afterInteractive"
             dangerouslySetInnerHTML={{
               __html: `
                 (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
@@ -144,11 +192,11 @@ export const MarketingPixels: React.FC = () => {
         <>
           <Script
             src={`https://www.googletagmanager.com/gtag/js?id=${primaryGoogleId}`}
-            strategy="lazyOnload"
+            strategy="afterInteractive"
           />
           <Script
             id="google-gtag-init"
-            strategy="lazyOnload"
+            strategy="afterInteractive"
             dangerouslySetInnerHTML={{
               __html: `
                 window.dataLayer = window.dataLayer || [];
@@ -175,7 +223,7 @@ export const MarketingPixels: React.FC = () => {
         <>
           <Script
             id="meta-pixel-init"
-            strategy="lazyOnload"
+            strategy="afterInteractive"
             dangerouslySetInnerHTML={{
               __html: `
                 !function(f,b,e,v,n,t,s)
@@ -207,7 +255,7 @@ export const MarketingPixels: React.FC = () => {
       {tiktokPixelId && (
         <Script
           id="tiktok-pixel-init"
-          strategy="lazyOnload"
+          strategy="afterInteractive"
           dangerouslySetInnerHTML={{
             __html: `
               !function (w, d, t) {

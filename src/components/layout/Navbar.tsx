@@ -116,7 +116,7 @@ export const Navbar: React.FC<NavbarProps> = ({ className = "" }) => {
                 : "border-black/10 dark:border-slate-800 bg-[#f5f5f7] dark:bg-slate-900/60 text-slate-700 dark:text-slate-300 hover:text-black dark:hover:text-white hover:border-black/20 dark:hover:border-slate-700"
             }`}
             title="Visualizar Carrinho"
-            aria-label="Carrinho de Compras"
+            aria-label={totalItems > 0 ? `Carrinho de Compras (${totalItems})` : "Carrinho de Compras"}
           >
             <ShoppingCart className="w-4 h-4" />
             {totalItems > 0 && (
