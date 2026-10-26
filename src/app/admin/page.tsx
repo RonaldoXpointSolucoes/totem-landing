@@ -1112,8 +1112,8 @@ export default function AdminPage() {
   return (
     <div className={`min-h-screen ${adminTheme === "light" ? "admin-light bg-slate-50 text-slate-900" : "bg-slate-950 text-slate-100"} flex flex-col antialiased transition-colors duration-200`}>
       {/* Topo / Header Administrativo */}
-      <header className="sticky top-0 z-40 bg-slate-900/90 border-b border-slate-800 backdrop-blur-md px-4 sm:px-8 py-3.5">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <header className="sticky top-0 z-40 bg-slate-900/90 border-b border-slate-800 backdrop-blur-md px-4 sm:px-6 lg:px-8 py-3.5">
+        <div className="max-w-[1600px] mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center shadow-md shadow-indigo-500/20">
               <ShieldCheck className="w-5 h-5 text-white" />
@@ -1202,7 +1202,7 @@ export default function AdminPage() {
 
       {/* Navegação por Abas Principais */}
       <div className="border-b border-slate-800/80 bg-slate-900/40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 flex items-center gap-2 overflow-x-auto py-2">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center flex-wrap gap-1.5 py-2.5">
           <button
             onClick={() => setActiveTab("orders")}
             className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all shrink-0 ${
@@ -1323,7 +1323,7 @@ export default function AdminPage() {
       </div>
 
       {/* Conteúdo Principal */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-8 space-y-6">
+      <main className="flex-1 max-w-[1600px] w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6 overflow-x-hidden">
         {/* Notificação de Sucesso */}
         {saveSuccessMsg && (
           <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-emerald-400 text-sm flex items-center gap-3 animate-fade-in shadow-lg shadow-emerald-500/5">
@@ -1338,15 +1338,15 @@ export default function AdminPage() {
         {activeTab === "orders" && (
           <div className="space-y-5">
             {/* Barra de Filtros, Busca e Modo de Visualização */}
-            <div className="flex flex-col xl:flex-row gap-3 items-stretch xl:items-center justify-between">
+            <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
               {/* Filtros por Status */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-2 xl:pb-0 scrollbar-none">
+              <div className="flex items-center flex-wrap gap-1.5">
                 <button
                   onClick={() => {
                     setStatusFilter("all");
                     loadOrders("all");
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-all ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-all cursor-pointer ${
                     statusFilter === "all"
                       ? "bg-slate-200 text-slate-900"
                       : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800"
@@ -1361,7 +1361,7 @@ export default function AdminPage() {
                       setStatusFilter(key);
                       loadOrders(key);
                     }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-all border ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-all border cursor-pointer ${
                       statusFilter === key
                         ? "bg-indigo-600 text-white border-indigo-500"
                         : "bg-slate-900 text-slate-400 hover:bg-slate-800 border-slate-800"
@@ -1372,13 +1372,13 @@ export default function AdminPage() {
                 ))}
               </div>
 
-              <div className="flex flex-wrap items-center gap-2.5">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
                 {/* Alternador de Modo de Visualização: Simplificada vs Detalhada */}
                 <div className="inline-flex items-center p-1 bg-slate-900 border border-slate-800 rounded-xl shrink-0">
                   <button
                     type="button"
                     onClick={() => toggleOrdersViewMode("simplified")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                       ordersViewMode === "simplified"
                         ? "bg-indigo-600 text-white shadow-sm"
                         : "text-slate-400 hover:text-white"
@@ -1391,7 +1391,7 @@ export default function AdminPage() {
                   <button
                     type="button"
                     onClick={() => toggleOrdersViewMode("detailed")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                       ordersViewMode === "detailed"
                         ? "bg-indigo-600 text-white shadow-sm"
                         : "text-slate-400 hover:text-white"
@@ -1404,7 +1404,7 @@ export default function AdminPage() {
                 </div>
 
                 {/* Campo de Busca */}
-                <div className="relative min-w-[240px] flex-1 sm:flex-none">
+                <div className="relative min-w-[240px] sm:w-64 lg:w-72">
                   <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     id="admin-order-search"
@@ -1466,7 +1466,7 @@ export default function AdminPage() {
                   return (
                     <div
                       key={order.$id}
-                      className={`bg-slate-900/85 border transition-all shadow-xl ${
+                      className={`bg-slate-900/85 border transition-all shadow-xl overflow-hidden ${
                         isExpanded ? "rounded-3xl p-4 sm:p-6 space-y-4" : "rounded-2xl p-4 sm:p-5 hover:border-indigo-500/50"
                       } ${
                         orderHasAnyDeviation
@@ -1476,170 +1476,191 @@ export default function AdminPage() {
                     >
                       {!isExpanded ? (
                         /* ======================================================== */
-                        /* MODO: LISTA SIMPLIFICADA (RESUMO EXECUTIVO ÁGIL)        */
+                        /* MODO: LISTA SIMPLIFICADA (CLIENTE À ESQUERDA / PEDIDO À DIREITA) */
                         /* ======================================================== */
-                        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-                          {/* Bloco 1: Pedido, Status, Pagamento e Data */}
-                          <div className="flex items-center gap-3 shrink-0">
-                            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
-                              <Package className="w-5 h-5" />
-                            </div>
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-extrabold text-white text-base font-mono tracking-tight">
-                                  {order.order_number}
-                                </span>
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border flex items-center gap-1 ${statusInfo.color}`}>
-                                  <StatusIcon className="w-3 h-3" />
-                                  <span>{statusInfo.label}</span>
-                                </span>
-                                {orderHasAnyDeviation && (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-400 flex items-center gap-1 animate-pulse">
-                                    <AlertTriangle className="w-3 h-3" />
-                                    <span>Atenção Fábrica</span>
-                                  </span>
-                                )}
+                        <div className="space-y-3.5">
+                          {/* Linha Principal Responsiva: [1. Cliente à Esquerda] | [2. Gabinetes ao Centro] | [3. Pedido & Valores à Direita] */}
+                          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+                            {/* BLOCO 1 (ESQUERDA): CLIENTE EM DESTAQUE COM FONTE MAIOR */}
+                            <div className="lg:col-span-4 flex items-center justify-between sm:justify-start gap-3.5 min-w-0">
+                              <div className="w-11 h-11 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 flex items-center justify-center shrink-0 font-black text-base shadow-inner">
+                                {(order.customer_name || "C").trim().charAt(0).toUpperCase()}
                               </div>
-                              <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
-                                <span>{new Date(order.$createdAt).toLocaleString("pt-BR")}</span>
-                                <span>•</span>
-                                <span className="text-slate-300 font-bold">{payMethod === "credit_card" ? "Cartão de Crédito" : "Pix à Vista"}</span>
-                                <span>•</span>
-                                <span className="text-cyan-400">{shipping.name}</span>
+                              <div className="min-w-0 flex-1 space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="font-black text-white text-lg sm:text-xl tracking-tight leading-tight break-words">
+                                    {order.customer_name || "Cliente não informado"}
+                                  </p>
+                                  {waHref && (
+                                    <a
+                                      href={waHref}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="p-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 active:scale-95 text-emerald-400 border border-emerald-500/30 transition-all shrink-0"
+                                      title="Falar com o cliente no WhatsApp"
+                                    >
+                                      <MessageCircle className="w-4 h-4" />
+                                    </a>
+                                  )}
+                                </div>
+                                <p className="text-xs sm:text-[13px] text-slate-300 font-mono flex items-center flex-wrap gap-1.5">
+                                  <span className="font-semibold text-slate-200">{order.customer_document || "—"}</span>
+                                  {addr?.city && (
+                                    <span className="text-slate-400 font-sans font-medium">
+                                      • {addr.city}/{addr.state || "SP"}
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* BLOCO 2 (CENTRO): GABINETES E EQUIPAMENTOS */}
+                            <div className="lg:col-span-4 flex items-center gap-3 lg:border-l lg:border-r lg:border-slate-800/80 lg:px-4 min-w-0">
+                              {firstItemThumb && (
+                                <div className="w-12 h-12 rounded-xl bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center p-1 shrink-0">
+                                  <img src={firstItemThumb} alt="Gabinete" className="w-full h-full object-contain" />
+                                </div>
+                              )}
+                              <div className="text-xs space-y-1 min-w-0 flex-1">
+                                <p className="font-extrabold text-slate-100 leading-snug">
+                                  {totalItemsQty} {totalItemsQty > 1 ? "gabinetes" : "gabinete"}{" "}
+                                  <span className="font-normal text-slate-400">
+                                    ({order.items?.map((it) => it.cabinet_name).join(", ") || "Configuração Padrão"})
+                                  </span>
+                                </p>
+                                <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
+                                  {firstItem?.color_name && (
+                                    <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-200 border border-slate-700 font-semibold">
+                                      {firstItem.color_name}
+                                    </span>
+                                  )}
+                                  {firstItem?.monitor_name && (
+                                    <span className="px-2 py-0.5 rounded-md bg-cyan-950/50 text-cyan-300 border border-cyan-800/40 font-semibold">
+                                      Monitor: {firstItem.monitor_name}
+                                    </span>
+                                  )}
+                                  {firstItem?.printer_name && (
+                                    <span className="px-2 py-0.5 rounded-md bg-indigo-950/50 text-indigo-300 border border-indigo-800/40 font-semibold">
+                                      Impressora: {firstItem.printer_name}
+                                    </span>
+                                  )}
+                                  {Boolean(firstSheet?.assemblyService?.includes("Montagem Especializada") || firstItem?.monitor_name?.includes("100% Montado")) && (
+                                    <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold flex items-center gap-1">
+                                      <Wrench className="w-2.5 h-2.5" />
+                                      Montagem de Fábrica (+R$ 999)
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* BLOCO 3 (DIREITA): DADOS DO PEDIDO À DIREITA + VALOR TOTAL */}
+                            <div className="lg:col-span-4 flex flex-col sm:flex-row lg:flex-col xl:flex-row items-start sm:items-center lg:items-end xl:items-center justify-between lg:justify-end gap-3 min-w-0">
+                              {/* Metadados do Pedido à Direita */}
+                              <div className="space-y-1 text-left sm:text-right min-w-0">
+                                <div className="flex items-center sm:justify-end gap-2 flex-wrap">
+                                  <span className="font-extrabold text-white text-sm sm:text-base font-mono tracking-tight">
+                                    {order.order_number}
+                                  </span>
+                                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border inline-flex items-center gap-1 ${statusInfo.color}`}>
+                                    <StatusIcon className="w-3 h-3" />
+                                    <span>{statusInfo.label}</span>
+                                  </span>
+                                  {orderHasAnyDeviation && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-400 inline-flex items-center gap-1 animate-pulse">
+                                      <AlertTriangle className="w-3 h-3" />
+                                      <span>Atenção Fábrica</span>
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center sm:justify-end gap-1.5 flex-wrap text-[11px] text-slate-400 font-mono">
+                                  <span>{new Date(order.$createdAt).toLocaleString("pt-BR")}</span>
+                                  <span>•</span>
+                                  <span className="text-slate-200 font-bold font-sans">
+                                    {payMethod === "credit_card" ? "Cartão de Crédito" : "Pix à Vista"}
+                                  </span>
+                                  <span>•</span>
+                                  <span className="text-cyan-400 font-sans font-semibold">{shipping.name}</span>
+                                </div>
+                              </div>
+
+                              {/* Total do Pedido */}
+                              <div className="sm:border-l sm:border-slate-800/80 sm:pl-3.5 text-left sm:text-right shrink-0">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                                  Total do Pedido
+                                </span>
+                                <span className="text-base sm:text-lg font-black text-emerald-400 font-mono block leading-tight">
+                                  {formatBRL(order.total_cents)}
+                                </span>
+                                <span className="text-[10px] text-slate-500 block">
+                                  Frete: {order.shipping_cents > 0 ? formatBRL(order.shipping_cents) : "Isento"}
+                                </span>
                               </div>
                             </div>
                           </div>
 
-                          {/* Bloco 2: Cliente */}
-                          <div className="flex items-center gap-3 xl:border-l xl:border-slate-800/80 xl:pl-4 shrink-0 min-w-[190px]">
-                            <div className="space-y-0.5 text-xs">
-                              <p className="font-bold text-white text-sm truncate max-w-[200px]">
-                                {order.customer_name || "Cliente não informado"}
-                              </p>
-                              <p className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
-                                <span>{order.customer_document || "—"}</span>
-                                {addr?.city && (
-                                  <span className="text-slate-500">
-                                    • {addr.city}/{addr.state}
-                                  </span>
-                                )}
-                              </p>
-                            </div>
-                            {waHref && (
-                              <a
-                                href={waHref}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition-colors shrink-0"
-                                title="Falar com o cliente no WhatsApp"
+                          {/* Barra Inferior Compacta de Ações Rápidas (100% Contida no Card) */}
+                          <div className="pt-3 border-t border-slate-800/70 flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <button
+                                type="button"
+                                onClick={() => toggleOrderExpanded(order.$id)}
+                                className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-600/25 transition-all cursor-pointer"
+                                title="Ver dados completos deste pedido em 3 colunas"
                               >
-                                <MessageCircle className="w-4 h-4" />
-                              </a>
-                            )}
-                          </div>
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>Ver em Detalhes</span>
+                                <ChevronDown className="w-3.5 h-3.5" />
+                              </button>
 
-                          {/* Bloco 3: Totens e Equipamentos */}
-                          <div className="flex items-center gap-3 xl:border-l xl:border-slate-800/80 xl:pl-4 flex-1 min-w-[200px]">
-                            {firstItemThumb && (
-                              <div className="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center p-0.5 shrink-0">
-                                <img src={firstItemThumb} alt="Totem" className="w-full h-full object-contain" />
-                              </div>
-                            )}
-                            <div className="text-xs space-y-0.5">
-                              <p className="font-extrabold text-slate-200">
-                                {totalItemsQty} {totalItemsQty > 1 ? "gabinetes" : "gabinete"}{" "}
-                                <span className="font-normal text-slate-400">
-                                  ({order.items?.map((it) => it.cabinet_name).join(", ") || "Configuração Padrão"})
-                                </span>
-                              </p>
-                              <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
-                                {firstItem?.color_name && (
-                                  <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                                    {firstItem.color_name}
-                                  </span>
-                                )}
-                                {firstItem?.monitor_name && (
-                                  <span className="px-1.5 py-0.5 rounded bg-cyan-950/40 text-cyan-300 border border-cyan-800/30">
-                                    Monitor: {firstItem.monitor_name}
-                                  </span>
-                                )}
-                                {firstItem?.printer_name && (
-                                  <span className="px-1.5 py-0.5 rounded bg-indigo-950/40 text-indigo-300 border border-indigo-800/30">
-                                    Impressora: {firstItem.printer_name}
-                                  </span>
-                                )}
-                                {Boolean(firstSheet?.assemblyService?.includes("Montagem Especializada") || firstItem?.monitor_name?.includes("100% Montado")) && (
-                                  <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold flex items-center gap-1">
-                                    <Wrench className="w-2.5 h-2.5" />
-                                    Montagem de Fábrica (+R$ 999)
-                                  </span>
-                                )}
-                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditOrder(order, "execution")}
+                                className="px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 active:scale-95 text-emerald-300 border border-emerald-500/30 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                                title="Abrir Ordem de Execução (Fotos, Vídeos e Ficha Técnica)"
+                              >
+                                <Camera className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Ordem de Execução</span>
+                              </button>
                             </div>
-                          </div>
 
-                          {/* Bloco 4: Financeiro */}
-                          <div className="xl:border-l xl:border-slate-800/80 xl:pl-4 text-left xl:text-right shrink-0 min-w-[130px]">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                              Total do Pedido
-                            </span>
-                            <span className="text-base sm:text-lg font-black text-emerald-400 font-mono block">
-                              {formatBRL(order.total_cents)}
-                            </span>
-                            <span className="text-[10px] text-slate-500 block">
-                              Frete: {order.shipping_cents > 0 ? formatBRL(order.shipping_cents) : "Isento"}
-                            </span>
-                          </div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {/* Seletor rápido de Status */}
+                              <select
+                                id={`order-status-simplified-${order.$id}`}
+                                name={`orderStatus-${order.$id}`}
+                                aria-label={`Mudar status do pedido ${order.order_number}`}
+                                value={order.status}
+                                onChange={(e) => handleUpdateOrderStatus(order.$id, e.target.value)}
+                                className="bg-slate-950 border border-slate-800 text-xs rounded-xl px-2.5 py-2 text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                              >
+                                {Object.entries(STATUS_CONFIG).map(([k, cfg]) => (
+                                  <option key={k} value={k}>
+                                    Mudar: {cfg.label}
+                                  </option>
+                                ))}
+                              </select>
 
-                          {/* Bloco 5: Botões de Ação com 'Ver em Detalhes' */}
-                          <div className="flex items-center gap-2 flex-wrap shrink-0 xl:border-l xl:border-slate-800/80 xl:pl-4">
-                            {/* Botão de Ver em Detalhes */}
-                            <button
-                              type="button"
-                              onClick={() => toggleOrderExpanded(order.$id)}
-                              className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-600/25 transition-all cursor-pointer shrink-0"
-                              title="Ver dados completos deste pedido em 3 colunas"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>Ver em Detalhes</span>
-                              <ChevronDown className="w-3.5 h-3.5" />
-                            </button>
+                              {/* Botão Editar Pedido */}
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditOrder(order, "all")}
+                                className="p-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 border border-amber-500/30 transition-all cursor-pointer"
+                                title="Editar dados deste pedido"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
 
-                            {/* Seletor rápido de Status */}
-                            <select
-                              id={`order-status-simplified-${order.$id}`}
-                              name={`orderStatus-${order.$id}`}
-                              aria-label={`Mudar status do pedido ${order.order_number}`}
-                              value={order.status}
-                              onChange={(e) => handleUpdateOrderStatus(order.$id, e.target.value)}
-                              className="bg-slate-950 border border-slate-800 text-xs rounded-xl px-2.5 py-2 text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer shrink-0"
-                            >
-                              {Object.entries(STATUS_CONFIG).map(([k, cfg]) => (
-                                <option key={k} value={k}>
-                                  Mudar: {cfg.label}
-                                </option>
-                              ))}
-                            </select>
-
-                            {/* Botão Editar Pedido */}
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditOrder(order, "all")}
-                              className="p-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 border border-amber-500/30 transition-all cursor-pointer shrink-0"
-                              title="Editar dados deste pedido"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-
-                            {/* Botão Excluir Pedido */}
-                            <button
-                              type="button"
-                              onClick={() => setDeletingOrder(order)}
-                              className="p-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 active:scale-95 text-rose-400 border border-rose-500/30 transition-all cursor-pointer shrink-0"
-                              title="Excluir este pedido permanentemente"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                              {/* Botão Excluir Pedido */}
+                              <button
+                                type="button"
+                                onClick={() => setDeletingOrder(order)}
+                                className="p-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 active:scale-95 text-rose-400 border border-rose-500/30 transition-all cursor-pointer"
+                                title="Excluir este pedido permanentemente"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ) : (
@@ -1647,140 +1668,163 @@ export default function AdminPage() {
                         /* MODO: VISÃO DETALHADA COMPLETA (3 COLUNAS DE FÁBRICA)   */
                         /* ======================================================== */
                         <>
-                          {/* Topo do Card: Número do Pedido, Status, Pagamento, Método de Entrega e Ações */}
-                          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 pb-3.5 border-b border-slate-800/80">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="font-extrabold text-white text-base sm:text-lg font-mono tracking-tight">
-                                {order.order_number}
-                              </span>
-                              <span
-                                className={`px-2.5 py-1 rounded-full text-[11px] font-bold border flex items-center gap-1.5 ${statusInfo.color}`}
-                              >
-                                <StatusIcon className="w-3.5 h-3.5" />
-                                <span>{statusInfo.label}</span>
-                              </span>
+                          {/* Topo do Card: Cliente em Destaque à Esquerda | Dados do Pedido à Direita */}
+                          <div className="flex flex-col gap-3.5 pb-4 border-b border-slate-800/80">
+                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                              {/* ESQUERDA: Cliente com Fonte Maior */}
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-11 h-11 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 flex items-center justify-center shrink-0 font-black text-base">
+                                  {(order.customer_name || "C").trim().charAt(0).toUpperCase()}
+                                </div>
+                                <div className="min-w-0 space-y-0.5">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h3 className="font-black text-white text-lg sm:text-2xl tracking-tight leading-tight">
+                                      {order.customer_name || "Cliente não informado"}
+                                    </h3>
+                                    {waHref && (
+                                      <a
+                                        href={waHref}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-2.5 py-1 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold inline-flex items-center gap-1 transition-colors"
+                                      >
+                                        <MessageCircle className="w-3.5 h-3.5" />
+                                        <span>WhatsApp</span>
+                                      </a>
+                                    )}
+                                  </div>
+                                  <p className="text-xs sm:text-sm text-slate-300 font-mono flex items-center flex-wrap gap-1.5">
+                                    <span className="font-semibold text-slate-200">{order.customer_document || "—"}</span>
+                                    {addr?.city && (
+                                      <span className="text-slate-400 font-sans font-medium">
+                                        • {addr.city}/{addr.state || "SP"}
+                                      </span>
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
 
-                              {/* Badge Forma de Pagamento */}
-                              <span
-                                className={`px-2.5 py-1 rounded-full text-[11px] font-extrabold border flex items-center gap-1.5 ${
-                                  payMethod === "credit_card"
-                                    ? "bg-indigo-500/15 text-indigo-300 border-indigo-500/30"
-                                    : "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-                                }`}
-                              >
-                                {payMethod === "credit_card" ? (
-                                  <CreditCard className="w-3.5 h-3.5" />
-                                ) : (
-                                  <QrCode className="w-3.5 h-3.5" />
-                                )}
-                                <span>{payMethod === "credit_card" ? "CARTÃO DE CRÉDITO" : "PIX À VISTA"}</span>
-                              </span>
-
-                              {/* Badge Método de Entrega */}
-                              <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 flex items-center gap-1.5">
-                                <Truck className="w-3.5 h-3.5" />
-                                <span>
-                                  {shipping.name}{" "}
-                                  {order.shipping_cents > 0 ? `(${formatBRL(order.shipping_cents)})` : "(Isento)"}
-                                </span>
-                              </span>
-
-                              {/* Badge Ordem de Execução Ativa */}
-                              {hasExecOrder && (
-                                <span className="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-400/50 flex items-center gap-1.5">
-                                  <ClipboardCheck className="w-3.5 h-3.5 text-indigo-300" />
-                                  <span>
-                                    O.S. Técnica ({addr?.executionOrder?.attachments?.length || 0} mídia/s)
+                              {/* DIREITA: Número do Pedido, Status, Data, Pagamento e Método de Entrega */}
+                              <div className="flex flex-col lg:items-end gap-1.5">
+                                <div className="flex flex-wrap items-center lg:justify-end gap-2">
+                                  <span className="font-extrabold text-white text-base sm:text-lg font-mono tracking-tight">
+                                    {order.order_number}
                                   </span>
-                                </span>
-                              )}
+                                  <span
+                                    className={`px-2.5 py-1 rounded-full text-[11px] font-bold border flex items-center gap-1.5 ${statusInfo.color}`}
+                                  >
+                                    <StatusIcon className="w-3.5 h-3.5" />
+                                    <span>{statusInfo.label}</span>
+                                  </span>
 
-                              {/* Badge Alerta Fora do Padrão / Observação no Topo */}
-                              {orderHasAnyDeviation && (
-                                <span className="px-2.5 py-1 rounded-full text-[11px] font-black bg-amber-500/20 text-amber-300 border-2 border-amber-400 flex items-center gap-1.5 animate-pulse">
-                                  <AlertTriangle className="w-3.5 h-3.5 text-amber-300" />
-                                  <span>ATENÇÃO: FORA DO PADRÃO / OBSERVAÇÃO</span>
-                                </span>
-                              )}
+                                  {hasExecOrder && (
+                                    <span className="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-400/50 flex items-center gap-1.5">
+                                      <ClipboardCheck className="w-3.5 h-3.5 text-indigo-300" />
+                                      <span>
+                                        O.S. Técnica ({addr?.executionOrder?.attachments?.length || 0} mídia/s)
+                                      </span>
+                                    </span>
+                                  )}
 
-                              <span className="text-xs text-slate-500 font-mono">
-                                {new Date(order.$createdAt).toLocaleString("pt-BR")}
-                              </span>
+                                  {orderHasAnyDeviation && (
+                                    <span className="px-2.5 py-1 rounded-full text-[11px] font-black bg-amber-500/20 text-amber-300 border-2 border-amber-400 flex items-center gap-1.5 animate-pulse">
+                                      <AlertTriangle className="w-3.5 h-3.5 text-amber-300" />
+                                      <span>ATENÇÃO: FORA DO PADRÃO / OBSERVAÇÃO</span>
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="flex flex-wrap items-center lg:justify-end gap-2 text-xs text-slate-400 font-mono">
+                                  <span>{new Date(order.$createdAt).toLocaleString("pt-BR")}</span>
+                                  <span>•</span>
+                                  <span className="text-slate-200 font-bold font-sans">
+                                    {payMethod === "credit_card" ? "Cartão de Crédito" : "Pix à Vista"}
+                                  </span>
+                                  <span>•</span>
+                                  <span className="text-cyan-400 font-sans font-semibold">
+                                    {shipping.name}{" "}
+                                    {order.shipping_cents > 0 ? `(${formatBRL(order.shipping_cents)})` : "(Isento)"}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-2">
-                              {/* Botão Recolher Detalhes (quando aberto em modo simplificado) */}
-                              {ordersViewMode === "simplified" && (
+                            {/* Barra de Botões de Ação da Visão Detalhada */}
+                            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/50">
+                              <div className="flex flex-wrap items-center gap-2">
+                                {ordersViewMode === "simplified" && (
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleOrderExpanded(order.$id)}
+                                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white border border-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+                                    title="Recolher para lista simplificada"
+                                  >
+                                    <ChevronUp className="w-3.5 h-3.5" />
+                                    <span>Recolher Detalhes</span>
+                                  </button>
+                                )}
+
                                 <button
                                   type="button"
-                                  onClick={() => toggleOrderExpanded(order.$id)}
-                                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white border border-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
-                                  title="Recolher para lista simplificada"
+                                  onClick={() => handleOpenEditOrder(order, "execution")}
+                                  className="px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 active:scale-95 text-emerald-300 border border-emerald-500/40 font-extrabold text-xs flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+                                  title="Abrir Editor Rico da Ordem de Execução para anexar fotos, vídeos e dados técnicos"
                                 >
-                                  <ChevronUp className="w-3.5 h-3.5" />
-                                  <span>Recolher Detalhes</span>
+                                  <Camera className="w-3.5 h-3.5" />
+                                  <span>Ordem de Execução (Fotos & Vídeos)</span>
                                 </button>
-                              )}
-                          {/* Seletor rápido de Status */}
-                          <select
-                            id={`order-status-detailed-${order.$id}`}
-                            name={`orderStatus-${order.$id}`}
-                            aria-label={`Mudar status do pedido ${order.order_number}`}
-                            value={order.status}
-                            onChange={(e) => handleUpdateOrderStatus(order.$id, e.target.value)}
-                            className="bg-slate-950 border border-slate-800 text-xs rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"
-                          >
-                            {Object.entries(STATUS_CONFIG).map(([k, cfg]) => (
-                              <option key={k} value={k}>
-                                Mudar: {cfg.label}
-                              </option>
-                            ))}
-                          </select>
 
-                          {/* Botão Direto: Ordem de Execução (Fotos, Vídeos & Dados Técnicos) */}
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditOrder(order, "execution")}
-                            className="px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 active:scale-95 text-emerald-300 border border-emerald-500/40 font-extrabold text-xs flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
-                            title="Abrir Editor Rico da Ordem de Execução para anexar fotos, vídeos e dados técnicos"
-                          >
-                            <Camera className="w-3.5 h-3.5" />
-                            <span>Ordem de Execução (Fotos & Vídeos)</span>
-                          </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedOrder(order)}
+                                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-600/25 transition-all shrink-0 cursor-pointer"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>Ver Pedido Completo & Ficha CNC</span>
+                                </button>
+                              </div>
 
-                          {/* 1-) Botão Editar Pedido */}
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditOrder(order, "all")}
-                            className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 border border-amber-500/30 font-bold text-xs flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
-                            title="Editar dados, itens, equipamentos ou observações deste pedido"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                            <span>Editar Pedido</span>
-                          </button>
+                              <div className="flex flex-wrap items-center gap-2">
+                                {/* Seletor rápido de Status */}
+                                <select
+                                  id={`order-status-detailed-${order.$id}`}
+                                  name={`orderStatus-${order.$id}`}
+                                  aria-label={`Mudar status do pedido ${order.order_number}`}
+                                  value={order.status}
+                                  onChange={(e) => handleUpdateOrderStatus(order.$id, e.target.value)}
+                                  className="bg-slate-950 border border-slate-800 text-xs rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                                >
+                                  {Object.entries(STATUS_CONFIG).map(([k, cfg]) => (
+                                    <option key={k} value={k}>
+                                      Mudar: {cfg.label}
+                                    </option>
+                                  ))}
+                                </select>
 
-                          {/* 1-) Botão Excluir Pedido */}
-                          <button
-                            type="button"
-                            onClick={() => setDeletingOrder(order)}
-                            className="px-3 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 active:scale-95 text-rose-400 border border-rose-500/30 font-bold text-xs flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
-                            title="Excluir este pedido permanentemente"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Excluir</span>
-                          </button>
+                                {/* Botão Editar Pedido */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditOrder(order, "all")}
+                                  className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 border border-amber-500/30 font-bold text-xs flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+                                  title="Editar dados, itens, equipamentos ou observações deste pedido"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                  <span>Editar Pedido</span>
+                                </button>
 
-                          {/* Botão de Ver Pedido Completo & Ficha CNC */}
-                          <button
-                            type="button"
-                            onClick={() => setSelectedOrder(order)}
-                            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-600/25 transition-all shrink-0 cursor-pointer"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>Ver Pedido Completo & Ficha CNC</span>
-                          </button>
-                        </div>
-                      </div>
+                                {/* Botão Excluir Pedido */}
+                                <button
+                                  type="button"
+                                  onClick={() => setDeletingOrder(order)}
+                                  className="px-3 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 active:scale-95 text-rose-400 border border-rose-500/30 font-bold text-xs flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+                                  title="Excluir este pedido permanentemente"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>Excluir</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
 
                       {/* Painel de Conferência em 3 Colunas: (1) Cliente & Endereço [3 cols], (2) Entrega & Pagamento [3 cols], (3) Detalhes na Escolha & Alertas [6 cols] */}
                       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 text-xs">
