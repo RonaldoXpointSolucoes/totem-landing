@@ -60,6 +60,19 @@ function removeTombstoneForCustomer(email?: string, whatsapp?: string, document?
   }
 }
 
+const BANNED_TEST_CUSTOMER_IDS = new Set([
+  "cust_1776296991806",
+  "cust_1776268356649",
+  "cust_1776268362364",
+  "cust_1776287718566",
+]);
+const BANNED_TEST_CUSTOMER_EMAILS = new Set([
+  "ana.teste@totempro.com.br",
+  "cliente.whatsapp@teste.com",
+  "google.cliente@gmail.com",
+  "marcos.cliente@totempro.com.br",
+]);
+
 /**
  * Carrega a lista completa de clientes cadastrados do arquivo JSON local.
  */
@@ -73,7 +86,21 @@ export function getAllCustomers(): CustomerAccount[] {
       return [];
     }
     const content = fs.readFileSync(CUSTOMERS_FILE, "utf-8");
-    return JSON.parse(content);
+    const parsed: CustomerAccount[] = JSON.parse(content);
+    if (!Array.isArray(parsed)) return [];
+
+    const filtered = parsed.filter(
+      (c) =>
+        !BANNED_TEST_CUSTOMER_IDS.has(c.id) &&
+        !BANNED_TEST_CUSTOMER_EMAILS.has((c.email || "").trim().toLowerCase()) &&
+        c.name !== "Ana Compradora"
+    );
+
+    if (filtered.length !== parsed.length) {
+      fs.writeFileSync(CUSTOMERS_FILE, JSON.stringify(filtered, null, 2), "utf-8");
+    }
+
+    return filtered;
   } catch (error) {
     console.error("Erro ao ler banco de clientes:", error);
     return [];

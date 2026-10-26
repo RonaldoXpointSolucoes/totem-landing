@@ -6,6 +6,8 @@ import { normalizePhone } from "@/lib/customers/customerStore";
 const DATA_DIR = path.join(process.cwd(), "src", "data");
 const ORDERS_FILE = path.join(DATA_DIR, "orders_local.json");
 
+const BANNED_TEST_ORDER_IDS = new Set(["ord_test99", "TP-TEST99"]);
+
 /**
  * Lê todos os pedidos salvos localmente.
  */
@@ -19,7 +21,21 @@ export function getAllLocalOrders(): OrderDetails[] {
       return [];
     }
     const content = fs.readFileSync(ORDERS_FILE, "utf-8");
-    return JSON.parse(content);
+    const parsed: OrderDetails[] = JSON.parse(content);
+    if (!Array.isArray(parsed)) return [];
+
+    const filtered = parsed.filter(
+      (o) =>
+        !BANNED_TEST_ORDER_IDS.has(o.id) &&
+        !BANNED_TEST_ORDER_IDS.has(o.orderNumber) &&
+        o.customer?.name !== "Ana Compradora"
+    );
+
+    if (filtered.length !== parsed.length) {
+      fs.writeFileSync(ORDERS_FILE, JSON.stringify(filtered, null, 2), "utf-8");
+    }
+
+    return filtered;
   } catch (error) {
     console.error("Erro ao ler pedidos locais:", error);
     return [];
@@ -161,4 +177,3 @@ export function deleteLocalOrder(orderIdOrNumber: string, altOrderNumber?: strin
     return false;
   }
 }
-
