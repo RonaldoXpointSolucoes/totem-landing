@@ -3,11 +3,13 @@
 import React, { useState, useEffect } from "react";
 import Script from "next/script";
 import { pixelConfig } from "@/config/pixels";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 
 declare global {
   interface Window {
     dataLayer?: unknown[];
     gtag?: (...args: unknown[]) => void;
+    gtag_report_conversion_whatsapp?: (url?: string, source?: string) => boolean;
     fbq?: (...args: unknown[]) => void;
     _fbq?: unknown;
     ttq?: {
@@ -34,6 +36,9 @@ export const MarketingPixels: React.FC = () => {
             gaMeasurementId: data.gaMeasurementId || prev.gaMeasurementId,
             googleAdsId: data.googleAdsId || prev.googleAdsId,
             googleAdsPurchaseLabel: data.googleAdsPurchaseLabel || prev.googleAdsPurchaseLabel,
+            googleAdsBeginCheckoutLabel:
+              data.googleAdsBeginCheckoutLabel || prev.googleAdsBeginCheckoutLabel,
+            googleAdsAddToCartLabel: data.googleAdsAddToCartLabel || prev.googleAdsAddToCartLabel,
             googleAdsLeadLabel: data.googleAdsLeadLabel || prev.googleAdsLeadLabel,
             googleAdsWhatsappLabel: data.googleAdsWhatsappLabel || prev.googleAdsWhatsappLabel,
             gtmId: data.gtmId || prev.gtmId,
@@ -45,6 +50,61 @@ export const MarketingPixels: React.FC = () => {
       .catch((err) => {
         console.debug("[MarketingPixels] Using static config:", err);
       });
+  }, []);
+
+  // Interceptor Global de Cliques em WhatsApp + Função Oficial gtag_report_conversion_whatsapp
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    window.gtag_report_conversion_whatsapp = (url?: string, source?: string) => {
+      trackEvent(ANALYTICS_EVENTS.WHATSAPP_CLICK, {
+        source: source || "gtag_report_conversion_whatsapp",
+        url: url || "",
+        number: "5511991649959",
+      });
+      return true;
+    };
+
+    const handleGlobalWhatsAppClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target || typeof target.closest !== "function") return;
+
+      const anchor = target.closest("a") as HTMLAnchorElement | null;
+      if (!anchor) return;
+
+      const href = anchor.getAttribute("href") || "";
+      const isWhatsAppLink =
+        href.includes("wa.me/") ||
+        href.includes("api.whatsapp.com") ||
+        href.includes("whatsapp.com/send");
+
+      if (!isWhatsAppLink) return;
+
+      // Não rastreia cliques feitos pelo próprio administrador dentro do painel /admin
+      if (window.location.pathname.startsWith("/admin")) return;
+
+      const customSource =
+        anchor.getAttribute("data-whatsapp-source") ||
+        anchor.id ||
+        `whatsapp_link_${window.location.pathname.replace(/\//g, "_") || "home"}`;
+
+      const phoneMatch = href.match(/wa\.me\/(\d+)/);
+      const phone =
+        anchor.getAttribute("data-whatsapp-phone") ||
+        (phoneMatch ? phoneMatch[1] : "5511991649959");
+
+      trackEvent(ANALYTICS_EVENTS.WHATSAPP_CLICK, {
+        source: customSource,
+        buttonId: anchor.id || "whatsapp_link",
+        number: phone,
+        url: href,
+      });
+    };
+
+    document.addEventListener("click", handleGlobalWhatsAppClick, true);
+    return () => {
+      document.removeEventListener("click", handleGlobalWhatsAppClick, true);
+    };
   }, []);
 
   const { gaMeasurementId, googleAdsId, metaPixelId, tiktokPixelId, gtmId } = config;
@@ -151,9 +211,7 @@ export const MarketingPixels: React.FC = () => {
           dangerouslySetInnerHTML={{
             __html: `
               !function (w, d, t) {
-                w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(
-                var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script")
-                ;n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};
+                w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var i="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=i,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};var o=document.createElement("script");o.type="text/javascript",o.async=!0,o.src=i+"?sdkid="+e+"&lib="+t;var a=document.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)};
                 ttq.load('${tiktokPixelId}');
                 ttq.page();
               }(window, document, 'ttq');

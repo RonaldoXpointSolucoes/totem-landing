@@ -41,13 +41,30 @@ function formatE164Phone(phoneRaw?: string): string | undefined {
 
 /**
  * Extrai e estrutura dados do comprador para o Google Ads Enhanced Conversions
+ * Faz fallback automático para os dados já salvos na sessão/checkout do cliente
  */
 function extractUserData(data: Record<string, unknown>) {
-  const email = (data.email as string)?.trim().toLowerCase() || undefined;
-  const rawPhone = (data.whatsapp || data.phone || data.telephone) as string | undefined;
+  let cachedDraft: Record<string, string> = {};
+  if (typeof window !== "undefined") {
+    try {
+      const rawDraft = window.localStorage.getItem("totem_checkout_draft_v2");
+      if (rawDraft) {
+        cachedDraft = JSON.parse(rawDraft) || {};
+      }
+    } catch {
+      // ignora erro de leitura
+    }
+  }
+
+  const email =
+    ((data.email as string) || cachedDraft.email || "")?.trim().toLowerCase() || undefined;
+  const rawPhone =
+    ((data.whatsapp || data.phone || data.telephone || cachedDraft.whatsapp) as
+      | string
+      | undefined) || undefined;
   const phone_number = formatE164Phone(rawPhone);
 
-  const fullName = (data.name as string)?.trim() || "";
+  const fullName = ((data.name as string) || cachedDraft.name || "")?.trim() || "";
   let first_name: string | undefined;
   let last_name: string | undefined;
   if (fullName) {
@@ -56,7 +73,8 @@ function extractUserData(data: Record<string, unknown>) {
     last_name = parts.slice(1).join(" ") || undefined;
   }
 
-  const postal_code = (data.cep as string)?.replace(/\D/g, "") || undefined;
+  const postal_code =
+    ((data.cep as string) || cachedDraft.cep || "")?.replace(/\D/g, "") || undefined;
 
   if (!email && !phone_number && !first_name) return null;
 
@@ -351,25 +369,51 @@ function dispatchToAdPlatforms(
     }
 
     case ANALYTICS_EVENTS.WHATSAPP_CLICK: {
+      const waSource = String(data.source || "floating_whatsapp_discreet");
+      const waNumber = String(data.number || "5511991649959");
+      const waUrl = String(data.url || "");
+      const waButtonId = String(data.buttonId || "btn-floating-whatsapp");
+
+      // 1. Disparo no dataLayer para o GTM (GTM-W4N3KKL7) acionar a Tag de Conversão do WhatsApp
       pushToGtmDataLayer("contact_whatsapp", {
         method: "WhatsApp",
-        source: data.source || "button",
+        source: waSource,
+        button_id: waButtonId,
+        phone_number: waNumber,
+        whatsapp_url: waUrl,
+        page_path: window.location.pathname,
         value: 1.0,
         currency: "BRL",
+        ...(userData ? { user_data: userData } : {}),
       });
+
       if (typeof window.gtag === "function") {
+        // 2. Eventos GA4 (contact + generate_lead via WhatsApp com transport_type beacon)
         window.gtag("event", "contact", {
           method: "WhatsApp",
-          source: data.source || "button",
+          source: waSource,
+          button_id: waButtonId,
+          phone_number: waNumber,
+          page_path: window.location.pathname,
+          transport_type: "beacon",
         });
 
-        // Google Ads Conversion Oficial para WhatsApp (ConvWhatsApp)
+        window.gtag("event", "generate_lead", {
+          currency: "BRL",
+          value: 1.0,
+          lead_source: "whatsapp",
+          source: waSource,
+          transport_type: "beacon",
+        });
+
+        // 3. Google Ads Conversion Oficial para WhatsApp ([Totem Pro] WhatsApp Consultor Engenharia)
         const waLabel = pixelConfig.googleAdsWhatsappLabel || "2vTuCKyvo6kdEJ2cmMID";
         if (pixelConfig.googleAdsId && waLabel) {
           window.gtag("event", "conversion", {
             send_to: `${pixelConfig.googleAdsId}/${waLabel}`,
             value: 1.0,
             currency: "BRL",
+            transport_type: "beacon",
           });
         }
       }
@@ -575,6 +619,8 @@ function dispatchToAdPlatforms(
   }
 }
 
+let lastWhatsappClickTs = 0;
+
 /**
  * Disparador central de eventos de Analytics, Pixels e GTM dataLayer
  */
@@ -583,6 +629,15 @@ export function trackEvent(
   metadata?: Record<string, unknown>
 ): void {
   if (typeof window === "undefined") return;
+
+  // Deduplicação automática de cliques em WhatsApp (evita duplo disparo entre onClick React e listener global)
+  if (eventName === ANALYTICS_EVENTS.WHATSAPP_CLICK) {
+    const now = Date.now();
+    if (now - lastWhatsappClickTs < 800) {
+      return;
+    }
+    lastWhatsappClickTs = now;
+  }
 
   const sessionId = getOrCreateSessionId();
   const payload = {

@@ -241,7 +241,8 @@
         "type": "awct",
         "liveOnly": false,
         "firingTriggerId": [
-          "105"
+          "105",
+          "106"
         ],
         "parameter": [
           {
@@ -263,6 +264,16 @@
             "type": "TEMPLATE",
             "key": "currencyCode",
             "value": "BRL"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "enableEnhancedConversions",
+            "value": "true"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "enhancedConversionsUserData",
+            "value": "{{dlv - user_data}}"
           }
         ]
       },
@@ -410,6 +421,30 @@
             ]
           }
         ]
+      },
+      {
+        "accountId": "6225983440",
+        "containerId": "99999999",
+        "triggerId": "106",
+        "name": "Clique em Link - WhatsApp (wa.me)",
+        "type": "LINK_CLICK",
+        "filter": [
+          {
+            "type": "CONTAINS",
+            "parameter": [
+              {
+                "type": "TEMPLATE",
+                "key": "arg0",
+                "value": "{{Click URL}}"
+              },
+              {
+                "type": "TEMPLATE",
+                "key": "arg1",
+                "value": "wa.me/5511991649959"
+              }
+            ]
+          }
+        ]
       }
     ],
     "variable": [
@@ -533,6 +568,18 @@
         "containerId": "99999999",
         "type": "EVENT",
         "name": "Event"
+      },
+      {
+        "accountId": "6225983440",
+        "containerId": "99999999",
+        "type": "CLICK_URL",
+        "name": "Click URL"
+      },
+      {
+        "accountId": "6225983440",
+        "containerId": "99999999",
+        "type": "CLICK_ID",
+        "name": "Click ID"
       }
     ]
   }

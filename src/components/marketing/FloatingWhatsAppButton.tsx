@@ -29,7 +29,9 @@ export const FloatingWhatsAppButton: React.FC = () => {
   const handleClick = () => {
     trackEvent(ANALYTICS_EVENTS.WHATSAPP_CLICK, {
       source: "floating_whatsapp_discreet",
+      buttonId: "btn-floating-whatsapp",
       number: siteConfig.links.whatsappRaw,
+      url: siteConfig.links.whatsapp,
     });
   };
 
@@ -40,15 +42,18 @@ export const FloatingWhatsAppButton: React.FC = () => {
       }`}
     >
       <a
+        id="btn-floating-whatsapp"
         href={siteConfig.links.whatsapp}
         target="_blank"
         rel="noopener noreferrer"
         onClick={handleClick}
-        aria-label={`Solicitar catálogo pelo WhatsApp ${siteConfig.links.whatsappDisplay}`}
-        title="Solicitar catálogo pelo WhatsApp"
+        data-gtm-event="contact_whatsapp"
+        data-whatsapp-source="floating_whatsapp_discreet"
+        data-whatsapp-phone={siteConfig.links.whatsappRaw}
+        aria-label={`Receber catálogo no WhatsApp ${siteConfig.links.whatsappDisplay}`}
         className="pointer-events-auto group relative flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-emerald-600/80 hover:bg-emerald-600 dark:bg-emerald-600/75 dark:hover:bg-emerald-500 text-white/95 hover:text-white backdrop-blur-md border border-white/20 dark:border-emerald-400/20 shadow-sm hover:shadow-md opacity-75 hover:opacity-100 hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
       >
-        {/* Tooltip discreto exibido apenas ao passar o mouse no desktop */}
+        {/* Tooltip único e discreto exibido apenas ao passar o mouse no desktop (sem atributo title nativo duplicado) */}
         <span className="hidden sm:flex items-center whitespace-nowrap pointer-events-none absolute right-full mr-2.5 px-2.5 py-1 rounded-lg bg-slate-900/90 dark:bg-slate-800/95 text-white text-[11px] font-medium shadow-md border border-white/10 opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200">
           Receber catálogo no WhatsApp
         </span>
