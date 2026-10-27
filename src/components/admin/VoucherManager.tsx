@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useUrlParamState } from "@/lib/navigation/useUrlParamState";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
 import {
   VoucherUsageRecord,
@@ -38,9 +39,15 @@ export const VoucherManager: React.FC = () => {
   const [usages, setUsages] = useState<VoucherUsageRecord[]>([]);
   const [metrics, setMetrics] = useState<VoucherSummaryMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<VoucherPayoutStatus | "all">("all");
-  const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const [search, setSearch] = useUrlParamState<string>("voucherSearch", "");
+  const [statusFilter, setStatusFilter] = useUrlParamState<VoucherPayoutStatus | "all">(
+    "voucherStatus",
+    "all",
+    { writeDefaultToUrl: true }
+  );
+  const [sourceFilter, setSourceFilter] = useUrlParamState<string>("voucherSource", "all", {
+    writeDefaultToUrl: true,
+  });
 
   // Modais
   const [inspectUsage, setInspectUsage] = useState<VoucherUsageRecord | null>(null);

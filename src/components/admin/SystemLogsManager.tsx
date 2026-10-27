@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useUrlParamState } from "@/lib/navigation/useUrlParamState";
 import {
   FileText,
   Search,
@@ -44,9 +45,13 @@ export const SystemLogsManager: React.FC = () => {
   const [logs, setLogs] = useState<LogItem[]>([]);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [levelFilter, setLevelFilter] = useState("all");
-  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useUrlParamState<string>("logCategory", "all", {
+    writeDefaultToUrl: true,
+  });
+  const [levelFilter, setLevelFilter] = useUrlParamState<string>("logLevel", "all", {
+    writeDefaultToUrl: true,
+  });
+  const [search, setSearch] = useUrlParamState<string>("logSearch", "");
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isClearing, setIsClearing] = useState(false);

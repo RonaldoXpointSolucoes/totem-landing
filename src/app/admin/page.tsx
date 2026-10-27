@@ -12,6 +12,11 @@ import { SystemLogsManager } from "@/components/admin/SystemLogsManager";
 import { TelemetryErrorsManager } from "@/components/admin/TelemetryErrorsManager";
 import { AnalyticsFunnelManager } from "@/components/admin/AnalyticsFunnelManager";
 import {
+  useUrlParamState,
+  readUrlParam,
+  writeUrlParams,
+} from "@/lib/navigation/useUrlParamState";
+import {
   OrderExecutionEditor,
   OrderExecutionViewer,
   OrderExecutionData,
@@ -232,29 +237,83 @@ export default function AdminPage() {
     } catch {}
   };
 
-  // Navegação do painel
-  const [activeTab, setActiveTab] = useState<"orders" | "catalog" | "vouchers" | "customers" | "analytics" | "marketing" | "team" | "logs" | "telemetry">("orders");
-  const [catalogSubTab, setCatalogSubTab] = useState<"models" | "colors" | "peripherals">("models");
+  // Navegação do painel sincronizada com a URL (?tab=...)
+  const [activeTab, setActiveTab] = useUrlParamState<
+    "orders" | "catalog" | "vouchers" | "customers" | "analytics" | "marketing" | "team" | "logs" | "telemetry"
+  >("tab", "orders", {
+    validValues: [
+      "orders",
+      "catalog",
+      "vouchers",
+      "customers",
+      "analytics",
+      "marketing",
+      "team",
+      "logs",
+      "telemetry",
+    ] as const,
+    writeDefaultToUrl: true,
+    pushHistory: true,
+  });
+  const [catalogSubTab, setCatalogSubTab] = useUrlParamState<"models" | "colors" | "peripherals">(
+    "catalogTab",
+    "models",
+    { validValues: ["models", "colors", "peripherals"] as const }
+  );
 
-  // Dados
+  // Dados e Filtros de Pedidos sincronizados com a URL (?status=... & ?q=... & ?view=...)
   const [orders, setOrders] = useState<OrderRecord[]>([]);
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useUrlParamState<string>("status", "all", {
+    validValues: [
+      "all",
+      "awaiting_custom_analysis",
+      "custom_approved",
+      "awaiting_payment",
+      "paid",
+      "in_production",
+      "ready",
+      "shipped",
+      "delivered",
+      "cancelled",
+    ] as const,
+    writeDefaultToUrl: true,
+  });
+  const [searchQuery, setSearchQuery] = useUrlParamState<string>("q", "");
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
 
   // Modo de Exibição de Pedidos: "simplified" (lista compacta executiva) ou "detailed" (visão 3 colunas completa)
-  const [ordersViewMode, setOrdersViewMode] = useState<"simplified" | "detailed">("simplified");
-  // Conjunto de IDs de pedidos expandidos individualmente na lista simplificada
-  const [expandedOrderIds, setExpandedOrderIds] = useState<Set<string>>(new Set());
+  const [ordersViewMode, setOrdersViewMode] = useUrlParamState<"simplified" | "detailed">(
+    "view",
+    "simplified",
+    {
+      validValues: ["simplified", "detailed"] as const,
+      writeDefaultToUrl: true,
+    }
+  );
+  // Conjunto de IDs de pedidos expandidos individualmente na lista simplificada (?expanded=id1,id2)
+  const [expandedOrderIds, setExpandedOrderIds] = useState<Set<string>>(() => {
+    const raw = readUrlParam("expanded");
+    if (raw) {
+      return new Set(raw.split(",").filter(Boolean));
+    }
+    return new Set();
+  });
 
   useEffect(() => {
-    try {
-      const savedMode = localStorage.getItem("totem_admin_orders_view_mode");
-      if (savedMode === "simplified" || savedMode === "detailed") {
-        setOrdersViewMode(savedMode);
-      }
-    } catch {}
-  }, []);
+    const rawExpanded = readUrlParam("expanded");
+    if (rawExpanded) {
+      setExpandedOrderIds(new Set(rawExpanded.split(",").filter(Boolean)));
+    }
+    const rawView = readUrlParam("view");
+    if (!rawView) {
+      try {
+        const savedMode = localStorage.getItem("totem_admin_orders_view_mode");
+        if (savedMode === "simplified" || savedMode === "detailed") {
+          setOrdersViewMode(savedMode);
+        }
+      } catch {}
+    }
+  }, [setOrdersViewMode]);
 
   const toggleOrdersViewMode = (mode: "simplified" | "detailed") => {
     setOrdersViewMode(mode);
@@ -271,6 +330,8 @@ export default function AdminPage() {
       } else {
         next.add(orderId);
       }
+      const serialized = Array.from(next).join(",");
+      writeUrlParams({ expanded: serialized || null });
       return next;
     });
   };
@@ -286,12 +347,26 @@ export default function AdminPage() {
   const [editFields, setEditFields] = useState<Record<string, any>>({});
   const [saveSuccessMsg, setSaveSuccessMsg] = useState("");
 
-  // Modal de Detalhes do Pedido / Ficha CNC
-  const [selectedOrder, setSelectedOrder] = useState<OrderRecord | null>(null);
+  // Modal de Detalhes do Pedido / Ficha CNC sincronizado com URL (?modalOrder=...)
+  const [selectedOrder, setSelectedOrderState] = useState<OrderRecord | null>(null);
   const [copiedAddressId, setCopiedAddressId] = useState<string | null>(null);
 
-  // Modal de Edição Completa do Pedido e Exclusão de Pedido
-  const [editingOrder, setEditingOrder] = useState<OrderRecord | null>(null);
+  const setSelectedOrder = (
+    next: OrderRecord | null | ((prev: OrderRecord | null) => OrderRecord | null)
+  ) => {
+    setSelectedOrderState((prev) => {
+      const resolved = typeof next === "function" ? next(prev) : next;
+      writeUrlParams({ modalOrder: resolved?.$id || null });
+      return resolved;
+    });
+  };
+
+  // Modal de Edição Completa do Pedido e Exclusão de Pedido sincronizado com URL (?editOrder=...)
+  const [editingOrder, setEditingOrderState] = useState<OrderRecord | null>(null);
+  const setEditingOrder = (order: OrderRecord | null) => {
+    setEditingOrderState(order);
+    writeUrlParams({ editOrder: order?.$id || null });
+  };
   const [editOrderForm, setEditOrderForm] = useState<EditOrderFormState | null>(null);
   const [editModalFocusSection, setEditModalFocusSection] = useState<"all" | "execution">("all");
   const [uploadingItemIdx, setUploadingItemIdx] = useState<number | null>(null);
@@ -546,7 +621,22 @@ export default function AdminPage() {
       const res = await fetch(url);
       const json = await res.json();
       if (json.ok) {
-        setOrders(json.data || []);
+        const fetchedOrders: OrderRecord[] = json.data || [];
+        setOrders(fetchedOrders);
+        const modalOrderId = readUrlParam("modalOrder");
+        if (modalOrderId && !selectedOrder) {
+          const found = fetchedOrders.find(
+            (o) => o.$id === modalOrderId || o.order_number === modalOrderId
+          );
+          if (found) setSelectedOrderState(found);
+        }
+        const editOrderId = readUrlParam("editOrder");
+        if (editOrderId && !editingOrder) {
+          const foundEdit = fetchedOrders.find(
+            (o) => o.$id === editOrderId || o.order_number === editOrderId
+          );
+          if (foundEdit) handleOpenEditOrder(foundEdit);
+        }
       }
     } catch (err) {
       console.error("Erro ao carregar pedidos:", err);
@@ -589,10 +679,12 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      loadOrders();
+      const initialStatus = readUrlParam("status") || statusFilter;
+      loadOrders(initialStatus);
       loadCatalog();
       loadAnalytics();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 
   // Login

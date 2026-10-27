@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useUrlParamState } from "@/lib/navigation/useUrlParamState";
 import { CustomerAccount } from "@/types/customer";
 import { OrderDetails, CartItem } from "@/types/order";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
@@ -87,7 +88,10 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
   orders,
   onLogout,
 }) => {
-  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useUrlParamState<string>("status", "all", {
+    validValues: ["all", "pending", "production", "shipped"] as const,
+    writeDefaultToUrl: true,
+  });
   const [copiedPixId, setCopiedPixId] = useState<string | null>(null);
   const [selectedOrderDetails, setSelectedOrderDetails] = useState<OrderDetails | null>(null);
 

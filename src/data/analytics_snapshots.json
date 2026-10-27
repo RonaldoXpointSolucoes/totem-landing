@@ -1,0 +1,154 @@
+[
+  {
+    "id": "snap_baseline_v321",
+    "title": "Marco v3.2.1 — Otimização Core Web Vitals, Contraste WCAG 100 & Imagens WebP",
+    "periodLabel": "Outubro 2026 (Baseline Pós-Otimização)",
+    "siteVersion": "3.2.5",
+    "createdAt": "2026-10-27T01:54:38.699Z",
+    "notes": "Marco de referência registrado após otimização profunda de performance Mobile/Desktop, eliminação de filtros CSS pesados no primeiro paint, redução da árvore DOM (profundidade máx. 12) e conversão das 21 fotos do catálogo para WebP 532x532.",
+    "appliedImprovements": "• PageSpeed Mobile: 99 Desempenho, 100 Acessibilidade, 100 Práticas Recomendadas, 100 SEO, 3/3 Navegação Agêntica\n• Eliminação da Long Task de 690ms de rasterização SVG/CSS antes do FCP/LCP (LCP reduzido para 339ms no trace)\n• Remoção de cadeias críticas (site.webmanifest e preloads duplicados)\n• Rastreamento GTM + Google Ads + GA4 para cliques em WhatsApp com deduplicação",
+    "futureGoals": "• Aumentar a taxa de avanço da Etapa 3 (Seleção de Modelo) para Etapa 4 (Adição ao Carrinho) acima de 35%\n• Monitorar conversão assistida pelo botão flutuante do WhatsApp vs. Checkout autônomo PIX\n• Ativar Proxy CDN Cloudflare no domínio para atingir 100% em Structure no GTmetrix",
+    "tags": [
+      "Core Web Vitals",
+      "PageSpeed 100",
+      "GTmetrix",
+      "WCAG AA",
+      "WebP",
+      "v3.2.1"
+    ],
+    "webVitals": {
+      "pagespeedMobile": 99,
+      "pagespeedDesktop": 100,
+      "accessibilityScore": 100,
+      "bestPracticesScore": 100,
+      "seoScore": 100,
+      "gtmetrixGrade": "A",
+      "gtmetrixPerformance": 96,
+      "gtmetrixStructure": 98,
+      "lcpMs": 339,
+      "tbtMs": 7,
+      "cls": 0,
+      "domElements": 890
+    },
+    "metrics": {
+      "totalSessions": 33,
+      "totalEvents": 93,
+      "globalConversionRate": 0,
+      "whatsappClicks": 4,
+      "whatsappConversionRate": 12.1,
+      "configuratorStarts": 33,
+      "cartAdditions": 6,
+      "checkoutsStarted": 3,
+      "leadsCaptured": 2,
+      "pixGenerated": 1,
+      "purchasesCompleted": 0,
+      "realOrdersCount": 2,
+      "realRevenueCents": 318000,
+      "stages": [
+        {
+          "stageId": "stage_home",
+          "eventName": "view_home",
+          "label": "Visita Landing Page",
+          "stepNumber": 1,
+          "count": 33,
+          "uniqueSessions": 33,
+          "conversionRateFromPrevious": 100,
+          "dropoffRateFromPrevious": 0,
+          "overallConversionRate": 100
+        },
+        {
+          "stageId": "stage_configurator",
+          "eventName": "start_configurator",
+          "label": "Início do Configurador",
+          "stepNumber": 2,
+          "count": 60,
+          "uniqueSessions": 33,
+          "conversionRateFromPrevious": 100,
+          "dropoffRateFromPrevious": 0,
+          "overallConversionRate": 100
+        },
+        {
+          "stageId": "stage_model_selected",
+          "eventName": "select_cabinet_model",
+          "label": "Seleção do Modelo de Gabinete",
+          "stepNumber": 3,
+          "count": 0,
+          "uniqueSessions": 0,
+          "conversionRateFromPrevious": 0,
+          "dropoffRateFromPrevious": 100,
+          "overallConversionRate": 0
+        },
+        {
+          "stageId": "stage_cart_added",
+          "eventName": "add_to_cart",
+          "label": "Adição ao Carrinho",
+          "stepNumber": 4,
+          "count": 0,
+          "uniqueSessions": 0,
+          "conversionRateFromPrevious": 0,
+          "dropoffRateFromPrevious": 100,
+          "overallConversionRate": 0
+        },
+        {
+          "stageId": "stage_checkout",
+          "eventName": "begin_checkout",
+          "label": "Início de Checkout",
+          "stepNumber": 5,
+          "count": 0,
+          "uniqueSessions": 0,
+          "conversionRateFromPrevious": 0,
+          "dropoffRateFromPrevious": 100,
+          "overallConversionRate": 0
+        },
+        {
+          "stageId": "stage_lead_captured",
+          "eventName": "lead_submitted",
+          "label": "Cadastro do Cliente",
+          "stepNumber": 6,
+          "count": 0,
+          "uniqueSessions": 0,
+          "conversionRateFromPrevious": 0,
+          "dropoffRateFromPrevious": 100,
+          "overallConversionRate": 0
+        },
+        {
+          "stageId": "stage_pix_issued",
+          "eventName": "pix_generated",
+          "label": "Pix Copia e Cola Gerado",
+          "stepNumber": 7,
+          "count": 0,
+          "uniqueSessions": 0,
+          "conversionRateFromPrevious": 0,
+          "dropoffRateFromPrevious": 100,
+          "overallConversionRate": 0
+        },
+        {
+          "stageId": "stage_purchase_completed",
+          "eventName": "purchase",
+          "label": "Pagamento Confirmado (Venda)",
+          "stepNumber": 8,
+          "count": 0,
+          "uniqueSessions": 0,
+          "conversionRateFromPrevious": 0,
+          "dropoffRateFromPrevious": 100,
+          "overallConversionRate": 0
+        }
+      ],
+      "popularModels": {
+        "cabinet-floor": 14,
+        "cabinet-wall": 12,
+        "cabinet-countertop": 7
+      },
+      "whatsappSources": {
+        "floating_whatsapp_discreet": 2,
+        "faq_bottom_cta": 1,
+        "b2b_reseller_card": 1
+      },
+      "deviceBreakdown": {
+        "mobile": 21,
+        "desktop": 11,
+        "tablet": 1
+      }
+    }
+  }
+]

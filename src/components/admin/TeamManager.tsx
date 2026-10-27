@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useUrlParamState } from "@/lib/navigation/useUrlParamState";
 import { WhitelistUser } from "@/lib/auth/whitelistStore";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
 import {
@@ -25,8 +26,15 @@ import {
 export const TeamManager: React.FC = () => {
   const [users, setUsers] = useState<WhitelistUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState<"all" | "admin" | "seller">("all");
+  const [search, setSearch] = useUrlParamState<string>("teamSearch", "");
+  const [roleFilter, setRoleFilter] = useUrlParamState<"all" | "admin" | "seller">(
+    "teamRole",
+    "all",
+    {
+      validValues: ["all", "admin", "seller"] as const,
+      writeDefaultToUrl: true,
+    }
+  );
   const [showAddModal, setShowAddModal] = useState(false);
   const [copiedCoupon, setCopiedCoupon] = useState<string | null>(null);
 

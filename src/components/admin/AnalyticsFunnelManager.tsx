@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { useUrlParamState } from "@/lib/navigation/useUrlParamState";
 import {
   BarChart3,
   RefreshCw,
@@ -121,18 +122,36 @@ export const AnalyticsFunnelManager: React.FC<AnalyticsFunnelManagerProps> = ({
   const [data, setData] = useState<any>(initialData || null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Sub-abas internas da Central de Inteligência
-  const [subTab, setSubTab] = useState<
+  // Sub-abas internas da Central de Inteligência sincronizadas com a URL (?analyticsTab=...)
+  const [subTab, setSubTab] = useUrlParamState<
     "overview" | "google_ads" | "snapshots" | "improvements" | "events"
-  >("google_ads");
+  >("analyticsTab", "google_ads", {
+    validValues: ["overview", "google_ads", "snapshots", "improvements", "events"] as const,
+    writeDefaultToUrl: true,
+    pushHistory: true,
+  });
 
-  // Filtros globais de consulta
-  const [periodFilter, setPeriodFilter] = useState<"all" | "today" | "7d" | "30d">("all");
-  const [deviceFilter, setDeviceFilter] = useState<"all" | "mobile" | "desktop" | "tablet">("all");
-  const [eventSearch, setEventSearch] = useState("");
+  // Filtros globais de consulta sincronizados com a URL (?period=... & ?device=... & ?eventSearch=...)
+  const [periodFilter, setPeriodFilter] = useUrlParamState<"all" | "today" | "7d" | "30d">(
+    "period",
+    "all",
+    {
+      validValues: ["all", "today", "7d", "30d"] as const,
+      writeDefaultToUrl: true,
+    }
+  );
+  const [deviceFilter, setDeviceFilter] = useUrlParamState<"all" | "mobile" | "desktop" | "tablet">(
+    "device",
+    "all",
+    {
+      validValues: ["all", "mobile", "desktop", "tablet"] as const,
+      writeDefaultToUrl: true,
+    }
+  );
+  const [eventSearch, setEventSearch] = useUrlParamState<string>("eventSearch", "");
 
-  // Comparador de Snapshots
-  const [selectedSnapshotId, setSelectedSnapshotId] = useState<string>("");
+  // Comparador de Snapshots sincronizado com a URL (?snapshotId=...)
+  const [selectedSnapshotId, setSelectedSnapshotId] = useUrlParamState<string>("snapshotId", "");
   const [viewingSnapshot, setViewingSnapshot] = useState<AnalyticsSnapshot | null>(null);
 
   // Modal: Salvar Novo Snapshot
@@ -160,7 +179,10 @@ export const AnalyticsFunnelManager: React.FC<AnalyticsFunnelManagerProps> = ({
   // Modal: Criar / Editar Melhoria (CRO)
   const [isImprovementModalOpen, setIsImprovementModalOpen] = useState(false);
   const [isSavingImprovement, setIsSavingImprovement] = useState(false);
-  const [improvementStatusFilter, setImprovementStatusFilter] = useState<string>("all");
+  const [improvementStatusFilter, setImprovementStatusFilter] = useUrlParamState<string>(
+    "croStatus",
+    "all"
+  );
   const [improvementForm, setImprovementForm] = useState<{
     id?: string;
     title: string;

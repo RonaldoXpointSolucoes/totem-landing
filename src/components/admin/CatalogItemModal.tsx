@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useUrlParamState } from "@/lib/navigation/useUrlParamState";
 import {
   X,
   Save,
@@ -70,8 +71,12 @@ export function CatalogItemModal({
 }: CatalogItemModalProps) {
   const isEditing = Boolean(initialItem?.$id);
 
-  // Abas internas do Modal
-  const [activeTab, setActiveTab] = useState<"general" | "media" | "engineering" | "kitItems">("general");
+  // Abas internas do Modal sincronizadas com a URL (?itemModalTab=...)
+  const [activeTab, setActiveTab] = useUrlParamState<
+    "general" | "media" | "engineering" | "kitItems"
+  >("itemModalTab", "general", {
+    validValues: ["general", "media", "engineering", "kitItems"] as const,
+  });
 
   // Estados dos Campos
   const [formData, setFormData] = useState<Record<string, any>>({});

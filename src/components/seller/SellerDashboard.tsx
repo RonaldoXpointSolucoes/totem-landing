@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useUrlParamState } from "@/lib/navigation/useUrlParamState";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
 import { SellerOrderRecord } from "@/app/api/seller/orders/route";
 import { buildTrackedCampaignLink } from "@/lib/vouchers/campaignTracker";
@@ -60,14 +61,31 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
 }) => {
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedKey, setCopiedKey] = useState(false);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "pending">("all");
+  const [search, setSearch] = useUrlParamState<string>("q", "");
+  const [statusFilter, setStatusFilter] = useUrlParamState<"all" | "paid" | "pending">(
+    "status",
+    "all",
+    {
+      validValues: ["all", "paid", "pending"] as const,
+      writeDefaultToUrl: true,
+    }
+  );
 
-  // Estados do Construtor de Links Rastreados (Campaign Link Builder)
-  const [selectedChannel, setSelectedChannel] = useState<
+  // Estados do Construtor de Links Rastreados (Campaign Link Builder) sincronizados com URL
+  const [selectedChannel, setSelectedChannel] = useUrlParamState<
     "instagram_stories" | "instagram_bio" | "tiktok" | "youtube" | "whatsapp" | "custom"
-  >("instagram_stories");
-  const [selectedPath, setSelectedPath] = useState<string>("/monte-seu-totem");
+  >("canal", "instagram_stories", {
+    validValues: [
+      "instagram_stories",
+      "instagram_bio",
+      "tiktok",
+      "youtube",
+      "whatsapp",
+      "custom",
+    ] as const,
+    writeDefaultToUrl: true,
+  });
+  const [selectedPath, setSelectedPath] = useUrlParamState<string>("destino", "/monte-seu-totem");
   const [customCampaignName, setCustomCampaignName] = useState("");
 
   const origin = typeof window !== "undefined" ? window.location.origin : "https://totempro.com.br";

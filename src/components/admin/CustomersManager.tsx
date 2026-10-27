@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useUrlParamState } from "@/lib/navigation/useUrlParamState";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
 import {
   Users,
@@ -56,7 +57,7 @@ interface CustomerData {
 export const CustomersManager: React.FC = () => {
   const [customers, setCustomers] = useState<CustomerData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useUrlParamState<string>("customerSearch", "");
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Estados de Edição

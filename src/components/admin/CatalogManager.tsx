@@ -33,6 +33,7 @@ import {
 import { CatalogItemModal } from "./CatalogItemModal";
 import { CatalogPhotoLightbox } from "./CatalogPhotoLightbox";
 import { InstagramVideoModal, InstagramGlyph } from "@/components/media";
+import { useUrlParamState } from "@/lib/navigation/useUrlParamState";
 
 interface CatalogManagerProps {
   catalogData: any;
@@ -49,9 +50,17 @@ export function CatalogManager({
   addAuditLog,
   onShowNotification,
 }: CatalogManagerProps) {
-  // Sub-abas
-  const [subTab, setSubTab] = useState<"models" | "colors" | "peripherals">("models");
-  const [searchQuery, setSearchQuery] = useState("");
+  // Sub-abas sincronizadas com a URL (?catalogTab=models|colors|peripherals & ?catalogSearch=...)
+  const [subTab, setSubTab] = useUrlParamState<"models" | "colors" | "peripherals">(
+    "catalogTab",
+    "models",
+    {
+      validValues: ["models", "colors", "peripherals"] as const,
+      writeDefaultToUrl: true,
+      pushHistory: true,
+    }
+  );
+  const [searchQuery, setSearchQuery] = useUrlParamState<string>("catalogSearch", "");
 
   // Modal de Edição / Criação
   const [isModalOpen, setIsModalOpen] = useState(false);

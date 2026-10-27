@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
+import { useUrlParamState } from "@/lib/navigation/useUrlParamState";
 import {
   TrendingUp,
   RefreshCw,
@@ -52,17 +53,51 @@ export function GoogleAdsIntelligencePanel({
     text: string;
   } | null>(null);
 
-  // Filtros de Alto Nível
-  const [dateFilter, setDateFilter] = useState<string>("ALL");
-  const [sectionView, setSectionView] = useState<
+  // Filtros de Alto Nível sincronizados com a URL (?adsDate=... & ?adsSection=... & ?adsGroup=... & ?adsMatch=... & ?adsConv=... & ?adsClicks=... & ?adsSearch=...)
+  const [dateFilter, setDateFilter] = useUrlParamState<string>("adsDate", "ALL", {
+    writeDefaultToUrl: true,
+  });
+  const [sectionView, setSectionView] = useUrlParamState<
     "ALL" | "DAILY" | "AD_GROUPS" | "SEARCH_TERMS" | "CONVERSIONS" | "OPTIMIZATIONS"
-  >("ALL");
-  const [campaignFilter, setCampaignFilter] = useState<string>("ALL");
-  const [adGroupFilter, setAdGroupFilter] = useState<string>("ALL");
-  const [matchTypeFilter, setMatchTypeFilter] = useState<string>("ALL");
-  const [onlyConversions, setOnlyConversions] = useState<boolean>(false);
-  const [onlyClicks, setOnlyClicks] = useState<boolean>(false);
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  >("adsSection", "ALL", {
+    validValues: [
+      "ALL",
+      "DAILY",
+      "AD_GROUPS",
+      "SEARCH_TERMS",
+      "CONVERSIONS",
+      "OPTIMIZATIONS",
+    ] as const,
+    writeDefaultToUrl: true,
+  });
+  const [campaignFilter, setCampaignFilter] = useUrlParamState<string>("adsCampaign", "ALL");
+  const [adGroupFilter, setAdGroupFilter] = useUrlParamState<string>("adsGroup", "ALL");
+  const [matchTypeFilter, setMatchTypeFilter] = useUrlParamState<string>("adsMatch", "ALL");
+  const [onlyConversionsStr, setOnlyConversionsStr] = useUrlParamState<"true" | "false">(
+    "adsConv",
+    "false",
+    { validValues: ["true", "false"] as const }
+  );
+  const [onlyClicksStr, setOnlyClicksStr] = useUrlParamState<"true" | "false">(
+    "adsClicks",
+    "false",
+    { validValues: ["true", "false"] as const }
+  );
+  const onlyConversions = onlyConversionsStr === "true";
+  const setOnlyConversions = (val: boolean | ((prev: boolean) => boolean)) => {
+    setOnlyConversionsStr((prev) => {
+      const next = typeof val === "function" ? val(prev === "true") : val;
+      return next ? "true" : "false";
+    });
+  };
+  const onlyClicks = onlyClicksStr === "true";
+  const setOnlyClicks = (val: boolean | ((prev: boolean) => boolean)) => {
+    setOnlyClicksStr((prev) => {
+      const next = typeof val === "function" ? val(prev === "true") : val;
+      return next ? "true" : "false";
+    });
+  };
+  const [searchQuery, setSearchQuery] = useUrlParamState<string>("adsSearch", "");
 
   // Modais de Registro e Importação
   const [isOptModalOpen, setIsOptModalOpen] = useState<boolean>(false);

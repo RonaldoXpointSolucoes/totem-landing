@@ -94,31 +94,67 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
 
   const [selectedColor, setSelectedColor] = useState<ColorOption>(() => {
     if (editingItem) return editingItem.configuration.color;
+    if (typeof window !== "undefined") {
+      const corParam = new URLSearchParams(window.location.search).get("cor");
+      if (corParam) {
+        const found = COLOR_OPTIONS.find((c) => c.id === corParam);
+        if (found) return found;
+      }
+    }
     return COLOR_OPTIONS[0];
   });
 
   const [selectedMonitor, setSelectedMonitor] = useState<MonitorOption | null>(() => {
     if (editingItem) return editingItem.configuration.monitor || null;
+    if (typeof window !== "undefined") {
+      const monParam = new URLSearchParams(window.location.search).get("monitor");
+      if (monParam) {
+        const found = HOMOLOGATED_MONITORS.find((m) => m.id === monParam);
+        if (found) return found;
+      }
+    }
     return null;
   });
 
   const [selectedPrinter, setSelectedPrinter] = useState<PrinterOption | null>(() => {
     if (editingItem) return editingItem.configuration.printer || null;
+    if (typeof window !== "undefined") {
+      const prtParam = new URLSearchParams(window.location.search).get("impressora");
+      if (prtParam) {
+        const found = HOMOLOGATED_PRINTERS.find((p) => p.id === prtParam);
+        if (found) return found;
+      }
+    }
     return null;
   });
 
   const [useReader, setUseReader] = useState<boolean>(() => {
     if (editingItem) return !!editingItem.configuration.barcodeReader;
+    if (typeof window !== "undefined") {
+      const rdrParam = new URLSearchParams(window.location.search).get("leitor");
+      if (rdrParam === "none") return false;
+    }
     return true;
   });
 
   const [selectedReader, setSelectedReader] = useState<BarcodeReaderOption | null>(() => {
     if (editingItem) return editingItem.configuration.barcodeReader || null;
+    if (typeof window !== "undefined") {
+      const rdrParam = new URLSearchParams(window.location.search).get("leitor");
+      if (rdrParam && rdrParam !== "none") {
+        const found = HOMOLOGATED_READERS.find((r) => r.id === rdrParam);
+        if (found) return found;
+      }
+    }
     return null;
   });
 
   const [readerConfigured, setReaderConfigured] = useState<boolean>(() => {
-    return !!editingItem;
+    if (editingItem) return true;
+    if (typeof window !== "undefined") {
+      return Boolean(new URLSearchParams(window.location.search).get("leitor"));
+    }
+    return false;
   });
 
   const [customizationNotes, setCustomizationNotes] = useState<string>(() => {
@@ -129,6 +165,9 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
   // Serviço Opcional de Montagem Especializada de Fábrica (+ R$ 999,00)
   const [includeAssemblyService, setIncludeAssemblyService] = useState<boolean>(() => {
     if (editingItem) return Boolean(editingItem.configuration.includeAssemblyService);
+    if (typeof window !== "undefined") {
+      return new URLSearchParams(window.location.search).get("montagem") === "1";
+    }
     return false;
   });
   const [lastAddedItemId, setLastAddedItemId] = useState<string | null>(null);
@@ -158,17 +197,51 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     return calculateKitTotalCents(activeKitItems);
   }, [isKitSelected, activeKitItems]);
 
-  // Sincronizar parâmetros de rota na URL sem reload
+  // Sincronizar todos os parâmetros de rota na URL sem reload (preservando F5 em qualquer etapa)
   useEffect(() => {
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
       if (url.pathname.includes("monte-seu-totem") || url.pathname.includes("configurador")) {
         url.searchParams.set("modelo", selectedModel.id);
         url.searchParams.set("etapa", step.toString());
+        if (selectedColor?.id) {
+          url.searchParams.set("cor", selectedColor.id);
+        }
+        if (selectedMonitor?.id) {
+          url.searchParams.set("monitor", selectedMonitor.id);
+        } else {
+          url.searchParams.delete("monitor");
+        }
+        if (selectedPrinter?.id) {
+          url.searchParams.set("impressora", selectedPrinter.id);
+        } else {
+          url.searchParams.delete("impressora");
+        }
+        if (!useReader) {
+          url.searchParams.set("leitor", "none");
+        } else if (selectedReader?.id) {
+          url.searchParams.set("leitor", selectedReader.id);
+        } else {
+          url.searchParams.delete("leitor");
+        }
+        if (includeAssemblyService) {
+          url.searchParams.set("montagem", "1");
+        } else {
+          url.searchParams.delete("montagem");
+        }
         window.history.replaceState({}, "", url.toString());
       }
     }
-  }, [step, selectedModel.id]);
+  }, [
+    step,
+    selectedModel.id,
+    selectedColor?.id,
+    selectedMonitor?.id,
+    selectedPrinter?.id,
+    useReader,
+    selectedReader?.id,
+    includeAssemblyService,
+  ]);
 
   // Modais de apoio
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);

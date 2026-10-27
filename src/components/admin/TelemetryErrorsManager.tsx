@@ -34,6 +34,7 @@ import {
   TelemetryErrorSeverity,
 } from "@/lib/telemetry/types";
 import { captureManualError } from "@/lib/telemetry/clientTelemetry";
+import { useUrlParamState } from "@/lib/navigation/useUrlParamState";
 
 export const TelemetryErrorsManager: React.FC = () => {
   const [errors, setErrors] = useState<TelemetryErrorPayload[]>([]);
@@ -41,11 +42,26 @@ export const TelemetryErrorsManager: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Filtros
-  const [typeFilter, setTypeFilter] = useState<string>("all");
-  const [severityFilter, setSeverityFilter] = useState<string>("all");
-  const [onlyUnresolved, setOnlyUnresolved] = useState(true);
-  const [search, setSearch] = useState("");
+  // Filtros sincronizados com URL (?errType=... & ?errSeverity=... & ?errUnresolved=... & ?errSearch=...)
+  const [typeFilter, setTypeFilter] = useUrlParamState<string>("errType", "all", {
+    writeDefaultToUrl: true,
+  });
+  const [severityFilter, setSeverityFilter] = useUrlParamState<string>("errSeverity", "all", {
+    writeDefaultToUrl: true,
+  });
+  const [onlyUnresolvedStr, setOnlyUnresolvedStr] = useUrlParamState<"true" | "false">(
+    "errUnresolved",
+    "true",
+    { validValues: ["true", "false"] as const }
+  );
+  const onlyUnresolved = onlyUnresolvedStr === "true";
+  const setOnlyUnresolved = (val: boolean | ((prev: boolean) => boolean)) => {
+    setOnlyUnresolvedStr((prev) => {
+      const next = typeof val === "function" ? val(prev === "true") : val;
+      return next ? "true" : "false";
+    });
+  };
+  const [search, setSearch] = useUrlParamState<string>("errSearch", "");
 
   // UI state
   const [expandedId, setExpandedId] = useState<string | null>(null);

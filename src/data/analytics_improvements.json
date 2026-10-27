@@ -1,0 +1,50 @@
+[
+  {
+    "id": "imp_vitals_v321",
+    "title": "Otimização Extrema de LCP, Acessibilidade WCAG AA (100) e Imagens WebP",
+    "targetStageId": "stage_home",
+    "targetStageLabel": "1. Visita Landing Page",
+    "problemIdentified": "Imagens PNG remotas de 1.8MB, contraste insuficiente em badges/preços (nota 92) e Long Task de 690ms na rasterização de filtros CSS antes do FCP.",
+    "proposedAction": "Converter todo o catálogo para WebP 532x532 local, elevar contraste de todas as seções para WCAG AA (100), remover feGaussianBlur e backdrop-blur redundantes e reduzir profundidade do DOM de 15 para 12.",
+    "expectedImpact": "Nota 99-100 no PageSpeed Mobile/Desktop, LCP sub-segundo e menor rejeição no carregamento 4G.",
+    "measuredResult": "PageSpeed Mobile: 99 Performance / 100 Acessibilidade / 100 Best Practices / 100 SEO / 3/3 Agentic Browsing. LCP em 339ms.",
+    "priority": "critica",
+    "status": "validada",
+    "owner": "Engenharia X-Point",
+    "versionTag": "v3.2.1",
+    "createdAt": "2026-10-27T01:54:38.702Z",
+    "updatedAt": "2026-10-27T01:54:38.702Z"
+  },
+  {
+    "id": "imp_whatsapp_tracking",
+    "title": "Rastreamento Unificado de Conversão de WhatsApp (GTM + GA4 + Google Ads)",
+    "targetStageId": "stage_configurator",
+    "targetStageLabel": "2. Início do Configurador",
+    "problemIdentified": "Muitos compradores B2B preferem fechar múltiplos gabinetes via WhatsApp em vez do checkout autônomo, o que subnotificava a conversão real do funil.",
+    "proposedAction": "Rastrear todos os cliques em links wa.me com identificação da origem (botão flutuante, FAQ, card B2B, rodapé) e contabilizar a Taxa de Conversão Assistida via WhatsApp no painel.",
+    "expectedImpact": "Visibilidade real dos leads gerados para o time comercial e otimização do lance no Google Ads.",
+    "measuredResult": "Evento contact_whatsapp ativo com deduplicação de 800ms e envio via transport beacon.",
+    "priority": "alta",
+    "status": "concluida",
+    "owner": "Marketing & Tráfego",
+    "versionTag": "v3.2.0",
+    "createdAt": "2026-10-27T01:54:38.702Z",
+    "updatedAt": "2026-10-27T01:54:38.702Z"
+  },
+  {
+    "id": "imp_configurator_to_cart",
+    "title": "Reduzir Drop-off entre Início do Configurador e Adição ao Carrinho",
+    "targetStageId": "stage_model_selected",
+    "targetStageLabel": "3. Seleção do Modelo de Gabinete",
+    "problemIdentified": "Usuários iniciam o configurador para simular preço, mas parte sai antes de clicar em Adicionar ao Carrinho.",
+    "proposedAction": "Destacar que a usinagem CNC sob medida para as peças do cliente não tem sobretaxa e exibir resumo claro de economia no PIX logo na primeira etapa do configurador.",
+    "expectedImpact": "Aumentar a taxa de passagem do Configurador para o Carrinho em +15% a +25%.",
+    "measuredResult": "Em monitoramento contínuo pós-deploy v3.2.1.",
+    "priority": "alta",
+    "status": "em_teste_ab",
+    "owner": "Produto & UX",
+    "versionTag": "v3.2.2",
+    "createdAt": "2026-10-27T01:54:38.702Z",
+    "updatedAt": "2026-10-27T01:54:38.702Z"
+  }
+]
