@@ -38,6 +38,7 @@ import {
 import { formatBRL } from "@/modules/pricing/pricingEngine";
 import { siteConfig } from "@/config/site";
 import { FUNNEL_STAGES } from "@/lib/analytics/events";
+import { GoogleAdsIntelligencePanel } from "@/components/admin/GoogleAdsIntelligencePanel";
 import type {
   AnalyticsSnapshot,
   FunnelImprovementAction,
@@ -122,8 +123,8 @@ export const AnalyticsFunnelManager: React.FC<AnalyticsFunnelManagerProps> = ({
 
   // Sub-abas internas da Central de Inteligência
   const [subTab, setSubTab] = useState<
-    "overview" | "snapshots" | "improvements" | "events"
-  >("overview");
+    "overview" | "google_ads" | "snapshots" | "improvements" | "events"
+  >("google_ads");
 
   // Filtros globais de consulta
   const [periodFilter, setPeriodFilter] = useState<"all" | "today" | "7d" | "30d">("all");
@@ -575,6 +576,22 @@ export const AnalyticsFunnelManager: React.FC<AnalyticsFunnelManagerProps> = ({
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
             <button
               type="button"
+              onClick={() => setSubTab("google_ads")}
+              className={`px-3.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 shrink-0 transition-all cursor-pointer ${
+                subTab === "google_ads"
+                  ? "bg-gradient-to-r from-cyan-600 to-indigo-600 text-white shadow-md shadow-cyan-600/25"
+                  : "bg-slate-950/70 text-cyan-300 hover:text-white border border-cyan-500/30"
+              }`}
+            >
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>Google Ads & Tráfego Pago (API v25)</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/25 text-emerald-200 text-[10px] border border-emerald-400/30">
+                Ao Vivo
+              </span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setSubTab("overview")}
               className={`px-3.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 shrink-0 transition-all cursor-pointer ${
                 subTab === "overview"
@@ -583,7 +600,7 @@ export const AnalyticsFunnelManager: React.FC<AnalyticsFunnelManagerProps> = ({
               }`}
             >
               <BarChart3 className="w-3.5 h-3.5" />
-              <span>Funil & Diagnóstico</span>
+              <span>Funil Orgânico / Geral & Diagnóstico</span>
             </button>
 
             <button
@@ -781,6 +798,20 @@ export const AnalyticsFunnelManager: React.FC<AnalyticsFunnelManagerProps> = ({
           </div>
         </div>
       </div>
+
+      {/* ==================================================================== */}
+      {/* SUB-ABA GOOGLE ADS & INTELIGÊNCIA DE TRÁFEGO PAGO (API v25)          */}
+      {/* ==================================================================== */}
+      {subTab === "google_ads" && (
+        <GoogleAdsIntelligencePanel
+          organicFunnelSummary={{
+            totalSessions: funnel.totalSessions || 0,
+            addToCartCount: counts.add_to_cart || 0,
+            whatsappClickCount: funnel.whatsappClicks || 0,
+            purchaseCount: counts.purchase || 0,
+          }}
+        />
+      )}
 
       {/* ==================================================================== */}
       {/* SUB-ABA 1: VISÃO GERAL, FUNIL DE 8 ETAPAS & DIAGNÓSTICO DE GARGALOS  */}

@@ -4,7 +4,7 @@ const WHATSAPP_DEFAULT_MESSAGE =
 
 export const siteConfig = {
   name: "Totem Pro — Gabinetes para Autoatendimento",
-  version: "3.2.2",
+  version: "3.2.3",
   description:
     "Configurador sob medida de gabinetes de piso, parede e balcão para totens de autoatendimento. Precisão milimétrica para seus equipamentos homologados.",
   url: "https://totem.xpointsolucoes.com.br",
