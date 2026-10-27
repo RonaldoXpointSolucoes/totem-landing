@@ -1255,11 +1255,14 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
 
             <div className="space-y-4 text-xs">
               <div>
-                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                <label htmlFor="checkout-name" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                   {personType === "individual" ? "Nome Completo" : "Razão Social da Empresa"} *
                 </label>
                 <Input
+                  id="checkout-name"
+                  name="name"
                   type="text"
+                  autoComplete="name"
                   placeholder={personType === "individual" ? "Ex: João da Silva" : "Ex: X-Point Soluções Tecnológicas Ltda"}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -1271,11 +1274,14 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                      <label htmlFor="checkout-cnpj" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                         CNPJ da Empresa *
                       </label>
                       <Input
+                        id="checkout-cnpj"
+                        name="cnpj"
                         type="text"
+                        inputMode="numeric"
                         placeholder="00.000.000/0000-00"
                         value={document}
                         onChange={(e) => setDocument(maskCNPJ(e.target.value))}
@@ -1284,11 +1290,14 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                      <label htmlFor="checkout-whatsapp-pj" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                         WhatsApp para Acompanhamento *
                       </label>
                       <Input
-                        type="text"
+                        id="checkout-whatsapp-pj"
+                        name="tel"
+                        type="tel"
+                        autoComplete="tel"
                         placeholder="(00) 00000-0000"
                         value={whatsapp}
                         onChange={(e) => setWhatsapp(maskPhone(e.target.value))}
@@ -1298,11 +1307,14 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                    <label htmlFor="checkout-email-pj" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                       E-mail Corporativo / Faturamento *
                     </label>
                     <Input
+                      id="checkout-email-pj"
+                      name="email"
                       type="email"
+                      autoComplete="email"
                       placeholder="contato@empresa.com.br"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -1314,14 +1326,17 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="sm:col-span-2">
                     <label htmlFor="checkout-cpf" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">CPF do comprador *</label>
-                    <Input id="checkout-cpf" inputMode="numeric" placeholder="000.000.000-00" value={document} onChange={(e) => setDocument(maskCPF(e.target.value))} required />
+                    <Input id="checkout-cpf" name="cpf" inputMode="numeric" placeholder="000.000.000-00" value={document} onChange={(e) => setDocument(maskCPF(e.target.value))} required />
                   </div>
                   <div>
-                    <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                    <label htmlFor="checkout-whatsapp-pf" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                       WhatsApp para Acompanhamento *
                     </label>
                     <Input
-                      type="text"
+                      id="checkout-whatsapp-pf"
+                      name="tel"
+                      type="tel"
+                      autoComplete="tel"
                       placeholder="(00) 00000-0000"
                       value={whatsapp}
                       onChange={(e) => setWhatsapp(maskPhone(e.target.value))}
@@ -1330,11 +1345,14 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                    <label htmlFor="checkout-email-pf" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                       E-mail para Acompanhamento e Rastreio *
                     </label>
                     <Input
+                      id="checkout-email-pf"
+                      name="email"
                       type="email"
+                      autoComplete="email"
                       placeholder="seuemail@exemplo.com.br"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -1381,10 +1399,14 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
             <div className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">CEP *</label>
+                  <label htmlFor="checkout-cep" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">CEP *</label>
                   <div className="relative">
                     <Input
+                      id="checkout-cep"
+                      name="postal-code"
                       type="text"
+                      inputMode="numeric"
+                      autoComplete="postal-code"
                       placeholder="00000-000"
                       value={cep}
                       onChange={handleCepChange}
@@ -1412,9 +1434,12 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="sm:col-span-2">
-                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Logradouro / Rua *</label>
+                  <label htmlFor="checkout-street" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Logradouro / Rua *</label>
                   <Input
+                    id="checkout-street"
+                    name="street-address"
                     type="text"
+                    autoComplete="address-line1"
                     placeholder={isLoadingCep ? "Buscando logradouro..." : "Ex: Av. Paulista"}
                     value={street}
                     onChange={(e) => setStreet(e.target.value)}
@@ -1423,8 +1448,10 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Número *</label>
+                  <label htmlFor="checkout-number" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Número *</label>
                   <Input
+                    id="checkout-number"
+                    name="address-number"
                     type="text"
                     placeholder="Ex: 1000"
                     value={number}
@@ -1436,17 +1463,22 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Complemento</label>
+                  <label htmlFor="checkout-complement" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Complemento</label>
                   <Input
+                    id="checkout-complement"
+                    name="address-line2"
                     type="text"
+                    autoComplete="address-line2"
                     placeholder="Sala 402, Bloco B"
                     value={complement}
                     onChange={(e) => setComplement(e.target.value)}
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Bairro *</label>
+                  <label htmlFor="checkout-neighborhood" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Bairro *</label>
                   <Input
+                    id="checkout-neighborhood"
+                    name="neighborhood"
                     type="text"
                     placeholder={isLoadingCep ? "Buscando bairro..." : "Bela Vista"}
                     value={neighborhood}
@@ -1456,10 +1488,13 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Cidade / UF *</label>
+                  <label htmlFor="checkout-city" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Cidade / UF *</label>
                   <div className="flex gap-2">
                     <Input
+                      id="checkout-city"
+                      name="city"
                       type="text"
+                      autoComplete="address-level2"
                       placeholder={isLoadingCep ? "Buscando cidade..." : "São Paulo"}
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
@@ -1467,7 +1502,11 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                       className={`flex-1 ${isLoadingCep ? "animate-pulse bg-blue-50/30" : ""}`}
                     />
                     <Input
+                      id="checkout-state"
+                      name="state"
                       type="text"
+                      autoComplete="address-level1"
+                      aria-label="UF (Estado)"
                       placeholder="SP"
                       value={state}
                       onChange={(e) => setState(e.target.value)}
@@ -2035,7 +2074,10 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   <div className="space-y-1.5">
                     <div className="flex gap-2">
                       <input
+                        id="checkout-coupon-code"
+                        name="couponCode"
                         type="text"
+                        aria-label="Código do cupom de desconto"
                         placeholder="Código do cupom (ex: CARLOS10)..."
                         value={checkoutCouponInput}
                         onChange={(e) => setCheckoutCouponInput(e.target.value.toUpperCase())}

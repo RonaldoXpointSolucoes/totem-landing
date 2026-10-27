@@ -1058,11 +1058,14 @@ export default function AdminPage() {
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+              <label htmlFor="admin-password-input" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
                 Chave de Acesso Administrativo
               </label>
               <input
+                id="admin-password-input"
+                name="password"
                 type="password"
+                autoComplete="current-password"
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
                 placeholder="Insira a senha do admin..."

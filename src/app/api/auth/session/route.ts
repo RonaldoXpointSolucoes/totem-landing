@@ -6,7 +6,7 @@ export async function GET() {
   const session = await getAuthSession();
 
   if (!session) {
-    return NextResponse.json({ ok: false, authenticated: false }, { status: 401 });
+    return NextResponse.json({ ok: false, authenticated: false });
   }
 
   // Busca dados mais recentes do usuário na Whitelist
