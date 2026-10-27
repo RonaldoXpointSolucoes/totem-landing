@@ -44,7 +44,8 @@ export interface FunnelStageMetric {
   eventName: AnalyticsEventType;
   label: string;
   stepNumber: number;
-  count: number;
+  count: number;                     // Total de disparos do evento
+  uniqueSessions: number;            // Sessões únicas que atingiram a etapa
   conversionRateFromPrevious: number; // Porcentagem de 0 a 100
   dropoffRateFromPrevious: number;   // Porcentagem de abandono (100 - conversionRate)
   overallConversionRate: number;     // Conversão relativa ao topo do funil
