@@ -185,8 +185,8 @@ function getDefaultSeedState(): GoogleAdsIntelligenceState {
         nominalDailyBudget: 35.0,
         effectiveDailyTargetMin: 35.0,
         effectiveDailyTargetMax: 50.0,
-        negativeKeywordsCount: 67,
-        recentNegativeKeywords: ["gov", "poupatempo", "detran", "inss", "prefeitura"],
+        negativeKeywordsCount: 81,
+        recentNegativeKeywords: ["banner", "vitrine", "tv vertical", "papel", "eva", "isopor", "acrilico"],
         allNegativeKeywords: [
           "gov",
           "poupatempo",
@@ -208,15 +208,29 @@ function getDefaultSeedState(): GoogleAdsIntelligenceState {
           "festa",
           "fotografico",
           "cabine fotografica",
+          "banner",
+          "vitrine",
+          "tv vertical",
+          "papel",
+          "eva",
+          "isopor",
+          "acrilico",
+          "acrílico",
+          "midia",
+          "mídia",
+          "tv 32",
+          "outdoor",
+          "sinalizacao",
+          "sinalização",
         ],
-        lastSyncedAt: "2026-10-26T21:27:00.000Z",
+        lastSyncedAt: "2026-10-28T21:05:00.000Z",
       },
     ],
     dailyMetrics: [
       {
         id: "daily_2026-10-25_24395671655",
         date: "2026-10-25",
-        label: "Ontem (Dom, 25/10)",
+        label: "Dom, 25/10/2026",
         campaignId,
         campaignName,
         impressions: 202,
@@ -229,17 +243,17 @@ function getDefaultSeedState(): GoogleAdsIntelligenceState {
         cpa: 0,
         roas: 0,
         overdeliveryFlag: false,
-        notes: "Domingo com menor volume comercial; gastou R$ 24,13 dos R$ 50,00 nominais anteriores, gerando saldo residual que acionou a compensação de segunda-feira.",
+        notes: "Domingo de estreia da campanha; gastou R$ 24,13 com 10 cliques iniciais.",
       },
       {
         id: "daily_2026-10-26_24395671655",
         date: "2026-10-26",
-        label: "Hoje (Seg, 26/10 até 21h27)",
+        label: "Seg, 26/10/2026",
         campaignId,
         campaignName,
-        impressions: 442,
+        impressions: 443,
         clicks: 35,
-        ctr: 7.92,
+        ctr: 7.9,
         avgCpc: 2.68,
         cost: 93.72,
         conversions: 2.0,
@@ -247,7 +261,43 @@ function getDefaultSeedState(): GoogleAdsIntelligenceState {
         cpa: 46.86,
         roas: 13.78,
         overdeliveryFlag: true,
-        notes: "Superfornecimento Diário (Overdelivery): compensou o saldo de domingo em segunda-feira de alta procura. CTR saltou +60% (de 4,95% para 7,92%) com 2 conversões principais (1 Carrinho R$ 1.290,00 + 1 WhatsApp). Trava nominal de R$ 35/dia e redução de 30% no CPC Máx já aplicadas.",
+        notes: "Segunda-feira com 2 conversões principais (1 Carrinho R$ 1.290,00 em SP Capital + 1 WhatsApp em Descalvado/SP). Trava nominal de R$ 35/dia aplicada.",
+      },
+      {
+        id: "daily_2026-10-27_24395671655",
+        date: "2026-10-27",
+        label: "Ter, 27/10/2026",
+        campaignId,
+        campaignName,
+        impressions: 405,
+        clicks: 24,
+        ctr: 5.93,
+        avgCpc: 2.35,
+        cost: 56.37,
+        conversions: 3.0,
+        conversionValue: 1591.0,
+        cpa: 18.79,
+        roas: 28.22,
+        overdeliveryFlag: false,
+        notes: "Terça-feira com queda do CPA para R$ 18,79 (-60%) e 3 conversões: 1 Lead Cadastro Checkout (Sorocaba/SP), 1 WhatsApp Engenharia (Sorocaba/SP) e 1 Carrinho de R$ 1.590,00 no Grupo 02 DIY (Manaus/AM).",
+      },
+      {
+        id: "daily_2026-10-28_24395671655",
+        date: "2026-10-28",
+        label: "Hoje (Qua, 28/10)",
+        campaignId,
+        campaignName,
+        impressions: 151,
+        clicks: 12,
+        ctr: 7.95,
+        avgCpc: 2.1,
+        cost: 25.16,
+        conversions: 3.0,
+        conversionValue: 15606.0,
+        cpa: 8.39,
+        roas: 620.27,
+        overdeliveryFlag: false,
+        notes: "Quarta-feira recorde de eficiência: CPC médio caiu para R$ 2,10, CTR subiu para 7,95% e CPA caiu para R$ 8,39 com 3 adições ao carrinho de R$ 5.202,00 (R$ 15.606,00) via palavra exata [totem de autoatendimento] no RS.",
       },
     ],
     adGroups: [
@@ -523,6 +573,102 @@ function getDefaultSeedState(): GoogleAdsIntelligenceState {
     ],
     conversionDetails: [
       {
+        id: "conv_2026-10-28_rs_cart",
+        date: "2026-10-28",
+        campaignId,
+        campaignName,
+        actionId: "7871297265",
+        actionName: "[Totem Pro] Adicionar ao Carrinho (Add to Cart)",
+        funnelOrder: 1,
+        count: 3.0,
+        value: 15606.0,
+        isSymbolicValue: false,
+        city: "Região Metropolitana / RS",
+        state: "RS",
+        device: "MOBILE",
+        adGroupName: "03 - Gastronomia, Mercados e Clínicas",
+        keyword: "[totem de autoatendimento]",
+        matchType: "EXACT",
+        adId: "829532711416",
+        landingUrl: "https://totem.xpointsolucoes.com.br",
+        stepsJourney: [
+          "Pesquisou [totem de autoatendimento] (Exata) via Mobile no Rio Grande do Sul (RS).",
+          "Entrou na Landing Page e avançou ao Configurador 3D (/monte-seu-totem).",
+          "Montou 3 variações de Gabinete de Piso + Kit Completo (R$ 5.202,00 cada) e clicou em Adicionar ao Carrinho (totalizando R$ 15.606,00).",
+        ],
+      },
+      {
+        id: "conv_2026-10-27_sorocaba_lead",
+        date: "2026-10-27",
+        campaignId,
+        campaignName,
+        actionId: "7871297928",
+        actionName: "[Totem Pro] Lead Cadastro Checkout",
+        funnelOrder: 4,
+        count: 1.0,
+        value: 0.0,
+        isSymbolicValue: true,
+        city: "Sorocaba",
+        state: "SP",
+        device: "DESKTOP",
+        adGroupName: "03 - Gastronomia, Mercados e Clínicas",
+        keyword: "totem retirada de senha",
+        matchType: "PHRASE",
+        adId: "829486528515",
+        landingUrl: "https://totem.xpointsolucoes.com.br/monte-seu-totem",
+        stepsJourney: [
+          "Pesquisou 'totem retirada de senha' via Desktop em Sorocaba/SP e clicou no Anúncio B (/monte-seu-totem).",
+          "Configurou o Totem e avançou para a etapa de Cadastro no Checkout.",
+        ],
+      },
+      {
+        id: "conv_2026-10-27_sorocaba_wpp",
+        date: "2026-10-27",
+        campaignId,
+        campaignName,
+        actionId: "7871190956",
+        actionName: "[Totem Pro] WhatsApp Consultor Engenharia",
+        funnelOrder: 2,
+        count: 1.0,
+        value: 1.0,
+        isSymbolicValue: true,
+        city: "Sorocaba",
+        state: "SP",
+        device: "DESKTOP",
+        adGroupName: "03 - Gastronomia, Mercados e Clínicas",
+        keyword: "totem retirada de senha",
+        matchType: "PHRASE",
+        adId: "829486528515",
+        landingUrl: "https://totem.xpointsolucoes.com.br/monte-seu-totem",
+        stepsJourney: [
+          "Após iniciar o cadastro em Sorocaba/SP, clicou no botão WhatsApp Consultor Engenharia para atendimento direto.",
+        ],
+      },
+      {
+        id: "conv_2026-10-27_manaus_cart",
+        date: "2026-10-27",
+        campaignId,
+        campaignName,
+        actionId: "7871297265",
+        actionName: "[Totem Pro] Adicionar ao Carrinho (Add to Cart)",
+        funnelOrder: 1,
+        count: 1.0,
+        value: 1590.0,
+        isSymbolicValue: false,
+        city: "Manaus",
+        state: "AM",
+        device: "DESKTOP",
+        adGroupName: "02 - Monte Seu Próprio Totem (-50%)",
+        keyword: "como montar totem de autoatendimento",
+        matchType: "PHRASE",
+        adId: "829532711266",
+        landingUrl: "https://totem.xpointsolucoes.com.br",
+        stepsJourney: [
+          "Pesquisou 'como montar totem de autoatendimento' via Desktop em Manaus/AM (Grupo 02 DIY).",
+          "Selecionou o Gabinete de Piso avulso (R$ 1.590,00 no PIX) e adicionou ao carrinho.",
+        ],
+      },
+      {
         id: "conv_2026-10-26_1",
         date: "2026-10-26",
         campaignId,
@@ -580,12 +726,12 @@ function getDefaultSeedState(): GoogleAdsIntelligenceState {
         stageLabel: "1º (Interesse Forte)",
         actionId: "7871297265",
         actionName: "[Totem Pro] Adicionar ao Carrinho (Add to Cart)",
-        triggerDescription: "Quando o cliente termina as 3 etapas do Configurador (/monte-seu-totem) e clica em Adicionar ao Carrinho",
-        valueRule: "Valor real configurado (ex: R$ 1.290,00)",
+        triggerDescription: "Quando o cliente termina as etapas do Configurador (/monte-seu-totem) e clica em Adicionar ao Carrinho",
+        valueRule: "Valor real configurado (ex: R$ 1.290,00 a R$ 5.202,00)",
         isPrimary: true,
-        conversionsToday: 1.0,
-        conversionsTotal: 1.0,
-        conversionValueTotal: 1290.0,
+        conversionsToday: 3.0,
+        conversionsTotal: 5.0,
+        conversionValueTotal: 18486.0,
       },
       {
         order: 2,
@@ -595,9 +741,9 @@ function getDefaultSeedState(): GoogleAdsIntelligenceState {
         triggerDescription: "Quando o cliente clica em qualquer botão de WhatsApp do site para falar com o consultor",
         valueRule: "R$ 1,00 (simbólico para diferenciar de produtos do carrinho)",
         isPrimary: true,
-        conversionsToday: 1.0,
-        conversionsTotal: 1.0,
-        conversionValueTotal: 1.0,
+        conversionsToday: 0.0,
+        conversionsTotal: 2.0,
+        conversionValueTotal: 2.0,
       },
       {
         order: 3,
@@ -620,7 +766,7 @@ function getDefaultSeedState(): GoogleAdsIntelligenceState {
         valueRule: "Valor total do pedido",
         isPrimary: true,
         conversionsToday: 0.0,
-        conversionsTotal: 0.0,
+        conversionsTotal: 1.0,
         conversionValueTotal: 0.0,
       },
       {
@@ -691,21 +837,51 @@ class GoogleAdsAnalyticsStore {
   }
 
   private loadFromDisk(): GoogleAdsIntelligenceState {
+    const seed = getDefaultSeedState();
     try {
       ensureDataDir();
       if (fs.existsSync(ADS_STORE_FILE)) {
         const raw = fs.readFileSync(ADS_STORE_FILE, "utf-8");
-        const parsed = JSON.parse(raw);
+        const parsed = JSON.parse(raw) as GoogleAdsIntelligenceState;
         if (parsed && Array.isArray(parsed.dailyMetrics)) {
+          let updated = false;
+          for (const sd of seed.dailyMetrics) {
+            if (!parsed.dailyMetrics.some((d) => d.date === sd.date)) {
+              parsed.dailyMetrics.push(sd);
+              updated = true;
+            }
+          }
+          for (const sc of seed.conversionDetails) {
+            if (!parsed.conversionDetails.some((c) => c.id === sc.id)) {
+              parsed.conversionDetails.unshift(sc);
+              updated = true;
+            }
+          }
+          if (updated) {
+            parsed.gtmActionsCatalog = seed.gtmActionsCatalog;
+            parsed.campaigns = seed.campaigns;
+            parsed.lastUpdatedAt = seed.lastUpdatedAt;
+            this.saveToDisk(parsed);
+          }
           return parsed;
         }
       }
     } catch (err) {
       console.warn("[GoogleAdsStore] Erro ao ler analytics_google_ads.json:", err);
     }
-    const seed = getDefaultSeedState();
     this.saveToDisk(seed);
     return seed;
+  }
+
+  public getSummary() {
+    const dash = this.getFilteredDashboardData({ dateFilter: "ALL" });
+    return {
+      campaign: {
+        ...(dash.campaigns[0] || {}),
+        lastSyncAt: dash.lastLiveSyncAt || dash.lastUpdatedAt,
+      },
+      totals: dash.summary,
+    };
   }
 
   private saveToDisk(stateToSave = this.state) {
@@ -1426,6 +1602,8 @@ const globalForGoogleAds = globalThis as unknown as {
 
 export const googleAdsAnalyticsStore =
   globalForGoogleAds.googleAdsAnalyticsStore ?? new GoogleAdsAnalyticsStore();
+
+export const googleAdsStore = googleAdsAnalyticsStore;
 
 if (process.env.NODE_ENV !== "production") {
   globalForGoogleAds.googleAdsAnalyticsStore = googleAdsAnalyticsStore;

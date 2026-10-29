@@ -17,6 +17,7 @@ import { saveLocalOrder } from "@/lib/orders/orderStore";
 import { setCustomerSession } from "@/lib/customers/customerSession";
 import { logEcosystemEvent } from "@/lib/logging/ecosystemLogger";
 import { notifyNewOrderOnWhatsApp } from "@/lib/notifications/whatsappNotifier";
+import { adsLeadsCartsStore } from "@/lib/analytics/adsLeadsCartsStore";
 
 interface RequestBody {
   paymentMethod?: "pix" | "credit_card";
@@ -45,6 +46,26 @@ export async function POST(req: Request) {
   try {
     const body: RequestBody = await req.json();
     const { customer, deliveryAddress, items, shippingOptionId } = body;
+
+    // Salva imediatamente a tentativa de checkout / lead em ads_leads_carts (Appwrite + Local)
+    adsLeadsCartsStore
+      .upsertFromCheckoutAttempt(
+        {
+          customer: {
+            ...(customer || {}),
+            ...(deliveryAddress || {}),
+          },
+          items,
+          shippingQuote: { priceCents: body.shippingCents || 0 },
+          couponCode: body.couponCode,
+          paymentMethod: body.paymentMethod,
+        },
+        {
+          ip: req.headers.get("x-forwarded-for") || "",
+          userAgent: req.headers.get("user-agent") || "",
+        }
+      )
+      .catch(() => {});
     const paymentMethod = body.paymentMethod || "pix";
     if (!["pix", "credit_card"].includes(paymentMethod)) {
       return NextResponse.json({ error: "Forma de pagamento inválida." }, { status: 400 });

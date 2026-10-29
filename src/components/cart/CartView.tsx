@@ -118,6 +118,14 @@ export const CartView: React.FC<CartViewProps> = ({
             setShippingRetryAttempt(0);
             const available = data.quotes.filter((q: any) => q.isAvailable);
             if (available.length > 0) {
+              const firstQuote = available[0];
+              trackEvent(ANALYTICS_EVENTS.SHIPPING_SIMULATED, {
+                cep: cleanCep,
+                shippingCents: Number(firstQuote.priceCents || 0),
+                shippingCarrier: String(firstQuote.carrierName || firstQuote.serviceName || ""),
+                shippingDeliveryDays: Number(firstQuote.deliveryDays || 0),
+                totalCents: finalTotalPriceCents + Number(firstQuote.priceCents || 0),
+              });
               setSelectedShippingId((prev) => {
                 const savedOpt =
                   typeof window !== "undefined"

@@ -21,10 +21,12 @@ export const ANALYTICS_EVENTS = {
 
   // Fundo do Funil (Carrinho & Checkout E-commerce)
   VIEW_CART: "view_cart",
+  SHIPPING_SIMULATED: "shipping_simulated",
   ADD_TO_CART: "add_to_cart",
   REMOVE_FROM_CART: "remove_from_cart",
   DUPLICATE_ITEM: "duplicate_item",
   BEGIN_CHECKOUT: "begin_checkout",
+  CHECKOUT_DRAFT: "checkout_draft",
   LEAD_SUBMITTED: "lead_submitted", // Cadastro concluído no checkout (Nome/Email/WhatsApp)
   PIX_GENERATED: "pix_generated",   // QR Code Pix / Copia e Cola gerado
   PURCHASE: "purchase",             // Pagamento aprovado / Pedido concluído

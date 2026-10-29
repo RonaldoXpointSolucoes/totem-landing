@@ -11,6 +11,8 @@ import { CustomersManager } from "@/components/admin/CustomersManager";
 import { SystemLogsManager } from "@/components/admin/SystemLogsManager";
 import { TelemetryErrorsManager } from "@/components/admin/TelemetryErrorsManager";
 import { AnalyticsFunnelManager } from "@/components/admin/AnalyticsFunnelManager";
+import { AdsOrdersLeadsPanel } from "@/components/admin/AdsOrdersLeadsPanel";
+import type { AdsLeadCartRecord, AdsLeadStatus } from "@/lib/analytics/adsLeadsCartsStore";
 import {
   useUrlParamState,
   readUrlParam,
@@ -661,6 +663,73 @@ export default function AdminPage() {
     }
   };
 
+  // Estados para Botão ADS (Carrinhos Abandonados, Conversões Google Ads & Leads)
+  const [adsRecords, setAdsRecords] = useState<AdsLeadCartRecord[]>([]);
+  const [adsSummary, setAdsSummary] = useState<any>(null);
+  const [isLoadingAdsLeads, setIsLoadingAdsLeads] = useState(false);
+
+  const loadAdsLeads = async (forceRefresh = false) => {
+    setIsLoadingAdsLeads(true);
+    try {
+      const res = await fetch(
+        `/api/admin/ads-leads${forceRefresh ? "?refresh=true" : ""}`,
+        { cache: "no-store" }
+      );
+      const json = await res.json();
+      if (json.success && Array.isArray(json.records)) {
+        setAdsRecords(json.records);
+        setAdsSummary(json.summary || null);
+      }
+    } catch (err) {
+      console.error("Erro ao carregar registros ADS:", err);
+    } finally {
+      setIsLoadingAdsLeads(false);
+    }
+  };
+
+  const handleUpdateAdsRecord = async (
+    id: string,
+    patch: {
+      status?: AdsLeadStatus;
+      commercialNotes?: string;
+      customer?: Partial<AdsLeadCartRecord["customer"]>;
+    }
+  ) => {
+    try {
+      const res = await fetch("/api/admin/ads-leads", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, ...patch }),
+      });
+      const json = await res.json();
+      if (json.success && json.record) {
+        setAdsRecords((prev) =>
+          prev.map((r) => (r.id === id ? json.record : r))
+        );
+        setSaveSuccessMsg("Registro ADS atualizado e salvo no Appwrite!");
+        setTimeout(() => setSaveSuccessMsg(""), 3500);
+      }
+    } catch (err) {
+      console.error("Erro ao atualizar registro ADS:", err);
+    }
+  };
+
+  const handleDeleteAdsRecord = async (id: string) => {
+    try {
+      const res = await fetch(`/api/admin/ads-leads?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      const json = await res.json();
+      if (json.success) {
+        setAdsRecords((prev) => prev.filter((r) => r.id !== id));
+        setSaveSuccessMsg("Registro ADS removido.");
+        setTimeout(() => setSaveSuccessMsg(""), 3500);
+      }
+    } catch (err) {
+      console.error("Erro ao excluir registro ADS:", err);
+    }
+  };
+
   // Carregar Telemetria de Funil & Abandono
   const loadAnalytics = async () => {
     setIsLoadingAnalytics(true);
@@ -680,7 +749,12 @@ export default function AdminPage() {
   useEffect(() => {
     if (isAuthenticated) {
       const initialStatus = readUrlParam("status") || statusFilter;
-      loadOrders(initialStatus);
+      if (initialStatus !== "ads") {
+        loadOrders(initialStatus);
+      } else {
+        loadOrders("all");
+      }
+      loadAdsLeads();
       loadCatalog();
       loadAnalytics();
     }
@@ -1450,6 +1524,21 @@ export default function AdminPage() {
                 >
                   Todos ({orders.length})
                 </button>
+                <button
+                  onClick={() => {
+                    setStatusFilter("ads");
+                    loadAdsLeads(false);
+                  }}
+                  title="Carrinhos Abandonados, Conversões Google Ads e Leads do Checkout"
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold shrink-0 transition-all border flex items-center gap-1.5 cursor-pointer ${
+                    statusFilter === "ads"
+                      ? "bg-gradient-to-r from-indigo-600 to-cyan-600 text-white border-cyan-400 shadow-lg shadow-indigo-500/25"
+                      : "bg-slate-900 text-cyan-400 hover:bg-slate-800 border-cyan-500/40"
+                  }`}
+                >
+                  <Target className="w-3.5 h-3.5" />
+                  <span>ADS ({adsRecords.length || 8})</span>
+                </button>
                 {Object.entries(STATUS_CONFIG).map(([key, config]) => (
                   <button
                     key={key}
@@ -1516,8 +1605,19 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Listagem de Pedidos */}
-            {isLoadingOrders ? (
+            {/* Listagem de Pedidos ou Painel ADS (Carrinhos Abandonados & Conversões) */}
+            {statusFilter === "ads" ? (
+              <AdsOrdersLeadsPanel
+                records={adsRecords}
+                summary={adsSummary}
+                loading={isLoadingAdsLeads}
+                ordersViewMode={ordersViewMode}
+                searchQuery={searchQuery}
+                onRefresh={() => loadAdsLeads(true)}
+                onUpdateRecord={handleUpdateAdsRecord}
+                onDeleteRecord={handleDeleteAdsRecord}
+              />
+            ) : isLoadingOrders ? (
               <div className="py-20 flex flex-col items-center justify-center text-slate-400 gap-3">
                 <RefreshCw className="w-8 h-8 animate-spin text-indigo-500" />
                 <span className="text-sm">Carregando pedidos do Appwrite...</span>

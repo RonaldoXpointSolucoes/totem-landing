@@ -19,5 +19,7 @@ export const APPWRITE_CONFIG = {
     orders: "orders",
     orderItems: "order_items",
     payments: "payments",
+    adsLeadsCarts: "ads_leads_carts",
+    analyticsEvents: "analytics_events",
   },
 } as const;

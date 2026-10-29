@@ -621,6 +621,67 @@ function dispatchToAdPlatforms(
 
 let lastWhatsappClickTs = 0;
 
+function collectBrowserSnapshots() {
+  if (typeof window === "undefined") return {};
+
+  let cartSnapshot: unknown[] = [];
+  let customerDraft: Record<string, unknown> = {};
+  let campaignAttribution: Record<string, unknown> = {};
+
+  try {
+    const rawCart = window.localStorage.getItem("totem_pro_cart_items_v1");
+    if (rawCart) {
+      const parsed = JSON.parse(rawCart);
+      if (Array.isArray(parsed)) cartSnapshot = parsed;
+    }
+  } catch {}
+
+  try {
+    const savedProfile = window.localStorage.getItem("totem_saved_buyer_profile");
+    const draftV2 = window.localStorage.getItem("totem_checkout_draft_v2");
+    const shippingCep = window.sessionStorage.getItem("totem_shipping_cep");
+    const pObj = savedProfile ? JSON.parse(savedProfile) : {};
+    const dObj = draftV2 ? JSON.parse(draftV2) : {};
+    customerDraft = {
+      ...pObj,
+      ...dObj,
+      cep: dObj?.cep || pObj?.cep || shippingCep || "",
+    };
+  } catch {}
+
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const storedAttrRaw = window.localStorage.getItem("totem_ads_attribution_v1");
+    const storedAttr = storedAttrRaw ? JSON.parse(storedAttrRaw) : {};
+    const gclid = urlParams.get("gclid") || storedAttr.gclid || "";
+    const utmSource = urlParams.get("utm_source") || storedAttr.utmSource || "";
+    const utmMedium = urlParams.get("utm_medium") || storedAttr.utmMedium || "";
+    const utmCampaign = urlParams.get("utm_campaign") || storedAttr.utmCampaign || "";
+    const utmTerm = urlParams.get("utm_term") || storedAttr.utmTerm || "";
+    const landingUrl = storedAttr.landingUrl || window.location.href;
+    const referrer = storedAttr.referrer || document.referrer || "";
+
+    campaignAttribution = {
+      gclid,
+      utmSource,
+      utmMedium,
+      utmCampaign,
+      utmTerm,
+      landingUrl,
+      referrer,
+    };
+
+    if (gclid || utmSource || !storedAttrRaw) {
+      window.localStorage.setItem(
+        "totem_ads_attribution_v1",
+        JSON.stringify(campaignAttribution)
+      );
+    }
+  } catch {}
+
+  return { cartSnapshot, customerDraft, campaignAttribution };
+}
+
 /**
  * Disparador central de eventos de Analytics, Pixels e GTM dataLayer
  */
@@ -640,13 +701,16 @@ export function trackEvent(
   }
 
   const sessionId = getOrCreateSessionId();
+  const snapshots = collectBrowserSnapshots();
   const payload = {
     eventName,
     sessionId,
     timestamp: new Date().toISOString(),
     metadata: {
+      ...snapshots,
       ...metadata,
       pathname: window.location.pathname,
+      url: window.location.href,
       referrer: document.referrer || null,
       screenWidth: window.innerWidth,
     },

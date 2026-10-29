@@ -587,8 +587,9 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     };
   }, []);
 
-  // Persistência contínua e silenciosa no localStorage para total resiliência
+  // Persistência contínua e silenciosa no localStorage e no Appwrite (ads_leads_carts) para total resiliência
   useEffect(() => {
+    let draftTimer: ReturnType<typeof setTimeout> | null = null;
     try {
       if (name || email || whatsapp || document || (cep && cep.length >= 8)) {
         const profilePayload = {
@@ -597,6 +598,13 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           whatsapp,
           document,
           personType,
+          cep,
+          street,
+          number,
+          complement,
+          neighborhood,
+          city,
+          state,
           address: {
             cep,
             street,
@@ -608,9 +616,32 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           },
         };
         localStorage.setItem("totem_saved_buyer_profile", JSON.stringify(profilePayload));
+        localStorage.setItem("totem_checkout_draft_v2", JSON.stringify(profilePayload));
+
+        draftTimer = setTimeout(() => {
+          trackEvent(ANALYTICS_EVENTS.CHECKOUT_DRAFT, {
+            customerName: name,
+            email,
+            whatsapp,
+            document,
+            cep,
+            street,
+            number,
+            complement,
+            neighborhood,
+            city,
+            state,
+            totalCents: finalTotalCents,
+            shippingCents,
+            paymentMethod,
+          });
+        }, 1400);
       }
     } catch {}
-  }, [name, email, whatsapp, document, personType, cep, street, number, complement, neighborhood, city, state]);
+    return () => {
+      if (draftTimer) clearTimeout(draftTimer);
+    };
+  }, [name, email, whatsapp, document, personType, cep, street, number, complement, neighborhood, city, state, finalTotalCents, shippingCents, paymentMethod]);
 
   // Alterna para um endereço salvo na conta do cliente
   const handleSelectAddress = (addr: DeliveryAddress, index: number) => {

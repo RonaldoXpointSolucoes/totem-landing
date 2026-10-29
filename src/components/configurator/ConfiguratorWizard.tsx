@@ -388,8 +388,23 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     trackEvent(ANALYTICS_EVENTS.ADD_TO_CART, {
       modelId: selectedModel.id,
       modelName: selectedModel.name,
+      cabinetName: selectedModel.name,
+      colorId: selectedColor?.id || "",
+      colorName: selectedColor?.name || "",
+      monitorId: selectedMonitor?.id || "",
+      monitorName: selectedMonitor?.displayName || "",
+      printerId: selectedPrinter?.id || "",
+      printerName: selectedPrinter?.displayName || "",
+      readerId: useReader && selectedReader ? selectedReader.id : "",
+      readerName: useReader && selectedReader ? selectedReader.displayName : "",
+      isKitSelected,
+      pixPriceCents: pricing.pixTotalPriceCents,
+      cardPriceCents: pricing.totalPriceCents,
+      totalCents: pricing.pixTotalPriceCents,
       totalPriceCents: pricing.totalPriceCents,
+      customizationNotes: customizationNotes.trim() || "",
       isEditing: !!editingItem,
+      assemblyServiceSelected: isKitSelected ? includeAssemblyService : false,
       includeAssemblyService: isKitSelected ? includeAssemblyService : false,
     });
 

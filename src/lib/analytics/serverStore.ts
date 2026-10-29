@@ -10,6 +10,7 @@ import { getServerDatabases } from "@/lib/appwrite/server";
 import { APPWRITE_CONFIG } from "@/lib/appwrite/config";
 import { siteConfig } from "@/config/site";
 import { ID } from "node-appwrite";
+import { adsLeadsCartsStore } from "./adsLeadsCartsStore";
 
 export interface StoredAnalyticsEvent {
   id: string;
@@ -373,6 +374,18 @@ class AnalyticsServerStore {
 
     this.saveEventsToDisk();
     this.persistToAppwriteAsync(fullEvent).catch(() => {});
+    adsLeadsCartsStore
+      .upsertFromClientEvent({
+        id: fullEvent.id,
+        eventName: fullEvent.eventName,
+        sessionId: fullEvent.sessionId,
+        timestamp: fullEvent.timestamp,
+        url: String(fullEvent.metadata?.url || fullEvent.metadata?.pathname || ""),
+        userAgent: fullEvent.userAgent,
+        ip: fullEvent.ip,
+        metadata: fullEvent.metadata as Record<string, any>,
+      })
+      .catch(() => {});
 
     return fullEvent;
   }
