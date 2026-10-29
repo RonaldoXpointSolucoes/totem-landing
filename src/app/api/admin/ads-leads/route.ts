@@ -11,6 +11,7 @@ export async function GET(request: Request) {
 
     const records = await adsLeadsCartsStore.listRecords(force);
     const adsSummary = googleAdsStore.getSummary();
+    const adsState = googleAdsStore.getState();
 
     const abandonedCarts = records.filter((r) => r.recordType === "abandoned_cart");
     const checkoutLeads = records.filter((r) => r.recordType === "checkout_lead");
@@ -45,6 +46,7 @@ export async function GET(request: Request) {
         campaignClicks: adsSummary.totals.clicks,
         campaignImpressions: adsSummary.totals.impressions,
         lastSyncAt: adsSummary.campaign.lastSyncAt,
+        dailyAdsMetrics: adsState.dailyMetrics || [],
       },
     });
   } catch (error: any) {

@@ -1,32 +1,21 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   ShoppingCart,
   MessageCircle,
   UserCheck,
-  Trophy,
-  Sparkles,
   Smartphone,
   Monitor,
-  MapPin,
-  Search,
   RefreshCw,
   ChevronDown,
   ChevronUp,
   Edit3,
   Trash2,
-  Check,
-  ExternalLink,
-  Tag,
-  Cpu,
-  DollarSign,
   Target,
   Activity,
-  Phone,
-  Mail,
-  FileText,
   Save,
+  Calendar,
 } from "lucide-react";
 import type {
   AdsLeadCartRecord,
@@ -34,6 +23,18 @@ import type {
   AdsRecordType,
 } from "@/lib/analytics/adsLeadsCartsStore";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
+import { useUrlParamState } from "@/lib/navigation/useUrlParamState";
+
+export type AdsDateFilterMode = "all" | "today" | "yesterday" | "7d" | "custom";
+
+interface DailyAdsMetricItem {
+  date: string; // YYYY-MM-DD
+  impressions: number;
+  clicks: number;
+  cost: number;
+  conversions: number;
+  conversionValue: number;
+}
 
 interface AdsOrdersLeadsPanelProps {
   records: AdsLeadCartRecord[];
@@ -51,6 +52,7 @@ interface AdsOrdersLeadsPanelProps {
     campaignClicks: number;
     campaignImpressions: number;
     lastSyncAt?: string;
+    dailyAdsMetrics?: DailyAdsMetricItem[];
   } | null;
   loading: boolean;
   ordersViewMode: "simplified" | "detailed";
@@ -73,28 +75,23 @@ const STATUS_LABELS: Record<
 > = {
   abandoned: {
     label: "Carrinho Abandonado",
-    badgeClass:
-      "bg-amber-500/15 text-amber-300 border-amber-500/30",
+    badgeClass: "bg-amber-500/15 text-amber-300 border-amber-500/30",
   },
   awaiting_contact: {
     label: "Aguardando Contato",
-    badgeClass:
-      "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",
+    badgeClass: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",
   },
   in_negotiation: {
     label: "Em Negociação (WhatsApp)",
-    badgeClass:
-      "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+    badgeClass: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
   },
   converted_order: {
     label: "Convertido em Pedido",
-    badgeClass:
-      "bg-indigo-500/20 text-indigo-300 border-indigo-500/40",
+    badgeClass: "bg-indigo-500/20 text-indigo-300 border-indigo-500/40",
   },
   archived: {
     label: "Arquivado",
-    badgeClass:
-      "bg-slate-700/40 text-slate-400 border-slate-600/40",
+    badgeClass: "bg-slate-700/40 text-slate-400 border-slate-600/40",
   },
 };
 
@@ -129,6 +126,35 @@ const RECORD_TYPE_META: Record<
   },
 };
 
+/**
+ * Converte uma data ISO ou Date para YYYY-MM-DD no fuso de São Paulo (America/Sao_Paulo)
+ */
+function toBrazilDateString(dateInput: string | Date): string {
+  try {
+    const d = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
+    if (isNaN(d.getTime())) return "";
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Sao_Paulo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(d);
+    const y = parts.find((p) => p.type === "year")?.value || "";
+    const m = parts.find((p) => p.type === "month")?.value || "";
+    const day = parts.find((p) => p.type === "day")?.value || "";
+    return `${y}-${m}-${day}`;
+  } catch {
+    return "";
+  }
+}
+
+function formatShortBrDate(ymd: string): string {
+  if (!ymd) return "";
+  const [y, m, d] = ymd.split("-");
+  if (!y || !m || !d) return ymd;
+  return `${d}/${m}/${y}`;
+}
+
 export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
   records,
   summary,
@@ -139,7 +165,24 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
   onUpdateRecord,
   onDeleteRecord,
 }) => {
-  const [subTypeFilter, setSubTypeFilter] = useState<string>("all");
+  // Estados de filtro sincronizados na URL
+  const [dateFilterMode, setDateFilterMode] = useUrlParamState<AdsDateFilterMode>(
+    "adsPeriod",
+    "all"
+  );
+  const [customStartDate, setCustomStartDate] = useUrlParamState<string>(
+    "adsFrom",
+    ""
+  );
+  const [customEndDate, setCustomEndDate] = useUrlParamState<string>(
+    "adsTo",
+    ""
+  );
+  const [subTypeFilter, setSubTypeFilter] = useUrlParamState<string>(
+    "adsType",
+    "all"
+  );
+
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editCustomer, setEditCustomer] = useState<
@@ -147,6 +190,198 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
   >(null);
   const [editNotes, setEditNotes] = useState<string>("");
   const [savingId, setSavingId] = useState<string | null>(null);
+
+  // Datas de referência em horário do Brasil (America/Sao_Paulo)
+  const { todayYmd, yesterdayYmd, sevenDaysAgoYmd } = useMemo(() => {
+    const now = new Date();
+    const today = toBrazilDateString(now);
+
+    const yest = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const yesterday = toBrazilDateString(yest);
+
+    const sevenAgo = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
+    const sevenDaysAgo = toBrazilDateString(sevenAgo);
+
+    return {
+      todayYmd: today,
+      yesterdayYmd: yesterday,
+      sevenDaysAgoYmd: sevenDaysAgo,
+    };
+  }, []);
+
+  // Função que verifica se uma data YYYY-MM-DD entra no filtro de período selecionado
+  const matchesDatePeriod = useMemo(() => {
+    return (ymd: string): boolean => {
+      if (!ymd) return true;
+      if (dateFilterMode === "all") return true;
+      if (dateFilterMode === "today") return ymd === todayYmd;
+      if (dateFilterMode === "yesterday") return ymd === yesterdayYmd;
+      if (dateFilterMode === "7d") {
+        return ymd >= sevenDaysAgoYmd && ymd <= todayYmd;
+      }
+      if (dateFilterMode === "custom") {
+        if (customStartDate && ymd < customStartDate) return false;
+        if (customEndDate && ymd > customEndDate) return false;
+        return true;
+      }
+      return true;
+    };
+  }, [
+    dateFilterMode,
+    todayYmd,
+    yesterdayYmd,
+    sevenDaysAgoYmd,
+    customStartDate,
+    customEndDate,
+  ]);
+
+  // 1. Filtra registros pelo período de data selecionado
+  const dateFilteredRecords = useMemo(() => {
+    return records.filter((r) => {
+      const recYmd = toBrazilDateString(r.createdAt);
+      return matchesDatePeriod(recYmd);
+    });
+  }, [records, matchesDatePeriod]);
+
+  // 2. Recalcula KPIs dos cartões e métricas do Google Ads para o período selecionado
+  const periodKpis = useMemo(() => {
+    const abandoned = dateFilteredRecords.filter(
+      (r) => r.recordType === "abandoned_cart"
+    );
+    const leads = dateFilteredRecords.filter(
+      (r) => r.recordType === "checkout_lead"
+    );
+    const wpp = dateFilteredRecords.filter(
+      (r) => r.recordType === "whatsapp_conversion"
+    );
+    const purchases = dateFilteredRecords.filter(
+      (r) =>
+        r.recordType === "purchase_conversion" || r.status === "converted_order"
+    );
+
+    const totalCartValueCents = abandoned.reduce(
+      (acc, r) => acc + (r.cart.totalCents || 0),
+      0
+    );
+    const totalConversions = dateFilteredRecords.reduce(
+      (acc, r) => acc + (r.conversionsCount || 1),
+      0
+    );
+
+    // Calcula investimento e cliques do Google Ads para o mesmo período de datas
+    const dailyList = summary?.dailyAdsMetrics || [];
+    const matchingDaily = dailyList.filter((d) => matchesDatePeriod(d.date));
+
+    let costBrl = 0;
+    let clicks = 0;
+    let impressions = 0;
+    let adsConv = 0;
+
+    if (dateFilterMode === "all" && dailyList.length === 0) {
+      costBrl = summary?.campaignCostBrl ?? 199.38;
+      clicks = summary?.campaignClicks ?? 81;
+      impressions = summary?.campaignImpressions ?? 1201;
+      adsConv = totalConversions;
+    } else if (matchingDaily.length > 0) {
+      for (const d of matchingDaily) {
+        costBrl += Number(d.cost || 0);
+        clicks += Number(d.clicks || 0);
+        impressions += Number(d.impressions || 0);
+        adsConv += Number(d.conversions || 0);
+      }
+    } else {
+      // Fallback para a soma dos custos individuais atribuídos aos registros do período
+      costBrl =
+        dateFilteredRecords.reduce(
+          (acc, r) => acc + (r.attribution.conversionCostCents || 0),
+          0
+        ) / 100;
+    }
+
+    const effectiveConvForCpa = adsConv > 0 ? adsConv : totalConversions;
+    const cpaBrl =
+      effectiveConvForCpa > 0 ? costBrl / effectiveConvForCpa : 0;
+
+    let periodLabel = "Todo o Período";
+    if (dateFilterMode === "today") {
+      periodLabel = `Hoje (${formatShortBrDate(todayYmd).slice(0, 5)})`;
+    } else if (dateFilterMode === "yesterday") {
+      periodLabel = `Ontem (${formatShortBrDate(yesterdayYmd).slice(0, 5)})`;
+    } else if (dateFilterMode === "7d") {
+      periodLabel = "Últimos 7 Dias";
+    } else if (dateFilterMode === "custom") {
+      if (customStartDate && customEndDate) {
+        periodLabel = `${formatShortBrDate(customStartDate)} até ${formatShortBrDate(
+          customEndDate
+        )}`;
+      } else if (customStartDate) {
+        periodLabel = `A partir de ${formatShortBrDate(customStartDate)}`;
+      } else if (customEndDate) {
+        periodLabel = `Até ${formatShortBrDate(customEndDate)}`;
+      } else {
+        periodLabel = "Período Personalizado";
+      }
+    }
+
+    return {
+      periodLabel,
+      totalConversions,
+      abandonedCount: abandoned.length,
+      leadsCount: leads.length,
+      wppCount: wpp.length,
+      purchasesCount: purchases.length,
+      totalCartValueCents,
+      costBrl,
+      cpaBrl,
+      clicks,
+      impressions,
+    };
+  }, [
+    dateFilteredRecords,
+    summary,
+    matchesDatePeriod,
+    dateFilterMode,
+    todayYmd,
+    yesterdayYmd,
+    customStartDate,
+    customEndDate,
+  ]);
+
+  // 3. Filtra registros pelo sub-tipo e pela busca textual
+  const filteredRecords = useMemo(() => {
+    return dateFilteredRecords.filter((r) => {
+      if (subTypeFilter !== "all" && r.recordType !== subTypeFilter) {
+        return false;
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const hay = [
+          r.recordId,
+          r.customer.name,
+          r.customer.whatsapp,
+          r.customer.email,
+          r.customer.document,
+          r.customer.city,
+          r.customer.state,
+          r.customer.cep,
+          r.attribution.keyword,
+          r.attribution.adGroupName,
+          r.attribution.conversionActionName,
+          r.commercialNotes,
+          ...r.cart.items.map(
+            (i) =>
+              `${i.cabinetName} ${i.colorName || ""} ${i.monitorName || ""} ${
+                i.printerName || ""
+              }`
+          ),
+        ]
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [dateFilteredRecords, subTypeFilter, searchQuery]);
 
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -171,39 +406,6 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
       setSavingId(null);
     }
   };
-
-  const filteredRecords = records.filter((r) => {
-    if (subTypeFilter !== "all" && r.recordType !== subTypeFilter) {
-      return false;
-    }
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const hay = [
-        r.recordId,
-        r.customer.name,
-        r.customer.whatsapp,
-        r.customer.email,
-        r.customer.document,
-        r.customer.city,
-        r.customer.state,
-        r.customer.cep,
-        r.attribution.keyword,
-        r.attribution.adGroupName,
-        r.attribution.conversionActionName,
-        r.commercialNotes,
-        ...r.cart.items.map(
-          (i) =>
-            `${i.cabinetName} ${i.colorName || ""} ${i.monitorName || ""} ${
-              i.printerName || ""
-            }`
-        ),
-      ]
-        .join(" ")
-        .toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
-    return true;
-  });
 
   const buildWhatsappRecoveryUrl = (rec: AdsLeadCartRecord) => {
     const cleanPhone = (rec.customer.whatsapp || "").replace(/\D/g, "");
@@ -230,21 +432,147 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
     return `https://wa.me/?text=${msg}`;
   };
 
+  // Contagens por dia para exibir nos botões Hoje e Ontem
+  const todayCount = useMemo(
+    () =>
+      records.filter((r) => toBrazilDateString(r.createdAt) === todayYmd).length,
+    [records, todayYmd]
+  );
+  const yesterdayCount = useMemo(
+    () =>
+      records.filter((r) => toBrazilDateString(r.createdAt) === yesterdayYmd)
+        .length,
+    [records, yesterdayYmd]
+  );
+  const sevenDaysCount = useMemo(
+    () =>
+      records.filter((r) => {
+        const ymd = toBrazilDateString(r.createdAt);
+        return ymd >= sevenDaysAgoYmd && ymd <= todayYmd;
+      }).length,
+    [records, sevenDaysAgoYmd, todayYmd]
+  );
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
+      {/* BARRA DE FILTRO DE DATA (HOJE, ONTEM, 7 DIAS, PERSONALIZADO, TODO O PERÍODO) */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-900/80 border border-slate-800/90 rounded-2xl p-3 shadow-md">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-extrabold uppercase tracking-wider text-cyan-400">
+            <Calendar className="w-3.5 h-3.5" />
+            <span>Período:</span>
+          </div>
+
+          {[
+            {
+              id: "today" as AdsDateFilterMode,
+              label: `Hoje (${todayCount})`,
+            },
+            {
+              id: "yesterday" as AdsDateFilterMode,
+              label: `Ontem (${yesterdayCount})`,
+            },
+            {
+              id: "7d" as AdsDateFilterMode,
+              label: `7 Dias (${sevenDaysCount})`,
+            },
+            {
+              id: "all" as AdsDateFilterMode,
+              label: `Todo o Período (${records.length})`,
+            },
+            {
+              id: "custom" as AdsDateFilterMode,
+              label: "📅 Personalizado",
+            },
+          ].map((btn) => (
+            <button
+              key={btn.id}
+              type="button"
+              onClick={() => {
+                setDateFilterMode(btn.id);
+                if (btn.id === "custom" && !customStartDate && !customEndDate) {
+                  setCustomStartDate(sevenDaysAgoYmd);
+                  setCustomEndDate(todayYmd);
+                }
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                dateFilterMode === btn.id
+                  ? "bg-gradient-to-r from-cyan-600 to-indigo-600 text-white shadow-md shadow-cyan-600/25 border border-cyan-400/50"
+                  : "bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700/70"
+              }`}
+            >
+              {btn.label}
+            </button>
+          ))}
+        </div>
+
+        {/* SELETOR DE DATAS PERSONALIZADO (DE / ATÉ) */}
+        {dateFilterMode === "custom" ? (
+          <div className="flex flex-wrap items-center gap-2 bg-slate-950/90 border border-cyan-500/30 rounded-xl px-3 py-1.5">
+            <div className="flex items-center gap-1.5 text-xs">
+              <label
+                htmlFor="ads-custom-from"
+                className="text-slate-400 font-semibold"
+              >
+                De:
+              </label>
+              <input
+                id="ads-custom-from"
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400"
+              />
+            </div>
+            <div className="flex items-center gap-1.5 text-xs">
+              <label
+                htmlFor="ads-custom-to"
+                className="text-slate-400 font-semibold"
+              >
+                Até:
+              </label>
+              <input
+                id="ads-custom-to"
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setCustomStartDate("");
+                setCustomEndDate("");
+                setDateFilterMode("all");
+              }}
+              className="text-[11px] font-bold text-slate-400 hover:text-rose-400 px-1.5 py-0.5 cursor-pointer"
+              title="Limpar filtro personalizado"
+            >
+              Limpar
+            </button>
+          </div>
+        ) : (
+          <div className="text-[11px] text-slate-400 font-medium px-2">
+            Exibindo dados de:{" "}
+            <strong className="text-cyan-300">{periodKpis.periodLabel}</strong>
+          </div>
+        )}
+      </div>
+
       {/* BARRA DE KPIs EXECUTIVOS DO TRÁFEGO PAGO & CARRINHOS ABANDONADOS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         <div className="rounded-2xl bg-slate-900/90 border border-indigo-500/30 p-4 shadow-lg">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-300">
-              Total Conversões ADS Salvas
+              Conversões ADS ({periodKpis.periodLabel})
             </span>
             <span className="w-7 h-7 rounded-lg bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
               <Target className="w-4 h-4" />
             </span>
           </div>
           <div className="text-2xl font-black text-white">
-            {summary?.totalConversions ?? records.length}{" "}
+            {periodKpis.totalConversions}{" "}
             <span className="text-xs font-semibold text-indigo-300">
               conversões
             </span>
@@ -257,17 +585,17 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
         <div className="rounded-2xl bg-slate-900/90 border border-amber-500/30 p-4 shadow-lg">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-[11px] font-bold uppercase tracking-wider text-amber-300">
-              🛒 Carrinhos Abandonados ({summary?.abandonedCartsCount ?? 5})
+              🛒 Carrinhos Abandonados ({periodKpis.abandonedCount})
             </span>
             <span className="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
               <ShoppingCart className="w-4 h-4" />
             </span>
           </div>
           <div className="text-2xl font-black text-amber-400">
-            {formatBRL(summary?.totalCartValueCents ?? 1848600)}
+            {formatBRL(periodKpis.totalCartValueCents)}
           </div>
           <p className="text-[11px] text-slate-400 mt-1">
-            Valor acumulado em totens montados no carrinho
+            Valor acumulado em totens montados no período
           </p>
         </div>
 
@@ -281,22 +609,21 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
             </span>
           </div>
           <div className="text-2xl font-black text-emerald-400">
-            {(summary?.checkoutLeadsCount ?? 1) +
-              (summary?.whatsappLeadsCount ?? 2)}{" "}
+            {periodKpis.leadsCount + periodKpis.wppCount}{" "}
             <span className="text-xs font-semibold text-emerald-300">
               leads diretos
             </span>
           </div>
           <p className="text-[11px] text-slate-400 mt-1">
-            {summary?.checkoutLeadsCount ?? 1} Cadastro Checkout •{" "}
-            {summary?.whatsappLeadsCount ?? 2} Cliques WhatsApp Engenharia
+            {periodKpis.leadsCount} Cadastro Checkout • {periodKpis.wppCount}{" "}
+            Cliques WhatsApp Engenharia
           </p>
         </div>
 
         <div className="rounded-2xl bg-slate-900/90 border border-cyan-500/30 p-4 shadow-lg">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-300">
-              Investimento & CPA Google Ads
+              Investimento & CPA ({periodKpis.periodLabel})
             </span>
             <span className="w-7 h-7 rounded-lg bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
               <Activity className="w-4 h-4" />
@@ -304,16 +631,18 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
           </div>
           <div className="text-2xl font-black text-white">
             CPA R${" "}
-            {(summary?.campaignCpaBrl ?? 24.92).toLocaleString("pt-BR", {
+            {periodKpis.cpaBrl.toLocaleString("pt-BR", {
               minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
             })}
           </div>
           <p className="text-[11px] text-slate-400 mt-1">
             Investido: R${" "}
-            {(summary?.campaignCostBrl ?? 199.38).toLocaleString("pt-BR", {
+            {periodKpis.costBrl.toLocaleString("pt-BR", {
               minimumFractionDigits: 2,
-            })}{" "}
-            ({summary?.campaignClicks ?? 81} cliques)
+              maximumFractionDigits: 2,
+            })}
+            {periodKpis.clicks > 0 ? ` (${periodKpis.clicks} cliques)` : ""}
           </p>
         </div>
       </div>
@@ -324,33 +653,23 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
           {[
             {
               id: "all",
-              label: `Todos ADS (${records.length})`,
+              label: `Todos ADS (${dateFilteredRecords.length})`,
             },
             {
               id: "abandoned_cart",
-              label: `🛒 Carrinhos Abandonados (${
-                records.filter((r) => r.recordType === "abandoned_cart").length
-              })`,
+              label: `🛒 Carrinhos Abandonados (${periodKpis.abandonedCount})`,
             },
             {
               id: "checkout_lead",
-              label: `📋 Leads Checkout (${
-                records.filter((r) => r.recordType === "checkout_lead").length
-              })`,
+              label: `📋 Leads Checkout (${periodKpis.leadsCount})`,
             },
             {
               id: "whatsapp_conversion",
-              label: `💬 Cliques WhatsApp (${
-                records.filter((r) => r.recordType === "whatsapp_conversion")
-                  .length
-              })`,
+              label: `💬 Cliques WhatsApp (${periodKpis.wppCount})`,
             },
             {
               id: "purchase_conversion",
-              label: `🏆 Compras (${
-                records.filter((r) => r.recordType === "purchase_conversion")
-                  .length
-              })`,
+              label: `🏆 Compras (${periodKpis.purchasesCount})`,
             },
           ].map((tab) => (
             <button
@@ -372,17 +691,29 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
           disabled={loading}
           className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 cursor-pointer transition-all"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+          <RefreshCw
+            className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`}
+          />
           <span>Sincronizar Appwrite & Ads</span>
         </button>
       </div>
 
       {/* LISTA DE CARDS (COMPATÍVEL COM LISTA SIMPLIFICADA + VER EM DETALHES E VISÃO DETALHADA) */}
       {filteredRecords.length === 0 ? (
-        <div className="rounded-3xl bg-slate-900/60 border border-slate-800 p-10 text-center">
-          <p className="text-slate-300 font-bold text-sm">
-            Nenhum registro ADS encontrado para este filtro.
+        <div className="rounded-3xl bg-slate-900/60 border border-slate-800 p-10 text-center space-y-2">
+          <p className="text-slate-200 font-bold text-sm">
+            Nenhum registro ADS encontrado para o período{" "}
+            <span className="text-cyan-400">{periodKpis.periodLabel}</span>.
           </p>
+          {dateFilterMode !== "all" && (
+            <button
+              type="button"
+              onClick={() => setDateFilterMode("all")}
+              className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer transition-all"
+            >
+              Ver Todo o Período ({records.length})
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-4">
@@ -395,14 +726,15 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
             const statusMeta =
               STATUS_LABELS[rec.status] || STATUS_LABELS.abandoned;
             const firstItem = rec.cart.items[0];
-            const initials = (rec.customer.name || "AD")
-              .replace(/[^a-zA-Z\s]/g, "")
-              .trim()
-              .split(/\s+/)
-              .slice(0, 2)
-              .map((p) => p[0])
-              .join("")
-              .toUpperCase() || "AD";
+            const initials =
+              (rec.customer.name || "AD")
+                .replace(/[^a-zA-Z\s]/g, "")
+                .trim()
+                .split(/\s+/)
+                .slice(0, 2)
+                .map((p) => p[0])
+                .join("")
+                .toUpperCase() || "AD";
 
             const isEditingThis = editingId === rec.id;
 
@@ -543,7 +875,10 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
                           </span>
                         </div>
                         <div className="text-[11px] text-slate-400">
-                          {new Date(rec.createdAt).toLocaleString("pt-BR")} •{" "}
+                          {new Date(rec.createdAt).toLocaleString("pt-BR", {
+                            timeZone: "America/Sao_Paulo",
+                          })}{" "}
+                          •{" "}
                           <strong className="text-slate-200">
                             {rec.cart.paymentMethod === "credit_card"
                               ? "Cartão"
@@ -586,9 +921,7 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
                         className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-600/20 cursor-pointer transition-all"
                       >
                         <span>
-                          {isExpanded
-                            ? "Ocultar Detalhes"
-                            : "Ver em Detalhes"}
+                          {isExpanded ? "Ocultar Detalhes" : "Ver em Detalhes"}
                         </span>
                         {isExpanded ? (
                           <ChevronUp className="w-3.5 h-3.5" />
