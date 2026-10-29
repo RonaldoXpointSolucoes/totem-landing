@@ -193,7 +193,8 @@ export async function getOrderWithDetails(orderId: string) {
 
 let cachedCatalogData: any = null;
 let cachedCatalogTimestamp = 0;
-const CATALOG_CACHE_TTL_MS = 60 * 1000; // 60s de cache ultrarrápido em memória
+let isRevalidatingCatalog = false;
+const CATALOG_CACHE_TTL_MS = 5 * 60 * 1000; // 5 min de cache em memória + Stale-While-Revalidate (SWR)
 
 export function invalidateCatalogCache() {
   cachedCatalogData = null;
@@ -209,10 +210,7 @@ function toFastWebp(url: string): string {
 /**
  * Carrega o catálogo dinâmico completo do Appwrite com cache em memória e imagens WebP.
  */
-export async function getAppwriteCatalog() {
-  if (cachedCatalogData && Date.now() - cachedCatalogTimestamp < CATALOG_CACHE_TTL_MS) {
-    return cachedCatalogData;
-  }
+export async function fetchCatalogFromAppwrite() {
   const db = getServerDatabases();
   const dbId = APPWRITE_CONFIG.databaseId;
   const cols = APPWRITE_CONFIG.collections;
@@ -370,6 +368,25 @@ export async function getAppwriteCatalog() {
 /**
  * Consulta administrativa de todos os itens do catálogo (ativos e inativos).
  */
+export async function getAppwriteCatalog() {
+  const now = Date.now();
+  if (cachedCatalogData) {
+    if (now - cachedCatalogTimestamp < CATALOG_CACHE_TTL_MS) {
+      return cachedCatalogData;
+    }
+    if (!isRevalidatingCatalog) {
+      isRevalidatingCatalog = true;
+      fetchCatalogFromAppwrite()
+        .catch(() => {})
+        .finally(() => {
+          isRevalidatingCatalog = false;
+        });
+    }
+    return cachedCatalogData;
+  }
+  return fetchCatalogFromAppwrite();
+}
+
 export async function getAllCatalogAdmin() {
   const db = getServerDatabases();
   const dbId = APPWRITE_CONFIG.databaseId;

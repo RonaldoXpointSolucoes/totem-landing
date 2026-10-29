@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useEffect } from "react";
+import React, { Suspense, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Navbar } from "@/components/layout";
 import { Footer } from "@/components/marketing";
@@ -16,20 +16,26 @@ function MonteSeuTotemContent() {
   const modeloParam = searchParams.get("modelo") || "cabinet-wall";
   const etapaParam = parseInt(searchParams.get("etapa") || "1", 10);
   const editParam = searchParams.get("edit");
+  const hasTrackedStartRef = useRef(false);
 
   useEffect(() => {
-    trackEvent(ANALYTICS_EVENTS.START_CONFIGURATOR, {
-      modelId: modeloParam,
-      source: "url_route_monte_seu_totem",
-    });
+    if (!hasTrackedStartRef.current) {
+      hasTrackedStartRef.current = true;
+      trackEvent(ANALYTICS_EVENTS.START_CONFIGURATOR, {
+        modelId: modeloParam,
+        source: "url_route_monte_seu_totem",
+      });
+    }
+  }, [modeloParam]);
 
+  useEffect(() => {
     if (editParam && !editingItem) {
       const itemToEdit = items.find((i) => i.id === editParam);
       if (itemToEdit) {
         setEditingItem(itemToEdit);
       }
     }
-  }, [editParam, items, editingItem, setEditingItem, modeloParam]);
+  }, [editParam, items, editingItem, setEditingItem]);
 
   return (
     <ConfiguratorWizard

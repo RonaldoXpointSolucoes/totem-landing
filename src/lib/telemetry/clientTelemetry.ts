@@ -333,34 +333,45 @@ export function initClientTelemetry(): void {
       } catch (networkError: any) {
         const duration = Math.round(performance.now() - startTime);
         if (isInternalApi) {
-          recordClientBreadcrumb("api", `Falha de Rede/Timeout em ${url} (${duration}ms)`);
-          sendTelemetryReport({
-            type: "api_network_failure",
-            severity: "critical",
-            message: `Falha de rede/conexão ao acessar ${url}: ${networkError?.message || "Sem resposta"}`,
-            stack: networkError?.stack,
-            customData: {
-              url,
-              durationMs: duration,
-              offline: !navigator.onLine,
-            },
-          });
+          const errMessage = String(networkError?.message || "Sem resposta");
+          const isAbortedOrBackground =
+            networkError?.name === "AbortError" ||
+            document.visibilityState === "hidden" ||
+            !navigator.onLine ||
+            (url.includes("/api/catalog") &&
+              /load failed|failed to fetch|networkerror/i.test(errMessage));
+
+          recordClientBreadcrumb(
+            "api",
+            isAbortedOrBackground
+              ? `Requisição cancelada em transição/background em ${url} (${duration}ms)`
+              : `Falha de Rede/Timeout em ${url} (${duration}ms)`
+          );
+
+          if (!isAbortedOrBackground) {
+            sendTelemetryReport({
+              type: "api_network_failure",
+              severity: "critical",
+              message: `Falha de rede/conexão ao acessar ${url}: ${errMessage}`,
+              stack: networkError?.stack,
+              customData: {
+                url,
+                durationMs: duration,
+                offline: !navigator.onLine,
+              },
+            });
+          }
         }
         throw networkError;
       }
     };
   } catch {}
 
-  // 4. Mudanças de status de conexão (Online / Offline)
+  // 4. Mudanças de status de conexão (Online / Offline) — registrado como breadcrumb de contexto
   window.addEventListener("online", () => {
     recordClientBreadcrumb("state", "Dispositivo voltou a ficar ONLINE");
   });
   window.addEventListener("offline", () => {
     recordClientBreadcrumb("state", "Dispositivo ficou OFFLINE");
-    sendTelemetryReport({
-      type: "api_network_failure",
-      severity: "warning",
-      message: "Usuário perdeu a conexão com a internet (Offline detectado no navegador)",
-    });
   });
 }

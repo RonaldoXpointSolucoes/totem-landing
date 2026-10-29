@@ -487,16 +487,28 @@ export function GoogleAdsIntelligencePanel({
       {/* ================================================================= */}
       <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          {/* Seletor de Data */}
+          {/* Seletor de Data Dinâmico */}
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[11px] font-bold text-slate-400 mr-1 flex items-center gap-1">
               <Filter className="w-3.5 h-3.5 text-indigo-400" />
               Data:
             </span>
             {[
-              { id: "ALL", label: "Acumulado Total (25/10 + 26/10)" },
-              { id: "2026-10-26", label: "Hoje (Seg, 26/10)" },
-              { id: "2026-10-25", label: "Ontem (Dom, 25/10)" },
+              {
+                id: "ALL",
+                label: `Acumulado Total (${data?.dailyMetrics?.length || 2} dias)`,
+              },
+              ...([...(data?.dailyMetrics || [])]
+                .sort((a: any, b: any) => String(b.date).localeCompare(String(a.date)))
+                .map((dm: any) => {
+                  const parts = String(dm.date || "").split("-");
+                  const shortDate =
+                    parts.length === 3 ? `${parts[2]}/${parts[1]}` : dm.date;
+                  return {
+                    id: dm.date,
+                    label: dm.label || shortDate,
+                  };
+                })),
             ].map((d) => (
               <button
                 key={d.id}
