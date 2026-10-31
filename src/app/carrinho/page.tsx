@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/layout";
 import { Footer } from "@/components/marketing";
@@ -10,14 +10,19 @@ import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 
 export default function CarrinhoPage() {
   const router = useRouter();
-  const { items, setEditingItem } = useCart();
+  const { items, setEditingItem, isInitialized } = useCart();
+  const hasTrackedViewCartRef = useRef(false);
 
   useEffect(() => {
-    trackEvent(ANALYTICS_EVENTS.VIEW_CART, {
-      itemsCount: items.length,
-      source: "url_route_carrinho",
-    });
-  }, [items.length]);
+    if (!isInitialized || items.length === 0) return;
+    if (!hasTrackedViewCartRef.current) {
+      hasTrackedViewCartRef.current = true;
+      trackEvent(ANALYTICS_EVENTS.VIEW_CART, {
+        itemsCount: items.length,
+        source: "url_route_carrinho",
+      });
+    }
+  }, [isInitialized, items.length]);
 
   const handleEditItem = (itemId: string) => {
     const itemToEdit = items.find((i) => i.id === itemId);

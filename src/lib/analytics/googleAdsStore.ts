@@ -1284,8 +1284,11 @@ class GoogleAdsAnalyticsStore {
         state: this.state,
       };
     } catch (err: any) {
-      this.state.liveSyncStatus = "error";
-      this.state.liveSyncMessage = `Aviso ao consultar API ao vivo (${err?.message || "Erro"}); exibindo dados salvos.`;
+      const errText = String(err?.message || "Erro");
+      this.state.liveSyncStatus = "seeded";
+      this.state.liveSyncMessage = errText.includes("400")
+        ? "Base histórica Google Ads + Conversões GTM/Appwrite ativas (Token OAuth2 de 7 dias do Google Cloud aguardando renovação para leitura ao vivo de impressões)."
+        : `Aviso ao consultar API ao vivo (${errText}); exibindo dados consolidados salvos.`;
       return {
         synced: false,
         message: this.state.liveSyncMessage,

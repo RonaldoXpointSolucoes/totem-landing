@@ -199,6 +199,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCouponError(null);
   };
 
+  const persistCartItemsSync = (nextItems: CartItem[]) => {
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(nextItems));
+      }
+    } catch {}
+  };
+
   // Adicionar novo item
   const addItem = (configuration: TotemConfiguration, quantity: number = 1): string => {
     const unitPrice = configuration.calculatedPriceCents;
@@ -211,14 +219,18 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       subtotalCents: unitPrice * Math.max(1, quantity),
     };
 
-    setItems((prev) => [...prev, newItem]);
+    setItems((prev) => {
+      const next = [...prev, newItem];
+      persistCartItemsSync(next);
+      return next;
+    });
     return newItemId;
   };
 
   // Atualizar item existente
   const updateItem = (id: string, configuration: TotemConfiguration, quantity?: number) => {
-    setItems((prev) =>
-      prev.map((item) => {
+    setItems((prev) => {
+      const next = prev.map((item) => {
         if (item.id === id) {
           const newQty = quantity !== undefined ? Math.max(1, quantity) : item.quantity;
           const unitPrice = configuration.calculatedPriceCents;
@@ -231,8 +243,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           };
         }
         return item;
-      })
-    );
+      });
+      persistCartItemsSync(next);
+      return next;
+    });
     setEditingItem(null);
   };
 
@@ -252,13 +266,18 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const idx = prev.findIndex((i) => i.id === id);
       const copy = [...prev];
       copy.splice(idx + 1, 0, duplicated);
+      persistCartItemsSync(copy);
       return copy;
     });
   };
 
   // Remover item
   const removeItem = (id: string) => {
-    setItems((prev) => prev.filter((i) => i.id !== id));
+    setItems((prev) => {
+      const next = prev.filter((i) => i.id !== id);
+      persistCartItemsSync(next);
+      return next;
+    });
     if (editingItem?.id === id) {
       setEditingItem(null);
     }
@@ -270,8 +289,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       removeItem(id);
       return;
     }
-    setItems((prev) =>
-      prev.map((item) => {
+    setItems((prev) => {
+      const next = prev.map((item) => {
         if (item.id === id) {
           return {
             ...item,
@@ -280,13 +299,16 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           };
         }
         return item;
-      })
-    );
+      });
+      persistCartItemsSync(next);
+      return next;
+    });
   };
 
   // Limpar carrinho
   const clearCart = () => {
     setItems([]);
+    persistCartItemsSync([]);
     setEditingItem(null);
     setAppliedCoupon(null);
   };

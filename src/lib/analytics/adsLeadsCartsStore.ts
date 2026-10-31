@@ -1041,7 +1041,52 @@ class AdsLeadsCartsStore {
             try {
               const parsed = JSON.parse(doc.payload_json) as AdsLeadCartRecord;
               if (parsed && parsed.id) {
+                let needsHealPersist = false;
+                // Auto-cura 1: Recalcula subtotalCents e totalCents a partir dos itens reais se houver divergência
+                if (Array.isArray(parsed.cart?.items) && parsed.cart.items.length > 0) {
+                  const itemsSum = parsed.cart.items.reduce(
+                    (acc, it) => acc + Number(it.subtotalCents || it.unitPriceCents * (it.quantity || 1) || 0),
+                    0
+                  );
+                  const itemsQty = parsed.cart.items.reduce(
+                    (acc, it) => acc + Math.max(1, Number(it.quantity || 1)),
+                    0
+                  );
+                  if (itemsSum > 0 && parsed.cart.subtotalCents !== itemsSum) {
+                    parsed.cart.subtotalCents = itemsSum;
+                    parsed.cart.itemsCount = itemsQty;
+                    parsed.cart.totalCents = Math.max(
+                      0,
+                      itemsSum + Number(parsed.cart.shippingCents || 0) - Number(parsed.cart.discountCents || 0)
+                    );
+                    parsed.cart.pixTotalCents = parsed.cart.totalCents;
+                    if (parsed.attribution) {
+                      parsed.attribution.conversionValueCents = parsed.cart.totalCents;
+                    }
+                    needsHealPersist = true;
+                  }
+                }
+                // Auto-cura 2: Se foi marcado como lead_submitted sem dados de contato (exceto seed oficial), ajusta para begin_checkout
+                const isSeedRecord = SEED_ADS_RECORDS.some((s) => s.id === parsed.id);
+                const hasContact = Boolean(
+                  parsed.customer?.whatsapp ||
+                    parsed.customer?.email ||
+                    parsed.customer?.document ||
+                    (parsed.customer?.name && !parsed.customer.name.startsWith("Visitante"))
+                );
+                if (!isSeedRecord && parsed.funnelStage === "lead_submitted" && !hasContact) {
+                  parsed.funnelStage = "begin_checkout";
+                  parsed.recordType = "abandoned_cart";
+                  if (parsed.attribution) {
+                    parsed.attribution.conversionActionName =
+                      "[Totem Pro] Início de Checkout (Begin Checkout)";
+                  }
+                  needsHealPersist = true;
+                }
                 this.recordsMap.set(parsed.id, parsed);
+                if (needsHealPersist) {
+                  this.persistToAppwrite(parsed).catch(() => {});
+                }
               }
             } catch {
               // Ignora documento malformado
@@ -1404,6 +1449,18 @@ class AdsLeadsCartsStore {
         customerDocument
     );
 
+    // Ignora eventos de visualização de carrinho ou checkout vazio quando não há itens, não há registro anterior e não há contato
+    if (
+      mappedItems.length === 0 &&
+      !existing &&
+      !hasContactIdentified &&
+      (event.eventName === "view_cart" ||
+        event.eventName === "begin_checkout" ||
+        event.eventName === "checkout_draft")
+    ) {
+      return null;
+    }
+
     // Atribuição de campanha
     const attrMeta = meta.campaignAttribution || {};
     const gclid = String(attrMeta.gclid || meta.gclid || existing?.attribution.gclid || "");
@@ -1434,13 +1491,15 @@ class AdsLeadsCartsStore {
     };
 
     const currentPriority = existing ? stagePriority[existing.funnelStage] || 0 : 0;
-    const incomingPriority = stagePriority[event.eventName] || 1;
-    const finalStage = (
-      incomingPriority >= currentPriority
-        ? event.eventName === "checkout_draft"
+    const mappedEventStage =
+      event.eventName === "checkout_draft"
+        ? hasContactIdentified
           ? "lead_submitted"
-          : event.eventName
-        : existing!.funnelStage
+          : existing?.funnelStage || "begin_checkout"
+        : event.eventName;
+    const incomingPriority = stagePriority[mappedEventStage] || 1;
+    const finalStage = (
+      incomingPriority >= currentPriority ? mappedEventStage : existing!.funnelStage
     ) as AdsLeadCartRecord["funnelStage"];
 
     let recordType: AdsRecordType = existing?.recordType || "abandoned_cart";

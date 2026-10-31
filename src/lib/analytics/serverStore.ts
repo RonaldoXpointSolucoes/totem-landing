@@ -146,9 +146,121 @@ class AnalyticsServerStore {
   private improvements: FunnelImprovementAction[] = [];
   private maxEvents = 5000;
   private initialized = false;
+  private appwriteHydrated = false;
 
   constructor() {
     this.loadFromDisk();
+  }
+
+  public async ensureHydratedFromAppwrite(): Promise<void> {
+    this.loadFromDisk();
+    if (this.appwriteHydrated) return;
+    this.appwriteHydrated = true;
+
+    try {
+      const records = await adsLeadsCartsStore.listRecords();
+      const existingSessionEvents = new Set(
+        this.events.map((e) => `${e.sessionId}::${e.eventName}`)
+      );
+      const synthesized: StoredAnalyticsEvent[] = [];
+
+      for (const rec of records) {
+        const sid = rec.sessionId || rec.id;
+        const ts = rec.createdAt || rec.updatedAt || new Date().toISOString();
+        const firstItem = rec.cart?.items?.[0];
+        const baseMeta: Record<string, unknown> = {
+          modelId: firstItem?.cabinetModelId || "cabinet-wall",
+          modelName: firstItem?.cabinetName || "Gabinete Totem",
+          colorId: firstItem?.colorId || "color-white",
+          colorName: firstItem?.colorName || "Branco TX",
+          monitorName: firstItem?.monitorName || undefined,
+          printerName: firstItem?.printerName || undefined,
+          referrer:
+            rec.attribution?.source === "google_ads"
+              ? "https://www.google.com/"
+              : rec.attribution?.referrer || "",
+          pathname: rec.attribution?.landingUrl || "/",
+          screenWidth: rec.telemetry?.device === "MOBILE" ? 390 : 1440,
+        };
+
+        const impliedEvents: AnalyticsEventType[] = [
+          ANALYTICS_EVENTS.VIEW_HOME,
+          ANALYTICS_EVENTS.START_CONFIGURATOR,
+          ANALYTICS_EVENTS.SELECT_CABINET_MODEL,
+        ];
+
+        if (
+          rec.funnelStage === "add_to_cart" ||
+          rec.funnelStage === "view_cart" ||
+          rec.funnelStage === "shipping_simulated" ||
+          rec.funnelStage === "begin_checkout" ||
+          rec.funnelStage === "lead_submitted" ||
+          rec.funnelStage === "pix_generated" ||
+          rec.funnelStage === "purchase" ||
+          (rec.cart?.items && rec.cart.items.length > 0)
+        ) {
+          impliedEvents.push(ANALYTICS_EVENTS.ADD_TO_CART);
+        }
+
+        if (
+          rec.funnelStage === "begin_checkout" ||
+          rec.funnelStage === "lead_submitted" ||
+          rec.funnelStage === "pix_generated" ||
+          rec.funnelStage === "purchase"
+        ) {
+          impliedEvents.push(ANALYTICS_EVENTS.BEGIN_CHECKOUT);
+        }
+
+        if (
+          rec.funnelStage === "lead_submitted" ||
+          rec.funnelStage === "pix_generated" ||
+          rec.funnelStage === "purchase"
+        ) {
+          impliedEvents.push(ANALYTICS_EVENTS.LEAD_SUBMITTED);
+        }
+
+        if (rec.funnelStage === "pix_generated" || rec.funnelStage === "purchase") {
+          impliedEvents.push(ANALYTICS_EVENTS.PIX_GENERATED);
+        }
+
+        if (rec.funnelStage === "purchase") {
+          impliedEvents.push(ANALYTICS_EVENTS.PURCHASE);
+        }
+
+        if (
+          rec.funnelStage === "whatsapp_click" ||
+          rec.recordType === "whatsapp_conversion" ||
+          rec.telemetry?.stepsJourney?.some((s) => s.toLowerCase().includes("whatsapp"))
+        ) {
+          impliedEvents.push(ANALYTICS_EVENTS.WHATSAPP_CLICK);
+        }
+
+        for (const evName of impliedEvents) {
+          const key = `${sid}::${evName}`;
+          if (!existingSessionEvents.has(key)) {
+            existingSessionEvents.add(key);
+            synthesized.push({
+              id: `hyd_${sid.slice(0, 10)}_${evName}`,
+              eventName: evName,
+              sessionId: sid,
+              timestamp: ts,
+              metadata: baseMeta,
+              ip: rec.telemetry?.ip,
+              userAgent: rec.telemetry?.userAgent,
+            });
+          }
+        }
+      }
+
+      if (synthesized.length > 0) {
+        this.events = [...this.events, ...synthesized]
+          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+          .slice(0, this.maxEvents);
+        this.saveEventsToDisk();
+      }
+    } catch (err) {
+      console.warn("[AnalyticsServerStore] Aviso ao hidratar funil a partir do Appwrite:", err);
+    }
   }
 
   private loadFromDisk(): void {

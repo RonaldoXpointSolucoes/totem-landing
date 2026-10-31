@@ -247,6 +247,18 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
   const [isCartSuccessModalOpen, setIsCartSuccessModalOpen] = useState(false);
   const [isMobileViewerOpen, setIsMobileViewerOpen] = useState(false);
+  const hasTrackedModelRef = React.useRef(false);
+
+  useEffect(() => {
+    if (step > 1 && !hasTrackedModelRef.current) {
+      hasTrackedModelRef.current = true;
+      trackEvent(ANALYTICS_EVENTS.SELECT_CABINET_MODEL, {
+        modelId: selectedModel.id,
+        modelName: selectedModel.name,
+        basePriceCents: selectedModel.basePriceCents,
+      });
+    }
+  }, [step, selectedModel]);
 
   // 2. Motor de Cálculo de Preço Reativo e Autoritativo
   const pricing = useMemo(() => {
@@ -305,6 +317,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
   };
 
   const handleSelectModel = (model: CabinetModel) => {
+    hasTrackedModelRef.current = true;
     setSelectedModel(model);
     trackEvent(ANALYTICS_EVENTS.SELECT_CABINET_MODEL, {
       modelId: model.id,
@@ -441,6 +454,14 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
         assemblyServicePriceCents: isKitSelected && nextVal ? 99900 : 0,
       };
       updateItem(targetId, updatedConfig);
+      trackEvent(ANALYTICS_EVENTS.VIEW_CART, {
+        modelId: selectedModel.id,
+        cabinetName: selectedModel.name,
+        assemblyServiceSelected: isKitSelected ? nextVal : false,
+        includeAssemblyService: isKitSelected ? nextVal : false,
+        pixPriceCents: updatedPricing.pixTotalPriceCents,
+        totalCents: updatedPricing.pixTotalPriceCents,
+      });
     }
   };
 

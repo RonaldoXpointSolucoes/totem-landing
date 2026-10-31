@@ -71,6 +71,8 @@ export async function GET(req: NextRequest) {
 
     const filterOpts: FunnelFilterOptions = { period, device, search };
 
+    await analyticsServerStore.ensureHydratedFromAppwrite();
+
     const [funnelMetrics, eventCounts, recentEvents, snapshots, improvements, commercial] =
       await Promise.all([
         Promise.resolve(analyticsServerStore.calculateFunnelMetrics(filterOpts)),

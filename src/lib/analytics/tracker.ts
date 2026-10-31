@@ -620,6 +620,7 @@ function dispatchToAdPlatforms(
 }
 
 let lastWhatsappClickTs = 0;
+let lastStartConfiguratorTs = 0;
 
 function collectBrowserSnapshots() {
   if (typeof window === "undefined") return {};
@@ -656,6 +657,7 @@ function collectBrowserSnapshots() {
           );
           return {
             id: String(it?.id || `item_${idx + 1}`),
+            itemId: String(it?.id || it?.itemId || `item_${idx + 1}`),
             cabinetModelId: String(it?.cabinetModelId || model?.id || "floor_totem"),
             cabinetName: String(
               it?.cabinetName || model?.name || "Gabinete Totem de Autoatendimento"
@@ -753,6 +755,15 @@ export function trackEvent(
       return;
     }
     lastWhatsappClickTs = now;
+  }
+
+  // Deduplicação automática de início de configurador (evita duplo disparo entre clique na Home e montagem da rota /monte-seu-totem)
+  if (eventName === ANALYTICS_EVENTS.START_CONFIGURATOR) {
+    const now = Date.now();
+    if (now - lastStartConfiguratorTs < 2500) {
+      return;
+    }
+    lastStartConfiguratorTs = now;
   }
 
   const sessionId = getOrCreateSessionId();
