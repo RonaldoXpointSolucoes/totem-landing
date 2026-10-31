@@ -401,7 +401,7 @@ class AnalyticsServerStore {
           eventName: event.eventName,
           sessionId: event.sessionId,
           timestamp: event.timestamp,
-          metadataJson: JSON.stringify(event.metadata || {}),
+          metadataJson: JSON.stringify(event.metadata || {}).slice(0, 14900),
         }
       );
     } catch {

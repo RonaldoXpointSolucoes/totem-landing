@@ -38,7 +38,7 @@ import {
   Edit3,
   Save,
 } from "lucide-react";
-import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
+import { trackEvent, ANALYTICS_EVENTS, getOrCreateSessionId } from "@/lib/analytics/tracker";
 
 interface CheckoutViewProps {
   onBackToCart: () => void;
@@ -587,61 +587,157 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     };
   }, []);
 
-  // Persistência contínua e silenciosa no localStorage e no Appwrite (ads_leads_carts) para total resiliência
-  useEffect(() => {
-    let draftTimer: ReturnType<typeof setTimeout> | null = null;
-    try {
-      if (name || email || whatsapp || document || (cep && cep.length >= 8)) {
+  // Sincronização imediata de dados do comprador e carrinho no localStorage e no Appwrite (ads_leads_carts)
+  const syncCheckoutDraftNow = React.useCallback(
+    (triggerReason = "auto") => {
+      try {
+        const hasAnyData = Boolean(
+          name.trim() ||
+            email.trim() ||
+            whatsapp.trim() ||
+            document.trim() ||
+            (cep && cep.replace(/\D/g, "").length >= 5)
+        );
+        if (!hasAnyData) return;
+
         const profilePayload = {
-          name,
-          email,
-          whatsapp,
-          document,
+          name: name.trim(),
+          email: email.trim(),
+          whatsapp: whatsapp.trim(),
+          document: document.trim(),
           personType,
-          cep,
-          street,
-          number,
-          complement,
-          neighborhood,
-          city,
-          state,
+          cep: cep.trim(),
+          street: street.trim(),
+          number: number.trim(),
+          complement: complement.trim(),
+          neighborhood: neighborhood.trim(),
+          city: city.trim(),
+          state: state.trim(),
           address: {
-            cep,
-            street,
-            number,
-            complement,
-            neighborhood,
-            city,
-            state,
+            cep: cep.trim(),
+            street: street.trim(),
+            number: number.trim(),
+            complement: complement.trim(),
+            neighborhood: neighborhood.trim(),
+            city: city.trim(),
+            state: state.trim(),
           },
         };
         localStorage.setItem("totem_saved_buyer_profile", JSON.stringify(profilePayload));
         localStorage.setItem("totem_checkout_draft_v2", JSON.stringify(profilePayload));
 
-        draftTimer = setTimeout(() => {
-          trackEvent(ANALYTICS_EVENTS.CHECKOUT_DRAFT, {
-            customerName: name,
-            email,
-            whatsapp,
-            document,
-            cep,
-            street,
-            number,
-            complement,
-            neighborhood,
-            city,
-            state,
-            totalCents: finalTotalCents,
-            shippingCents,
-            paymentMethod,
+        const cartItemsSnapshot = items.map((i) => {
+          const p = calculateTotemPrice({
+            cabinet: i.configuration.model,
+            color: i.configuration.color,
+            monitor: i.configuration.monitor,
+            printer: i.configuration.printer,
+            barcodeReader: i.configuration.barcodeReader,
+            includeAssemblyService: i.configuration.includeAssemblyService,
           });
-        }, 1400);
+          const isKitSelected = Boolean(
+            i.configuration.monitor?.isKit ||
+              String(i.configuration.monitor?.displayName || "")
+                .toLowerCase()
+                .includes("kit")
+          );
+          return {
+            id: i.id,
+            cabinetModelId: i.configuration.model.id,
+            cabinetName: i.configuration.model.name,
+            colorId: i.configuration.color.id,
+            colorName: i.configuration.color.name,
+            monitorId: i.configuration.monitor?.id || undefined,
+            monitorName: i.configuration.monitor?.displayName || undefined,
+            printerId: i.configuration.printer?.id || undefined,
+            printerName: i.configuration.printer?.displayName || undefined,
+            barcodeReaderId: i.configuration.barcodeReader?.id || undefined,
+            barcodeReaderName: i.configuration.barcodeReader?.displayName || undefined,
+            isKitSelected,
+            purchaseMode: isKitSelected ? "complete_kit" : "cabinet_only",
+            assemblyServiceSelected: Boolean(i.configuration.includeAssemblyService),
+            assemblyFeeCents: i.configuration.includeAssemblyService ? 99900 : 0,
+            customizationNotes: i.configuration.customizationNotes || "",
+            quantity: i.quantity,
+            unitPriceCents: p.pixTotalPriceCents,
+            pixPriceCents: p.pixTotalPriceCents,
+            cardPriceCents: p.cardTotalPriceCents,
+            subtotalCents: p.pixTotalPriceCents * i.quantity,
+          };
+        });
+
+        trackEvent(ANALYTICS_EVENTS.CHECKOUT_DRAFT, {
+          customerName: name.trim(),
+          name: name.trim(),
+          email: email.trim(),
+          whatsapp: whatsapp.trim(),
+          phone: whatsapp.trim(),
+          document: document.trim(),
+          personType,
+          cep: cep.trim(),
+          street: street.trim(),
+          number: number.trim(),
+          complement: complement.trim(),
+          neighborhood: neighborhood.trim(),
+          city: city.trim(),
+          state: state.trim(),
+          totalCents: finalTotalCents,
+          shippingCents,
+          shippingCarrier:
+            selectedShippingQuote?.carrier || selectedShippingQuote?.name || "",
+          shippingDeliveryDays: selectedShippingQuote?.deliveryDaysMax || 0,
+          paymentMethod,
+          triggerReason,
+          cartItems: cartItemsSnapshot,
+        });
+      } catch {}
+    },
+    [
+      name,
+      email,
+      whatsapp,
+      document,
+      personType,
+      cep,
+      street,
+      number,
+      complement,
+      neighborhood,
+      city,
+      state,
+      finalTotalCents,
+      shippingCents,
+      selectedShippingQuote,
+      paymentMethod,
+      items,
+    ]
+  );
+
+  // Persistência contínua e silenciosa no localStorage e no Appwrite (ads_leads_carts) com debounce rápido (450ms)
+  useEffect(() => {
+    const draftTimer = setTimeout(() => {
+      syncCheckoutDraftNow("debounced_input");
+    }, 450);
+    return () => clearTimeout(draftTimer);
+  }, [syncCheckoutDraftNow]);
+
+  // Garante envio imediato via sendBeacon se o usuário trocar de aba, abrir o WhatsApp ou fechar a janela
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (window.document.visibilityState === "hidden") {
+        syncCheckoutDraftNow("visibility_hidden");
       }
-    } catch {}
-    return () => {
-      if (draftTimer) clearTimeout(draftTimer);
     };
-  }, [name, email, whatsapp, document, personType, cep, street, number, complement, neighborhood, city, state, finalTotalCents, shippingCents, paymentMethod]);
+    const handlePageHide = () => {
+      syncCheckoutDraftNow("page_hide");
+    };
+    window.document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handlePageHide);
+    return () => {
+      window.document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handlePageHide);
+    };
+  }, [syncCheckoutDraftNow]);
 
   // Alterna para um endereço salvo na conta do cliente
   const handleSelectAddress = (addr: DeliveryAddress, index: number) => {
@@ -688,18 +784,21 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     e.preventDefault();
     setErrorMsg(null);
 
+    // Salva imediatamente no painel ADS qualquer dado já digitado antes mesmo das validações
+    syncCheckoutDraftNow("submit_button_click");
+
     // Validações básicas
     if (!name.trim()) return setErrorMsg("Por favor, preencha o Nome Completo ou Razão Social.");
+    if (!whatsapp.trim() || whatsapp.replace(/\D/g, "").length < 10) {
+      return setErrorMsg("Por favor, informe um WhatsApp válido com DDD.");
+    }
+    if (!email.trim() || !email.includes("@")) return setErrorMsg("Por favor, informe um e-mail válido.");
     if (personType === "company" && (!document.trim() || document.replace(/\D/g, "").length < 14)) {
       return setErrorMsg("Por favor, preencha um CNPJ válido da empresa.");
     }
     if (personType === "individual" && document.replace(/\D/g, "").length !== 11) return setErrorMsg("Informe seu CPF para processar o pagamento.");
-    if (!email.trim() || !email.includes("@")) return setErrorMsg("Por favor, informe um e-mail válido.");
-    if (!whatsapp.trim() || whatsapp.replace(/\D/g, "").length < 10) {
-      return setErrorMsg("Por favor, informe um WhatsApp válido com DDD.");
-    }
     if (!cep.trim() || !street.trim() || !number.trim() || !city.trim()) {
-      return setErrorMsg("Por favor, preencha o endereço de entrega completo.");
+      return setErrorMsg("Por favor, preencha o endereço de entrega completo (incluindo o número).");
     }
     if (shippingQuotes.some((q) => q.isAvailable) && !selectedShippingId) {
       return setErrorMsg("Por favor, selecione uma modalidade de frete ou retirada na fábrica.");
@@ -709,6 +808,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
 
     try {
       const payload = {
+        sessionId: getOrCreateSessionId(),
         paymentMethod,
         customer: {
           personType,
@@ -733,14 +833,26 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
         items: items.map((i) => ({
           id: i.id,
           modelId: i.configuration.model.id,
+          cabinetName: i.configuration.model.name,
           colorId: i.configuration.color.id,
+          colorName: i.configuration.color.name,
           monitorId: i.configuration.monitor?.id || null,
+          monitorName: i.configuration.monitor?.displayName || null,
           customMonitor: i.configuration.monitor?.isCustom ? i.configuration.monitor : undefined,
           printerId: i.configuration.printer?.id || null,
+          printerName: i.configuration.printer?.displayName || null,
           readerId: i.configuration.barcodeReader?.id || null,
+          readerName: i.configuration.barcodeReader?.displayName || null,
           hasScanner: !!i.configuration.barcodeReader,
+          isKitSelected: Boolean(
+            i.configuration.monitor?.isKit ||
+              String(i.configuration.monitor?.displayName || "")
+                .toLowerCase()
+                .includes("kit")
+          ),
           customizationNotes: i.configuration.customizationNotes || "",
           includeAssemblyService: Boolean(i.configuration.includeAssemblyService),
+          unitPriceCents: i.unitPriceCents,
           quantity: i.quantity,
         })),
       };
@@ -1285,58 +1397,44 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
             </div>
 
             <div className="space-y-4 text-xs">
-              <div>
-                <label htmlFor="checkout-name" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
-                  {personType === "individual" ? "Nome Completo" : "Razão Social da Empresa"} *
-                </label>
-                <Input
-                  id="checkout-name"
-                  name="name"
-                  type="text"
-                  autoComplete="name"
-                  placeholder={personType === "individual" ? "Ex: João da Silva" : "Ex: X-Point Soluções Tecnológicas Ltda"}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="checkout-name" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                    {personType === "individual" ? "Nome Completo" : "Razão Social da Empresa"} *
+                  </label>
+                  <Input
+                    id="checkout-name"
+                    name="name"
+                    type="text"
+                    autoComplete="name"
+                    placeholder={personType === "individual" ? "Ex: João da Silva" : "Ex: X-Point Soluções Tecnológicas Ltda"}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    onBlur={() => syncCheckoutDraftNow("name_blur")}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="checkout-whatsapp" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                    WhatsApp para Acompanhamento *
+                  </label>
+                  <Input
+                    id="checkout-whatsapp"
+                    name="tel"
+                    type="tel"
+                    autoComplete="tel"
+                    placeholder="(00) 00000-0000"
+                    value={whatsapp}
+                    onChange={(e) => setWhatsapp(maskPhone(e.target.value))}
+                    onBlur={() => syncCheckoutDraftNow("whatsapp_blur")}
+                    required
+                  />
+                </div>
               </div>
 
               {personType === "company" ? (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label htmlFor="checkout-cnpj" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
-                        CNPJ da Empresa *
-                      </label>
-                      <Input
-                        id="checkout-cnpj"
-                        name="cnpj"
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="00.000.000/0000-00"
-                        value={document}
-                        onChange={(e) => setDocument(maskCNPJ(e.target.value))}
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label htmlFor="checkout-whatsapp-pj" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
-                        WhatsApp para Acompanhamento *
-                      </label>
-                      <Input
-                        id="checkout-whatsapp-pj"
-                        name="tel"
-                        type="tel"
-                        autoComplete="tel"
-                        placeholder="(00) 00000-0000"
-                        value={whatsapp}
-                        onChange={(e) => setWhatsapp(maskPhone(e.target.value))}
-                        required
-                      />
-                    </div>
-                  </div>
-
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="checkout-email-pj" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                       E-mail Corporativo / Faturamento *
@@ -1349,32 +1447,30 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                       placeholder="contato@empresa.com.br"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                </>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="sm:col-span-2">
-                    <label htmlFor="checkout-cpf" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">CPF do comprador *</label>
-                    <Input id="checkout-cpf" name="cpf" inputMode="numeric" placeholder="000.000.000-00" value={document} onChange={(e) => setDocument(maskCPF(e.target.value))} required />
-                  </div>
-                  <div>
-                    <label htmlFor="checkout-whatsapp-pf" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
-                      WhatsApp para Acompanhamento *
-                    </label>
-                    <Input
-                      id="checkout-whatsapp-pf"
-                      name="tel"
-                      type="tel"
-                      autoComplete="tel"
-                      placeholder="(00) 00000-0000"
-                      value={whatsapp}
-                      onChange={(e) => setWhatsapp(maskPhone(e.target.value))}
+                      onBlur={() => syncCheckoutDraftNow("email_blur")}
                       required
                     />
                   </div>
 
+                  <div>
+                    <label htmlFor="checkout-cnpj" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                      CNPJ da Empresa *
+                    </label>
+                    <Input
+                      id="checkout-cnpj"
+                      name="cnpj"
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="00.000.000/0000-00"
+                      value={document}
+                      onChange={(e) => setDocument(maskCNPJ(e.target.value))}
+                      onBlur={() => syncCheckoutDraftNow("document_blur")}
+                      required
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="checkout-email-pf" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                       E-mail para Acompanhamento e Rastreio *
@@ -1387,6 +1483,23 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                       placeholder="seuemail@exemplo.com.br"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      onBlur={() => syncCheckoutDraftNow("email_blur")}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="checkout-cpf" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                      CPF do Comprador *
+                    </label>
+                    <Input
+                      id="checkout-cpf"
+                      name="cpf"
+                      inputMode="numeric"
+                      placeholder="000.000.000-00"
+                      value={document}
+                      onChange={(e) => setDocument(maskCPF(e.target.value))}
+                      onBlur={() => syncCheckoutDraftNow("document_blur")}
                       required
                     />
                   </div>
@@ -1441,6 +1554,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                       placeholder="00000-000"
                       value={cep}
                       onChange={handleCepChange}
+                      onBlur={() => syncCheckoutDraftNow("cep_blur")}
                       required
                       className={isLoadingCep ? "pr-9 border-[#0071e3] ring-1 ring-[#0071e3]/20" : ""}
                     />
@@ -1474,6 +1588,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                     placeholder={isLoadingCep ? "Buscando logradouro..." : "Ex: Av. Paulista"}
                     value={street}
                     onChange={(e) => setStreet(e.target.value)}
+                    onBlur={() => syncCheckoutDraftNow("street_blur")}
                     required
                     className={isLoadingCep ? "animate-pulse bg-blue-50/30" : ""}
                   />
@@ -1487,6 +1602,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                     placeholder="Ex: 1000"
                     value={number}
                     onChange={(e) => setNumber(e.target.value)}
+                    onBlur={() => syncCheckoutDraftNow("number_blur")}
                     required
                   />
                 </div>
@@ -1503,6 +1619,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                     placeholder="Sala 402, Bloco B"
                     value={complement}
                     onChange={(e) => setComplement(e.target.value)}
+                    onBlur={() => syncCheckoutDraftNow("complement_blur")}
                   />
                 </div>
                 <div>
@@ -1514,6 +1631,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                     placeholder={isLoadingCep ? "Buscando bairro..." : "Bela Vista"}
                     value={neighborhood}
                     onChange={(e) => setNeighborhood(e.target.value)}
+                    onBlur={() => syncCheckoutDraftNow("neighborhood_blur")}
                     required
                     className={isLoadingCep ? "animate-pulse bg-blue-50/30" : ""}
                   />
@@ -1529,6 +1647,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                       placeholder={isLoadingCep ? "Buscando cidade..." : "São Paulo"}
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
+                      onBlur={() => syncCheckoutDraftNow("city_blur")}
                       required
                       className={`flex-1 ${isLoadingCep ? "animate-pulse bg-blue-50/30" : ""}`}
                     />
@@ -1541,6 +1660,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                       placeholder="SP"
                       value={state}
                       onChange={(e) => setState(e.target.value)}
+                      onBlur={() => syncCheckoutDraftNow("state_blur")}
                       required
                       className="w-14 text-center uppercase"
                       maxLength={2}
@@ -2186,10 +2306,18 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
               <p className="flex justify-between text-sm font-bold"><span>Total selecionado</span><span>{formatBRL(finalTotalCents)}</span></p>
             </fieldset>
 
+            {errorMsg && (
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-500/40 text-rose-700 dark:text-rose-300 text-xs flex items-start gap-2 animate-in fade-in">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-500 dark:text-rose-400 mt-0.5" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
             <Button
               type="submit"
               variant="primary"
               size="lg"
+              onClick={() => syncCheckoutDraftNow("submit_button_click")}
               disabled={isSubmitting || items.length === 0}
               className="w-full font-bold shadow-blue-500/25 shadow-lg text-sm bg-[#0071e3] hover:bg-[#0077ed]"
             >
@@ -2205,6 +2333,40 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                 </>
               )}
             </Button>
+
+            <a
+              href={`https://wa.me/5511991649959?text=${encodeURIComponent(
+                `Olá! Estou no checkout do Totem Pro${name ? ` (${name})` : ""}${cep ? ` - CEP ${cep}` : ""}. Quero concluir meu pedido (${items
+                  .map(
+                    (it) =>
+                      `${it.quantity}x ${it.configuration.model.name} (${it.configuration.color.name})`
+                  )
+                  .join(", ")}) no valor de ${formatBRL(finalTotalCents)} via ${
+                  paymentMethod === "credit_card" ? "Cartão de Crédito" : "PIX"
+                }.`
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => {
+                syncCheckoutDraftNow("checkout_whatsapp_assist");
+                trackEvent(ANALYTICS_EVENTS.WHATSAPP_CLICK, {
+                  source: "checkout_payment_assist",
+                  buttonId: "btn-checkout-whatsapp-assist",
+                  customerName: name.trim(),
+                  whatsapp: whatsapp.trim(),
+                  email: email.trim(),
+                  cep: cep.trim(),
+                  city: city.trim(),
+                  state: state.trim(),
+                  totalCents: finalTotalCents,
+                  paymentMethod,
+                });
+              }}
+              className="w-full py-2.5 px-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer text-center"
+            >
+              <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+              <span>Dúvida no pagamento ou limite do cartão? Finalizar no WhatsApp</span>
+            </a>
           </Card>
         </div>
       </form>

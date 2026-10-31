@@ -1125,43 +1125,115 @@ class AdsLeadsCartsStore {
     const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
     const device = isMobile ? "MOBILE" : "DESKTOP";
 
-    // Extrai itens do carrinho se enviados no evento ou no cartSnapshot
-    const rawItems: any[] = Array.isArray(meta.cartItems)
+    // Extrai itens do carrinho se enviados no evento ou no cartSnapshot (suporta formato plano ou CartItem.configuration)
+    const rawItems: any[] = Array.isArray(meta.cartItems) && meta.cartItems.length > 0
       ? meta.cartItems
-      : Array.isArray(meta.cartSnapshot)
+      : Array.isArray(meta.cartSnapshot) && meta.cartSnapshot.length > 0
       ? meta.cartSnapshot
       : [];
+
+    const existingItemsById = new Map<string, AdsCartItemSnapshot>();
+    for (const prevIt of existing?.cart.items || []) {
+      if (prevIt.itemId) existingItemsById.set(prevIt.itemId, prevIt);
+    }
 
     const mappedItems: AdsCartItemSnapshot[] =
       rawItems.length > 0
         ? rawItems.map((it: any, idx: number) => {
-            const qty = Math.max(1, Number(it.quantity || 1));
+            const cfg = it?.configuration || {};
+            const cfgModel = cfg.model || {};
+            const cfgColor = cfg.color || {};
+            const cfgMonitor = cfg.monitor || null;
+            const cfgPrinter = cfg.printer || null;
+            const cfgReader = cfg.barcodeReader || null;
+
+            const itemId = String(it.id || it.itemId || `item_${idx + 1}`);
+            const prevItem = existingItemsById.get(itemId);
+
+            const qty = Math.max(1, Number(it.quantity || prevItem?.quantity || 1));
             const unitCents = Number(
               it.unitPriceCents ||
                 it.pixPriceCents ||
-                (it.unitPrice ? Math.round(Number(it.unitPrice) * 100) : 159000)
+                cfg.calculatedPriceCents ||
+                cfgModel.pixPriceCents ||
+                (it.unitPrice ? Math.round(Number(it.unitPrice) * 100) : prevItem?.unitPriceCents || 159000)
             );
+
+            const rawCabinetName = String(
+              it.cabinetName ||
+                cfgModel.name ||
+                it.modelName ||
+                prevItem?.cabinetName ||
+                "Gabinete Totem de Autoatendimento"
+            );
+            const cabinetName =
+              rawCabinetName === "Gabinete Totem de Autoatendimento" &&
+              prevItem?.cabinetName &&
+              prevItem.cabinetName !== "Gabinete Totem de Autoatendimento"
+                ? prevItem.cabinetName
+                : rawCabinetName;
+
+            const colorId = it.colorId || cfgColor.id || prevItem?.colorId;
+            const colorName = it.colorName || cfgColor.name || prevItem?.colorName;
+            const monitorId = it.monitorId || cfgMonitor?.id || prevItem?.monitorId;
+            const monitorName =
+              it.monitorName ||
+              cfgMonitor?.displayName ||
+              cfgMonitor?.model ||
+              prevItem?.monitorName;
+            const printerId = it.printerId || cfgPrinter?.id || prevItem?.printerId;
+            const printerName =
+              it.printerName ||
+              cfgPrinter?.displayName ||
+              cfgPrinter?.model ||
+              prevItem?.printerName;
+            const barcodeReaderId =
+              it.barcodeReaderId || it.readerId || cfgReader?.id || prevItem?.barcodeReaderId;
+            const barcodeReaderName =
+              it.barcodeReaderName ||
+              it.readerName ||
+              cfgReader?.displayName ||
+              cfgReader?.model ||
+              prevItem?.barcodeReaderName;
+
+            const isKit = Boolean(
+              it.isKitSelected ||
+                it.purchaseMode === "complete_kit" ||
+                cfgMonitor?.isKit ||
+                String(monitorName || "").toLowerCase().includes("kit") ||
+                prevItem?.purchaseMode === "complete_kit"
+            );
+            const assemblySelected = Boolean(
+              it.assemblyServiceSelected ??
+                it.includeAssemblyService ??
+                cfg.includeAssemblyService ??
+                prevItem?.assemblyServiceSelected
+            );
+
             return {
-              itemId: String(it.id || `item_${idx + 1}`),
-              cabinetModelId: String(it.cabinetModelId || "floor_totem"),
-              cabinetName: String(
-                it.cabinetName || it.modelName || "Gabinete Totem de Autoatendimento"
+              itemId,
+              cabinetModelId: String(
+                it.cabinetModelId || cfgModel.id || it.modelId || prevItem?.cabinetModelId || "floor_totem"
               ),
-              colorId: it.colorId ? String(it.colorId) : undefined,
-              colorName: it.colorName ? String(it.colorName) : undefined,
-              monitorId: it.monitorId ? String(it.monitorId) : undefined,
-              monitorName: it.monitorName ? String(it.monitorName) : undefined,
-              printerId: it.printerId ? String(it.printerId) : undefined,
-              printerName: it.printerName ? String(it.printerName) : undefined,
-              barcodeReaderId: it.barcodeReaderId ? String(it.barcodeReaderId) : undefined,
-              barcodeReaderName: it.barcodeReaderName ? String(it.barcodeReaderName) : undefined,
-              purchaseMode:
-                it.isKitSelected || it.purchaseMode === "complete_kit"
-                  ? "complete_kit"
-                  : "cabinet_only",
-              assemblyServiceSelected: Boolean(it.assemblyServiceSelected),
-              assemblyFeeCents: Number(it.assemblyFeeCents || 0),
-              customizationNotes: String(it.customizationNotes || ""),
+              cabinetName,
+              colorId: colorId ? String(colorId) : undefined,
+              colorName: colorName ? String(colorName) : undefined,
+              monitorId: monitorId ? String(monitorId) : undefined,
+              monitorName: monitorName ? String(monitorName) : undefined,
+              printerId: printerId ? String(printerId) : undefined,
+              printerName: printerName ? String(printerName) : undefined,
+              barcodeReaderId: barcodeReaderId ? String(barcodeReaderId) : undefined,
+              barcodeReaderName: barcodeReaderName ? String(barcodeReaderName) : undefined,
+              purchaseMode: isKit ? "complete_kit" : "cabinet_only",
+              assemblyServiceSelected: assemblySelected,
+              assemblyFeeCents: Number(
+                it.assemblyFeeCents ||
+                  cfg.assemblyServicePriceCents ||
+                  (assemblySelected ? 99900 : 0)
+              ),
+              customizationNotes: String(
+                it.customizationNotes || cfg.customizationNotes || prevItem?.customizationNotes || ""
+              ),
               quantity: qty,
               unitPriceCents: unitCents,
               pixPriceCents: Number(it.pixPriceCents || unitCents),
@@ -1178,9 +1250,10 @@ class AdsLeadsCartsStore {
               cabinetModelId: String(meta.modelId || "floor_totem"),
               cabinetName: String(
                 meta.cabinetName ||
-                  (meta.modelId === "wall_totem"
-                    ? "Gabinete Totem de Parede Compacto"
-                    : "Gabinete Totem de Piso Autoatendimento")
+                  meta.modelName ||
+                  (meta.modelId === "wall_totem" || meta.modelId === "cabinet-wall"
+                    ? "Gabinete de Parede"
+                    : "Gabinete de Piso")
               ),
               colorId: meta.colorId ? String(meta.colorId) : undefined,
               colorName: meta.colorName ? String(meta.colorName) : undefined,
@@ -1191,8 +1264,11 @@ class AdsLeadsCartsStore {
               barcodeReaderId: meta.readerId ? String(meta.readerId) : undefined,
               barcodeReaderName: meta.readerName ? String(meta.readerName) : undefined,
               purchaseMode: meta.isKitSelected ? "complete_kit" : "cabinet_only",
-              assemblyServiceSelected: Boolean(meta.assemblyServiceSelected),
-              assemblyFeeCents: meta.assemblyServiceSelected ? 99900 : 0,
+              assemblyServiceSelected: Boolean(
+                meta.assemblyServiceSelected || meta.includeAssemblyService
+              ),
+              assemblyFeeCents:
+                meta.assemblyServiceSelected || meta.includeAssemblyService ? 99900 : 0,
               customizationNotes: String(meta.customizationNotes || ""),
               quantity: Math.max(1, Number(meta.quantity || 1)),
               unitPriceCents: Number(
@@ -1218,6 +1294,8 @@ class AdsLeadsCartsStore {
     const itemsSubtotalCents = mappedItems.reduce((acc, it) => acc + it.subtotalCents, 0);
     const totalFromMetaCents = meta.totalCents
       ? Number(meta.totalCents)
+      : meta.totalPriceCents
+      ? Number(meta.totalPriceCents)
       : meta.totalPrice
       ? Math.round(Number(meta.totalPrice) * 100)
       : 0;
@@ -1238,23 +1316,28 @@ class AdsLeadsCartsStore {
         : existing?.cart.discountCents || 0;
     const totalCents = Math.max(0, subtotalCents + shippingCents - discountCents);
 
-    // Dados de cliente mesclados (nunca sobrescreve um dado preenchido por vazio)
+    // Dados de cliente mesclados (nunca sobrescreve um dado preenchido por vazio e sempre prioriza nome real sobre "Visitante")
     const draftCustomer = meta.customerDraft || meta.customer || {};
+    const draftAddr = draftCustomer.address || {};
     const cepVal = String(
-      draftCustomer.cep || meta.cep || existing?.customer.cep || ""
+      meta.cep || draftCustomer.cep || draftAddr.cep || existing?.customer.cep || ""
     ).trim();
 
     let resolvedCity = String(
-      draftCustomer.city || meta.city || existing?.customer.city || ""
+      meta.city || draftCustomer.city || draftAddr.city || existing?.customer.city || ""
     ).trim();
     let resolvedState = String(
-      draftCustomer.state || meta.state || existing?.customer.state || ""
+      meta.state || draftCustomer.state || draftAddr.state || existing?.customer.state || ""
     ).trim();
     let resolvedNeighborhood = String(
-      draftCustomer.neighborhood || meta.neighborhood || existing?.customer.neighborhood || ""
+      meta.neighborhood ||
+        draftCustomer.neighborhood ||
+        draftAddr.neighborhood ||
+        existing?.customer.neighborhood ||
+        ""
     ).trim();
     let resolvedStreet = String(
-      draftCustomer.street || meta.street || existing?.customer.street || ""
+      meta.street || draftCustomer.street || draftAddr.street || existing?.customer.street || ""
     ).trim();
 
     if (cepVal && (!resolvedCity || !resolvedState)) {
@@ -1267,24 +1350,59 @@ class AdsLeadsCartsStore {
       }
     }
 
+    const incomingRealName = String(
+      meta.customerName || meta.name || draftCustomer.name || ""
+    ).trim();
+    const existingRealName =
+      existing?.customer.name && !existing.customer.name.startsWith("Visitante")
+        ? existing.customer.name
+        : "";
+
     const customerName = String(
-      draftCustomer.name ||
-        meta.customerName ||
-        existing?.customer.name ||
+      (incomingRealName && !incomingRealName.startsWith("Visitante")
+        ? incomingRealName
+        : existingRealName) ||
         (resolvedCity
           ? `Visitante (${resolvedCity}/${resolvedState})`
-          : "Visitante do Site / Configurador")
+          : existing?.customer.name || "Visitante do Site / Configurador")
     ).trim();
 
     const customerWhatsapp = String(
-      draftCustomer.whatsapp || meta.whatsapp || existing?.customer.whatsapp || ""
+      meta.whatsapp ||
+        meta.phone ||
+        draftCustomer.whatsapp ||
+        draftCustomer.phone ||
+        existing?.customer.whatsapp ||
+        ""
     ).trim();
     const customerEmail = String(
-      draftCustomer.email || meta.email || existing?.customer.email || ""
+      meta.email || draftCustomer.email || existing?.customer.email || ""
     ).trim();
     const customerDocument = String(
-      draftCustomer.document || meta.document || existing?.customer.document || ""
+      meta.document ||
+        meta.cpf ||
+        meta.cnpj ||
+        draftCustomer.document ||
+        existing?.customer.document ||
+        ""
     ).trim();
+    const customerNumber = String(
+      meta.number || draftCustomer.number || draftAddr.number || existing?.customer.number || ""
+    ).trim();
+    const customerComplement = String(
+      meta.complement ||
+        draftCustomer.complement ||
+        draftAddr.complement ||
+        existing?.customer.complement ||
+        ""
+    ).trim();
+
+    const hasContactIdentified = Boolean(
+      (incomingRealName && !incomingRealName.startsWith("Visitante")) ||
+        customerWhatsapp ||
+        customerEmail ||
+        customerDocument
+    );
 
     // Atribuição de campanha
     const attrMeta = meta.campaignAttribution || {};
@@ -1361,7 +1479,15 @@ class AdsLeadsCartsStore {
       view_cart: "Visualizou o Carrinho (/carrinho)",
       shipping_simulated: `Simulou Frete para CEP ${cepVal || "informado"}`,
       begin_checkout: "Iniciou Checkout (/checkout)",
-      checkout_draft: "Preencheu Dados no Checkout",
+      checkout_draft: hasContactIdentified
+        ? `Preencheu Dados de Contato no Checkout (${[
+            incomingRealName || existingRealName,
+            customerWhatsapp,
+            customerEmail,
+          ]
+            .filter(Boolean)
+            .join(" • ")})`
+        : `Preencheu Endereço/CEP no Checkout (${cepVal || "em preenchimento"})`,
       lead_submitted: "Lead Identificado no Checkout",
       whatsapp_click: "Clicou no Botão WhatsApp Consultor Engenharia",
       pix_generated: "Gerou QR Code PIX no Checkout",
@@ -1379,17 +1505,22 @@ class AdsLeadsCartsStore {
       existing?.recordId ||
       `${isGoogleAds ? "ADS" : "CART"}-${dateCode}-${sessionClean.slice(0, 6).toUpperCase()}`;
 
+    const resolvedStatus: AdsLeadStatus =
+      finalStage === "purchase"
+        ? "converted_order"
+        : existing?.status && existing.status !== "abandoned"
+        ? existing.status
+        : hasContactIdentified
+        ? "awaiting_contact"
+        : "abandoned";
+
     const updatedRecord: AdsLeadCartRecord = {
       id: docId,
       recordId,
       sessionId: event.sessionId,
       recordType,
       funnelStage: finalStage,
-      status:
-        finalStage === "purchase"
-          ? "converted_order"
-          : existing?.status ||
-            (customerWhatsapp || customerEmail ? "awaiting_contact" : "abandoned"),
+      status: resolvedStatus,
       conversionsCount: (existing?.conversionsCount || 0) + (event.eventName === "add_to_cart" ? 1 : 0) || 1,
       customer: {
         name: customerName,
@@ -1398,8 +1529,8 @@ class AdsLeadsCartsStore {
         document: customerDocument,
         cep: cepVal,
         street: resolvedStreet,
-        number: String(draftCustomer.number || existing?.customer.number || ""),
-        complement: String(draftCustomer.complement || existing?.customer.complement || ""),
+        number: customerNumber,
+        complement: customerComplement,
         neighborhood: resolvedNeighborhood,
         city: resolvedCity,
         state: resolvedState,
@@ -1485,8 +1616,9 @@ class AdsLeadsCartsStore {
       const customer = body?.customer || {};
       const itemsRaw = Array.isArray(body?.items) ? body.items : [];
       const shipping = body?.shippingQuote || {};
+      const rawSessionId = String(body?.sessionId || "").trim();
       const sessionKey = String(
-        body?.sessionId ||
+        rawSessionId ||
           customer?.document?.replace(/\D/g, "") ||
           customer?.whatsapp?.replace(/\D/g, "") ||
           Date.now()
@@ -1494,40 +1626,92 @@ class AdsLeadsCartsStore {
         .replace(/[^a-zA-Z0-9]/g, "")
         .slice(0, 20);
 
-      const docId = `chk_${sessionKey}`;
+      const candidateSessDocId = `sess_${sessionKey}`;
+      const docId =
+        rawSessionId && (rawSessionId.startsWith("ses_") || this.recordsMap.has(candidateSessDocId))
+          ? candidateSessDocId
+          : `chk_${sessionKey}`;
       const existing = this.recordsMap.get(docId);
       const nowIso = new Date().toISOString();
 
-      const mappedItems: AdsCartItemSnapshot[] = itemsRaw.map((it: any, idx: number) => {
-        const qty = Math.max(1, Number(it.quantity || 1));
-        const unitCents = Number(
-          it.unitPriceCents ||
-            it.pixPriceCents ||
-            (it.unitPrice ? Math.round(Number(it.unitPrice) * 100) : 159000)
-        );
-        return {
-          itemId: String(it.id || `chk_item_${idx + 1}`),
-          cabinetModelId: String(it.cabinetModelId || "floor_totem"),
-          cabinetName: String(it.cabinetName || "Gabinete Totem de Autoatendimento"),
-          colorId: it.colorId ? String(it.colorId) : undefined,
-          colorName: it.colorName ? String(it.colorName) : undefined,
-          monitorId: it.monitorId ? String(it.monitorId) : undefined,
-          monitorName: it.monitorName ? String(it.monitorName) : undefined,
-          printerId: it.printerId ? String(it.printerId) : undefined,
-          printerName: it.printerName ? String(it.printerName) : undefined,
-          barcodeReaderId: it.barcodeReaderId ? String(it.barcodeReaderId) : undefined,
-          barcodeReaderName: it.barcodeReaderName ? String(it.barcodeReaderName) : undefined,
-          purchaseMode: it.isKitSelected ? "complete_kit" : "cabinet_only",
-          assemblyServiceSelected: Boolean(it.assemblyServiceSelected),
-          assemblyFeeCents: it.assemblyServiceSelected ? 99900 : 0,
-          customizationNotes: String(it.customizationNotes || ""),
-          quantity: qty,
-          unitPriceCents: unitCents,
-          pixPriceCents: unitCents,
-          cardPriceCents: Math.round(unitCents * 1.12),
-          subtotalCents: unitCents * qty,
-        };
-      });
+      const mappedItems: AdsCartItemSnapshot[] =
+        itemsRaw.length > 0
+          ? itemsRaw.map((it: any, idx: number) => {
+              const prevItem = existing?.cart.items?.[idx];
+              const qty = Math.max(1, Number(it.quantity || prevItem?.quantity || 1));
+              const unitCents = Number(
+                it.unitPriceCents ||
+                  it.pixPriceCents ||
+                  (it.unitPrice
+                    ? Math.round(Number(it.unitPrice) * 100)
+                    : prevItem?.unitPriceCents || 159000)
+              );
+              return {
+                itemId: String(it.id || prevItem?.itemId || `chk_item_${idx + 1}`),
+                cabinetModelId: String(
+                  it.cabinetModelId || it.modelId || prevItem?.cabinetModelId || "floor_totem"
+                ),
+                cabinetName: String(
+                  it.cabinetName ||
+                    it.modelName ||
+                    prevItem?.cabinetName ||
+                    "Gabinete Totem de Autoatendimento"
+                ),
+                colorId: it.colorId || prevItem?.colorId ? String(it.colorId || prevItem?.colorId) : undefined,
+                colorName:
+                  it.colorName || prevItem?.colorName
+                    ? String(it.colorName || prevItem?.colorName)
+                    : undefined,
+                monitorId:
+                  it.monitorId || prevItem?.monitorId
+                    ? String(it.monitorId || prevItem?.monitorId)
+                    : undefined,
+                monitorName:
+                  it.monitorName || prevItem?.monitorName
+                    ? String(it.monitorName || prevItem?.monitorName)
+                    : undefined,
+                printerId:
+                  it.printerId || prevItem?.printerId
+                    ? String(it.printerId || prevItem?.printerId)
+                    : undefined,
+                printerName:
+                  it.printerName || prevItem?.printerName
+                    ? String(it.printerName || prevItem?.printerName)
+                    : undefined,
+                barcodeReaderId:
+                  it.barcodeReaderId || it.readerId || prevItem?.barcodeReaderId
+                    ? String(it.barcodeReaderId || it.readerId || prevItem?.barcodeReaderId)
+                    : undefined,
+                barcodeReaderName:
+                  it.barcodeReaderName || it.readerName || prevItem?.barcodeReaderName
+                    ? String(it.barcodeReaderName || it.readerName || prevItem?.barcodeReaderName)
+                    : undefined,
+                purchaseMode:
+                  it.isKitSelected || prevItem?.purchaseMode === "complete_kit"
+                    ? "complete_kit"
+                    : "cabinet_only",
+                assemblyServiceSelected: Boolean(
+                  it.assemblyServiceSelected ??
+                    it.includeAssemblyService ??
+                    prevItem?.assemblyServiceSelected
+                ),
+                assemblyFeeCents:
+                  it.assemblyServiceSelected ||
+                  it.includeAssemblyService ||
+                  prevItem?.assemblyServiceSelected
+                    ? 99900
+                    : 0,
+                customizationNotes: String(
+                  it.customizationNotes || prevItem?.customizationNotes || ""
+                ),
+                quantity: qty,
+                unitPriceCents: unitCents,
+                pixPriceCents: unitCents,
+                cardPriceCents: Math.round(unitCents * 1.12),
+                subtotalCents: unitCents * qty,
+              };
+            })
+          : existing?.cart.items || [];
 
       const subtotalCents =
         mappedItems.reduce((acc, it) => acc + it.subtotalCents, 0) ||

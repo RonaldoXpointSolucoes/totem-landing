@@ -20,6 +20,7 @@ import { notifyNewOrderOnWhatsApp } from "@/lib/notifications/whatsappNotifier";
 import { adsLeadsCartsStore } from "@/lib/analytics/adsLeadsCartsStore";
 
 interface RequestBody {
+  sessionId?: string;
   paymentMethod?: "pix" | "credit_card";
   customer: CustomerInfo;
   deliveryAddress: DeliveryAddress;
@@ -30,14 +31,21 @@ interface RequestBody {
   items: {
     id?: string;
     modelId: string;
+    cabinetName?: string;
     colorId: string;
+    colorName?: string;
     monitorId?: string | null;
+    monitorName?: string | null;
     customMonitor?: Partial<MonitorOption>;
     printerId?: string | null;
+    printerName?: string | null;
     readerId?: string | null;
+    readerName?: string | null;
     hasScanner?: boolean;
+    isKitSelected?: boolean;
     customizationNotes?: string;
     includeAssemblyService?: boolean;
+    unitPriceCents?: number;
     quantity: number;
   }[];
 }
@@ -51,6 +59,7 @@ export async function POST(req: Request) {
     adsLeadsCartsStore
       .upsertFromCheckoutAttempt(
         {
+          sessionId: body.sessionId,
           customer: {
             ...(customer || {}),
             ...(deliveryAddress || {}),

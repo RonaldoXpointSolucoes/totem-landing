@@ -632,7 +632,62 @@ function collectBrowserSnapshots() {
     const rawCart = window.localStorage.getItem("totem_pro_cart_items_v1");
     if (rawCart) {
       const parsed = JSON.parse(rawCart);
-      if (Array.isArray(parsed)) cartSnapshot = parsed;
+      if (Array.isArray(parsed)) {
+        cartSnapshot = parsed.map((it: any, idx: number) => {
+          const cfg = it?.configuration || {};
+          const model = cfg.model || {};
+          const color = cfg.color || {};
+          const monitor = cfg.monitor || null;
+          const printer = cfg.printer || null;
+          const reader = cfg.barcodeReader || null;
+          const qty = Math.max(1, Number(it?.quantity || 1));
+          const unitPriceCents = Number(
+            it?.unitPriceCents || cfg?.calculatedPriceCents || model?.pixPriceCents || 159000
+          );
+          const isKitSelected = Boolean(
+            it?.isKitSelected ||
+              monitor?.isKit ||
+              String(monitor?.displayName || monitor?.model || "")
+                .toLowerCase()
+                .includes("kit")
+          );
+          const assemblyServiceSelected = Boolean(
+            it?.assemblyServiceSelected || cfg?.includeAssemblyService
+          );
+          return {
+            id: String(it?.id || `item_${idx + 1}`),
+            cabinetModelId: String(it?.cabinetModelId || model?.id || "floor_totem"),
+            cabinetName: String(
+              it?.cabinetName || model?.name || "Gabinete Totem de Autoatendimento"
+            ),
+            colorId: color?.id || it?.colorId || undefined,
+            colorName: color?.name || it?.colorName || undefined,
+            monitorId: monitor?.id || it?.monitorId || undefined,
+            monitorName:
+              monitor?.displayName || monitor?.model || it?.monitorName || undefined,
+            printerId: printer?.id || it?.printerId || undefined,
+            printerName:
+              printer?.displayName || printer?.model || it?.printerName || undefined,
+            barcodeReaderId: reader?.id || it?.barcodeReaderId || undefined,
+            barcodeReaderName:
+              reader?.displayName || reader?.model || it?.barcodeReaderName || undefined,
+            isKitSelected,
+            purchaseMode: isKitSelected ? "complete_kit" : "cabinet_only",
+            assemblyServiceSelected,
+            assemblyFeeCents: Number(
+              cfg?.assemblyServicePriceCents || (assemblyServiceSelected ? 99900 : 0)
+            ),
+            customizationNotes: String(
+              cfg?.customizationNotes || it?.customizationNotes || ""
+            ),
+            quantity: qty,
+            unitPriceCents,
+            pixPriceCents: unitPriceCents,
+            cardPriceCents: Math.round(unitPriceCents * 1.12),
+            subtotalCents: Number(it?.subtotalCents || unitPriceCents * qty),
+          };
+        });
+      }
     }
   } catch {}
 
