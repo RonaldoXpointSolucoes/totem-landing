@@ -9,6 +9,10 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const force = searchParams.get("refresh") === "true";
 
+    if (force) {
+      await googleAdsStore.syncWithLiveGoogleAdsApi().catch(() => {});
+    }
+
     const records = await adsLeadsCartsStore.listRecords(force);
     const adsSummary = googleAdsStore.getSummary();
     const adsState = googleAdsStore.getState();

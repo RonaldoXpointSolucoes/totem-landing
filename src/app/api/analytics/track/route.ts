@@ -14,14 +14,32 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const ip = req.headers.get("x-forwarded-for") || "127.0.0.1";
+    const rawForwarded = req.headers.get("x-forwarded-for") || "";
+    const firstForwardedIp = rawForwarded.split(",")[0]?.trim() || "";
+    const ip =
+      req.headers.get("cf-connecting-ip")?.trim() ||
+      req.headers.get("x-real-ip")?.trim() ||
+      firstForwardedIp ||
+      "127.0.0.1";
     const userAgent = req.headers.get("user-agent") || undefined;
+    const cfCity =
+      req.headers.get("cf-ipcity") ||
+      req.headers.get("x-vercel-ip-city") ||
+      undefined;
+    const cfRegion =
+      req.headers.get("cf-region-code") ||
+      req.headers.get("x-vercel-ip-country-region") ||
+      undefined;
 
     const recorded = await analyticsServerStore.recordEvent({
       eventName: eventName as AnalyticsEventType,
       sessionId: sessionId || "unknown-session",
       timestamp: new Date().toISOString(),
-      metadata: metadata || {},
+      metadata: {
+        ...(metadata || {}),
+        ...(cfCity && !(metadata as any)?.city ? { geoIpCity: cfCity } : {}),
+        ...(cfRegion && !(metadata as any)?.state ? { geoIpState: cfRegion } : {}),
+      },
       ip,
       userAgent,
     });

@@ -184,6 +184,7 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
   );
 
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+  const [showDecisionPanel, setShowDecisionPanel] = useState<boolean>(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editCustomer, setEditCustomer] = useState<
     AdsLeadCartRecord["customer"] | null
@@ -367,6 +368,12 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
           r.attribution.keyword,
           r.attribution.adGroupName,
           r.attribution.conversionActionName,
+          r.telemetry.ip,
+          r.telemetry.isp,
+          r.telemetry.os,
+          r.telemetry.browser,
+          r.telemetry.abandonmentDiagnosis?.label,
+          r.telemetry.abandonmentDiagnosis?.reason,
           r.commercialNotes,
           ...r.cart.items.map(
             (i) =>
@@ -382,6 +389,94 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
       return true;
     });
   }, [dateFilteredRecords, subTypeFilter, searchQuery]);
+
+  // 4. Diagnóstico consolidado de motivos de abandono de carrinho no período (Tomada de Decisão)
+  const abandonmentInsights = useMemo(() => {
+    const abandonedList = dateFilteredRecords.filter(
+      (r) => r.recordType === "abandoned_cart"
+    );
+    const totalAbandoned = abandonedList.length;
+
+    const buckets: Record<
+      string,
+      {
+        category: string;
+        title: string;
+        badgeColor: string;
+        count: number;
+        totalValueCents: number;
+        summaryReason: string;
+        actionTip: string;
+      }
+    > = {
+      technical_vesa_doubt: {
+        category: "technical_vesa_doubt",
+        title: '🔧 Dúvida Furação "Apenas Gabinete" + Sem CEP',
+        badgeColor: "border-cyan-500/40 bg-cyan-500/10 text-cyan-300",
+        count: 0,
+        totalValueCents: 0,
+        summaryReason:
+          "Usuários montam Gabinete de Parede/Piso na modalidade 'Apenas Gabinete (-50%)' informando Monitor e Impressora, mas saem no /carrinho antes de digitar o CEP.",
+        actionTip:
+          "Destacar no /carrinho que a Engenharia confere 100% da furação VESA/impressora pelo WhatsApp pós-pedido e oferecer botão 'Cotar Frete Rápido no WhatsApp sem CEP'.",
+      },
+      no_cep_freight_barrier: {
+        category: "no_cep_freight_barrier",
+        title: "⚠️ Parou no /carrinho sem Simular CEP / Frete",
+        badgeColor: "border-amber-500/40 bg-amber-500/10 text-amber-300",
+        count: 0,
+        totalValueCents: 0,
+        summaryReason:
+          "Visitantes clicam em 'Adicionar ao Carrinho' para ver o resumo financeiro (PIX), mas fecham a aba ao ver o frete bloqueado aguardando CEP.",
+        actionTip:
+          "Exibir estimativa prévia de frete por região (Sudeste/Sul) automaticamente pelo IP do visitante já ao abrir o /carrinho.",
+      },
+      b2b_budget_comparison: {
+        category: "b2b_budget_comparison",
+        title: "📊 Comparação de Orçamentos B2B (Múltiplas Simulações)",
+        badgeColor: "border-indigo-500/40 bg-indigo-500/10 text-indigo-300",
+        count: 0,
+        totalValueCents: 0,
+        summaryReason:
+          "Comprador B2B realizou 2 ou mais configurações seguidas (ex: trocando monitor 23.8\" vs 27\" ou cor Branco vs Preto) para submeter à diretoria.",
+        actionTip:
+          "Oferecer botão 'Baixar Orçamento Formal PDF / Enviar no WhatsApp' no /carrinho para capturar o telefone do decisor B2B.",
+      },
+      shipping_or_checkout: {
+        category: "shipping_or_checkout",
+        title: "🚚 Simulou CEP / Avançou ao Cadastro e Parou",
+        badgeColor: "border-rose-500/40 bg-rose-500/10 text-rose-300",
+        count: 0,
+        totalValueCents: 0,
+        summaryReason:
+          "Cliente calculou o frete ou iniciou o preenchimento do checkout, mas interrompeu antes de gerar o QR Code PIX ou aprovar o cartão.",
+        actionTip:
+          "Acionar imediatamente no WhatsApp oferecendo condição especial no frete rodoviário ou parcelamento B2B.",
+      },
+    };
+
+    for (const r of abandonedList) {
+      const cat =
+        r.telemetry.abandonmentDiagnosis?.category || "SHIPPING_NOT_SIMULATED";
+      const targetKey =
+        cat === "DIY_COMPATIBILITY_DOUBT"
+          ? "technical_vesa_doubt"
+          : cat === "B2B_BUDGET_COMPARISON"
+          ? "b2b_budget_comparison"
+          : cat === "SHIPPING_COST_REVIEW" ||
+            cat === "CHECKOUT_PAYMENT_FRICTION"
+          ? "shipping_or_checkout"
+          : "no_cep_freight_barrier";
+
+      buckets[targetKey].count += 1;
+      buckets[targetKey].totalValueCents += r.cart.totalCents || 0;
+    }
+
+    return {
+      totalAbandoned,
+      items: Object.values(buckets),
+    };
+  }, [dateFilteredRecords]);
 
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -494,7 +589,9 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
                   setCustomStartDate(sevenDaysAgoYmd);
                   setCustomEndDate(todayYmd);
                 }
+                onRefresh();
               }}
+              title="Clique para filtrar e atualizar os dados em tempo real"
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 dateFilterMode === btn.id
                   ? "bg-gradient-to-r from-cyan-600 to-indigo-600 text-white shadow-md shadow-cyan-600/25 border border-cyan-400/50"
@@ -504,6 +601,19 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
               {btn.label}
             </button>
           ))}
+
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={loading}
+            title="Atualizar registros do Appwrite e métricas da API do Google Ads agora"
+            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5 cursor-pointer transition-all"
+          >
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`}
+            />
+            <span>{loading ? "Atualizando..." : "Atualizar"}</span>
+          </button>
         </div>
 
         {/* SELETOR DE DATAS PERSONALIZADO (DE / ATÉ) */}
@@ -647,7 +757,7 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
         </div>
       </div>
 
-      {/* SUB-FILTROS POR TIPO DE CONVERSÃO + BOTÃO ATUALIZAR */}
+      {/* SUB-FILTROS POR TIPO DE CONVERSÃO + BOTÃO ATUALIZAR + RAIO-X DE DECISÃO */}
       <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-2.5">
         <div className="flex flex-wrap items-center gap-1.5">
           {[
@@ -674,7 +784,11 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setSubTypeFilter(tab.id)}
+              onClick={() => {
+                setSubTypeFilter(tab.id);
+                onRefresh();
+              }}
+              title="Clique para filtrar e atualizar a lista"
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 subTypeFilter === tab.id
                   ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/25"
@@ -686,17 +800,103 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
           ))}
         </div>
 
-        <button
-          onClick={onRefresh}
-          disabled={loading}
-          className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 cursor-pointer transition-all"
-        >
-          <RefreshCw
-            className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`}
-          />
-          <span>Sincronizar Appwrite & Ads</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowDecisionPanel((prev) => !prev)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1.5 cursor-pointer transition-all ${
+              showDecisionPanel
+                ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                : "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700"
+            }`}
+          >
+            <span>🧠 Raio-X Abandono & Decisão</span>
+            {showDecisionPanel ? (
+              <ChevronUp className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5" />
+            )}
+          </button>
+
+          <button
+            onClick={onRefresh}
+            disabled={loading}
+            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 cursor-pointer transition-all"
+          >
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`}
+            />
+            <span>Sincronizar Appwrite & Ads</span>
+          </button>
+        </div>
       </div>
+
+      {/* PAINEL DE TOMADA DE DECISÃO & DIAGNÓSTICO DE ABANDONO DE CARRINHO (GOOGLE ADS API) */}
+      {showDecisionPanel && (
+        <div className="rounded-3xl bg-gradient-to-br from-slate-900/95 via-[#0f172a]/95 to-indigo-950/30 border border-amber-500/30 p-4 sm:p-5 shadow-xl space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+            <div>
+              <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-amber-300 flex items-center gap-2">
+                <span>
+                  🧠 Diagnóstico de Funil: Por que os usuários avançam até o{" "}
+                  <code>/carrinho</code> e abandonam sem comprar?
+                </span>
+              </h3>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Cruzamento em tempo real da telemetria de sessão (Appwrite{" "}
+                <code>ads_leads_carts</code>) com os grupos e palavras-chave da
+                API do Google Ads ({periodKpis.periodLabel})
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-[11px] font-bold text-cyan-300 bg-cyan-950/50 border border-cyan-500/30 px-3 py-1 rounded-xl shrink-0">
+              <span>91 Termos Negativados</span>
+              <span>•</span>
+              <span>Grupo 01 & 03 Líderes (CPA ~R$ 9,50)</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            {abandonmentInsights.items.map((bucket) => {
+              const pct =
+                abandonmentInsights.totalAbandoned > 0
+                  ? Math.round(
+                      (bucket.count / abandonmentInsights.totalAbandoned) * 100
+                    )
+                  : 0;
+              return (
+                <div
+                  key={bucket.category}
+                  className="rounded-2xl bg-slate-950/85 border border-slate-800/90 p-3.5 flex flex-col justify-between space-y-2.5"
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className={`px-2 py-0.5 rounded-lg border text-[10px] font-extrabold ${bucket.badgeColor}`}
+                      >
+                        {bucket.count} carrinho{bucket.count === 1 ? "" : "s"} (
+                        {pct}%)
+                      </span>
+                      <span className="text-xs font-black text-emerald-400">
+                        {formatBRL(bucket.totalValueCents)}
+                      </span>
+                    </div>
+                    <div className="text-xs font-bold text-white leading-snug">
+                      {bucket.title}
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      {bucket.summaryReason}
+                    </p>
+                  </div>
+                  <div className="pt-2 border-t border-slate-800/80 text-[11px] text-cyan-300/95">
+                    <strong className="text-amber-300">Ação / Decisão: </strong>
+                    {bucket.actionTip}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* LISTA DE CARDS (COMPATÍVEL COM LISTA SIMPLIFICADA + VER EM DETALHES E VISÃO DETALHADA) */}
       {filteredRecords.length === 0 ? (
@@ -785,30 +985,61 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
                             </span>
                           )}
                           <span>•</span>
-                          <span className="text-slate-300 font-semibold">
+                          <span className="text-cyan-300 font-bold">
                             {rec.customer.city
                               ? `${rec.customer.city}/${rec.customer.state}`
                               : rec.customer.state || "Brasil"}
                           </span>
                           <span>•</span>
-                          <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                          <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-200 border border-slate-700">
                             {rec.telemetry.device === "MOBILE" ? (
                               <>
                                 <Smartphone className="w-3 h-3 text-cyan-400" />
-                                Mobile
+                                <span>
+                                  Mobile
+                                  {rec.telemetry.os
+                                    ? ` • ${rec.telemetry.os}`
+                                    : ""}
+                                </span>
                               </>
                             ) : (
                               <>
                                 <Monitor className="w-3 h-3 text-indigo-400" />
-                                Desktop
+                                <span>
+                                  Desktop
+                                  {rec.telemetry.os
+                                    ? ` • ${rec.telemetry.os}`
+                                    : ""}
+                                </span>
                               </>
                             )}
                           </span>
                         </div>
+
+                        {/* LINHA DE TELEMETRIA IP / PROVEDOR DIRETO NO CARD */}
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-900/90 border border-slate-700/80 text-[10px] font-mono text-slate-300">
+                            🌐 IP:{" "}
+                            <strong className="text-cyan-300">
+                              {rec.telemetry.ip || "Rastreado"}
+                            </strong>
+                            {rec.telemetry.isp ? (
+                              <span className="text-slate-400 font-sans">
+                                {" "}
+                                • {rec.telemetry.isp}
+                              </span>
+                            ) : null}
+                          </span>
+                          {rec.telemetry.browser && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-slate-900/80 border border-slate-800 text-[10px] text-slate-400">
+                              {rec.telemetry.browser}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
-                    {/* COLUNA 2: RESUMO DO CARRINHO / ITENS CONFIGURADOS (4 cols) */}
+                    {/* COLUNA 2: RESUMO DO CARRINHO / ITENS CONFIGURADOS + DIAGNÓSTICO DE ABANDONO (4 cols) */}
                     <div className="lg:col-span-4 border-l-0 lg:border-l border-slate-800/80 lg:pl-4">
                       {firstItem ? (
                         <div>
@@ -852,10 +1083,29 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
                               </span>
                             )}
                           </div>
+                          {rec.telemetry.abandonmentDiagnosis && (
+                            <div
+                              className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-950/50 border border-amber-500/30 text-[11px] font-bold text-amber-300"
+                              title={rec.telemetry.abandonmentDiagnosis.reason}
+                            >
+                              <span>
+                                {rec.telemetry.abandonmentDiagnosis.label}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       ) : (
-                        <div className="text-xs text-slate-400">
-                          Contato direto via botão de WhatsApp da Engenharia
+                        <div className="space-y-1.5">
+                          <div className="text-xs text-slate-300 font-semibold">
+                            Contato direto via botão de WhatsApp da Engenharia
+                          </div>
+                          {rec.telemetry.abandonmentDiagnosis && (
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-950/50 border border-emerald-500/30 text-[11px] font-bold text-emerald-300">
+                              <span>
+                                {rec.telemetry.abandonmentDiagnosis.label}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -885,8 +1135,14 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
                               : "Pix à Vista"}
                           </strong>
                         </div>
+                        {rec.attribution.adGroupName &&
+                          rec.attribution.adGroupName !== "Direto / Geral" && (
+                            <div className="text-[11px] text-indigo-300 font-semibold truncate max-w-[260px]">
+                              📢 {rec.attribution.adGroupName}
+                            </div>
+                          )}
                         {rec.attribution.keyword && (
-                          <div className="text-[11px] text-cyan-400 font-semibold truncate max-w-[240px]">
+                          <div className="text-[11px] text-cyan-400 font-semibold truncate max-w-[260px]">
                             🔑 Busca:{" "}
                             {rec.attribution.matchType === "EXACT"
                               ? `[${rec.attribution.keyword}]`
@@ -1192,11 +1448,38 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
                               <span className="text-slate-400">
                                 Localização / CEP:
                               </span>
-                              <span className="font-bold text-cyan-300">
+                              <span className="font-bold text-cyan-300 text-right">
                                 {rec.customer.city
                                   ? `${rec.customer.city} - ${rec.customer.state}`
                                   : rec.customer.state || "Brasil"}{" "}
                                 {rec.customer.cep ? `(${rec.customer.cep})` : ""}
+                              </span>
+                            </div>
+                            <div className="flex justify-between border-b border-slate-800/70 pb-1.5">
+                              <span className="text-slate-400">
+                                IP / Provedor (ISP):
+                              </span>
+                              <span className="font-mono font-bold text-slate-200 text-right">
+                                {rec.telemetry.ip || "Rastreado"}
+                                {rec.telemetry.isp
+                                  ? ` • ${rec.telemetry.isp}`
+                                  : ""}
+                              </span>
+                            </div>
+                            <div className="flex justify-between border-b border-slate-800/70 pb-1.5">
+                              <span className="text-slate-400">
+                                Sistema / Navegador:
+                              </span>
+                              <span className="font-semibold text-slate-200 text-right">
+                                {rec.telemetry.device === "MOBILE"
+                                  ? "Mobile"
+                                  : "Desktop"}
+                                {rec.telemetry.os
+                                  ? ` • ${rec.telemetry.os}`
+                                  : ""}
+                                {rec.telemetry.browser
+                                  ? ` (${rec.telemetry.browser})`
+                                  : ""}
                               </span>
                             </div>
                             {rec.customer.street && (
@@ -1344,12 +1627,33 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
                         </div>
                       </div>
 
-                      {/* BLOCO 3: ATRIBUIÇÃO GOOGLE ADS & LINHA DO TEMPO DA JORNADA */}
+                      {/* BLOCO 3: ATRIBUIÇÃO GOOGLE ADS, DIAGNÓSTICO DE ABANDONO & LINHA DO TEMPO */}
                       <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-4 space-y-3">
                         <h4 className="text-xs font-black uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
                           <Target className="w-4 h-4" />
-                          Rastreamento Google Ads & Jornada
+                          Rastreamento Google Ads & Diagnóstico de Abandono
                         </h4>
+
+                        {rec.telemetry.abandonmentDiagnosis && (
+                          <div className="p-3 rounded-xl bg-amber-950/35 border border-amber-500/35 space-y-1.5 text-xs">
+                            <div className="font-black text-amber-300 flex items-center justify-between gap-2">
+                              <span>
+                                {rec.telemetry.abandonmentDiagnosis.label}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-200 leading-relaxed">
+                              <strong>Por que parou:</strong>{" "}
+                              {rec.telemetry.abandonmentDiagnosis.reason}
+                            </p>
+                            <p className="text-[11px] text-cyan-300 leading-relaxed pt-1 border-t border-amber-500/20">
+                              <strong>Ação Recomendada:</strong>{" "}
+                              {
+                                rec.telemetry.abandonmentDiagnosis
+                                  .recommendedAction
+                              }
+                            </p>
+                          </div>
+                        )}
 
                         <div className="space-y-1.5 text-xs">
                           <div className="flex justify-between gap-2 border-b border-slate-800/70 pb-1">
@@ -1392,7 +1696,7 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
                             <span className="text-slate-400">
                               Anúncio / Landing:
                             </span>
-                            <span className="text-slate-300 text-right truncate max-w-[180px]">
+                            <span className="text-slate-300 text-right truncate max-w-[200px]">
                               {rec.attribution.adId
                                 ? `#${rec.attribution.adId} • `
                                 : ""}

@@ -1333,13 +1333,14 @@ export default function AdminPage() {
             <button
               onClick={() => {
                 loadOrders();
+                loadAdsLeads(true);
                 loadCatalog();
                 loadAnalytics();
               }}
-              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center gap-1.5 transition-colors border border-slate-700/60"
-              title="Sincronizar dados"
+              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center gap-1.5 transition-colors border border-slate-700/60 cursor-pointer"
+              title="Sincronizar todos os dados (Pedidos, ADS, Appwrite e Catálogo)"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingOrders || isLoadingCatalog || isLoadingAnalytics ? "animate-spin" : ""}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingOrders || isLoadingAdsLeads || isLoadingCatalog || isLoadingAnalytics ? "animate-spin" : ""}`} />
               <span className="hidden sm:inline">Atualizar</span>
             </button>
             <a
@@ -1527,16 +1528,16 @@ export default function AdminPage() {
                 <button
                   onClick={() => {
                     setStatusFilter("ads");
-                    loadAdsLeads(false);
+                    loadAdsLeads(true);
                   }}
-                  title="Carrinhos Abandonados, Conversões Google Ads e Leads do Checkout"
+                  title="Carrinhos Abandonados, Conversões Google Ads e Leads do Checkout (Clique para atualizar)"
                   className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold shrink-0 transition-all border flex items-center gap-1.5 cursor-pointer ${
                     statusFilter === "ads"
                       ? "bg-gradient-to-r from-indigo-600 to-cyan-600 text-white border-cyan-400 shadow-lg shadow-indigo-500/25"
                       : "bg-slate-900 text-cyan-400 hover:bg-slate-800 border-cyan-500/40"
                   }`}
                 >
-                  <Target className="w-3.5 h-3.5" />
+                  <Target className={`w-3.5 h-3.5 ${isLoadingAdsLeads && statusFilter === "ads" ? "animate-spin" : ""}`} />
                   <span>ADS ({adsRecords.length || 8})</span>
                 </button>
                 {Object.entries(STATUS_CONFIG).map(([key, config]) => (

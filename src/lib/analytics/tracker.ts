@@ -711,15 +711,39 @@ function collectBrowserSnapshots() {
     const storedAttrRaw = window.localStorage.getItem("totem_ads_attribution_v1");
     const storedAttr = storedAttrRaw ? JSON.parse(storedAttrRaw) : {};
     const gclid = urlParams.get("gclid") || storedAttr.gclid || "";
-    const utmSource = urlParams.get("utm_source") || storedAttr.utmSource || "";
-    const utmMedium = urlParams.get("utm_medium") || storedAttr.utmMedium || "";
-    const utmCampaign = urlParams.get("utm_campaign") || storedAttr.utmCampaign || "";
+    const gadSource = urlParams.get("gad_source") || storedAttr.gadSource || "";
+    const gadCampaignId = urlParams.get("gad_campaignid") || storedAttr.gadCampaignId || "";
+    const gbraid = urlParams.get("gbraid") || storedAttr.gbraid || "";
+    const wbraid = urlParams.get("wbraid") || storedAttr.wbraid || "";
+    const isGoogleAdsParam = Boolean(
+      gclid || gadSource === "1" || gadCampaignId || gbraid || wbraid
+    );
+    const utmSource =
+      urlParams.get("utm_source") ||
+      storedAttr.utmSource ||
+      (isGoogleAdsParam ? "google" : "");
+    const utmMedium =
+      urlParams.get("utm_medium") ||
+      storedAttr.utmMedium ||
+      (isGoogleAdsParam ? "cpc" : "");
+    const utmCampaign =
+      urlParams.get("utm_campaign") ||
+      storedAttr.utmCampaign ||
+      gadCampaignId ||
+      (isGoogleAdsParam ? "24395671655" : "");
     const utmTerm = urlParams.get("utm_term") || storedAttr.utmTerm || "";
-    const landingUrl = storedAttr.landingUrl || window.location.href;
+    const landingUrl =
+      (isGoogleAdsParam && window.location.search ? window.location.href : "") ||
+      storedAttr.landingUrl ||
+      window.location.href;
     const referrer = storedAttr.referrer || document.referrer || "";
 
     campaignAttribution = {
-      gclid,
+      gclid: gclid || gbraid || wbraid || "",
+      gadSource,
+      gadCampaignId,
+      gbraid,
+      wbraid,
       utmSource,
       utmMedium,
       utmCampaign,
@@ -728,7 +752,7 @@ function collectBrowserSnapshots() {
       referrer,
     };
 
-    if (gclid || utmSource || !storedAttrRaw) {
+    if (isGoogleAdsParam || utmSource || !storedAttrRaw) {
       window.localStorage.setItem(
         "totem_ads_attribution_v1",
         JSON.stringify(campaignAttribution)
@@ -736,7 +760,46 @@ function collectBrowserSnapshots() {
     }
   } catch {}
 
-  return { cartSnapshot, customerDraft, campaignAttribution };
+  let cartTelemetry: Record<string, unknown> = {};
+  let timeOnSiteSeconds = 0;
+  let interactionsCount = 1;
+  try {
+    const nowMs = Date.now();
+    const rawStart = window.sessionStorage.getItem("totem_session_started_at");
+    const startMs = rawStart ? Number(rawStart) : nowMs;
+    if (!rawStart) {
+      window.sessionStorage.setItem("totem_session_started_at", String(nowMs));
+    }
+    timeOnSiteSeconds = Math.max(1, Math.round((nowMs - startMs) / 1000));
+
+    const prevCount = Number(
+      window.sessionStorage.getItem("totem_session_interactions_count") || "0"
+    );
+    interactionsCount = prevCount + 1;
+    window.sessionStorage.setItem(
+      "totem_session_interactions_count",
+      String(interactionsCount)
+    );
+
+    const rawCartTel = window.sessionStorage.getItem("totem_cart_telemetry_v1");
+    if (rawCartTel) {
+      cartTelemetry = JSON.parse(rawCartTel) || {};
+    }
+  } catch {}
+
+  return {
+    cartSnapshot,
+    customerDraft,
+    campaignAttribution,
+    cartTelemetry,
+    timeOnSiteSeconds,
+    interactionsCount,
+    screenResolution:
+      typeof window.screen !== "undefined"
+        ? `${window.screen.width}x${window.screen.height}`
+        : undefined,
+    viewportSize: `${window.innerWidth}x${window.innerHeight}`,
+  };
 }
 
 /**

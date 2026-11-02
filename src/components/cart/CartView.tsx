@@ -65,6 +65,28 @@ export const CartView: React.FC<CartViewProps> = ({
   const [isLoadingShipping, setIsLoadingShipping] = useState(false);
   const [shippingRetryAttempt, setShippingRetryAttempt] = useState(0);
   const [shippingError, setShippingError] = useState<string | null>(null);
+  const cartEnteredAtRef = React.useRef<number>(Date.now());
+
+  const persistCartTelemetry = React.useCallback(
+    (patch: Record<string, unknown>) => {
+      if (typeof window === "undefined") return;
+      try {
+        const prevRaw = sessionStorage.getItem("totem_cart_telemetry_v1");
+        const prev = prevRaw ? JSON.parse(prevRaw) : {};
+        const next = {
+          ...prev,
+          ...patch,
+          timeInCartSeconds: Math.max(
+            1,
+            Math.round((Date.now() - cartEnteredAtRef.current) / 1000)
+          ),
+          updatedAt: new Date().toISOString(),
+        };
+        sessionStorage.setItem("totem_cart_telemetry_v1", JSON.stringify(next));
+      } catch {}
+    },
+    []
+  );
 
   const calculateShippingForCep = React.useCallback(
     async (rawCep: string) => {
@@ -119,6 +141,14 @@ export const CartView: React.FC<CartViewProps> = ({
             const available = data.quotes.filter((q: any) => q.isAvailable);
             if (available.length > 0) {
               const firstQuote = available[0];
+              persistCartTelemetry({
+                hasSimulatedShipping: true,
+                cep: cleanCep,
+                shippingCents: Number(firstQuote.priceCents || 0),
+                shippingCarrier: String(firstQuote.carrierName || firstQuote.serviceName || ""),
+                shippingDeliveryDays: Number(firstQuote.deliveryDays || 0),
+                shippingError: null,
+              });
               trackEvent(ANALYTICS_EVENTS.SHIPPING_SIMULATED, {
                 cep: cleanCep,
                 shippingCents: Number(firstQuote.priceCents || 0),
@@ -158,14 +188,80 @@ export const CartView: React.FC<CartViewProps> = ({
         }
       }
 
-      setShippingError(`${lastErr} (Tentamos ${MAX_ATTEMPTS} vezes automaticamente)`);
+      const fullErr = `${lastErr} (Tentamos ${MAX_ATTEMPTS} vezes automaticamente)`;
+      setShippingError(fullErr);
+      persistCartTelemetry({
+        hasSimulatedShipping: false,
+        cep: cleanCep,
+        shippingError: lastErr,
+      });
+      trackEvent(ANALYTICS_EVENTS.VIEW_CART, {
+        itemsCount: totalItems,
+        totalPriceCents: finalTotalPriceCents,
+        cep: cleanCep,
+        shippingError: lastErr,
+        abandonmentSignal: "shipping_quote_error",
+      });
       setShippingQuotes([]);
       setSelectedShippingId(null);
       setShippingRetryAttempt(0);
       setIsLoadingShipping(false);
     },
-    [items]
+    [items, finalTotalPriceCents, totalItems, persistCartTelemetry]
   );
+
+  // Rastreia tempo de permanência e sinais de abandono ao sair do /carrinho
+  React.useEffect(() => {
+    if (typeof window === "undefined" || items.length === 0) return;
+    persistCartTelemetry({
+      enteredCartAt: new Date(cartEnteredAtRef.current).toISOString(),
+      itemsCount: totalItems,
+    });
+
+    const handleVisibilityOrExit = () => {
+      if (document.visibilityState === "hidden") {
+        const cleanCep = shippingCep.replace(/\D/g, "");
+        const hasQuotes = shippingQuotes.some((q) => q.isAvailable);
+        const reason = shippingError
+          ? `Erro ao cotar frete (${shippingError})`
+          : cleanCep.length !== 8
+          ? "Parou no carrinho sem simular CEP/Frete (Revisão de orçamento ou dúvida técnica)"
+          : hasQuotes
+          ? "Simulou frete por CEP, avaliou prazo/valor de entrega e pausou antes do checkout"
+          : "Saiu do carrinho durante simulação de frete";
+
+        persistCartTelemetry({
+          abandonmentReason: reason,
+          hasSimulatedShipping: hasQuotes,
+          cep: cleanCep || undefined,
+        });
+        trackEvent(ANALYTICS_EVENTS.VIEW_CART, {
+          itemsCount: totalItems,
+          totalPriceCents: finalTotalPriceCents,
+          cep: cleanCep || undefined,
+          abandonmentReason: reason,
+          hasSimulatedShipping: hasQuotes,
+          timeInCartSeconds: Math.max(
+            1,
+            Math.round((Date.now() - cartEnteredAtRef.current) / 1000)
+          ),
+        });
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityOrExit);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityOrExit);
+    };
+  }, [
+    items.length,
+    totalItems,
+    finalTotalPriceCents,
+    shippingCep,
+    shippingQuotes,
+    shippingError,
+    persistCartTelemetry,
+  ]);
 
   // Recupera CEP persistido em sessão
   React.useEffect(() => {
