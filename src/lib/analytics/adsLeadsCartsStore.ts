@@ -1500,6 +1500,14 @@ class AdsLeadsCartsStore {
                   }
                   needsHealPersist = true;
                 }
+                // Auto-cura 2.1: Limpa número de endereço caso tenha sido preenchido com o telefone de destino do WhatsApp (>= 8 dígitos)
+                if (
+                  parsed.customer?.number &&
+                  String(parsed.customer.number).replace(/\D/g, "").length >= 8
+                ) {
+                  parsed.customer.number = "";
+                  needsHealPersist = true;
+                }
                 // Auto-cura 3: Enriquecimento com inteligência Google Ads API + Geo-IP + Diagnóstico de Abandono
                 if (isPublicIp(parsed.telemetry?.ip) && (!parsed.customer?.city || !parsed.telemetry?.isp)) {
                   const ipGeo = await resolveIpGeo(parsed.telemetry.ip);
@@ -1881,9 +1889,16 @@ class AdsLeadsCartsStore {
         existing?.customer.document ||
         ""
     ).trim();
-    const customerNumber = String(
-      meta.number || draftCustomer.number || draftAddr.number || existing?.customer.number || ""
-    ).trim();
+    const rawHouseNumber =
+      event.eventName === "whatsapp_click"
+        ? draftCustomer.number || draftAddr.number || existing?.customer.number || ""
+        : meta.number || draftCustomer.number || draftAddr.number || existing?.customer.number || "";
+    const customerNumber =
+      String(rawHouseNumber).replace(/\D/g, "").length >= 8
+        ? existing?.customer.number && String(existing.customer.number).replace(/\D/g, "").length < 8
+          ? String(existing.customer.number).trim()
+          : ""
+        : String(rawHouseNumber).trim();
     const customerComplement = String(
       meta.complement ||
         draftCustomer.complement ||
@@ -2279,14 +2294,20 @@ class AdsLeadsCartsStore {
       const ua = String(reqMeta.userAgent || "");
       const device = /Android|iPhone|iPad|iPod|Mobile/i.test(ua) ? "MOBILE" : "DESKTOP";
 
+      const isPixStage = body?.funnelStage === "pix_generated" || Boolean(body?.orderNumber);
       const record: AdsLeadCartRecord = {
         id: docId,
         recordId:
           existing?.recordId ||
           `LEAD-${nowIso.slice(0, 10).replace(/-/g, "")}-${sessionKey.slice(0, 5).toUpperCase()}`,
         sessionId: sessionKey,
-        recordType: "checkout_lead",
-        funnelStage: "lead_submitted",
+        recordType: existing?.recordType === "purchase_conversion" ? "purchase_conversion" : "checkout_lead",
+        funnelStage:
+          existing?.funnelStage === "purchase"
+            ? "purchase"
+            : isPixStage
+            ? "pix_generated"
+            : "lead_submitted",
         status: existing?.status || "awaiting_contact",
         conversionsCount: existing?.conversionsCount || 1,
         customer: {
@@ -2309,8 +2330,8 @@ class AdsLeadsCartsStore {
           shippingCents,
           shippingCarrier: String(shipping.carrierName || existing?.cart.shippingCarrier || ""),
           shippingDeliveryDays: Number(shipping.deliveryDays || 0),
-          discountCents: 0,
-          couponCode: String(body?.couponCode || ""),
+          discountCents: Number(body?.discountCents || existing?.cart.discountCents || 0),
+          couponCode: String(body?.couponCode || existing?.cart.couponCode || ""),
           totalCents,
           pixTotalCents: totalCents,
           paymentMethod: body?.paymentMethod === "credit_card" ? "credit_card" : "pix",
@@ -2339,17 +2360,27 @@ class AdsLeadsCartsStore {
         telemetry: {
           device,
           ip: String(reqMeta.ip || existing?.telemetry.ip || ""),
-          userAgent: ua,
-          stepsJourney: [
-            ...(existing?.telemetry.stepsJourney || ["Configurador 3D", "Carrinho"]),
-            "Submeteu Dados Completos no Checkout",
-          ],
+          isp: existing?.telemetry.isp,
+          screenResolution: existing?.telemetry.screenResolution,
+          viewportSize: existing?.telemetry.viewportSize,
+          timeOnSiteSeconds: existing?.telemetry.timeOnSiteSeconds,
+          interactionsCount: existing?.telemetry.interactionsCount,
+          userAgent: ua || existing?.telemetry.userAgent || "",
+          stepsJourney: Array.from(
+            new Set([
+              ...(existing?.telemetry.stepsJourney || ["Configurador 3D", "Carrinho"]),
+              "Submeteu Dados Completos no Checkout",
+              ...(isPixStage ? [`Gerou Pedido #${body.orderNumber || "PIX"}`] : []),
+            ])
+          ),
         },
         commercialNotes: existing?.commercialNotes || "",
+        linkedOrderNumber: body?.orderNumber || existing?.linkedOrderNumber,
         createdAt: existing?.createdAt || nowIso,
         updatedAt: nowIso,
       };
 
+      enrichAndDiagnoseRecord(record);
       this.recordsMap.set(docId, record);
       this.saveLocalCache();
       await this.persistToAppwrite(record);
@@ -2357,6 +2388,60 @@ class AdsLeadsCartsStore {
     } catch (e) {
       console.error("[AdsLeadsCartsStore] Erro em upsertFromCheckoutAttempt:", e);
       return null;
+    }
+  }
+
+  public async syncOrderPaymentApproved(params: {
+    orderNumber: string;
+    customerDocument?: string;
+    customerEmail?: string;
+    customerWhatsapp?: string;
+    totalCents?: number;
+  }): Promise<void> {
+    try {
+      await this.ensureHydratedFromAppwrite();
+      const docClean = String(params.customerDocument || "").replace(/\D/g, "");
+      const waClean = String(params.customerWhatsapp || "").replace(/\D/g, "");
+      const emailClean = String(params.customerEmail || "").trim().toLowerCase();
+
+      for (const rec of this.recordsMap.values()) {
+        const recDoc = String(rec.customer?.document || "").replace(/\D/g, "");
+        const recWa = String(rec.customer?.whatsapp || "").replace(/\D/g, "");
+        const recEmail = String(rec.customer?.email || "").trim().toLowerCase();
+        const matches =
+          (params.orderNumber && rec.linkedOrderNumber === params.orderNumber) ||
+          (docClean.length >= 11 && recDoc === docClean) ||
+          (waClean.length >= 10 && recWa === waClean) ||
+          (emailClean.length >= 5 && recEmail === emailClean);
+
+        if (matches) {
+          rec.funnelStage = "purchase";
+          rec.recordType = "purchase_conversion";
+          rec.status = "converted_order";
+          rec.linkedOrderNumber = params.orderNumber || rec.linkedOrderNumber;
+          if (rec.attribution) {
+            rec.attribution.conversionActionId = "7871295732";
+            rec.attribution.conversionActionName = "[Totem Pro] Compra Aprovada (Purchase)";
+            if (params.totalCents) {
+              rec.attribution.conversionValueCents = params.totalCents;
+            }
+          }
+          if (!rec.telemetry.stepsJourney.includes("Compra Confirmada / Pedido Pago")) {
+            rec.telemetry.stepsJourney = [
+              ...rec.telemetry.stepsJourney,
+              "Compra Confirmada / Pedido Pago",
+            ];
+          }
+          rec.updatedAt = new Date().toISOString();
+          enrichAndDiagnoseRecord(rec);
+          this.recordsMap.set(rec.id, rec);
+          this.saveLocalCache();
+          await this.persistToAppwrite(rec);
+          break;
+        }
+      }
+    } catch (err) {
+      console.warn("[AdsLeadsCartsStore] Aviso ao sincronizar pagamento aprovado:", err);
     }
   }
 

@@ -6,6 +6,7 @@ import { findOrderByNumber, saveLocalOrder } from "@/lib/orders/orderStore";
 import { syncOrderStatusToVoucherUsage } from "@/lib/vouchers/voucherStore";
 import { logEcosystemEvent } from "@/lib/logging/ecosystemLogger";
 import { notifyPaymentConfirmedOnWhatsApp } from "@/lib/notifications/whatsappNotifier";
+import { adsLeadsCartsStore } from "@/lib/analytics/adsLeadsCartsStore";
 import { mercadoPagoRequest, MercadoPagoPayment, paymentMatchesOrder } from "./mercadoPago";
 
 export async function updateMercadoPagoPayment(orderId: string, data: Record<string, unknown>) {
@@ -79,6 +80,15 @@ export async function reconcileMercadoPagoPayment(paymentId: string) {
   if (nextStatus !== order.status) {
     await getServerDatabases().updateDocument(APPWRITE_CONFIG.databaseId, APPWRITE_CONFIG.collections.orders, order.$id, { status: nextStatus });
     if (nextStatus === "paid") {
+      adsLeadsCartsStore
+        .syncOrderPaymentApproved({
+          orderNumber: order.order_number || order.$id,
+          customerDocument: order.customer_document,
+          customerEmail: order.customer_email,
+          customerWhatsapp: order.customer_whatsapp,
+          totalCents: order.total_cents || 0,
+        })
+        .catch(() => {});
       await notifyPaymentConfirmedOnWhatsApp({
         orderNumber: order.order_number || order.$id,
         customerName: order.customer_name || "Cliente",

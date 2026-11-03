@@ -9,7 +9,7 @@ import { ANALYTICS_EVENTS, AnalyticsEventType, FUNNEL_STAGES, FunnelStageMetric 
 import { getServerDatabases } from "@/lib/appwrite/server";
 import { APPWRITE_CONFIG } from "@/lib/appwrite/config";
 import { siteConfig } from "@/config/site";
-import { ID } from "node-appwrite";
+import { ID, Query } from "node-appwrite";
 import { adsLeadsCartsStore } from "./adsLeadsCartsStore";
 
 export interface StoredAnalyticsEvent {
@@ -249,6 +249,89 @@ class AnalyticsServerStore {
               userAgent: rec.telemetry?.userAgent,
             });
           }
+        }
+      }
+
+      // Hidrata também pedidos reais da coleção 'orders' do Appwrite para refletir Pix Gerados e Compras Confirmadas no Funil
+      if (APPWRITE_CONFIG.apiKey) {
+        try {
+          const db = getServerDatabases();
+          const ordersRes = await db.listDocuments(
+            APPWRITE_CONFIG.databaseId,
+            APPWRITE_CONFIG.collections.orders,
+            [Query.orderDesc("$createdAt"), Query.limit(100)]
+          );
+          for (const doc of ordersRes.documents || []) {
+            if (doc.status === "cancelled") continue;
+            const orderRef = String(doc.order_number || doc.$id).replace(/[^a-zA-Z0-9]/g, "");
+            // Evita duplicar sessão caso algum registro em adsLeadsCartsStore já aponte para este pedido
+            const matchedLead = records.find(
+              (r) =>
+                (doc.order_number && r.linkedOrderNumber === doc.order_number) ||
+                (doc.customer_document &&
+                  r.customer?.document &&
+                  String(r.customer.document).replace(/\D/g, "") ===
+                    String(doc.customer_document).replace(/\D/g, ""))
+            );
+            const sid = matchedLead ? matchedLead.sessionId || matchedLead.id : `ord_${orderRef}`;
+            const ts = doc.$createdAt || new Date().toISOString();
+            const isPaidOrder =
+              doc.status === "paid" ||
+              doc.status === "in_production" ||
+              doc.status === "ready" ||
+              doc.status === "shipped" ||
+              doc.status === "delivered";
+
+            let modelName = "Gabinete de Parede";
+            let colorName = "Branco TX";
+            try {
+              if (doc.manufacturing_sheet_json) {
+                const sheets = JSON.parse(doc.manufacturing_sheet_json);
+                const firstSheet = Array.isArray(sheets) ? sheets[0] : sheets;
+                if (firstSheet?.cabinetModelName) modelName = firstSheet.cabinetModelName;
+                if (firstSheet?.colorName) colorName = firstSheet.colorName;
+              }
+            } catch {}
+
+            const orderEvents: AnalyticsEventType[] = [
+              ANALYTICS_EVENTS.VIEW_HOME,
+              ANALYTICS_EVENTS.START_CONFIGURATOR,
+              ANALYTICS_EVENTS.SELECT_CABINET_MODEL,
+              ANALYTICS_EVENTS.ADD_TO_CART,
+              ANALYTICS_EVENTS.BEGIN_CHECKOUT,
+              ANALYTICS_EVENTS.LEAD_SUBMITTED,
+              ANALYTICS_EVENTS.PIX_GENERATED,
+              ...(isPaidOrder ? [ANALYTICS_EVENTS.PURCHASE] : []),
+            ];
+
+            for (const evName of orderEvents) {
+              const key = `${sid}::${evName}`;
+              if (!existingSessionEvents.has(key)) {
+                existingSessionEvents.add(key);
+                synthesized.push({
+                  id: `hyd_ord_${orderRef.slice(0, 10)}_${evName}`,
+                  eventName: evName,
+                  sessionId: sid,
+                  timestamp: ts,
+                  metadata: {
+                    orderNumber: doc.order_number,
+                    totalCents: Number(doc.total_cents || 0),
+                    customerName: doc.customer_name,
+                    modelId: modelName.toLowerCase().includes("parede")
+                      ? "cabinet-wall"
+                      : modelName.toLowerCase().includes("balc")
+                      ? "cabinet-counter"
+                      : "cabinet-floor",
+                    modelName,
+                    colorName,
+                    pathname: "/checkout",
+                  },
+                });
+              }
+            }
+          }
+        } catch (ordErr) {
+          console.warn("[AnalyticsServerStore] Aviso ao hidratar pedidos do Appwrite no funil:", ordErr);
         }
       }
 

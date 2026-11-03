@@ -508,6 +508,32 @@ export async function POST(req: Request) {
     // 8. Persistência Local e Indexação Automática do Cliente
     try {
       saveLocalOrder(orderDetails);
+      adsLeadsCartsStore
+        .upsertFromCheckoutAttempt(
+          {
+            sessionId: body.sessionId,
+            orderNumber,
+            funnelStage: "pix_generated",
+            customer: {
+              ...(customer || {}),
+              ...(deliveryAddress || {}),
+            },
+            items,
+            shippingQuote: {
+              priceCents: shippingCents,
+              carrierName: selectedShippingInfo?.carrier || "",
+              deliveryDays: selectedShippingInfo?.deliveryDaysMax || 0,
+            },
+            discountCents,
+            couponCode: appliedCouponCode || body.couponCode,
+            paymentMethod,
+          },
+          {
+            ip: req.headers.get("x-forwarded-for") || "",
+            userAgent: req.headers.get("user-agent") || "",
+          }
+        )
+        .catch(() => {});
       const customerAccount = findOrCreateCustomerFromCheckout(customer, deliveryAddress, totalCents);
       await setCustomerSession(customerAccount);
 
