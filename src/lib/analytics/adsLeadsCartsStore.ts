@@ -2013,8 +2013,18 @@ class AdsLeadsCartsStore {
             .filter(Boolean)
             .join(" • ")})`
         : `Preencheu Endereço/CEP no Checkout (${cepVal || "em preenchimento"})`,
-      lead_submitted: "Lead Identificado no Checkout",
-      whatsapp_click: "Clicou no Botão WhatsApp Consultor Engenharia",
+      lead_submitted: meta.quotePdfRequested
+        ? `📄 Gerou Orçamento Formal em PDF no /carrinho (${[
+            meta.quoteNumber,
+            incomingRealName || existingRealName,
+            customerWhatsapp,
+          ]
+            .filter(Boolean)
+            .join(" • ")})`
+        : "Lead Identificado no Checkout",
+      whatsapp_click: meta.quotePdfRequested
+        ? `💬 Enviou Orçamento Formal PDF no WhatsApp (${meta.quoteNumber || "B2B"})`
+        : "Clicou no Botão WhatsApp Consultor Engenharia",
       pix_generated: "Gerou QR Code PIX no Checkout",
       purchase: "Compra Confirmada / Pedido Gerado",
     };
@@ -2129,7 +2139,14 @@ class AdsLeadsCartsStore {
         userAgent: ua || existing?.telemetry.userAgent || "",
         stepsJourney,
       },
-      commercialNotes: existing?.commercialNotes || "",
+      commercialNotes: meta.quotePdfRequested
+        ? [
+            existing?.commercialNotes,
+            `Solicitou Orçamento Formal em PDF (${meta.quoteNumber || "B2B"}) direto no /carrinho.`,
+          ]
+            .filter(Boolean)
+            .join(" | ")
+        : existing?.commercialNotes || "",
       linkedOrderNumber: meta.orderId || existing?.linkedOrderNumber,
       createdAt: existing?.createdAt || nowIso,
       updatedAt: nowIso,

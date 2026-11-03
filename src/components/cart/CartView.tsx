@@ -23,8 +23,11 @@ import {
   Check,
   CreditCard,
   Wrench,
+  FileText,
+  MessageCircle,
 } from "lucide-react";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
+import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
 
 interface CartViewProps {
@@ -66,6 +69,30 @@ export const CartView: React.FC<CartViewProps> = ({
   const [shippingRetryAttempt, setShippingRetryAttempt] = useState(0);
   const [shippingError, setShippingError] = useState<string | null>(null);
   const cartEnteredAtRef = React.useRef<number>(Date.now());
+
+  // Estados de Captura de Lead B2B: Orçamento Formal em PDF no WhatsApp
+  const [showQuoteForm, setShowQuoteForm] = useState(false);
+  const [quoteName, setQuoteName] = useState("");
+  const [quoteWhatsapp, setQuoteWhatsapp] = useState("");
+  const [quoteDocOrEmail, setQuoteDocOrEmail] = useState("");
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [generatedQuoteRef, setGeneratedQuoteRef] = useState<string | null>(null);
+  const [generatedWhatsappUrl, setGeneratedWhatsappUrl] = useState<string>("");
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const savedDraftRaw = localStorage.getItem("totem_checkout_draft_v2");
+      if (savedDraftRaw) {
+        const draft = JSON.parse(savedDraftRaw);
+        if (draft?.name && !quoteName) setQuoteName(String(draft.name));
+        if (draft?.whatsapp && !quoteWhatsapp) setQuoteWhatsapp(String(draft.whatsapp));
+        if ((draft?.document || draft?.email) && !quoteDocOrEmail) {
+          setQuoteDocOrEmail(String(draft.document || draft.email));
+        }
+      }
+    } catch {}
+  }, []);
 
   const persistCartTelemetry = React.useCallback(
     (patch: Record<string, unknown>) => {
@@ -333,6 +360,446 @@ export const CartView: React.FC<CartViewProps> = ({
   const cartPixSavings = Math.max(0, rawCardTotalCents - rawPixTotalCents);
   const finalPixTotal = Math.max(0, rawPixTotalCents - couponDiscountCents);
   const finalCardTotal = Math.max(0, rawCardTotalCents - couponDiscountCents);
+
+  const handleQuoteWhatsappChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/\D/g, "").slice(0, 11);
+    if (digits.length === 0) {
+      setQuoteWhatsapp("");
+    } else if (digits.length <= 2) {
+      setQuoteWhatsapp(`(${digits}`);
+    } else if (digits.length <= 6) {
+      setQuoteWhatsapp(`(${digits.slice(0, 2)}) ${digits.slice(2)}`);
+    } else if (digits.length <= 10) {
+      setQuoteWhatsapp(
+        `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`
+      );
+    } else {
+      setQuoteWhatsapp(
+        `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
+      );
+    }
+  };
+
+  const openPrintableFormalQuotePdf = (
+    quoteRef: string,
+    customerName: string,
+    customerWhatsapp: string,
+    customerDocOrEmail: string,
+    whatsappLink: string
+  ) => {
+    if (typeof window === "undefined") return;
+    const issueDate = new Date().toLocaleDateString("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+    });
+    const validUntilDate = new Date(
+      Date.now() + 7 * 24 * 60 * 60 * 1000
+    ).toLocaleDateString("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+    });
+
+    const escapeHtml = (str: string) =>
+      String(str || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+
+    const rowsHtml = items
+      .map((item, idx) => {
+        const { configuration, quantity } = item;
+        const { model, color, monitor, printer, barcodeReader } = configuration;
+        const itemPrice = calculateTotemPrice({
+          cabinet: model,
+          color,
+          monitor,
+          printer,
+          barcodeReader,
+          includeAssemblyService: configuration.includeAssemblyService,
+        });
+        const isKit = itemPrice.equipmentAdjustmentCents > 0;
+        const modeLabel = isKit
+          ? "Gabinete + Kit Completo de Periféricos"
+          : "Apenas Gabinete CNC (-50% • Furação Sob Medida)";
+        const unitPix = formatBRL(itemPrice.pixTotalPriceCents);
+        const subPix = formatBRL(itemPrice.pixTotalPriceCents * quantity);
+        const subCard = formatBRL(itemPrice.cardTotalPriceCents * quantity);
+
+        return `
+          <tr>
+            <td style="padding:12px;border-bottom:1px solid #e2e8f0;font-weight:700;color:#0f172a;vertical-align:top;">
+              ${idx + 1}
+            </td>
+            <td style="padding:12px;border-bottom:1px solid #e2e8f0;vertical-align:top;">
+              <div style="font-weight:800;font-size:14px;color:#0f172a;margin-bottom:4px;">
+                ${escapeHtml(model.name)}
+              </div>
+              <div style="font-size:12px;color:#334155;line-height:1.5;">
+                • <strong>Modalidade:</strong> ${escapeHtml(modeLabel)}<br/>
+                • <strong>Acabamento / Cor:</strong> ${escapeHtml(color.name)}<br/>
+                • <strong>Monitor Touch VESA:</strong> ${escapeHtml(monitor?.displayName || "Padrão VESA Universal")}<br/>
+                • <strong>Impressora Térmica:</strong> ${escapeHtml(printer?.displayName || "Compartimento Padrão 80mm")}<br/>
+                • <strong>Leitor 2D QR/Barras:</strong> ${escapeHtml(barcodeReader ? barcodeReader.displayName : "Sem leitor adicional")}
+                ${
+                  configuration.includeAssemblyService
+                    ? `<br/>• <strong style="color:#047857;">✓ Inclui Montagem Técnica Pronta de Fábrica (+ R$ 999,00)</strong>`
+                    : ""
+                }
+              </div>
+            </td>
+            <td style="padding:12px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:700;vertical-align:top;">
+              ${quantity} un.
+            </td>
+            <td style="padding:12px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:600;vertical-align:top;">
+              ${unitPix}
+            </td>
+            <td style="padding:12px;border-bottom:1px solid #e2e8f0;text-align:right;vertical-align:top;">
+              <div style="font-weight:800;color:#047857;font-size:14px;">${subPix} (PIX)</div>
+              <div style="font-size:11px;color:#64748b;">10x: ${subCard}</div>
+            </td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    const shippingLineText = selectedShippingQuote
+      ? `${
+          shippingCents === 0 ? "Grátis" : formatBRL(shippingCents)
+        } (${escapeHtml(
+          selectedShippingQuote.name ||
+            selectedShippingQuote.serviceName ||
+            selectedShippingQuote.carrier ||
+            "Transportadora"
+        )})`
+      : shippingCep.replace(/\D/g, "").length === 8
+      ? `CEP ${escapeHtml(shippingCep)} (Sob consulta na finalização)`
+      : "A calcular conforme CEP de destino";
+
+    const htmlDoc = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Orçamento Formal ${escapeHtml(quoteRef)} — Totem Pro (X-Point Soluções)</title>
+  <style>
+    @page { size: A4; margin: 14mm; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #0f172a;
+      background: #f1f5f9;
+      margin: 0;
+      padding: 24px;
+    }
+    .toolbar {
+      max-width: 820px;
+      margin: 0 auto 16px auto;
+      background: #0f172a;
+      color: #fff;
+      padding: 12px 18px;
+      border-radius: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      box-shadow: 0 10px 25px rgba(15,23,42,0.2);
+    }
+    .toolbar-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn {
+      border: none;
+      padding: 9px 16px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-print { background: #0284c7; color: #fff; }
+    .btn-wpp { background: #10b981; color: #fff; }
+    .sheet {
+      max-width: 820px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 32px 36px;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+      border: 1px solid #cbd5e1;
+    }
+    @media print {
+      body { background: #fff; padding: 0; }
+      .toolbar { display: none !important; }
+      .sheet { box-shadow: none; border: none; padding: 0; max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <div style="font-size:13px;">
+      <strong>📄 Orçamento Formal ${escapeHtml(quoteRef)} pronto!</strong>
+      <span style="color:#94a3b8;margin-left:6px;">Escolha "Salvar como PDF" na janela de impressão.</span>
+    </div>
+    <div class="toolbar-btns">
+      <button class="btn btn-print" onclick="window.print()">🖨️ Salvar em PDF / Imprimir</button>
+      <a class="btn btn-wpp" href="${escapeHtml(whatsappLink)}" target="_blank" rel="noopener noreferrer">💬 Receber Cópia no WhatsApp</a>
+    </div>
+  </div>
+
+  <div class="sheet">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0f172a;padding-bottom:18px;margin-bottom:20px;gap:16px;">
+      <div>
+        <div style="font-size:11px;font-weight:800;letter-spacing:1.2px;color:#0284c7;text-transform:uppercase;">
+          X-Point Soluções em Tecnologia & Engenharia CNC
+        </div>
+        <h1 style="margin:4px 0 4px 0;font-size:22px;font-weight:900;color:#0f172a;">
+          TOTEM PRO — PROPOSTA COMERCIAL TÉCNICA
+        </h1>
+        <div style="font-size:12px;color:#475569;">
+          Site Oficial: <strong>totem.xpointsolucoes.com.br</strong> • WhatsApp Engenharia: <strong>(11) 99164-9959</strong>
+        </div>
+      </div>
+      <div style="text-align:right;background:#f8fafc;border:1px solid #cbd5e1;padding:10px 14px;border-radius:10px;min-width:190px;">
+        <div style="font-size:11px;color:#64748b;font-weight:700;">PROPOSTA Nº</div>
+        <div style="font-size:15px;font-weight:900;color:#0f172a;">${escapeHtml(quoteRef)}</div>
+        <div style="font-size:11px;color:#475569;margin-top:4px;">
+          Emissão: <strong>${issueDate}</strong><br/>
+          Validade: <strong>${validUntilDate} (7 dias)</strong>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px 18px;margin-bottom:20px;display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px;">
+      <div>
+        <span style="color:#64748b;">Solicitante / Empresa:</span><br/>
+        <strong style="font-size:14px;color:#0f172a;">${escapeHtml(customerName)}</strong>
+      </div>
+      <div>
+        <span style="color:#64748b;">WhatsApp de Contato:</span><br/>
+        <strong style="font-size:14px;color:#047857;">${escapeHtml(customerWhatsapp)}</strong>
+      </div>
+      <div>
+        <span style="color:#64748b;">CNPJ / CPF ou E-mail:</span><br/>
+        <strong>${escapeHtml(customerDocOrEmail || "A informar no faturamento")}</strong>
+      </div>
+      <div>
+        <span style="color:#64748b;">Frete / CEP Simulado:</span><br/>
+        <strong>${shippingLineText}</strong>
+      </div>
+    </div>
+
+    <table style="width:100%;border-collapse:collapse;margin-bottom:22px;font-size:13px;">
+      <thead>
+        <tr style="background:#0f172a;color:#ffffff;">
+          <th style="padding:10px 12px;text-align:left;border-radius:8px 0 0 0;">#</th>
+          <th style="padding:10px 12px;text-align:left;">Especificação Técnica do Totem Configurado</th>
+          <th style="padding:10px 12px;text-align:center;">Qtd</th>
+          <th style="padding:10px 12px;text-align:right;">Unit. PIX</th>
+          <th style="padding:10px 12px;text-align:right;border-radius:0 8px 0 0;">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rowsHtml}
+      </tbody>
+    </table>
+
+    <div style="display:flex;justify-content:space-between;gap:20px;align-items:stretch;flex-wrap:wrap;">
+      <div style="flex:1;min-width:260px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px 16px;font-size:12px;color:#166534;line-height:1.5;">
+        <div style="font-weight:800;font-size:13px;margin-bottom:4px;">
+          🛡️ Garantia Técnica de Engenharia & Usinagem CNC
+        </div>
+        • Estrutura em MDF Naval / MaDeFibra BP de alta densidade com usinagem computadorizada CNC submilimétrica.<br/>
+        • Furação VESA e berço de impressora térmica conferidos individualmente pela nossa Engenharia após o pedido.<br/>
+        • Pintura e acabamento de padrão corporativo pronto para operação intensiva.
+      </div>
+
+      <div style="min-width:280px;background:#f8fafc;border:2px solid #0f172a;border-radius:12px;padding:14px 18px;font-size:13px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;color:#475569;">
+          <span>Subtotal dos Itens (${totalItems} un.):</span>
+          <strong>${formatBRL(rawPixTotalCents)}</strong>
+        </div>
+        ${
+          appliedCoupon && couponDiscountCents > 0
+            ? `<div style="display:flex;justify-content:space-between;margin-bottom:6px;color:#047857;">
+                <span>Cupom (${escapeHtml(appliedCoupon.code)}):</span>
+                <strong>-${formatBRL(couponDiscountCents)}</strong>
+              </div>`
+            : ""
+        }
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px;color:#475569;">
+          <span>Frete Estimado:</span>
+          <strong>${shippingCents > 0 ? formatBRL(shippingCents) : "A calcular"}</strong>
+        </div>
+        <div style="border-top:1px solid #cbd5e1;padding-top:10px;display:flex;justify-content:space-between;align-items:baseline;">
+          <span style="font-weight:800;color:#0f172a;">TOTAL NO PIX À VISTA:</span>
+          <span style="font-size:20px;font-weight:900;color:#047857;">
+            ${formatBRL(finalPixTotal + shippingCents)}
+          </span>
+        </div>
+        <div style="text-align:right;font-size:11px;color:#475569;margin-top:4px;">
+          Ou no Cartão em até 10x de <strong>${formatBRL(
+            Math.round((finalCardTotal + shippingCents) / 10)
+          )}</strong> (Total: ${formatBRL(finalCardTotal + shippingCents)})
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    window.addEventListener("load", function() {
+      setTimeout(function() { window.print(); }, 450);
+    });
+  </script>
+</body>
+</html>`;
+
+    const printWin = window.open("", "_blank");
+    if (printWin) {
+      printWin.document.open();
+      printWin.document.write(htmlDoc);
+      printWin.document.close();
+    }
+  };
+
+  const handleGenerateFormalQuotePdfAndWhatsapp = () => {
+    const cleanName = quoteName.trim();
+    const cleanWppDigits = quoteWhatsapp.replace(/\D/g, "");
+    const cleanDocOrEmail = quoteDocOrEmail.trim();
+
+    if (cleanName.length < 2) {
+      setQuoteError("Por favor, informe seu nome ou nome da empresa.");
+      return;
+    }
+    if (cleanWppDigits.length < 10) {
+      setQuoteError("Informe um WhatsApp válido com DDD (ex: 11 99999-9999).");
+      return;
+    }
+
+    setQuoteError(null);
+
+    const dateCode = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    const randSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const quoteRef = `ORC-${dateCode}-${randSuffix}`;
+
+    const isEmail = cleanDocOrEmail.includes("@");
+    const emailVal = isEmail ? cleanDocOrEmail : "";
+    const docVal = !isEmail ? cleanDocOrEmail : "";
+    const cleanCep = shippingCep.replace(/\D/g, "");
+
+    // Salva também no rascunho do Checkout para que o cliente não precise redigitar se avançar
+    if (typeof window !== "undefined") {
+      try {
+        const prevRaw = localStorage.getItem("totem_checkout_draft_v2");
+        const prev = prevRaw ? JSON.parse(prevRaw) : {};
+        localStorage.setItem(
+          "totem_checkout_draft_v2",
+          JSON.stringify({
+            ...prev,
+            name: cleanName,
+            whatsapp: quoteWhatsapp,
+            ...(emailVal ? { email: emailVal } : {}),
+            ...(docVal ? { document: docVal } : {}),
+            ...(cleanCep.length === 8 ? { cep: shippingCep } : {}),
+          })
+        );
+      } catch {}
+    }
+
+    // Atualiza telemetria local da sessão do carrinho
+    persistCartTelemetry({
+      quotePdfRequested: true,
+      quoteNumber: quoteRef,
+      customerName: cleanName,
+      whatsapp: quoteWhatsapp,
+      abandonmentReason: `Solicitou Orçamento Formal em PDF (${quoteRef}) no /carrinho (${cleanName} • ${quoteWhatsapp})`,
+    });
+
+    // Dispara captura imediata do Lead para o Appwrite (ads_leads_carts) e Analytics
+    const leadPayload = {
+      quotePdfRequested: true,
+      quoteNumber: quoteRef,
+      customerName: cleanName,
+      name: cleanName,
+      whatsapp: quoteWhatsapp,
+      phone: quoteWhatsapp,
+      email: emailVal || undefined,
+      document: docVal || undefined,
+      cep: cleanCep || undefined,
+      shippingCents,
+      shippingCarrier: selectedShippingQuote
+        ? String(
+            selectedShippingQuote.name ||
+              selectedShippingQuote.serviceName ||
+              selectedShippingQuote.carrier ||
+              ""
+          )
+        : undefined,
+      totalItems,
+      totalPriceCents: finalPixTotal + shippingCents,
+      totalCents: finalPixTotal + shippingCents,
+    };
+
+    trackEvent(ANALYTICS_EVENTS.LEAD_SUBMITTED, leadPayload);
+    trackEvent(ANALYTICS_EVENTS.WHATSAPP_CLICK, {
+      ...leadPayload,
+      location: "cart_formal_pdf_quote",
+    });
+
+    // Monta mensagem estruturada do Orçamento Formal para o WhatsApp da Engenharia
+    const itemsLines = items
+      .map((it, idx) => {
+        const { configuration, quantity } = it;
+        const { model, color, monitor, printer, barcodeReader } = configuration;
+        const p = calculateTotemPrice({
+          cabinet: model,
+          color,
+          monitor,
+          printer,
+          barcodeReader,
+          includeAssemblyService: configuration.includeAssemblyService,
+        });
+        const isKit = p.equipmentAdjustmentCents > 0;
+        return `${idx + 1}. *${quantity}x ${model.name}* (${color.name}) — ${
+          isKit ? "Gabinete + Kit Completo" : "Apenas Gabinete (-50%)"
+        } | Tela: ${monitor?.displayName || "Padrão"} | Impressora: ${
+          printer?.displayName || "Padrão"
+        }${
+          configuration.includeAssemblyService ? " | + Montagem Pronta" : ""
+        } = *${formatBRL(p.pixTotalPriceCents * quantity)} no PIX*`;
+      })
+      .join("\n");
+
+    const wppText = [
+      `Olá! Emiti o *Orçamento Formal ${quoteRef}* no carrinho da Totem Pro e gostaria de receber o acompanhamento no WhatsApp:`,
+      ``,
+      `👤 *Solicitante/Empresa:* ${cleanName}`,
+      `📱 *WhatsApp:* ${quoteWhatsapp}`,
+      cleanDocOrEmail ? `🏢 *CNPJ/CPF/E-mail:* ${cleanDocOrEmail}` : null,
+      cleanCep ? `📍 *CEP:* ${shippingCep}` : null,
+      ``,
+      `🛒 *Itens Configurados (${totalItems} un.):*`,
+      itemsLines,
+      ``,
+      `💰 *Total no PIX à vista:* ${formatBRL(finalPixTotal + shippingCents)}`,
+      `💳 *Ou em até 10x no Cartão:* ${formatBRL(finalCardTotal + shippingCents)}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const wppUrl = `https://wa.me/${siteConfig.links.whatsappRaw}?text=${encodeURIComponent(
+      wppText
+    )}`;
+
+    setGeneratedQuoteRef(quoteRef);
+    setGeneratedWhatsappUrl(wppUrl);
+
+    // Abre o PDF formal timbrado em nova guia pronto para salvar/imprimir
+    openPrintableFormalQuotePdf(
+      quoteRef,
+      cleanName,
+      quoteWhatsapp,
+      cleanDocOrEmail,
+      wppUrl
+    );
+  };
 
   if (items.length === 0) {
     return (
@@ -848,28 +1315,146 @@ export const CartView: React.FC<CartViewProps> = ({
               </p>
             </div>
 
-            <Button
-              variant="primary"
-              size="lg"
-              onClick={() => {
-                const clean = shippingCep.replace(/\D/g, "");
-                if (typeof window !== "undefined" && clean.length === 8) {
-                  sessionStorage.setItem("totem_shipping_cep", clean);
-                  if (selectedShippingId) {
-                    sessionStorage.setItem("totem_shipping_option_id", selectedShippingId);
+            <div className="space-y-2.5">
+              <Button
+                variant="primary"
+                size="lg"
+                onClick={() => {
+                  const clean = shippingCep.replace(/\D/g, "");
+                  if (typeof window !== "undefined" && clean.length === 8) {
+                    sessionStorage.setItem("totem_shipping_cep", clean);
+                    if (selectedShippingId) {
+                      sessionStorage.setItem("totem_shipping_option_id", selectedShippingId);
+                    }
                   }
-                }
-                trackEvent(ANALYTICS_EVENTS.BEGIN_CHECKOUT, {
-                  totalItems,
-                  totalPriceCents,
-                  shippingCents,
-                });
-                onProceedToCheckout();
-              }}
-              className="w-full font-bold shadow-blue-500/25 shadow-lg bg-[#0071e3] hover:bg-[#0077ed]"
-            >
-              Avançar para o Checkout <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
+                  trackEvent(ANALYTICS_EVENTS.BEGIN_CHECKOUT, {
+                    totalItems,
+                    totalPriceCents,
+                    shippingCents,
+                  });
+                  onProceedToCheckout();
+                }}
+                className="w-full font-bold shadow-blue-500/25 shadow-lg bg-[#0071e3] hover:bg-[#0077ed]"
+              >
+                Avançar para o Checkout <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+
+              {/* BOTÃO DE CAPTURA B2B: RECEBER ORÇAMENTO FORMAL EM PDF NO WHATSAPP */}
+              <button
+                type="button"
+                onClick={() => setShowQuoteForm((prev) => !prev)}
+                className="w-full py-2.5 px-3.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 border border-emerald-500/40 text-emerald-700 dark:text-emerald-300 text-xs font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm"
+              >
+                <FileText className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span>Receber Orçamento Formal em PDF no WhatsApp</span>
+              </button>
+
+              {showQuoteForm && (
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/90 border border-emerald-500/40 space-y-2.5 text-xs animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-extrabold text-slate-900 dark:text-emerald-300 flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                      <span>Emissão de Proposta Comercial (PDF + WhatsApp)</span>
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                      Validade 7 dias
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                    Ideal para aprovação da diretoria/sócios. Gere o PDF timbrado com especificações técnicas e receba atendimento no WhatsApp:
+                  </p>
+
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                        Seu Nome ou Empresa *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ex: João Silva / Rede Farmácias..."
+                        value={quoteName}
+                        onChange={(e) => setQuoteName(e.target.value)}
+                        className="w-full px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-black/15 dark:border-slate-700 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                        Seu WhatsApp com DDD *
+                      </label>
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        placeholder="(11) 99999-9999"
+                        value={quoteWhatsapp}
+                        onChange={handleQuoteWhatsappChange}
+                        className="w-full px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-black/15 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-0.5">
+                        CNPJ / CPF ou E-mail (Opcional — sai no cabeçalho do PDF)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="00.000.000/0001-00 ou email@empresa.com.br"
+                        value={quoteDocOrEmail}
+                        onChange={(e) => setQuoteDocOrEmail(e.target.value)}
+                        className="w-full px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-black/15 dark:border-slate-700 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+
+                  {quoteError && (
+                    <p className="text-[11px] font-bold text-rose-500">{quoteError}</p>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleGenerateFormalQuotePdfAndWhatsapp}
+                    className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 cursor-pointer transition-all"
+                  >
+                    <FileText className="w-3.5 h-3.5 shrink-0" />
+                    <span>Gerar Orçamento em PDF & Receber no WhatsApp</span>
+                  </button>
+
+                  {generatedQuoteRef && (
+                    <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 space-y-2 text-[11px]">
+                      <div className="font-bold text-emerald-700 dark:text-emerald-300 flex items-center justify-between">
+                        <span>✓ Proposta {generatedQuoteRef} emitida!</span>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-1.5">
+                        <a
+                          href={generatedWhatsappUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 py-1.5 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-center flex items-center justify-center gap-1"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>Enviar / Abrir no WhatsApp</span>
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openPrintableFormalQuotePdf(
+                              generatedQuoteRef,
+                              quoteName.trim(),
+                              quoteWhatsapp,
+                              quoteDocOrEmail.trim(),
+                              generatedWhatsappUrl
+                            )
+                          }
+                          className="py-1.5 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold cursor-pointer"
+                        >
+                          🖨️ Reabrir PDF
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </Card>
         </div>
       </div>
