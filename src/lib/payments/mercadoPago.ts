@@ -100,7 +100,7 @@ export async function createMercadoPagoPayment(params: {
 }) {
   const { orderId, orderNumber, amountCents, customer, method } = params;
   const site = (process.env.NEXT_PUBLIC_SITE_URL || "https://totem.xpointsolucoes.com.br").replace(/\/$/, "");
-  const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   const document = (customer.document || "").replace(/\D/g, "");
   const payer = {
     email: customer.email,

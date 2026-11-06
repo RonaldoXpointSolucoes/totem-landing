@@ -76,7 +76,7 @@ export async function reconcileMercadoPagoPayment(paymentId: string) {
     ...(paidAt ? { paid_at: paidAt } : {}),
   });
   // Retrying after a partial database failure repairs the order without duplicating a purchase.
-  const nextStatus = reversed || (!hasMerchantOrder && payment.status === "cancelled") ? "cancelled" : approved && order.status === "awaiting_payment" ? "paid" : order.status;
+  const nextStatus = reversed ? "cancelled" : approved && (order.status === "awaiting_payment" || order.status === "cancelled") ? "paid" : order.status;
   if (nextStatus !== order.status) {
     await getServerDatabases().updateDocument(APPWRITE_CONFIG.databaseId, APPWRITE_CONFIG.collections.orders, order.$id, { status: nextStatus });
     if (nextStatus === "paid") {

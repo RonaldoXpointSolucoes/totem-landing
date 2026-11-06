@@ -591,6 +591,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   const syncCheckoutDraftNow = React.useCallback(
     (triggerReason = "auto") => {
       try {
+        if (step !== "form") return;
         const hasAnyData = Boolean(
           name.trim() ||
             email.trim() ||
@@ -870,6 +871,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
       }
 
       trackEvent(ANALYTICS_EVENTS.LEAD_SUBMITTED, {
+        orderNumber: data.order.orderNumber,
         name: name.trim(),
         email: email.trim().toLowerCase(),
         whatsapp: whatsapp.trim(),
@@ -878,6 +880,8 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
         personType,
         city: city.trim(),
         state: state.trim(),
+        shippingCents: data.order.shippingCents,
+        totalCents: data.order.totalCents,
         totalPriceCents: data.order.totalCents,
       });
 
@@ -920,6 +924,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
       trackEvent(ANALYTICS_EVENTS.PIX_GENERATED, {
         orderId: data.order.id,
         orderNumber: data.order.orderNumber,
+        shippingCents: data.order.shippingCents,
         totalPriceCents: data.order.totalCents,
         totalCents: data.order.totalCents,
         itemCount: data.order.items.length,

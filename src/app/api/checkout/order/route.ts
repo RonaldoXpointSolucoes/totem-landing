@@ -434,8 +434,8 @@ export async function POST(req: Request) {
       }
     }
 
-    // Persist the immutable price snapshot before contacting the payment provider.
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+    // Persist the immutable price snapshot before contacting the payment provider (validade comercial de 24h).
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     const now = new Date();
 
     // 7. Persistência e Congelamento de Snapshot Imutável de Venda no Appwrite

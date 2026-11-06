@@ -305,24 +305,30 @@ export function initClientTelemetry(): void {
         if (isInternalApi) {
           // Se a API retornou erro HTTP (4xx ou 5xx)
           if (!response.ok) {
+            const isExpectedAuthCheckOrFailure =
+              response.status === 401 &&
+              (url.includes("/api/admin/auth") || url.includes("/api/auth/"));
+
             recordClientBreadcrumb("api", `Falha ${response.status} em ${url} (${duration}ms)`);
 
-            // Para erros de servidor (5xx) ou falhas críticas de checkout/frete, reporta
-            const isCriticalApi =
-              url.includes("/shipping/quote") ||
-              url.includes("/checkout/") ||
-              url.includes("/webhooks/");
+            if (!isExpectedAuthCheckOrFailure) {
+              // Para erros de servidor (5xx) ou falhas críticas de checkout/frete, reporta
+              const isCriticalApi =
+                url.includes("/shipping/quote") ||
+                url.includes("/checkout/") ||
+                url.includes("/webhooks/");
 
-            sendTelemetryReport({
-              type: "api_network_failure",
-              severity: response.status >= 500 || isCriticalApi ? "critical" : "warning",
-              message: `API HTTP ${response.status} (${response.statusText || "Erro"}) em ${url}`,
-              customData: {
-                status: response.status,
-                url,
-                durationMs: duration,
-              },
-            });
+              sendTelemetryReport({
+                type: "api_network_failure",
+                severity: response.status >= 500 || isCriticalApi ? "critical" : "warning",
+                message: `API HTTP ${response.status} (${response.statusText || "Erro"}) em ${url}`,
+                customData: {
+                  status: response.status,
+                  url,
+                  durationMs: duration,
+                },
+              });
+            }
           } else {
             // Sucesso na API - apenas breadcrumb
             recordClientBreadcrumb("api", `Sucesso 200 em ${url} (${duration}ms)`);

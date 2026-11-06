@@ -736,18 +736,36 @@ class AnalyticsServerStore {
     }
 
     const totalSessions = allSessionIds.size;
+    // Garante monotonicidade hierárquica do funil: toda sessão que alcançou a etapa k também passou pelas etapas 0..k-1
+    for (let i = FUNNEL_STAGES.length - 1; i > 0; i--) {
+      const currentEvent = FUNNEL_STAGES[i].eventName;
+      const prevEvent = FUNNEL_STAGES[i - 1].eventName;
+      const currentSet = sessionsByEvent[currentEvent];
+      const prevSet = sessionsByEvent[prevEvent];
+      if (currentSet && prevSet) {
+        for (const sid of currentSet) {
+          prevSet.add(sid);
+        }
+      }
+    }
+
     const homeSessions = sessionsByEvent[ANALYTICS_EVENTS.VIEW_HOME]?.size || 0;
     const topBaselineSessions = Math.max(totalSessions, homeSessions);
 
     const stages: FunnelStageMetric[] = [];
     let previousUnique = topBaselineSessions;
+    let previousCount = Math.max(counts[FUNNEL_STAGES[0].eventName] || 0, topBaselineSessions);
 
     FUNNEL_STAGES.forEach((stageDef, index) => {
       const rawCount = counts[stageDef.eventName] || 0;
       const stageUnique =
         index === 0
           ? topBaselineSessions
-          : sessionsByEvent[stageDef.eventName]?.size || 0;
+          : Math.min(previousUnique, sessionsByEvent[stageDef.eventName]?.size || 0);
+      const effectiveCount =
+        index === 0
+          ? previousCount
+          : Math.min(previousCount, Math.max(rawCount, stageUnique));
 
       let conversionFromPrev = 100;
       let dropoffFromPrev = 0;
@@ -773,7 +791,7 @@ class AnalyticsServerStore {
         eventName: stageDef.eventName,
         label: stageDef.label,
         stepNumber: stageDef.stepNumber,
-        count: index === 0 ? Math.max(rawCount, topBaselineSessions) : rawCount,
+        count: effectiveCount,
         uniqueSessions: stageUnique,
         conversionRateFromPrevious: conversionFromPrev,
         dropoffRateFromPrevious: dropoffFromPrev,
@@ -781,6 +799,7 @@ class AnalyticsServerStore {
       });
 
       previousUnique = stageUnique;
+      previousCount = effectiveCount;
     });
 
     const purchaseSessions = sessionsByEvent[ANALYTICS_EVENTS.PURCHASE]?.size || 0;

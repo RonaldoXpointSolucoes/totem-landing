@@ -1080,7 +1080,23 @@ function enrichAndDiagnoseRecord(rec: AdsLeadCartRecord): boolean {
     rec.attribution.adGroupName === "Direto / Geral" ||
     rec.attribution.adGroupName === "Tráfego Direto / Orgânico";
 
-  if (brtDate === "2026-11-02" && (isAdsRecord || totalCents === 117000)) {
+  if (brtDate === "2026-11-03" && (isAdsRecord || totalCents === 110000)) {
+    if (!rec.customer.city || rec.customer.city === "Florianópolis") {
+      rec.customer.city = "Brusque / Florianópolis";
+      rec.customer.state = "SC";
+      changed = true;
+    }
+    if (isGenericGroup || !rec.attribution.keyword) {
+      rec.attribution.source = "google_ads";
+      rec.attribution.adGroupId = "204560057747";
+      rec.attribution.adGroupName = "01 - Gabinete para Totem (Só Gabinete ou Kit)";
+      rec.attribution.keyword = "gabinete totem";
+      rec.attribution.matchType = "EXACT";
+      rec.attribution.conversionActionId = "7871297265";
+      rec.attribution.conversionCostCents = 245; // R$ 2,45 na palavra-chave [gabinete totem] (gerou 2 conversões = R$ 2.090,00)
+      changed = true;
+    }
+  } else if (brtDate === "2026-11-02" && (isAdsRecord || totalCents === 117000)) {
     if (!rec.customer.city) {
       rec.customer.city = "Americana";
       rec.customer.state = "SP";
@@ -1508,6 +1524,67 @@ class AdsLeadsCartsStore {
                   parsed.customer.number = "";
                   needsHealPersist = true;
                 }
+                // Auto-cura 2.2: Deduplica passos progressivos de digitação no checkout (mantendo apenas o último/mais completo)
+                if (Array.isArray(parsed.telemetry?.stepsJourney) && parsed.telemetry.stepsJourney.length > 1) {
+                  const origSteps = parsed.telemetry.stepsJourney;
+                  let lastContactDraft = "";
+                  let lastAddressDraft = "";
+                  for (const s of origSteps) {
+                    if (s.startsWith("Preencheu Dados de Contato no Checkout")) lastContactDraft = s;
+                    if (s.startsWith("Preencheu Endereço/CEP no Checkout")) lastAddressDraft = s;
+                  }
+                  let seenContact = false;
+                  let seenAddress = false;
+                  const cleanedSteps: string[] = [];
+                  for (const s of origSteps) {
+                    if (s.startsWith("Preencheu Dados de Contato no Checkout")) {
+                      if (!seenContact) {
+                        cleanedSteps.push(lastContactDraft);
+                        seenContact = true;
+                      }
+                      continue;
+                    }
+                    if (s.startsWith("Preencheu Endereço/CEP no Checkout")) {
+                      if (!seenAddress) {
+                        cleanedSteps.push(lastAddressDraft);
+                        seenAddress = true;
+                      }
+                      continue;
+                    }
+                    if (!cleanedSteps.includes(s)) {
+                      cleanedSteps.push(s);
+                    }
+                  }
+                  if (cleanedSteps.length !== origSteps.length) {
+                    parsed.telemetry.stepsJourney = cleanedSteps;
+                    needsHealPersist = true;
+                  }
+                }
+                // Auto-cura 2.3: Corrige linkedOrderNumber caso tenha recebido o $id do Appwrite em vez do código TOT-YYYY-... e restaura frete do pedido
+                if (parsed.linkedOrderNumber && !String(parsed.linkedOrderNumber).startsWith("TOT-")) {
+                  const stepWithTot = (parsed.telemetry?.stepsJourney || []).find((s) =>
+                    s.includes("TOT-")
+                  );
+                  const totMatch = stepWithTot?.match(/(TOT-\d{4}-[A-Z0-9]+)/);
+                  if (totMatch?.[1]) {
+                    parsed.linkedOrderNumber = totMatch[1];
+                    needsHealPersist = true;
+                  }
+                }
+                if (
+                  parsed.linkedOrderNumber === "TOT-2026-314208876B66" &&
+                  (!parsed.cart.shippingCents || parsed.cart.shippingCents === 0)
+                ) {
+                  parsed.cart.shippingCents = 15332;
+                  parsed.cart.shippingCarrier = "PAC Contrato AG (Correios)";
+                  parsed.cart.shippingDeliveryDays = 10;
+                  parsed.cart.totalCents = parsed.cart.subtotalCents + 15332;
+                  parsed.cart.pixTotalCents = parsed.cart.totalCents;
+                  if (parsed.attribution) {
+                    parsed.attribution.conversionValueCents = parsed.cart.totalCents;
+                  }
+                  needsHealPersist = true;
+                }
                 // Auto-cura 3: Enriquecimento com inteligência Google Ads API + Geo-IP + Diagnóstico de Abandono
                 if (isPublicIp(parsed.telemetry?.ip) && (!parsed.customer?.city || !parsed.telemetry?.isp)) {
                   const ipGeo = await resolveIpGeo(parsed.telemetry.ip);
@@ -1795,9 +1872,9 @@ class AdsLeadsCartsStore {
         : existing?.cart.subtotalCents || 159000;
 
     const shippingCents =
-      meta.shippingCents !== undefined
+      meta.shippingCents !== undefined && Number(meta.shippingCents) > 0
         ? Number(meta.shippingCents)
-        : existing?.cart.shippingCents || 0;
+        : existing?.cart.shippingCents || Number(meta.shippingCents || 0);
     const discountCents =
       meta.discountCents !== undefined
         ? Number(meta.discountCents)
@@ -2046,9 +2123,26 @@ class AdsLeadsCartsStore {
 
     const nextStepLabel = stepLabelMap[event.eventName] || event.eventName;
     const prevSteps = existing?.telemetry.stepsJourney || ["Acesso à Loja / Configurador 3D"];
-    const stepsJourney = prevSteps.includes(nextStepLabel)
-      ? prevSteps
-      : [...prevSteps, nextStepLabel];
+    let stepsJourney: string[];
+    if (
+      nextStepLabel.startsWith("Preencheu Dados de Contato no Checkout") ||
+      nextStepLabel.startsWith("Preencheu Endereço/CEP no Checkout")
+    ) {
+      const prefix = nextStepLabel.startsWith("Preencheu Dados de Contato no Checkout")
+        ? "Preencheu Dados de Contato no Checkout"
+        : "Preencheu Endereço/CEP no Checkout";
+      const existingIdx = prevSteps.findIndex((s) => s.startsWith(prefix));
+      if (existingIdx >= 0) {
+        stepsJourney = [...prevSteps];
+        stepsJourney[existingIdx] = nextStepLabel;
+      } else {
+        stepsJourney = [...prevSteps, nextStepLabel];
+      }
+    } else {
+      stepsJourney = prevSteps.includes(nextStepLabel)
+        ? prevSteps
+        : [...prevSteps, nextStepLabel];
+    }
 
     const dateCode = nowIso.slice(0, 10).replace(/-/g, "");
     const recordId =
@@ -2162,7 +2256,12 @@ class AdsLeadsCartsStore {
             .filter(Boolean)
             .join(" | ")
         : existing?.commercialNotes || "",
-      linkedOrderNumber: meta.orderId || existing?.linkedOrderNumber,
+      linkedOrderNumber:
+        String(meta.orderNumber || "").startsWith("TOT-")
+          ? String(meta.orderNumber)
+          : existing?.linkedOrderNumber?.startsWith("TOT-")
+          ? existing.linkedOrderNumber
+          : meta.orderNumber || meta.orderId || existing?.linkedOrderNumber,
       createdAt: existing?.createdAt || nowIso,
       updatedAt: nowIso,
     };
