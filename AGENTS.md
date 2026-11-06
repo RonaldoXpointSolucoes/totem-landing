@@ -42,3 +42,5 @@ Sempre que o usuário solicitar **"analise os resultados"**, **"analise o andame
      5. 🏆 `[Totem Pro] Compra Aprovada (Purchase)` (`7871295732`) — *Objetivo Principal*
 3. **Dicas de Melhoria + Termômetro de Maturidade e Orçamento**:
    - Todo relatório deve finalizar com **dicas práticas de melhoria técnica** (CPC, termos negativos, grupos, anúncios A/B, regiões e dispositivos) e uma **recomendação objetiva de investimento** (**Aumentar**, **Manter** ou **Diminuir/Realocar** orçamento) baseada no estágio real de maturidade da campanha.
+4. **Envio Obrigatório do Resumo Executivo no WhatsApp (`FoodNext` ➔ `Ronaldo`)**:
+   - Sempre que gerar qualquer análise ou explicação da campanha do Google Ads, envie automaticamente uma versão executiva, didática, bem formatada para leitura no celular e focada em tomada de decisão da instância **FoodNext** (`cc4efe36-f391-4b3d-a24c-ddcd8a293cf6`) para a instância **Ronaldo** (`5511975960999` / `5c78d358-d449-41c4-b396-a04ab20a39e4`) utilizando o script `.agents/skills/totem-pro-ads-specialist/scripts/send-whatsapp-report.cjs`.

@@ -1,5 +1,5 @@
 {
-  "lastUpdatedAt": "2026-10-26T21:27:00.000Z",
+  "lastUpdatedAt": "2026-11-02T23:30:00.000Z",
   "lastLiveSyncAt": null,
   "liveSyncStatus": "seeded",
   "liveSyncMessage": "Dados oficiais da campanha 24395671655 carregados e prontos para sincronização em tempo real.",
@@ -14,15 +14,17 @@
       "nominalDailyBudget": 35,
       "effectiveDailyTargetMin": 35,
       "effectiveDailyTargetMax": 50,
-      "negativeKeywordsCount": 81,
+      "negativeKeywordsCount": 91,
       "recentNegativeKeywords": [
-        "banner",
-        "vitrine",
-        "tv vertical",
-        "papel",
-        "eva",
-        "isopor",
-        "acrilico"
+        "o que é",
+        "como funciona",
+        "55 polegadas",
+        "50 polegadas",
+        "totem touch screen 55",
+        "led indoor",
+        "painel de led",
+        "com tv",
+        "sunmi"
       ],
       "allNegativeKeywords": [
         "gov",
@@ -58,9 +60,19 @@
         "tv 32",
         "outdoor",
         "sinalizacao",
-        "sinalização"
+        "sinalização",
+        "o que é",
+        "o que e",
+        "como funciona",
+        "55 polegadas",
+        "50 polegadas",
+        "totem touch screen 55",
+        "led indoor",
+        "painel de led",
+        "com tv",
+        "sunmi"
       ],
-      "lastSyncedAt": "2026-10-28T21:05:00.000Z"
+      "lastSyncedAt": "2026-11-02T23:30:00.000Z"
     }
   ],
   "dailyMetrics": [
@@ -85,12 +97,12 @@
     {
       "id": "daily_2026-10-26_24395671655",
       "date": "2026-10-26",
-      "label": "Hoje (Seg, 26/10 até 21h27)",
+      "label": "Seg, 26/10/2026",
       "campaignId": "24395671655",
       "campaignName": "[SEARCH] Totem Pro — Gabinete & Monte Seu Totem (-50%)",
-      "impressions": 442,
+      "impressions": 443,
       "clicks": 35,
-      "ctr": 7.92,
+      "ctr": 7.9,
       "avgCpc": 2.68,
       "cost": 93.72,
       "conversions": 2,
@@ -98,7 +110,7 @@
       "cpa": 46.86,
       "roas": 13.78,
       "overdeliveryFlag": true,
-      "notes": "Superfornecimento Diário (Overdelivery): compensou o saldo de domingo em segunda-feira de alta procura. CTR saltou +60% (de 4,95% para 7,92%) com 2 conversões principais (1 Carrinho R$ 1.290,00 + 1 WhatsApp). Trava nominal de R$ 35/dia e redução de 30% no CPC Máx já aplicadas."
+      "notes": "Segunda-feira com 2 conversões principais (1 Carrinho R$ 1.290,00 em SP Capital + 1 WhatsApp em Descalvado/SP). Trava nominal de R$ 35/dia aplicada."
     },
     {
       "id": "daily_2026-10-27_24395671655",
@@ -536,6 +548,127 @@
   ],
   "conversionDetails": [
     {
+      "id": "conv_2026-10-28_vilavelha_cart",
+      "date": "2026-10-28",
+      "campaignId": "24395671655",
+      "campaignName": "[SEARCH] Totem Pro — Gabinete & Monte Seu Totem (-50%)",
+      "actionId": "7871297265",
+      "actionName": "[Totem Pro] Adicionar ao Carrinho (Add to Cart)",
+      "funnelOrder": 1,
+      "count": 3,
+      "value": 7388.71,
+      "isSymbolicValue": false,
+      "city": "Vila Velha",
+      "state": "ES",
+      "device": "DESKTOP",
+      "adGroupName": "03 - Gastronomia, Mercados e Clínicas",
+      "keyword": "totem de autoatendimento",
+      "matchType": "PHRASE",
+      "adId": "829486528515",
+      "landingUrl": "https://totem.xpointsolucoes.com.br/monte-seu-totem",
+      "stepsJourney": [
+        "Pesquisou 'totem de autoatendimento' via Desktop em Vila Velha/ES e adicionou 3 configurações ao carrinho (totalizando R$ 7.388,71)."
+      ]
+    },
+    {
+      "id": "conv_2026-10-29_vilavelha_cart",
+      "date": "2026-10-29",
+      "campaignId": "24395671655",
+      "campaignName": "[SEARCH] Totem Pro — Gabinete & Monte Seu Totem (-50%)",
+      "actionId": "7871297265",
+      "actionName": "[Totem Pro] Adicionar ao Carrinho (Add to Cart)",
+      "funnelOrder": 1,
+      "count": 9,
+      "value": 53402.58,
+      "isSymbolicValue": false,
+      "city": "Vila Velha",
+      "state": "ES",
+      "device": "DESKTOP",
+      "adGroupName": "03 - Gastronomia, Mercados e Clínicas",
+      "keyword": "[totem de autoatendimento]",
+      "matchType": "EXACT",
+      "adId": "829486528515",
+      "landingUrl": "https://totem.xpointsolucoes.com.br/monte-seu-totem",
+      "stepsJourney": [
+        "Pesquisou [totem de autoatendimento] (Exata) via Desktop em Vila Velha/ES.",
+        "Realizou 9 simulações completas de Gabinete de Piso + Kit Completo (R$ 5.781,00 a R$ 5.997,29 cada) comparando cores e periféricos."
+      ]
+    },
+    {
+      "id": "conv_2026-10-30_pinda_cart",
+      "date": "2026-10-30",
+      "campaignId": "24395671655",
+      "campaignName": "[SEARCH] Totem Pro — Gabinete & Monte Seu Totem (-50%)",
+      "actionId": "7871297265",
+      "actionName": "[Totem Pro] Adicionar ao Carrinho (Add to Cart)",
+      "funnelOrder": 1,
+      "count": 1,
+      "value": 1100,
+      "isSymbolicValue": false,
+      "city": "Pindamonhangaba",
+      "state": "SP",
+      "device": "MOBILE",
+      "adGroupName": "03 - Gastronomia, Mercados e Clínicas",
+      "keyword": "totem de autoatendimento",
+      "matchType": "PHRASE",
+      "adId": "829532711416",
+      "landingUrl": "https://totem.xpointsolucoes.com.br",
+      "stepsJourney": [
+        "Pesquisou 'totem de autoatendimento' via Mobile em Pindamonhangaba/SP.",
+        "Configurou Gabinete de Parede (Apenas Gabinete -50% + Monitor 21.5\" + Impressora) por R$ 1.100,00 e adicionou ao carrinho."
+      ]
+    },
+    {
+      "id": "conv_2026-11-01_ubatuba_cart",
+      "date": "2026-11-01",
+      "campaignId": "24395671655",
+      "campaignName": "[SEARCH] Totem Pro — Gabinete & Monte Seu Totem (-50%)",
+      "actionId": "7871297265",
+      "actionName": "[Totem Pro] Adicionar ao Carrinho (Add to Cart)",
+      "funnelOrder": 1,
+      "count": 1,
+      "value": 1290,
+      "isSymbolicValue": false,
+      "city": "Ubatuba",
+      "state": "SP",
+      "device": "MOBILE",
+      "adGroupName": "01 - Gabinete para Totem (Só Gabinete ou Kit)",
+      "keyword": "gabinete para totem",
+      "matchType": "PHRASE",
+      "adId": "829484769324",
+      "landingUrl": "https://totem.xpointsolucoes.com.br",
+      "stepsJourney": [
+        "Pesquisou 'gabinete para totem' via Mobile em Ubatuba/SP e clicou no Anúncio A (/).",
+        "Abriu o Configurador e montou Gabinete de Parede Branco TX (Apenas Gabinete -50% + Aytek 27\" + Epson TM-T20X) por R$ 1.290,00.",
+        "Retornou em 2 sessões no mesmo dia para revisar o carrinho em /carrinho sem preencher CEP."
+      ]
+    },
+    {
+      "id": "conv_2026-11-02_americana_cart",
+      "date": "2026-11-02",
+      "campaignId": "24395671655",
+      "campaignName": "[SEARCH] Totem Pro — Gabinete & Monte Seu Totem (-50%)",
+      "actionId": "7871297265",
+      "actionName": "[Totem Pro] Adicionar ao Carrinho (Add to Cart)",
+      "funnelOrder": 1,
+      "count": 1,
+      "value": 1170,
+      "isSymbolicValue": false,
+      "city": "Americana",
+      "state": "SP",
+      "device": "DESKTOP",
+      "adGroupName": "01 - Gabinete para Totem (Só Gabinete ou Kit)",
+      "keyword": "gabinete para totem",
+      "matchType": "PHRASE",
+      "adId": "829610458202",
+      "landingUrl": "https://totem.xpointsolucoes.com.br/monte-seu-totem",
+      "stepsJourney": [
+        "Pesquisou 'gabinete para totem' via Desktop em Americana/SP e clicou no Anúncio B (/monte-seu-totem).",
+        "Configurou Gabinete de Parede Preto TX (Apenas Gabinete -50% + Furação Samsung 32\" + Epson TM-T20X) por R$ 1.170,00.",
+        "Avançou para /carrinho sem informar CEP para cálculo de frete."
+      ]
+    },
+    {
       "id": "conv_2026-10-27_manaus_cart",
       "date": "2026-10-27",
       "campaignId": "24395671655",
@@ -690,11 +823,11 @@
       "actionId": "7871297265",
       "actionName": "[Totem Pro] Adicionar ao Carrinho (Add to Cart)",
       "triggerDescription": "Quando o cliente termina as etapas do Configurador (/monte-seu-totem) e clica em Adicionar ao Carrinho",
-      "valueRule": "Valor real configurado (ex: R$ 1.290,00 a R$ 5.202,00)",
+      "valueRule": "Valor real configurado (ex: R$ 1.100,00 a R$ 5.997,29)",
       "isPrimary": true,
-      "conversionsToday": 3,
-      "conversionsTotal": 5,
-      "conversionValueTotal": 18486
+      "conversionsToday": 1,
+      "conversionsTotal": 20,
+      "conversionValueTotal": 82837.29
     },
     {
       "order": 2,
@@ -746,6 +879,20 @@
     }
   ],
   "optimizations": [
+    {
+      "id": "opt_2026-11-02_bids_negatives",
+      "date": "2026-11-02",
+      "timestamp": "2026-11-02T20:15:00.000Z",
+      "campaignId": "24395671655",
+      "campaignName": "[SEARCH] Totem Pro — Gabinete & Monte Seu Totem (-50%)",
+      "category": "BID_REDUCTION",
+      "title": "Realocação de Lances para Grupo 01 (CPA R$ 9,48) + Redução G04 + 10 Novas Negativas (91 Total)",
+      "targetScope": "Grupo 01 (+15% Lance), Grupo 04 (-33% Lance) e Campanha (+10 Negativas)",
+      "beforeValue": "G01: R$ 2,20 | G04: R$ 2,10 | 81 negativas ativas",
+      "afterValue": "G01: R$ 2,45 ('gabinete para totem': R$ 2,55) | G04: R$ 1,40 | 91 negativas ativas",
+      "expectedImpact": "Concentrar orçamento nos grupos que geram 100% das conversões (G01 e G03) e bloquear buscas de telas gigantes (50\"/55\") e dúvidas informacionais.",
+      "technicalReason": "Grupo 01 atingiu CTR de 8,70% e CPA de R$ 9,48 (Ubatuba/SP e Americana/SP), enquanto Grupo 04 consumiu R$ 97,94 com 0 conversões."
+    },
     {
       "id": "opt_2026-10-26_budget_guard",
       "date": "2026-10-26",

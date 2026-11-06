@@ -110,6 +110,7 @@ export interface OrderDetails {
     provider?: string;
     gatewayPaymentId?: string;
     gatewayPreferenceId?: string;
+    gatewayStatus?: string;
     checkoutUrl?: string;
     statusToken?: string;
     pixCode: string;

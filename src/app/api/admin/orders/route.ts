@@ -4,6 +4,7 @@ import { listAllOrdersAdmin } from "@/lib/appwrite/server";
 import { getAuthSession, LEGACY_ADMIN_COOKIE, LEGACY_SECRET } from "@/lib/auth/session";
 import { getAllLocalOrders } from "@/lib/orders/orderStore";
 import { calculateShippingQuotes } from "@/modules/shipping";
+import { checkoutStatusToken, translateMercadoPagoStatusDetail } from "@/lib/payments/mercadoPago";
 
 async function verifyAdminAuth(): Promise<boolean> {
   const session = await getAuthSession();
@@ -23,6 +24,7 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status") || undefined;
+    const site = (process.env.NEXT_PUBLIC_SITE_URL || "https://totem.xpointsolucoes.com.br").replace(/\/$/, "");
 
     // 1. Carrega do Appwrite
     let appwriteOrders: any[] = [];
@@ -61,8 +63,6 @@ export async function GET(req: Request) {
       const localMatch = localByNumber.get(o.order_number);
       let shippingMethod = parsedAddress?.shippingMethod || localMatch?.shippingMethod || null;
 
-      // Caso o pedido antigo tenha frete cobrado (> 0) mas sem o objeto shippingMethod salvo,
-      // deduzimos automaticamente cotando o CEP de destino com os itens do pedido
       if (!shippingMethod && o.shipping_cents > 0 && parsedAddress?.cep) {
         try {
           const quoteRes = await calculateShippingQuotes({
@@ -104,6 +104,26 @@ export async function GET(req: Request) {
         };
       }
 
+      const payMethod =
+        o.payment?.payment_method ||
+        parsedAddress?.paymentMethod ||
+        (o.payment?.gateway_preference_id ? "credit_card" : "pix");
+      const isPaid = ["paid", "in_production", "ready", "shipped", "delivered"].includes(o.status);
+      const isExpired =
+        !isPaid &&
+        Boolean(o.payment?.expires_at) &&
+        Date.parse(o.payment.expires_at) < Date.now();
+      const gatewayDiag = translateMercadoPagoStatusDetail(
+        isPaid ? "approved" : isExpired && o.payment?.status === "pending" ? "cancelled" : o.payment?.status,
+        isPaid ? "accredited" : isExpired && o.payment?.status === "pending" ? "expired" : o.payment?.gateway_status,
+        payMethod
+      );
+
+      let customerPaymentUrl = "";
+      try {
+        customerPaymentUrl = `${site}/checkout/retorno?orderId=${encodeURIComponent(o.$id)}&token=${checkoutStatusToken(o.$id)}`;
+      } catch {}
+
       orderMap.set(o.order_number, {
         ...o,
         delivery_address: parsedAddress || localMatch?.deliveryAddress || null,
@@ -111,6 +131,10 @@ export async function GET(req: Request) {
         manufacturing_sheets: parsedSheets.length ? parsedSheets : localMatch?.manufacturingSheets || [],
         coupon_code: parsedAddress?.couponCode || null,
         discount_cents: parsedAddress?.discountCents || 0,
+        customer_payment_url: customerPaymentUrl,
+        gateway_diagnosis: gatewayDiag,
+        payment_history: Array.isArray(parsedAddress?.paymentHistory) ? parsedAddress.paymentHistory : [],
+        last_gateway_diag: parsedAddress?.lastGatewayDiag || null,
       });
     }
 

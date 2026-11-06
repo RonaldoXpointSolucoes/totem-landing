@@ -480,13 +480,20 @@ export async function POST(req: Request) {
     }
 
     const payment = await createMercadoPagoPayment({
-      orderId: appwriteResult!.orderId, orderNumber, amountCents: totalCents, customer, method: paymentMethod,
+      orderId: appwriteResult!.orderId,
+      orderNumber,
+      amountCents: totalCents,
+      customer,
+      deliveryAddress,
+      method: paymentMethod,
     });
     await updateMercadoPagoPayment(appwriteResult!.orderId, {
-      pix_code: payment.pixCode, expires_at: payment.expiresAt,
+      pix_code: payment.pixCode,
+      expires_at: payment.expiresAt,
       gateway_payment_id: "gatewayPaymentId" in payment ? payment.gatewayPaymentId : "",
       gateway_preference_id: "gatewayPreferenceId" in payment ? payment.gatewayPreferenceId : "",
       checkout_url: "checkoutUrl" in payment ? payment.checkoutUrl : "",
+      gateway_status: payment.gatewayStatus || "pending",
     });
 
     const orderDetails: OrderDetails = {

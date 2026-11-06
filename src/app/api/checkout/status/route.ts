@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getOrderWithDetails } from "@/lib/appwrite/server";
-import { verifyCheckoutStatusToken } from "@/lib/payments/mercadoPago";
+import { translateMercadoPagoStatusDetail, verifyCheckoutStatusToken } from "@/lib/payments/mercadoPago";
 import { refreshMercadoPagoOrder } from "@/lib/payments/mercadoPagoStore";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +10,7 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const orderId = searchParams.get("orderId");
+    const forceSync = searchParams.get("forceSync") === "1";
 
     if (!orderId) {
       return NextResponse.json({ ok: false, error: "Parâmetro orderId obrigatório." }, { status: 400 });
@@ -24,28 +25,69 @@ export async function GET(req: Request) {
     }
 
     let syncPending = false;
-    if (orderDetails.payment?.provider === "mercadopago" && orderDetails.order.status === "awaiting_payment" && Date.now() - (lastRefresh.get(orderId) || 0) >= 15000) {
+    const minIntervalMs = forceSync ? 2000 : 12000;
+    if (
+      orderDetails.payment?.provider === "mercadopago" &&
+      (orderDetails.order.status === "awaiting_payment" || orderDetails.order.status === "cancelled") &&
+      Date.now() - (lastRefresh.get(orderId) || 0) >= minIntervalMs
+    ) {
       if (lastRefresh.size > 5000) lastRefresh.clear();
       lastRefresh.set(orderId, Date.now());
       try {
-        await refreshMercadoPagoOrder(orderId, orderDetails.payment.payment_method === "pix" ? orderDetails.payment.gateway_payment_id || undefined : undefined);
-        orderDetails = await getOrderWithDetails(orderId) || orderDetails;
-      } catch { syncPending = true; }
+        await refreshMercadoPagoOrder(
+          orderId,
+          orderDetails.payment.gateway_payment_id || undefined,
+          forceSync ? "Retorno Checkout Cliente" : "Polling Checkout Cliente"
+        );
+        orderDetails = (await getOrderWithDetails(orderId)) || orderDetails;
+      } catch {
+        syncPending = true;
+      }
     }
+
+    const method = orderDetails.payment?.payment_method === "credit_card" ? "credit_card" : "pix";
     const paymentStatus = orderDetails.payment?.status || "pending";
-    const isPaid = ["paid", "partially_refunded"].includes(paymentStatus) && ["paid", "in_production", "ready", "shipped", "delivered"].includes(orderDetails.order.status);
+    const gatewayStatus = orderDetails.payment?.gateway_status || paymentStatus;
+    const isPaid =
+      ["paid", "partially_refunded"].includes(paymentStatus) &&
+      ["paid", "in_production", "ready", "shipped", "delivered"].includes(orderDetails.order.status);
     const expired = !isPaid && Date.parse(orderDetails.payment?.expires_at || "") < Date.now();
 
-    return NextResponse.json({
-      ok: true,
-      status: orderDetails.order.status,
-      isPaid,
-      paymentStatus, expired, syncPending,
-      method: orderDetails.payment?.payment_method || "pix",
-      orderNumber: orderDetails.order.order_number,
-      paidAt: orderDetails.payment?.paid_at || null,
-      totalCents: orderDetails.order.total_cents,
-    }, { headers: { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" } });
+    const statusTranslation = translateMercadoPagoStatusDetail(
+      expired && paymentStatus === "pending" ? "cancelled" : paymentStatus,
+      expired && paymentStatus === "pending" ? "expired" : gatewayStatus,
+      method
+    );
+
+    let parsedAddress: any = {};
+    try {
+      parsedAddress = orderDetails.order.delivery_address_json
+        ? JSON.parse(orderDetails.order.delivery_address_json)
+        : {};
+    } catch {}
+
+    return NextResponse.json(
+      {
+        ok: true,
+        status: orderDetails.order.status,
+        isPaid,
+        paymentStatus,
+        gatewayStatus,
+        statusTranslation,
+        expired,
+        syncPending,
+        method,
+        orderNumber: orderDetails.order.order_number,
+        customerName: orderDetails.order.customer_name || "",
+        paidAt: orderDetails.payment?.paid_at || null,
+        expiresAt: orderDetails.payment?.expires_at || null,
+        pixCode: orderDetails.payment?.pix_code || "",
+        checkoutUrl: orderDetails.payment?.checkout_url || "",
+        totalCents: orderDetails.order.total_cents,
+        lastGatewayDiag: parsedAddress.lastGatewayDiag || null,
+      },
+      { headers: { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" } }
+    );
   } catch (error: any) {
     return NextResponse.json(
       { ok: false, error: "Não foi possível consultar o pagamento." },

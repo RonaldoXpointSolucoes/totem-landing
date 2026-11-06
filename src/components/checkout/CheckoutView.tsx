@@ -136,8 +136,54 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
 
   // Estados Pix
   const [copied, setCopied] = useState(false);
-  const [timeLeftSeconds, setTimeLeftSeconds] = useState(1800); // 30 minutos
+  const [timeLeftSeconds, setTimeLeftSeconds] = useState(86400); // 24 horas
   const [paymentNotice, setPaymentNotice] = useState("");
+  const [isRegeneratingPayment, setIsRegeneratingPayment] = useState(false);
+
+  const handleRegenerateOrderPayment = async (
+    targetMethod: "pix" | "credit_card",
+    autoRedirectCard = false
+  ) => {
+    if (!orderDetails?.id || !orderDetails?.payment?.statusToken || isRegeneratingPayment) return;
+    setIsRegeneratingPayment(true);
+    setPaymentNotice("");
+    try {
+      const res = await fetch("/api/checkout/regenerate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: orderDetails.id,
+          token: orderDetails.payment.statusToken,
+          method: targetMethod,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Não foi possível gerar nova cobrança no Mercado Pago.");
+      }
+      const nextOrder: OrderDetails = {
+        ...orderDetails,
+        status: "awaiting_payment",
+        payment: {
+          ...orderDetails.payment,
+          ...data.payment,
+          method: targetMethod,
+          status: "pending",
+        },
+      };
+      setOrderDetails(nextOrder);
+      sessionStorage.setItem("totem_pending_payment", JSON.stringify(nextOrder));
+      setPaymentMethod(targetMethod);
+      setStep(targetMethod === "credit_card" ? "awaiting_card" : "awaiting_pix");
+      if (autoRedirectCard && data.payment?.checkoutUrl) {
+        window.location.assign(data.payment.checkoutUrl);
+      }
+    } catch (err: any) {
+      setPaymentNotice(err?.message || "Erro ao gerar novo pagamento.");
+    } finally {
+      setIsRegeneratingPayment(false);
+    }
+  };
 
   useEffect(() => {
     try {
@@ -212,9 +258,15 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           clearCart();
           window.scrollTo({ top: 0, behavior: "smooth" });
         } else if (data.expired) {
-          setPaymentNotice("Este pagamento expirou. Volte para gerar um novo pedido.");
+          setPaymentNotice(
+            data.statusTranslation?.customerMessage ||
+              "O prazo deste código expirou. Clique abaixo para gerar um novo código ou link de pagamento imediatamente."
+          );
         } else if (["failed", "cancelled", "refunded", "charged_back"].includes(data.paymentStatus)) {
-          setPaymentNotice("Pagamento não concluído. Volte ao checkout para tentar novamente.");
+          setPaymentNotice(
+            data.statusTranslation?.customerMessage ||
+              "Pagamento não autorizado na tentativa anterior. Você pode gerar uma nova cobrança ou alternar entre Pix e Cartão abaixo."
+          );
         }
       } catch (err) {
         // Silencioso em caso de oscilação transitória
@@ -224,10 +276,14 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     return () => clearInterval(pollInterval);
   }, [step, orderDetails?.id, clearCart]);
 
-  // Formatação MM:SS
+  // Formatação HH:MM:SS ou MM:SS
   const formatTimer = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
+    if (hrs > 0) {
+      return `${hrs.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+    }
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
@@ -1154,11 +1210,37 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     return (
       <div className="max-w-lg mx-auto px-4 py-12 space-y-5 text-center">
         <CreditCard className="w-12 h-12 mx-auto text-blue-600" />
-        <h1 className="text-2xl font-bold">Pagamento com cartão de crédito</h1>
+        <h1 className="text-2xl font-bold">Pagamento com Cartão de Crédito</h1>
         <p>Pedido <strong>{orderDetails.orderNumber}</strong> · {formatBRL(orderDetails.totalCents)}</p>
-        <p className="text-sm text-slate-600 dark:text-slate-300">Conclua o pagamento no ambiente seguro do Mercado Pago. Você pode escolher até 10 parcelas, conforme as condições exibidas antes da confirmação.</p>
-        {orderDetails.payment.checkoutUrl && <a href={orderDetails.payment.checkoutUrl} className="block rounded-xl bg-blue-600 px-4 py-3 font-bold text-white">Continuar no Mercado Pago</a>}
-        {paymentNotice && <p role="status" className="text-sm text-amber-700">{paymentNotice}</p>}
+        <p className="text-sm text-slate-600 dark:text-slate-300">Conclua o pagamento no ambiente seguro do Mercado Pago. Você pode escolher até 10 parcelas ou combinar 2 cartões/saldo Mercado Pago.</p>
+        {orderDetails.payment.checkoutUrl && (
+          <a href={orderDetails.payment.checkoutUrl} className="block rounded-xl bg-blue-600 hover:bg-blue-500 px-4 py-3.5 font-bold text-white shadow-lg shadow-blue-600/20 transition">
+            Continuar no Mercado Pago (Cartão até 10x)
+          </a>
+        )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isRegeneratingPayment}
+            onClick={() => handleRegenerateOrderPayment("credit_card", true)}
+            className="text-xs font-bold"
+          >
+            <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+            Gerar Novo Link Cartão
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={isRegeneratingPayment}
+            onClick={() => handleRegenerateOrderPayment("pix", false)}
+            className="text-xs font-bold text-emerald-700 dark:text-emerald-300"
+          >
+            <QrCode className="w-3.5 h-3.5 mr-1.5" />
+            Alternar para Pix Imediato
+          </Button>
+        </div>
+        {paymentNotice && <p role="status" className="text-sm text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">{paymentNotice}</p>}
         <Button onClick={() => { sessionStorage.removeItem("totem_pending_payment"); setStep("form"); }} variant="ghost">Voltar ao checkout</Button>
       </div>
     );
@@ -1262,8 +1344,31 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
             </div>
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isRegeneratingPayment}
+              onClick={() => handleRegenerateOrderPayment("pix", false)}
+              className="text-xs font-bold"
+            >
+              <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+              Gerar Novo QR Code Pix (24h)
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isRegeneratingPayment}
+              onClick={() => handleRegenerateOrderPayment("credit_card", true)}
+              className="text-xs font-bold text-blue-700 dark:text-blue-300"
+            >
+              <CreditCard className="w-3.5 h-3.5 mr-1.5" />
+              Pagar com Cartão (Até 10x)
+            </Button>
+          </div>
+
           <p className="text-sm text-slate-600 dark:text-slate-300">A confirmação será automática após o Mercado Pago aprovar o pagamento.</p>
-          {paymentNotice && <p role="status" className="text-sm text-amber-700">{paymentNotice}</p>}
+          {paymentNotice && <p role="status" className="text-sm text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">{paymentNotice}</p>}
         </Card>
       </div>
     );

@@ -4,21 +4,23 @@ description: >-
   Skill exclusiva para gestão, auditoria, análise de resultados e escala da
   campanha Google Ads do Totem Pro (Conta X-Point customer_id: 2248859628,
   campaign_id: 24395671655). Deve ser usada sempre que o usuário pedir "analise
-  os resultados", "analise o andamento da campanha", "análise agora" ou
-  similares, entregando todas as 5 conversões separadas por tipo com seus
-  respectivos custos, origens (cidade, dispositivo, grupo e palavra-chave),
-  dicas práticas de melhoria e recomendação de investimento (aumentar, manter
-  ou diminuir) conforme a maturidade da campanha.
+  os resultados", "analise o andamento da campanha", "resultado de ontem",
+  "como está a campanha hoje", "análise agora" ou similares, entregando todas
+  as 5 conversões separadas por tipo com seus respectivos custos, origens
+  (cidade, dispositivo, grupo e palavra-chave), dicas práticas de melhoria,
+  recomendação de investimento e enviando obrigatoriamente um resumo executivo
+  didático via WhatsApp da instância FoodNext para a instância do Ronaldo.
 ---
 
 # Especialista Google Ads — Totem Pro (Gabinete & Monte Seu Próprio Totem)
 
 > [!IMPORTANT]
 > **REGRA DE OURO DESTA SKILL**:
-> Sempre que o usuário solicitar **"analise os resultados"**, **"analise o andamento da campanha"**, **"qual o andamento da campanha hoje"**, **"análise agora"** ou qualquer relatório do Google Ads:
+> Sempre que o usuário solicitar **"analise os resultados"**, **"analise o andamento da campanha"**, **"resultado de ontem"**, **"qual o andamento da campanha hoje"**, **"análise agora"** ou qualquer explicação/relatório do Google Ads:
 > 1. **Todas as 5 conversões existentes são importantes**, mesmo que o objetivo principal da campanha seja **Venda (`Compra Aprovada`)**.
 > 2. Você **NUNCA** deve apresentar as conversões apenas como um número consolidado único. É **OBRIGATÓRIO** detalhar o relatório com **todas as conversões separadas por tipo**, mostrando a quantidade, o valor registrado, o **custo exato de cada conversão** e a origem (Cidade/Estado, Dispositivo, Grupo de Anúncios e Palavra-chave).
 > 3. Ao final de todo relatório, entregue obrigatoriamente **dicas práticas de melhoria** e um **Diagnóstico de Maturidade e Investimento** indicando claramente se é momento de **Manter**, **Diminuir/Realocar** ou **Aumentar o Orçamento** (quando a campanha estiver madura e pronta para escalar vendas).
+> 4. **ENVIO OBRIGATÓRIO NO WHATSAPP (`FoodNext` ➔ `Ronaldo`)**: Toda vez que gerar uma análise ou explicar o que aconteceu na campanha, você **DEVE OBRIGATORIAMENTE** disparar uma mensagem no WhatsApp partindo da instância **FoodNext** (`cc4efe36-f391-4b3d-a24c-ddcd8a293cf6` / `5511947758860`) para a instância do **Ronaldo** (`5c78d358-d449-41c4-b396-a04ab20a39e4` / `5511975960999`). Essa mensagem no WhatsApp deve ser **extremamente organizada, didática, fácil de ler no celular e focada em tomada de decisão** (sem poluição visual ou excesso de tabelas brutas).
 
 ---
 
@@ -94,3 +96,39 @@ Avalie em qual estágio a campanha se encontra e dê um veredito direto sobre o 
 3. **Estágio 3 — Campanha Madura e Preparada para Escala (Vendas Aprovadas / Leads Fechados e Funil Previsível)**:
    - *Critérios de Maturidade*: Termos de pesquisa 100% comerciais, CTR consistente acima de 7%, geração diária previsível de *Carrinhos + WhatsApp + Checkouts* e validação de **Vendas (`Compra Aprovada` ou fechamento via WhatsApp)** com ROAS saudável.
    - *Veredito*: **🟢 AUMENTAR INVESTIMENTO GRADUALMENTE** (recomendar degraus seguros de +20% a +30% por vez, ex.: de R$ 50/dia para R$ 65/dia ➔ R$ 85/dia ➔ R$ 100+/dia) ou **🔴 DIMINUIR INVESTIMENTO** caso o CPA suba acima do limite saudável sem retorno proporcional no funil.
+
+---
+
+## 4. Protocolo de Envio Automático no WhatsApp (`FoodNext` ➔ `Ronaldo`)
+
+Sempre que o usuário pedir uma análise da campanha ou explicação dos resultados, **após gerar o relatório no chat**, execute obrigatoriamente o disparo do resumo executivo via WhatsApp:
+
+### 4.1. Dados Técnicos das Instâncias
+- **Remetente (`FoodNext`)**:
+  - Instance ID: `cc4efe36-f391-4b3d-a24c-ddcd8a293cf6` (`(11) 94775-8860`)
+- **Destinatário (`Ronaldo` / `Ronaldo-Web`)**:
+  - Instance ID: `5c78d358-d449-41c4-b396-a04ab20a39e4`
+  - Número / JID: `5511975960999` (`5511975960999@s.whatsapp.net`)
+- **Servidor da API**: `https://wh1ss8sy848ufj6zh8t492y7.69.62.92.212.sslip.io/message/sendText`
+- **Script Oficial de Disparo**:
+  ```powershell
+  node .agents/skills/totem-pro-ads-specialist/scripts/send-whatsapp-report.cjs --file <caminho_arquivo_mensagem.txt>
+  ```
+
+### 4.2. Diretrizes de Formatação e Didática da Mensagem no WhatsApp
+A mensagem enviada ao WhatsApp do Ronaldo **NÃO** deve ser uma cópia poluída de tabelas enormes em Markdown (que quebram na tela do celular). Ela deve ser **enxuta, visualmente impecável, didática e 100% orientada à tomada de decisão**, contendo exatamente estes **5 blocos curtos**:
+
+1. **📌 Cabeçalho & Resumo do Período**:
+   - Data/Período analisado, **Investimento (`R$`)**, **Cliques**, **CTR (%)**, **CPC Médio (`R$`)** e se o gasto respeitou a meta diária (`~R$ 35–R$ 50/dia`).
+2. **🎯 Placar das 5 Conversões (Separadas por Tipo e Custo)**:
+   - 🛒 *Carrinhos Adicionados*: Qtd, Valor (`R$`), CPA e Cidades/Dispositivos.
+   - 💬 *WhatsApp Engenharia*: Qtd (Ads + Appwrite), CPA e Cidades/Dispositivos.
+   - 💳 *Início de Checkout*: Qtd, Valor (`R$`) e CPA.
+   - 📋 *Lead Cadastro Checkout*: Qtd e CPA.
+   - 🏆 *Compra Aprovada (Venda)*: Qtd e Receita (`R$`).
+3. **🔍 O Que Aconteceu na Prática (Leitura Didática)**:
+   - Explicação simples e direta de 2 a 3 tópicos: qual grupo puxou o orçamento, o que os clientes realmente buscaram (termos quentes vs. termos ruins) e o comportamento no site (ex.: por que pararam no carrinho ou clicaram no WhatsApp).
+4. **🛠️ Ações Executadas / Recomendadas**:
+   - O que já foi otimizado (termos negativados, ajustes de CPC por grupo) ou o que precisa de aprovação.
+5. **🚀 Veredito de Decisão (Orçamento)**:
+   - Recomendação direta (**🟢 Aumentar**, **🟡 Manter/Realocar** ou **🔴 Diminuir**) com o motivo em 1 frase clara.

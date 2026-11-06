@@ -30,6 +30,7 @@ import { GoogleLoginButton } from "@/components/auth/GoogleLoginButton";
 import {
   ShieldCheck,
   ShieldAlert,
+  Zap,
   Package,
   Layers,
   FileText,
@@ -183,10 +184,37 @@ interface OrderRecord {
     status: string;
     pix_code?: string;
     paid_at?: string;
+    expires_at?: string | null;
+    checkout_url?: string | null;
     payment_method?: "pix" | "credit_card" | string | null;
     gateway_payment_id?: string | null;
+    gateway_preference_id?: string | null;
     gateway_status?: string | null;
   };
+  customer_payment_url?: string;
+  gateway_diagnosis?: {
+    code: string;
+    label: string;
+    description: string;
+    customerMessage: string;
+    severity: "success" | "info" | "warn" | "error";
+    canRetry: boolean;
+  };
+  payment_history?: Array<{
+    at: string;
+    action: string;
+    gatewayPaymentId?: string;
+    gatewayPreferenceId?: string;
+    gatewayStatus: string;
+    statusDetail: string;
+    statusLabel: string;
+    statusDescription: string;
+    severity: string;
+    method: string;
+    amountCents: number;
+    actor: string;
+  }>;
+  last_gateway_diag?: any;
 }
 
 interface AuditLog {
@@ -203,7 +231,7 @@ const STATUS_CONFIG: Record<
 > = {
   awaiting_custom_analysis: { label: "Em Análise CNC", color: "bg-amber-500/15 text-amber-300 border-amber-500/40", icon: AlertTriangle },
   custom_approved: { label: "Orçamento Aprovado", color: "bg-cyan-500/15 text-cyan-300 border-cyan-500/40", icon: CheckCircle2 },
-  awaiting_payment: { label: "Aguardando Pix", color: "bg-amber-500/10 text-amber-400 border-amber-500/30", icon: Clock },
+  awaiting_payment: { label: "Aguardando Pagto", color: "bg-amber-500/10 text-amber-400 border-amber-500/30", icon: Clock },
   paid: { label: "Pago / Confirmado", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30", icon: CheckCircle2 },
   in_production: { label: "Em Produção CNC", color: "bg-blue-500/10 text-blue-400 border-blue-500/30", icon: Wrench },
   ready: { label: "Pronto para Expedição", color: "bg-purple-500/10 text-purple-400 border-purple-500/30", icon: Package },
@@ -211,6 +239,31 @@ const STATUS_CONFIG: Record<
   delivered: { label: "Entregue ao Cliente", color: "bg-teal-500/10 text-teal-400 border-teal-500/30", icon: CheckCircle2 },
   cancelled: { label: "Cancelado", color: "bg-rose-500/10 text-rose-400 border-rose-500/30", icon: AlertCircle },
 };
+
+function getDynamicOrderStatusBadge(order: OrderRecord, payMethod: "pix" | "credit_card") {
+  if (order.status === "awaiting_payment") {
+    if (order.gateway_diagnosis?.severity === "error") {
+      return {
+        label: "Pagamento Recusado",
+        color: "bg-rose-500/15 text-rose-300 border-rose-500/40",
+        icon: AlertCircle,
+      };
+    }
+    if (order.gateway_diagnosis?.code === "expired") {
+      return {
+        label: payMethod === "credit_card" ? "Link Cartão Expirado" : "Pix Expirado",
+        color: "bg-amber-500/20 text-amber-300 border-amber-500/50",
+        icon: AlertTriangle,
+      };
+    }
+    return {
+      label: payMethod === "credit_card" ? "Aguardando Cartão" : "Aguardando Pix",
+      color: "bg-amber-500/10 text-amber-400 border-amber-500/30",
+      icon: Clock,
+    };
+  }
+  return STATUS_CONFIG[order.status] || STATUS_CONFIG.awaiting_payment;
+}
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
@@ -818,6 +871,70 @@ export default function AdminPage() {
     } catch (err) {
       console.error("Erro ao mudar status:", err);
     }
+  };
+
+  // Ações de Pagamento Mercado Pago (Sincronizar, Regenerar Pix 24h ou Link Cartão 72h)
+  const [paymentActionOrderId, setPaymentActionOrderId] = useState<string | null>(null);
+  const [copiedPaymentLinkOrderId, setCopiedPaymentLinkOrderId] = useState<string | null>(null);
+
+  const handleOrderPaymentAction = async (
+    order: OrderRecord,
+    action: "sync" | "regenerate_pix" | "regenerate_card"
+  ) => {
+    if (paymentActionOrderId) return;
+    setPaymentActionOrderId(`${order.$id}:${action}`);
+    try {
+      const res = await fetch(`/api/admin/orders/${order.$id}/payment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        alert(json.error || "Falha ao comunicar com o Mercado Pago.");
+        return;
+      }
+      setSaveSuccessMsg(json.message || "Operação Mercado Pago concluída com sucesso!");
+      setTimeout(() => setSaveSuccessMsg(""), 4500);
+      if (json.customerPaymentUrl && (action === "regenerate_pix" || action === "regenerate_card")) {
+        try {
+          await navigator.clipboard.writeText(json.customerPaymentUrl);
+          setCopiedPaymentLinkOrderId(order.$id);
+          setTimeout(() => setCopiedPaymentLinkOrderId(null), 3500);
+        } catch {}
+      }
+      addAuditLog(
+        action === "regenerate_pix"
+          ? "Novo Pix MP (24h)"
+          : action === "regenerate_card"
+          ? "Novo Link Cartão MP (72h)"
+          : "Sincronização MP",
+        `Pedido #${order.order_number}`,
+        json.message || "Operação Mercado Pago concluída"
+      );
+      await loadOrders();
+    } catch (err: any) {
+      console.error("Erro na ação Mercado Pago:", err);
+      alert("Erro de comunicação com o servidor.");
+    } finally {
+      setPaymentActionOrderId(null);
+    }
+  };
+
+  const handleCopyCustomerPaymentLink = async (order: OrderRecord) => {
+    const link =
+      order.customer_payment_url ||
+      order.payment?.checkout_url ||
+      `${window.location.origin}/?view=checkout`;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopiedPaymentLinkOrderId(order.$id);
+      setSaveSuccessMsg(`Link de pagamento do pedido ${order.order_number} copiado!`);
+      setTimeout(() => {
+        setCopiedPaymentLinkOrderId(null);
+        setSaveSuccessMsg("");
+      }, 3000);
+    } catch {}
   };
 
   // Abrir Modal de Edição Completa do Pedido (com opção de foco na Ordem de Execução)
@@ -1634,16 +1751,19 @@ export default function AdminPage() {
             ) : (
               <div className="grid grid-cols-1 gap-5">
                 {filteredOrders.map((order) => {
-                  const statusInfo = STATUS_CONFIG[order.status] || STATUS_CONFIG.awaiting_payment;
-                  const StatusIcon = statusInfo.icon;
                   const addr = getOrderAddress(order);
                   const shipping = getOrderShipping(order);
                   const payMethod = getOrderPaymentMethod(order);
+                  const statusInfo = getDynamicOrderStatusBadge(order, payMethod);
+                  const StatusIcon = statusInfo.icon;
                   const sheets = getOrderSheets(order);
                   const cleanPhone = (order.customer_whatsapp || "").replace(/\D/g, "");
+                  const paymentLinkForWa = order.customer_payment_url || order.payment?.checkout_url || "";
                   const waHref = cleanPhone
                     ? `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(
-                        `Olá ${order.customer_name || ""}, referente ao seu pedido ${order.order_number} na Totem Pro:`
+                        order.status === "awaiting_payment" && paymentLinkForWa
+                          ? `Olá ${order.customer_name || ""}! Tudo bem? Referente ao seu pedido ${order.order_number} na Totem Pro (${formatBRL(order.total_cents)}), segue seu link atualizado para concluir o pagamento via Pix ou Cartão em até 10x:\n\n${paymentLinkForWa}`
+                          : `Olá ${order.customer_name || ""}, referente ao seu pedido ${order.order_number} na Totem Pro:`
                       )}`
                     : null;
 
@@ -1795,6 +1915,88 @@ export default function AdminPage() {
                               </div>
                             </div>
                           </div>
+
+                          {/* Faixa de Diagnóstico & Recuperação Mercado Pago (Pedidos Pendentes ou com Falha) */}
+                          {(order.status === "awaiting_payment" || order.status === "cancelled") && (
+                            <div
+                              className={`p-3 rounded-xl border text-xs flex flex-col xl:flex-row xl:items-center justify-between gap-2.5 ${
+                                order.gateway_diagnosis?.severity === "error"
+                                  ? "bg-rose-950/30 border-rose-500/40 text-rose-200"
+                                  : order.gateway_diagnosis?.severity === "warn"
+                                  ? "bg-amber-950/30 border-amber-500/40 text-amber-200"
+                                  : "bg-slate-950/80 border-slate-800 text-slate-300"
+                              }`}
+                            >
+                              <div className="space-y-0.5 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                                    Mercado Pago
+                                  </span>
+                                  <strong className="font-extrabold text-white">
+                                    {order.gateway_diagnosis?.label || "Aguardando Confirmação"}
+                                  </strong>
+                                  {order.payment?.gateway_payment_id && (
+                                    <span className="text-[10px] font-mono text-slate-400">
+                                      ID #{order.payment.gateway_payment_id}
+                                    </span>
+                                  )}
+                                  {order.payment?.expires_at && (
+                                    <span className="text-[10px] font-mono text-slate-400">
+                                      • Validade: {new Date(order.payment.expires_at).toLocaleString("pt-BR")}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-slate-300 leading-snug">
+                                  {order.gateway_diagnosis?.description || "Cobrança gerada e aguardando compensação."}
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 flex-wrap shrink-0">
+                                <button
+                                  type="button"
+                                  disabled={Boolean(paymentActionOrderId)}
+                                  onClick={() => handleOrderPaymentAction(order, "sync")}
+                                  className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-[11px] flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                  title="Consultar status ao vivo na API do Mercado Pago"
+                                >
+                                  <RefreshCw className={`w-3 h-3 ${paymentActionOrderId === `${order.$id}:sync` ? "animate-spin" : ""}`} />
+                                  <span>Sincronizar MP</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={Boolean(paymentActionOrderId)}
+                                  onClick={() => handleOrderPaymentAction(order, "regenerate_pix")}
+                                  className="px-2.5 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 font-bold text-[11px] flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                  title="Gerar novo QR Code Pix válido por 24h no Mercado Pago"
+                                >
+                                  <Zap className="w-3 h-3" />
+                                  <span>{paymentActionOrderId === `${order.$id}:regenerate_pix` ? "Gerando..." : "Novo Pix (24h)"}</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={Boolean(paymentActionOrderId)}
+                                  onClick={() => handleOrderPaymentAction(order, "regenerate_card")}
+                                  className="px-2.5 py-1.5 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/40 font-bold text-[11px] flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                  title="Gerar novo Link Checkout Pro de Cartão válido por 72h"
+                                >
+                                  <CreditCard className="w-3 h-3" />
+                                  <span>{paymentActionOrderId === `${order.$id}:regenerate_card` ? "Gerando..." : "Novo Link Cartão (72h)"}</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyCustomerPaymentLink(order)}
+                                  className="px-2.5 py-1.5 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 border border-indigo-500/40 font-bold text-[11px] flex items-center gap-1 cursor-pointer"
+                                  title="Copiar link da página de pagamento (Pix + Cartão) para enviar ao cliente"
+                                >
+                                  <Copy className="w-3 h-3" />
+                                  <span>{copiedPaymentLinkOrderId === order.$id ? "Link Copiado!" : "Copiar Link Pagto"}</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
 
                           {/* Barra Inferior Compacta de Ações Rápidas (100% Contida no Card) */}
                           <div className="pt-3 border-t border-slate-800/70 flex flex-wrap items-center justify-between gap-2">
@@ -2158,6 +2360,96 @@ export default function AdminPage() {
                                     ? ` • Pago em ${new Date(order.payment.paid_at).toLocaleString("pt-BR")}`
                                     : ""}
                                 </p>
+                              )}
+                              {order.payment?.gateway_preference_id && (
+                                <p className="text-[10px] text-slate-500 font-mono pt-0.5 truncate" title={order.payment.gateway_preference_id}>
+                                  Pref. MP: {order.payment.gateway_preference_id}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Box Diagnóstico & Ações Gateway Mercado Pago */}
+                            <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2 text-[11px]">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[10px] uppercase font-bold text-blue-400">Gateway Mercado Pago:</span>
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    order.gateway_diagnosis?.severity === "success"
+                                      ? "bg-emerald-500/20 text-emerald-300"
+                                      : order.gateway_diagnosis?.severity === "error"
+                                      ? "bg-rose-500/20 text-rose-300"
+                                      : order.gateway_diagnosis?.severity === "warn"
+                                      ? "bg-amber-500/20 text-amber-300"
+                                      : "bg-blue-500/20 text-blue-300"
+                                  }`}
+                                >
+                                  {order.gateway_diagnosis?.label || order.payment?.gateway_status || "Pendente"}
+                                </span>
+                              </div>
+                              {order.gateway_diagnosis?.description && (
+                                <p className="text-[10px] text-slate-300 leading-snug">
+                                  {order.gateway_diagnosis.description}
+                                </p>
+                              )}
+                              {order.payment?.expires_at && order.status !== "paid" && (
+                                <p className="text-[10px] text-slate-400 font-mono">
+                                  Expira em: {new Date(order.payment.expires_at).toLocaleString("pt-BR")}
+                                </p>
+                              )}
+                              <div className="grid grid-cols-2 gap-1.5 pt-1">
+                                <button
+                                  type="button"
+                                  disabled={Boolean(paymentActionOrderId)}
+                                  onClick={() => handleOrderPaymentAction(order, "sync")}
+                                  className="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                                >
+                                  <RefreshCw className={`w-3 h-3 ${paymentActionOrderId === `${order.$id}:sync` ? "animate-spin" : ""}`} />
+                                  <span>Sincronizar MP</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyCustomerPaymentLink(order)}
+                                  className="px-2 py-1.5 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 border border-indigo-500/40 font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer"
+                                >
+                                  <Copy className="w-3 h-3" />
+                                  <span>{copiedPaymentLinkOrderId === order.$id ? "Copiado!" : "Copiar Link"}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={Boolean(paymentActionOrderId)}
+                                  onClick={() => handleOrderPaymentAction(order, "regenerate_pix")}
+                                  className="px-2 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                                >
+                                  <Zap className="w-3 h-3" />
+                                  <span>Novo Pix (24h)</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={Boolean(paymentActionOrderId)}
+                                  onClick={() => handleOrderPaymentAction(order, "regenerate_card")}
+                                  className="px-2 py-1.5 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/40 font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                                >
+                                  <CreditCard className="w-3 h-3" />
+                                  <span>Novo Cartão (72h)</span>
+                                </button>
+                              </div>
+                              {order.payment_history && order.payment_history.length > 0 && (
+                                <div className="pt-2 border-t border-slate-800 space-y-1 max-h-36 overflow-y-auto">
+                                  <span className="text-[9px] uppercase font-bold text-slate-400 block">
+                                    Histórico de Eventos MP ({order.payment_history.length}):
+                                  </span>
+                                  {order.payment_history.slice(0, 5).map((h, i) => (
+                                    <div key={i} className="text-[10px] p-1.5 rounded bg-slate-950 border border-slate-800/80 space-y-0.5">
+                                      <div className="flex items-center justify-between gap-1">
+                                        <strong className="text-slate-200">{h.statusLabel}</strong>
+                                        <span className="text-[9px] text-slate-500 font-mono">
+                                          {new Date(h.at).toLocaleString("pt-BR")}
+                                        </span>
+                                      </div>
+                                      <p className="text-[9px] text-slate-400">{h.statusDescription}</p>
+                                    </div>
+                                  ))}
+                                </div>
                               )}
                             </div>
                           </div>
