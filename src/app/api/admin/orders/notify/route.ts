@@ -4,8 +4,10 @@ import { getAuthSession, LEGACY_ADMIN_COOKIE, LEGACY_SECRET } from "@/lib/auth/s
 import {
   broadcastAdminWhatsAppNotification,
   DEFAULT_ORDER_NOTIFICATION_RECIPIENTS,
+  sendDirectWhatsAppToCustomer,
 } from "@/lib/notifications/whatsappNotifier";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
+import { resolveKitEquipmentSummary } from "@/modules/catalog/kitDefaults";
 
 async function verifyAdminAuth(): Promise<boolean> {
   const session = await getAuthSession();
@@ -40,6 +42,29 @@ export async function POST(req: Request) {
       });
     }
 
+    if (body.mode === "send_to_customer") {
+      const customerWhatsapp = String(body.customerWhatsapp || "").trim();
+      const customerName = String(body.customerName || "Cliente").trim();
+      const message = String(body.message || "").trim();
+      const orderNumber = String(body.orderNumber || "").trim();
+      if (!customerWhatsapp || !message) {
+        return NextResponse.json(
+          { ok: false, error: "Número de WhatsApp e mensagem são obrigatórios." },
+          { status: 400 }
+        );
+      }
+      const res = await sendDirectWhatsAppToCustomer({
+        customerName,
+        customerWhatsapp,
+        message,
+        contextLabel: orderNumber ? `Pedido #${orderNumber}` : customerName,
+      });
+      return NextResponse.json({
+        ok: res.ok,
+        error: res.error,
+      });
+    }
+
     const order = body.order;
     if (!order || !order.order_number) {
       return NextResponse.json({ ok: false, error: "Dados do pedido inválidos." }, { status: 400 });
@@ -56,17 +81,38 @@ export async function POST(req: Request) {
 
     const itemsSummary = Array.isArray(order.items)
       ? order.items
-          .map(
-            (it: any, idx: number) =>
+          .map((it: any, idx: number) => {
+            const kitEq = resolveKitEquipmentSummary({
+              monitorName: it.monitor_name,
+              printerName: it.printer_name,
+              readerName: it.reader_name,
+            });
+            const readerLine = kitEq.hasReader ? `   • Leitor: ${kitEq.readerDisplay}\n` : "";
+            return (
               `*${idx + 1}. ${it.quantity}x ${it.cabinet_name}*\n` +
               `   • Cor: ${it.color_name}\n` +
-              `   • Monitor: ${it.monitor_name || "Nenhum"}\n` +
-              `   • Impressora: ${it.printer_name || "Nenhuma"}\n` +
-              `   • Leitor: ${it.reader_name || "Sem leitor"}\n` +
+              `   • Monitor: ${kitEq.monitorDisplay}\n` +
+              `   • Impressora: ${kitEq.printerDisplay}\n` +
+              readerLine +
               `   • Subtotal: *${formatBRL(it.subtotal_cents || 0)}*`
-          )
+            );
+          })
           .join("\n\n")
       : "Itens não listados";
+
+    const additionalCharges = Array.isArray(addr?.additionalCharges) ? addr.additionalCharges : [];
+    const extrasSummary =
+      additionalCharges.length > 0
+        ? `\n\n➕ *ITENS / VALORES ADICIONAIS*\n` +
+          additionalCharges
+            .map(
+              (ch: any, idx: number) =>
+                `• ${idx + 1}. ${ch.description || "Item Adicional"}${
+                  (ch.quantity || 1) > 1 ? ` (${ch.quantity}x)` : ""
+                }: *+ ${formatBRL((Number(ch.amountCents) || 0) * (Number(ch.quantity) || 1))}*`
+            )
+            .join("\n")
+        : "";
 
     const shippingName = addr?.shippingMethod?.name || (order.shipping_cents > 0 ? "Correios / Transportadora" : "Grátis");
     const addressLine = addr?.street
@@ -80,7 +126,7 @@ export async function POST(req: Request) {
       `🪪 *CPF/CNPJ:* ${order.customer_document || "—"}\n` +
       `📱 *WhatsApp:* ${order.customer_whatsapp || "—"}\n` +
       `✉️ *E-mail:* ${order.customer_email || "—"}\n\n` +
-      `🛒 *ITENS DO PEDIDO*\n${itemsSummary}\n\n` +
+      `🛒 *ITENS DO PEDIDO*\n${itemsSummary}${extrasSummary}\n\n` +
       `🚚 *ENTREGA (${shippingName})*\n` +
       `• Frete: ${formatBRL(order.shipping_cents || 0)}\n` +
       `• Endereço: ${addressLine}\n\n` +

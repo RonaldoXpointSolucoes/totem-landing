@@ -24,6 +24,7 @@ import type {
 } from "@/lib/analytics/adsLeadsCartsStore";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
 import { useUrlParamState } from "@/lib/navigation/useUrlParamState";
+import { resolveKitEquipmentSummary } from "@/modules/catalog/kitDefaults";
 
 export type AdsDateFilterMode = "all" | "today" | "yesterday" | "7d" | "custom";
 
@@ -1041,7 +1042,13 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
 
                     {/* COLUNA 2: RESUMO DO CARRINHO / ITENS CONFIGURADOS + DIAGNÓSTICO DE ABANDONO (4 cols) */}
                     <div className="lg:col-span-4 border-l-0 lg:border-l border-slate-800/80 lg:pl-4">
-                      {firstItem ? (
+                      {firstItem ? (() => {
+                        const resolvedFirst = resolveKitEquipmentSummary({
+                          monitorName: firstItem.monitorName,
+                          printerName: firstItem.printerName,
+                          readerName: firstItem.barcodeReaderName,
+                        });
+                        return (
                         <div>
                           <div className="text-xs sm:text-sm font-bold text-white">
                             {rec.cart.itemsCount}{" "}
@@ -1058,23 +1065,23 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
                             )}
                             <span
                               className={`px-2 py-0.5 rounded-md border text-[11px] font-bold ${
-                                firstItem.purchaseMode === "complete_kit"
+                                firstItem.purchaseMode === "complete_kit" || resolvedFirst.isKit
                                   ? "bg-indigo-500/15 border-indigo-500/30 text-indigo-300"
                                   : "bg-cyan-500/15 border-cyan-500/30 text-cyan-300"
                               }`}
                             >
-                              {firstItem.purchaseMode === "complete_kit"
+                              {firstItem.purchaseMode === "complete_kit" || resolvedFirst.isKit
                                 ? "Gabinete + Kit Completo"
                                 : "Apenas Gabinete (-50%)"}
                             </span>
-                            {firstItem.monitorName && (
+                            {resolvedFirst.monitorDisplay && resolvedFirst.monitorDisplay !== "Nenhum" && (
                               <span className="px-2 py-0.5 rounded-md bg-blue-950/60 border border-blue-700/40 text-[11px] font-semibold text-blue-300">
-                                {firstItem.monitorName}
+                                {resolvedFirst.monitorDisplay}
                               </span>
                             )}
-                            {firstItem.printerName && (
+                            {resolvedFirst.printerDisplay && resolvedFirst.printerDisplay !== "Sem impressora" && (
                               <span className="px-2 py-0.5 rounded-md bg-purple-950/60 border border-purple-700/40 text-[11px] font-semibold text-purple-300">
-                                {firstItem.printerName}
+                                {resolvedFirst.printerDisplay}
                               </span>
                             )}
                             {firstItem.assemblyServiceSelected && (
@@ -1094,7 +1101,8 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
                             </div>
                           )}
                         </div>
-                      ) : (
+                        );
+                      })() : (
                         <div className="space-y-1.5">
                           <div className="text-xs text-slate-300 font-semibold">
                             Contato direto via botão de WhatsApp da Engenharia
@@ -1522,7 +1530,13 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
                         </h4>
 
                         <div className="space-y-2.5">
-                          {rec.cart.items.map((item, idx) => (
+                          {rec.cart.items.map((item, idx) => {
+                            const resolvedItem = resolveKitEquipmentSummary({
+                              monitorName: item.monitorName,
+                              printerName: item.printerName,
+                              readerName: item.barcodeReaderName,
+                            });
+                            return (
                             <div
                               key={item.itemId || idx}
                               className="p-3 rounded-xl bg-slate-950/90 border border-slate-800 space-y-1.5 text-xs"
@@ -1549,33 +1563,41 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
                                     Modalidade:{" "}
                                   </span>
                                   <strong className="text-cyan-300">
-                                    {item.purchaseMode === "complete_kit"
+                                    {item.purchaseMode === "complete_kit" || resolvedItem.isKit
                                       ? "Gabinete + Kit Completo de Periféricos"
                                       : "Apenas Gabinete (Cliente usa suas peças)"}
                                   </strong>
                                 </div>
-                                {item.monitorName && (
+                                {resolvedItem.monitorDisplay && (
                                   <div>
                                     <span className="text-slate-400">
                                       Monitor Touch:{" "}
                                     </span>
-                                    <strong>{item.monitorName}</strong>
+                                    <strong>{resolvedItem.monitorDisplay}</strong>
                                   </div>
                                 )}
-                                {item.printerName && (
+                                {resolvedItem.printerDisplay && (
                                   <div>
                                     <span className="text-slate-400">
                                       Impressora:{" "}
                                     </span>
-                                    <strong>{item.printerName}</strong>
+                                    <strong>{resolvedItem.printerDisplay}</strong>
                                   </div>
                                 )}
-                                {item.barcodeReaderName && (
+                                {(!resolvedItem.isKit || resolvedItem.hasReader) && resolvedItem.readerDisplay && (
                                   <div>
                                     <span className="text-slate-400">
                                       Leitor 2D:{" "}
                                     </span>
-                                    <strong>{item.barcodeReaderName}</strong>
+                                    <strong>{resolvedItem.readerDisplay}</strong>
+                                  </div>
+                                )}
+                                {resolvedItem.isKit && resolvedItem.accessoriesSummary && (
+                                  <div>
+                                    <span className="text-slate-400">
+                                      Acessórios do Kit:{" "}
+                                    </span>
+                                    <strong className="text-emerald-300">{resolvedItem.accessoriesSummary}</strong>
                                   </div>
                                 )}
                                 {item.assemblyServiceSelected && (
@@ -1591,7 +1613,8 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
                                 )}
                               </div>
                             </div>
-                          ))}
+                            );
+                          })}
                         </div>
 
                         <div className="pt-2 border-t border-slate-800 space-y-1 text-xs">

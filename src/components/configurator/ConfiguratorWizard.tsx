@@ -765,6 +765,9 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                 selectedMonitor={selectedMonitor}
                 onSelectMonitor={handleSelectMonitor}
                 onRequestCustomization={() => setIsCustomModalOpen(true)}
+                cabinetName={selectedModel.name}
+                cabinetBasePixCents={selectedModel.pixPriceCents || selectedModel.basePriceCents}
+                cabinetBaseCardCents={selectedModel.basePriceCents}
               />
             )}
 
@@ -802,6 +805,15 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                 customizationNotes={customizationNotes}
                 onChangeNotes={setCustomizationNotes}
                 onEditStep={(stepNum) => setStep(stepNum)}
+                onRemoveKit={() => {
+                  const fallbackMon =
+                    catalog.monitors.find((m) => !isItemKit(m) && (m.priceAdjustmentCents || 0) === 0) ||
+                    catalog.monitors.find((m) => !isItemKit(m)) ||
+                    null;
+                  setSelectedMonitor(fallbackMon);
+                  setIncludeAssemblyService(false);
+                  setStep(3);
+                }}
                 onAddToCart={handleAddToCart}
               />
             )}

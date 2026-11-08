@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
 import { siteConfig } from "@/config/site";
+import { resolveKitEquipmentSummary } from "@/modules/catalog/kitDefaults";
 import { CatalogManager } from "@/components/admin/CatalogManager";
 import { MarketingSettingsManager } from "@/components/admin/MarketingSettingsManager";
 import { TeamManager } from "@/components/admin/TeamManager";
@@ -42,6 +43,7 @@ import {
   Truck,
   Wrench,
   AlertCircle,
+  Send,
   Eye,
   Edit2,
   Save,
@@ -101,6 +103,13 @@ interface ShippingMethodInfo {
   deliveryDaysMax?: number;
 }
 
+interface OrderAdditionalCharge {
+  id: string;
+  description: string;
+  amountCents: number;
+  quantity: number;
+}
+
 interface ParsedDeliveryAddress {
   cep?: string;
   street?: string;
@@ -115,6 +124,7 @@ interface ParsedDeliveryAddress {
   discountCents?: number;
   customerNotes?: string | null;
   executionOrder?: OrderExecutionData | null;
+  additionalCharges?: OrderAdditionalCharge[];
 }
 
 interface EditableOrderItem {
@@ -156,6 +166,7 @@ interface EditOrderFormState {
   order_notes: string;
   execution_order: OrderExecutionData;
   items: EditableOrderItem[];
+  additional_charges: OrderAdditionalCharge[];
 }
 
 interface OrderRecord {
@@ -423,11 +434,18 @@ export default function AdminPage() {
     writeUrlParams({ editOrder: order?.$id || null });
   };
   const [editOrderForm, setEditOrderForm] = useState<EditOrderFormState | null>(null);
-  const [editModalFocusSection, setEditModalFocusSection] = useState<"all" | "execution">("all");
+  const [editModalFocusSection, setEditModalFocusSection] = useState<"all" | "execution" | "payment_proposal">("all");
   const [uploadingItemIdx, setUploadingItemIdx] = useState<number | null>(null);
   const [isSavingOrderEdit, setIsSavingOrderEdit] = useState(false);
   const [deletingOrder, setDeletingOrder] = useState<OrderRecord | null>(null);
   const [isDeletingOrder, setIsDeletingOrder] = useState(false);
+
+  const isOrderConfirmedPaid = (order: OrderRecord): boolean => {
+    return (
+      ["paid", "in_production", "ready", "shipped", "delivered"].includes(order.status) ||
+      order.payment?.status === "paid"
+    );
+  };
 
   const getOrderAddress = (order: OrderRecord): ParsedDeliveryAddress | null => {
     if (order.delivery_address) return order.delivery_address;
@@ -437,6 +455,18 @@ export default function AdminPage() {
       }
     } catch {}
     return null;
+  };
+
+  const getOrderAdditionalCharges = (
+    orderOrAddr: OrderRecord | ParsedDeliveryAddress | null
+  ): OrderAdditionalCharge[] => {
+    if (!orderOrAddr) return [];
+    if ("$id" in orderOrAddr || "order_number" in orderOrAddr) {
+      const addr = getOrderAddress(orderOrAddr as OrderRecord);
+      return Array.isArray(addr?.additionalCharges) ? addr.additionalCharges : [];
+    }
+    const addr = orderOrAddr as ParsedDeliveryAddress;
+    return Array.isArray(addr?.additionalCharges) ? addr.additionalCharges : [];
   };
 
   const getOrderShipping = (order: OrderRecord): ShippingMethodInfo => {
@@ -937,22 +967,169 @@ export default function AdminPage() {
     } catch {}
   };
 
-  // Abrir Modal de Edição Completa do Pedido (com opção de foco na Ordem de Execução)
-  const handleOpenEditOrder = (order: OrderRecord, focusSection: "all" | "execution" = "all") => {
+  const buildCustomerPaymentWhatsAppText = (order: OrderRecord, customPaymentUrl?: string): string => {
+    const shipping = getOrderShipping(order);
+    const additionalCharges = getOrderAdditionalCharges(order);
+    const payUrl =
+      customPaymentUrl ||
+      order.customer_payment_url ||
+      order.payment?.checkout_url ||
+      `${typeof window !== "undefined" ? window.location.origin : "https://totem.xpointsolucoes.com.br"}/checkout/retorno?orderId=${order.$id}`;
+
+    const itemsLines = (order.items || [])
+      .map((it, i) => {
+        const resolved = resolveKitEquipmentSummary({
+          monitorName: it.monitor_name,
+          printerName: it.printer_name,
+          readerName: it.reader_name,
+        });
+        const lines = [
+          `*${i + 1}. ${it.quantity}x ${it.cabinet_name}* (${it.color_name})`,
+          `   • Monitor: ${resolved.monitorDisplay}`,
+          `   • Impressora: ${resolved.printerDisplay}`,
+        ];
+        if (!resolved.isKit || resolved.hasReader) {
+          lines.push(`   • Leitor: ${resolved.readerDisplay}`);
+        } else if (resolved.accessoriesSummary) {
+          lines.push(`   • Acessórios do Kit: ${resolved.accessoriesSummary}`);
+        }
+        lines.push(`   • Subtotal Item: *${formatBRL(it.subtotal_cents)}*`);
+        return lines.join("\n");
+      })
+      .join("\n\n");
+
+    const extrasLines =
+      additionalCharges.length > 0
+        ? `\n\n➕ *ITENS / VALORES ADICIONAIS INCLUSOS:*\n` +
+          additionalCharges
+            .map(
+              (ch) =>
+                `   • ${ch.quantity && ch.quantity > 1 ? `${ch.quantity}x ` : ""}${ch.description}: *+ ${formatBRL(
+                  (Number(ch.amountCents) || 0) * (Number(ch.quantity) || 1)
+                )}*`
+            )
+            .join("\n")
+        : "";
+
+    const extraTotalCents = additionalCharges.reduce(
+      (acc, ch) => acc + (Number(ch.amountCents) || 0) * (Number(ch.quantity) || 1),
+      0
+    );
+
+    return [
+      `Olá *${order.customer_name || "Cliente"}*! Tudo bem?`,
+      `Segue o resumo atualizado e a condição de pagamento do seu pedido na *Totem Pro — X-Point Engenharia*:`,
+      ``,
+      `📦 *Pedido:* #${order.order_number}`,
+      ``,
+      `🛒 *ITENS CONFIGURADOS:*`,
+      itemsLines + extrasLines,
+      ``,
+      `💰 *RESUMO FINANCEIRO:*`,
+      `• Subtotal Gabinetes: ${formatBRL(order.subtotal_cents)}`,
+      ...(extraTotalCents > 0 ? [`• Valores Adicionais: + ${formatBRL(extraTotalCents)}`] : []),
+      `• Frete (${shipping.name}): ${order.shipping_cents > 0 ? formatBRL(order.shipping_cents) : "Grátis / Isento"}`,
+      `*VALOR TOTAL: ${formatBRL(order.total_cents)}*`,
+      ``,
+      `🔗 *Link Seguro de Pagamento (Pix à Vista ou Cartão em até 10x):*`,
+      payUrl,
+    ].join("\n");
+  };
+
+  const [sendingWaOrderId, setSendingWaOrderId] = useState<string | null>(null);
+
+  const handleSendPaymentToCustomerWhatsAppApi = async (order: OrderRecord) => {
+    if (sendingWaOrderId) return;
+    setSendingWaOrderId(order.$id);
+    try {
+      const res = await fetch("/api/admin/orders/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: order.$id, mode: "send_to_customer" }),
+      });
+      const json = await res.json();
+      if (json.ok && json.whatsapp?.sent) {
+        setSaveSuccessMsg(`Cobrança e resumo do pedido ${order.order_number} enviados no WhatsApp de ${order.customer_name}!`);
+        setTimeout(() => setSaveSuccessMsg(""), 4500);
+        addAuditLog("Cobrança WhatsApp Enviada", `Pedido #${order.order_number}`, `Enviado para ${order.customer_whatsapp}`);
+      } else {
+        // Fallback: abre o wa.me com o texto completo
+        const cleanPhone = (order.customer_whatsapp || "").replace(/\D/g, "");
+        if (cleanPhone) {
+          const text = json.whatsappText || buildCustomerPaymentWhatsAppText(order, json.customerPaymentUrl);
+          window.open(`https://wa.me/55${cleanPhone}?text=${encodeURIComponent(text)}`, "_blank");
+        } else {
+          alert(json.error || "Cliente não possui número de WhatsApp cadastrado.");
+        }
+      }
+    } catch {
+      const cleanPhone = (order.customer_whatsapp || "").replace(/\D/g, "");
+      if (cleanPhone) {
+        window.open(
+          `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(buildCustomerPaymentWhatsAppText(order))}`,
+          "_blank"
+        );
+      }
+    } finally {
+      setSendingWaOrderId(null);
+    }
+  };
+
+  const recalculateEditFormTotals = (
+    items: EditableOrderItem[],
+    additionalCharges: OrderAdditionalCharge[],
+    shippingCents: number,
+    discountCents: number
+  ) => {
+    const itemsSum = items.reduce((acc, i) => acc + (Number(i.subtotal_cents) || 0), 0);
+    const extrasSum = additionalCharges.reduce(
+      (acc, c) => acc + (Number(c.amountCents) || 0) * Math.max(1, Number(c.quantity) || 1),
+      0
+    );
+    const ship = Number(shippingCents) || 0;
+    const disc = Number(discountCents) || 0;
+    return {
+      subtotal_cents: itemsSum,
+      total_cents: Math.max(0, itemsSum + extrasSum - disc + ship),
+    };
+  };
+
+  // Abrir Modal de Edição Completa do Pedido (com opção de foco na Ordem de Execução ou Proposta/Adicionais)
+  const handleOpenEditOrder = (
+    order: OrderRecord,
+    focusSection: "all" | "execution" | "payment_proposal" = "all"
+  ) => {
     const addr = getOrderAddress(order);
     const shipping = getOrderShipping(order);
     const payMethod = getOrderPaymentMethod(order);
     const sheets = getOrderSheets(order);
+    const existingCharges: OrderAdditionalCharge[] = Array.isArray(addr?.additionalCharges)
+      ? addr!.additionalCharges!.map((c, idx) => ({
+          id: c.id || `extra_${idx}_${Date.now()}`,
+          description: c.description || "",
+          amountCents: Number(c.amountCents) || 0,
+          quantity: Math.max(1, Number(c.quantity) || 1),
+        }))
+      : [];
 
     const editableItems: EditableOrderItem[] = (order.items || []).map((it, idx) => {
       const sheet = sheets[idx] || null;
+      const resolved = resolveKitEquipmentSummary({
+        monitorName: it.monitor_name,
+        printerName: it.printer_name,
+        readerName: it.reader_name,
+      });
       return {
         $id: it.$id,
         cabinet_name: it.cabinet_name || "Gabinete de Parede Compacto",
         color_name: it.color_name || "Branco TX",
-        monitor_name: it.monitor_name || "Nenhum",
-        printer_name: it.printer_name || "Nenhum",
-        reader_name: it.reader_name || "Nenhum",
+        monitor_name: resolved.monitorDisplay || "Nenhum",
+        printer_name: resolved.printerDisplay || "Nenhum",
+        reader_name: resolved.isKit
+          ? resolved.hasReader
+            ? resolved.readerDisplay
+            : resolved.accessoriesSummary || "Kit Completo (Coolers + Régua + Cabos)"
+          : resolved.readerDisplay || "Sem leitor",
         unit_price_cents: it.unit_price_cents || 0,
         quantity: it.quantity || 1,
         subtotal_cents: it.subtotal_cents || 0,
@@ -992,6 +1169,7 @@ export default function AdminPage() {
       order_notes: addr?.customerNotes || "",
       execution_order: createDefaultExecutionOrder(addr?.executionOrder || null),
       items: editableItems,
+      additional_charges: existingCharges,
     });
   };
 
@@ -1051,6 +1229,15 @@ export default function AdminPage() {
       const prevAddr = getOrderAddress(editingOrder) || {};
       const prevSheets = getOrderSheets(editingOrder);
 
+      const validAdditionalCharges = (editOrderForm.additional_charges || [])
+        .map((c) => ({
+          id: c.id || `extra_${Date.now()}`,
+          description: (c.description || "").trim(),
+          amountCents: Math.round(Number(c.amountCents) || 0),
+          quantity: Math.max(1, Number(c.quantity) || 1),
+        }))
+        .filter((c) => c.description.length > 0 && c.amountCents > 0);
+
       const newDeliveryAddress = {
         ...prevAddr,
         cep: editOrderForm.cep.trim(),
@@ -1065,6 +1252,7 @@ export default function AdminPage() {
         discountCents: Number(editOrderForm.discount_cents) || 0,
         customerNotes: editOrderForm.order_notes.trim() || null,
         executionOrder: editOrderForm.execution_order,
+        additionalCharges: validAdditionalCharges,
         shippingMethod: {
           ...(prevAddr.shippingMethod || {}),
           id: prevAddr.shippingMethod?.id || "custom_shipping",
@@ -1178,6 +1366,223 @@ export default function AdminPage() {
       }
     } catch (err: any) {
       alert("Erro de conexão ao salvar pedido: " + err?.message);
+    } finally {
+      setIsSavingOrderEdit(false);
+    }
+  };
+
+  // Salvar Edição + Gerar Nova Condição de Pagamento no Mercado Pago + Enviar ao Cliente
+  const handleSaveAndRegenerateOrderPayment = async (
+    targetMethod: "pix" | "credit_card",
+    sendMode: "none" | "wa_web" | "api" = "none"
+  ) => {
+    if (!editingOrder || !editOrderForm || isSavingOrderEdit) return;
+    setIsSavingOrderEdit(true);
+
+    try {
+      const prevAddr = getOrderAddress(editingOrder) || {};
+      const prevSheets = getOrderSheets(editingOrder);
+
+      const validAdditionalCharges = (editOrderForm.additional_charges || [])
+        .map((c) => ({
+          id: c.id || `extra_${Date.now()}`,
+          description: (c.description || "").trim(),
+          amountCents: Math.round(Number(c.amountCents) || 0),
+          quantity: Math.max(1, Number(c.quantity) || 1),
+        }))
+        .filter((c) => c.description.length > 0 && c.amountCents > 0);
+
+      const newDeliveryAddress = {
+        ...prevAddr,
+        cep: editOrderForm.cep.trim(),
+        street: editOrderForm.street.trim(),
+        number: editOrderForm.number.trim(),
+        complement: editOrderForm.complement.trim(),
+        neighborhood: editOrderForm.neighborhood.trim(),
+        city: editOrderForm.city.trim(),
+        state: editOrderForm.state.trim() || "SP",
+        paymentMethod: targetMethod,
+        couponCode: editOrderForm.coupon_code.trim() || null,
+        discountCents: Number(editOrderForm.discount_cents) || 0,
+        customerNotes: editOrderForm.order_notes.trim() || null,
+        executionOrder: editOrderForm.execution_order,
+        additionalCharges: validAdditionalCharges,
+        shippingMethod: {
+          ...(prevAddr.shippingMethod || {}),
+          id: prevAddr.shippingMethod?.id || "custom_shipping",
+          name: editOrderForm.shipping_name.trim() || "Transportadora / Correios",
+          carrier: editOrderForm.shipping_carrier.trim() || "Logística Homologada",
+          priceCents: Number(editOrderForm.shipping_cents) || 0,
+          deliveryDaysMin: prevAddr.shippingMethod?.deliveryDaysMin || 5,
+          deliveryDaysMax: prevAddr.shippingMethod?.deliveryDaysMax || 9,
+        },
+      };
+
+      const newSheets = editOrderForm.items.map((it, idx) => {
+        const baseSheet = prevSheets[idx] || {
+          itemIndex: idx + 1,
+          dimensionsMm: { heightMm: 680, widthMm: 420, depthMm: 220 },
+          finishType: "Pintura Eletrostática a Pó Microtexturizada (Cura 200°C)",
+          ventilationSpecs: "Grelhas de exaustão térmica convectiva superior e inferior (passagem de ar 35 CFM)",
+          securityLock: "Fechadura tipo tubular escamoteável com segredo e par de chaves",
+          status: "ready_for_cutting",
+        };
+        return {
+          ...baseSheet,
+          itemIndex: idx + 1,
+          cabinetModelName: it.cabinet_name,
+          colorName: it.color_name,
+          customizationNotes: it.customizationNotes.trim(),
+          itemAttachments: it.itemAttachments || [],
+          screenSpecs: {
+            ...(baseSheet.screenSpecs || {}),
+            monitorName: it.monitor_name,
+            screenCutoutMm:
+              it.screenCutoutMm.trim() ||
+              baseSheet.screenSpecs?.screenCutoutMm ||
+              `Abertura usinada para ${it.monitor_name}`,
+          },
+          printerSpecs: {
+            ...(baseSheet.printerSpecs || {}),
+            printerName: it.printer_name,
+          },
+          scannerSpecs: {
+            ...(baseSheet.scannerSpecs || {}),
+            hasScanner: it.reader_name !== "Nenhum" && it.reader_name !== "Sem leitor",
+            scannerName: it.reader_name,
+          },
+        };
+      });
+
+      const nextStatus =
+        editingOrder.status === "cancelled" || editingOrder.status === "awaiting_custom_analysis"
+          ? "awaiting_payment"
+          : editOrderForm.status;
+
+      const payload = {
+        order_number: editingOrder.order_number,
+        status: nextStatus,
+        payment_method: targetMethod,
+        customer_name: editOrderForm.customer_name.trim(),
+        customer_document: editOrderForm.customer_document.trim(),
+        customer_email: editOrderForm.customer_email.trim(),
+        customer_whatsapp: editOrderForm.customer_whatsapp.trim(),
+        subtotal_cents: Number(editOrderForm.subtotal_cents) || 0,
+        shipping_cents: Number(editOrderForm.shipping_cents) || 0,
+        total_cents: Number(editOrderForm.total_cents) || 0,
+        delivery_address_json: JSON.stringify(newDeliveryAddress),
+        manufacturing_sheet_json: JSON.stringify(newSheets),
+        items: editOrderForm.items.map((it) => ({
+          $id: it.$id,
+          cabinet_name: it.cabinet_name.trim(),
+          color_name: it.color_name.trim(),
+          monitor_name: it.monitor_name.trim() || "Nenhum",
+          printer_name: it.printer_name.trim() || "Nenhum",
+          reader_name: it.reader_name.trim() || "Nenhum",
+          unit_price_cents: Number(it.unit_price_cents) || 0,
+          quantity: Number(it.quantity) || 1,
+          subtotal_cents: Number(it.subtotal_cents) || 0,
+        })),
+      };
+
+      // 1. Salva pedido, itens e adicionais
+      const saveRes = await fetch(`/api/admin/orders/${editingOrder.$id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const saveJson = await saveRes.json();
+      if (!saveRes.ok || !saveJson.ok) {
+        alert(saveJson.error || "Erro ao salvar alterações antes de gerar a nova cobrança.");
+        return;
+      }
+
+      // 2. Gera nova condição de pagamento no Mercado Pago (Pix 24h ou Cartão 72h)
+      const action = targetMethod === "credit_card" ? "regenerate_card" : "regenerate_pix";
+      const payRes = await fetch(`/api/admin/orders/${editingOrder.$id}/payment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const payJson = await payRes.json();
+      if (!payRes.ok || !payJson.ok) {
+        alert(payJson.error || "Pedido salvo, mas falha ao gerar nova cobrança no Mercado Pago.");
+        await loadOrders();
+        return;
+      }
+
+      const customerPaymentUrl =
+        payJson.customerPaymentUrl ||
+        editingOrder.customer_payment_url ||
+        `${window.location.origin}/checkout/retorno?orderId=${editingOrder.$id}`;
+
+      try {
+        await navigator.clipboard.writeText(customerPaymentUrl);
+        setCopiedPaymentLinkOrderId(editingOrder.$id);
+        setTimeout(() => setCopiedPaymentLinkOrderId(null), 4000);
+      } catch {}
+
+      // 3. Dispara ao cliente se solicitado
+      const updatedOrderSnapshot: OrderRecord = {
+        ...editingOrder,
+        status: nextStatus,
+        customer_name: payload.customer_name,
+        customer_whatsapp: payload.customer_whatsapp,
+        subtotal_cents: payload.subtotal_cents,
+        shipping_cents: payload.shipping_cents,
+        total_cents: payload.total_cents,
+        delivery_address: newDeliveryAddress,
+        delivery_address_json: payload.delivery_address_json,
+        customer_payment_url: customerPaymentUrl,
+        items: payload.items.map((i, idx) => ({
+          ...i,
+          $id: i.$id || `item_${idx}`,
+        })),
+      };
+
+      if (sendMode === "api") {
+        try {
+          const notifyRes = await fetch("/api/admin/orders/notify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ orderId: editingOrder.$id, mode: "send_to_customer" }),
+          });
+          const notifyJson = await notifyRes.json();
+          if (!notifyJson.ok || !notifyJson.whatsapp?.sent) {
+            const cleanPhone = (payload.customer_whatsapp || "").replace(/\D/g, "");
+            if (cleanPhone) {
+              const waText =
+                notifyJson.whatsappText ||
+                buildCustomerPaymentWhatsAppText(updatedOrderSnapshot, customerPaymentUrl);
+              window.open(`https://wa.me/55${cleanPhone}?text=${encodeURIComponent(waText)}`, "_blank");
+            }
+          }
+        } catch {}
+      } else if (sendMode === "wa_web") {
+        const cleanPhone = (payload.customer_whatsapp || "").replace(/\D/g, "");
+        if (cleanPhone) {
+          const waText = buildCustomerPaymentWhatsAppText(updatedOrderSnapshot, customerPaymentUrl);
+          window.open(`https://wa.me/55${cleanPhone}?text=${encodeURIComponent(waText)}`, "_blank");
+        }
+      }
+
+      addAuditLog(
+        "Nova Condição de Pagamento Gerada",
+        editingOrder.order_number,
+        `Total atualizado para ${formatBRL(payload.total_cents)} (${
+          validAdditionalCharges.length
+        } adicional/is) + ${targetMethod === "credit_card" ? "Novo Link Cartão (72h)" : "Novo Pix (24h)"}`
+      );
+
+      setSaveSuccessMsg(
+        `Nova condição de pagamento (${formatBRL(payload.total_cents)}) gerada no Mercado Pago e link copiado!`
+      );
+      setTimeout(() => setSaveSuccessMsg(""), 5500);
+      setEditingOrder(null);
+      setEditOrderForm(null);
+      await loadOrders();
+    } catch (err: any) {
+      alert("Erro ao gerar nova condição de pagamento: " + err?.message);
     } finally {
       setIsSavingOrderEdit(false);
     }
@@ -1754,15 +2159,20 @@ export default function AdminPage() {
                   const addr = getOrderAddress(order);
                   const shipping = getOrderShipping(order);
                   const payMethod = getOrderPaymentMethod(order);
+                  const isOrderPaid = isOrderConfirmedPaid(order);
+                  const additionalCharges = getOrderAdditionalCharges(order);
+                  const additionalChargesTotalCents = additionalCharges.reduce(
+                    (acc, ch) => acc + (Number(ch.amountCents) || 0) * Math.max(1, Number(ch.quantity) || 1),
+                    0
+                  );
                   const statusInfo = getDynamicOrderStatusBadge(order, payMethod);
                   const StatusIcon = statusInfo.icon;
                   const sheets = getOrderSheets(order);
                   const cleanPhone = (order.customer_whatsapp || "").replace(/\D/g, "");
-                  const paymentLinkForWa = order.customer_payment_url || order.payment?.checkout_url || "";
                   const waHref = cleanPhone
                     ? `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(
-                        order.status === "awaiting_payment" && paymentLinkForWa
-                          ? `Olá ${order.customer_name || ""}! Tudo bem? Referente ao seu pedido ${order.order_number} na Totem Pro (${formatBRL(order.total_cents)}), segue seu link atualizado para concluir o pagamento via Pix ou Cartão em até 10x:\n\n${paymentLinkForWa}`
+                        !isOrderPaid
+                          ? buildCustomerPaymentWhatsAppText(order)
                           : `Olá ${order.customer_name || ""}, referente ao seu pedido ${order.order_number} na Totem Pro:`
                       )}`
                     : null;
@@ -1779,16 +2189,31 @@ export default function AdminPage() {
                   const firstSheet = sheets[0] || null;
                   const firstItemThumb = firstItem ? getItemCabinetImage(firstItem, firstSheet) : "";
                   const totalItemsQty = (order.items || []).reduce((acc, curr) => acc + (curr.quantity || 1), 0) || 1;
+                  const resolvedFirstItem = firstItem
+                    ? resolveKitEquipmentSummary({
+                        monitorName: firstItem.monitor_name,
+                        printerName: firstItem.printer_name,
+                        readerName: firstItem.reader_name,
+                      })
+                    : null;
+
+                  const isPaymentFailedOrCancelled =
+                    !isOrderPaid &&
+                    (order.status === "cancelled" || order.gateway_diagnosis?.severity === "error");
 
                   return (
                     <div
                       key={order.$id}
-                      className={`bg-slate-900/85 border transition-all shadow-xl overflow-hidden ${
-                        isExpanded ? "rounded-3xl p-4 sm:p-6 space-y-4" : "rounded-2xl p-4 sm:p-5 hover:border-indigo-500/50"
+                      className={`bg-slate-900/90 border transition-all shadow-xl overflow-hidden ${
+                        isExpanded ? "rounded-3xl p-4 sm:p-6 space-y-4" : "rounded-2xl p-4 sm:p-5"
                       } ${
                         orderHasAnyDeviation
-                          ? "border-amber-400/70 hover:border-amber-400 shadow-amber-500/10"
-                          : "border-slate-800"
+                          ? "border-amber-400/80 border-l-4 border-l-amber-400 hover:border-amber-400 shadow-amber-500/10"
+                          : isPaymentFailedOrCancelled
+                          ? "border-rose-500/45 border-l-4 border-l-rose-500 hover:border-rose-500/70 bg-gradient-to-r from-rose-950/20 via-slate-900/90 to-slate-900/90"
+                          : !isOrderPaid
+                          ? "border-amber-500/45 border-l-4 border-l-amber-500 hover:border-amber-500/70 bg-gradient-to-r from-amber-950/20 via-slate-900/90 to-slate-900/90"
+                          : "border-slate-800 border-l-4 border-l-emerald-500/80 hover:border-indigo-500/50"
                       }`}
                     >
                       {!isExpanded ? (
@@ -1800,7 +2225,13 @@ export default function AdminPage() {
                           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
                             {/* BLOCO 1 (ESQUERDA): CLIENTE EM DESTAQUE COM FONTE MAIOR */}
                             <div className="lg:col-span-4 flex items-center justify-between sm:justify-start gap-3.5 min-w-0">
-                              <div className="w-11 h-11 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 flex items-center justify-center shrink-0 font-black text-base shadow-inner">
+                              <div
+                                className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 font-black text-base shadow-inner border ${
+                                  !isOrderPaid
+                                    ? "bg-amber-500/15 border-amber-500/35 text-amber-300"
+                                    : "bg-indigo-500/15 border-indigo-500/30 text-indigo-300"
+                                }`}
+                              >
                                 {(order.customer_name || "C").trim().charAt(0).toUpperCase()}
                               </div>
                               <div className="min-w-0 flex-1 space-y-1">
@@ -1814,7 +2245,7 @@ export default function AdminPage() {
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       className="p-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 active:scale-95 text-emerald-400 border border-emerald-500/30 transition-all shrink-0"
-                                      title="Falar com o cliente no WhatsApp"
+                                      title="Falar com o cliente no WhatsApp (com resumo do pedido)"
                                     >
                                       <MessageCircle className="w-4 h-4" />
                                     </a>
@@ -1831,10 +2262,10 @@ export default function AdminPage() {
                               </div>
                             </div>
 
-                            {/* BLOCO 2 (CENTRO): GABINETES E EQUIPAMENTOS */}
+                            {/* BLOCO 2 (CENTRO): GABINETES E EQUIPAMENTOS (COM MODELOS REAIS DO KIT + ADICIONAIS) */}
                             <div className="lg:col-span-4 flex items-center gap-3 lg:border-l lg:border-r lg:border-slate-800/80 lg:px-4 min-w-0">
                               {firstItemThumb && (
-                                <div className="w-12 h-12 rounded-xl bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center p-1 shrink-0">
+                                <div className="w-12 h-12 rounded-xl bg-white border border-slate-700 overflow-hidden flex items-center justify-center p-1 shrink-0 shadow-sm">
                                   <img src={firstItemThumb} alt="Gabinete" className="w-full h-full object-contain" />
                                 </div>
                               )}
@@ -1851,27 +2282,45 @@ export default function AdminPage() {
                                       {firstItem.color_name}
                                     </span>
                                   )}
-                                  {firstItem?.monitor_name && (
-                                    <span className="px-2 py-0.5 rounded-md bg-cyan-950/50 text-cyan-300 border border-cyan-800/40 font-semibold">
-                                      Monitor: {firstItem.monitor_name}
+                                  {resolvedFirstItem?.monitorDisplay && (
+                                    <span className="px-2 py-0.5 rounded-md bg-cyan-950/60 text-cyan-300 border border-cyan-500/35 font-bold">
+                                      Monitor: {resolvedFirstItem.monitorDisplay}
                                     </span>
                                   )}
-                                  {firstItem?.printer_name && (
-                                    <span className="px-2 py-0.5 rounded-md bg-indigo-950/50 text-indigo-300 border border-indigo-800/40 font-semibold">
-                                      Impressora: {firstItem.printer_name}
+                                  {resolvedFirstItem?.printerDisplay && (
+                                    <span className="px-2 py-0.5 rounded-md bg-indigo-950/60 text-indigo-300 border border-indigo-500/35 font-bold">
+                                      Impressora: {resolvedFirstItem.printerDisplay}
                                     </span>
                                   )}
-                                  {Boolean(firstSheet?.assemblyService?.includes("Montagem Especializada") || firstItem?.monitor_name?.includes("100% Montado")) && (
+                                  {resolvedFirstItem?.hasReader && resolvedFirstItem.readerDisplay && (
+                                    <span className="px-2 py-0.5 rounded-md bg-purple-950/50 text-purple-300 border border-purple-500/35 font-semibold">
+                                      Leitor: {resolvedFirstItem.readerDisplay}
+                                    </span>
+                                  )}
+                                  {Boolean(
+                                    firstSheet?.assemblyService?.includes("Montagem Especializada") ||
+                                      firstItem?.monitor_name?.includes("100% Montado")
+                                  ) && (
                                     <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold flex items-center gap-1">
                                       <Wrench className="w-2.5 h-2.5" />
                                       Montagem de Fábrica (+R$ 999)
                                     </span>
                                   )}
+                                  {additionalCharges.map((ch) => (
+                                    <span
+                                      key={ch.id}
+                                      className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-200 border border-amber-400/50 font-extrabold"
+                                      title={`Valor Adicional: ${ch.description}`}
+                                    >
+                                      + {ch.quantity > 1 ? `${ch.quantity}x ` : ""}
+                                      {ch.description} ({formatBRL(ch.amountCents * Math.max(1, ch.quantity || 1))})
+                                    </span>
+                                  ))}
                                 </div>
                               </div>
                             </div>
 
-                            {/* BLOCO 3 (DIREITA): DADOS DO PEDIDO À DIREITA + VALOR TOTAL */}
+                            {/* BLOCO 3 (DIREITA): DADOS DO PEDIDO À DIREITA + VALOR COM DESTAQUE PAGO VS PENDENTE */}
                             <div className="lg:col-span-4 flex flex-col sm:flex-row lg:flex-col xl:flex-row items-start sm:items-center lg:items-end xl:items-center justify-between lg:justify-end gap-3 min-w-0">
                               {/* Metadados do Pedido à Direita */}
                               <div className="space-y-1 text-left sm:text-right min-w-0">
@@ -1879,7 +2328,9 @@ export default function AdminPage() {
                                   <span className="font-extrabold text-white text-sm sm:text-base font-mono tracking-tight">
                                     {order.order_number}
                                   </span>
-                                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border inline-flex items-center gap-1 ${statusInfo.color}`}>
+                                  <span
+                                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border inline-flex items-center gap-1 ${statusInfo.color}`}
+                                  >
                                     <StatusIcon className="w-3 h-3" />
                                     <span>{statusInfo.label}</span>
                                   </span>
@@ -1901,98 +2352,206 @@ export default function AdminPage() {
                                 </div>
                               </div>
 
-                              {/* Total do Pedido */}
-                              <div className="sm:border-l sm:border-slate-800/80 sm:pl-3.5 text-left sm:text-right shrink-0">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                                  Total do Pedido
+                              {/* Box de Valor (Diferenciação Visual Clara: Pendente vs Pago) */}
+                              <div
+                                className={`sm:pl-3.5 text-left sm:text-right shrink-0 rounded-xl px-3 py-2 border ${
+                                  isOrderPaid
+                                    ? "bg-emerald-950/30 border-emerald-500/35"
+                                    : isPaymentFailedOrCancelled
+                                    ? "bg-rose-950/35 border-rose-500/45"
+                                    : "bg-amber-950/35 border-amber-500/45"
+                                }`}
+                              >
+                                <span
+                                  className={`text-[9px] font-black uppercase tracking-wider flex items-center sm:justify-end gap-1 ${
+                                    isOrderPaid
+                                      ? "text-emerald-300"
+                                      : isPaymentFailedOrCancelled
+                                      ? "text-rose-300"
+                                      : "text-amber-300"
+                                  }`}
+                                >
+                                  {isOrderPaid ? (
+                                    <>
+                                      <CheckCircle2 className="w-3 h-3" />
+                                      <span>Valor Pago</span>
+                                    </>
+                                  ) : isPaymentFailedOrCancelled ? (
+                                    <>
+                                      <AlertCircle className="w-3 h-3" />
+                                      <span>Não Pago / Falha</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Clock className="w-3 h-3" />
+                                      <span>Aguardando Pagto</span>
+                                    </>
+                                  )}
                                 </span>
-                                <span className="text-base sm:text-lg font-black text-emerald-400 font-mono block leading-tight">
+                                <span
+                                  className={`text-base sm:text-lg font-black font-mono block leading-tight mt-0.5 ${
+                                    isOrderPaid
+                                      ? "text-emerald-400"
+                                      : isPaymentFailedOrCancelled
+                                      ? "text-rose-400"
+                                      : "text-amber-400"
+                                  }`}
+                                >
                                   {formatBRL(order.total_cents)}
                                 </span>
-                                <span className="text-[10px] text-slate-500 block">
+                                <span className="text-[10px] text-slate-400 block">
                                   Frete: {order.shipping_cents > 0 ? formatBRL(order.shipping_cents) : "Isento"}
+                                  {additionalChargesTotalCents > 0
+                                    ? ` • +${formatBRL(additionalChargesTotalCents)} extra`
+                                    : ""}
                                 </span>
                               </div>
                             </div>
                           </div>
 
-                          {/* Faixa de Diagnóstico & Recuperação Mercado Pago (Pedidos Pendentes ou com Falha) */}
-                          {(order.status === "awaiting_payment" || order.status === "cancelled") && (
+                          {/* ================================================================================= */}
+                          {/* FAIXA PREMIUM DE COBRANÇA, EDIÇÃO DE ADICIONAIS & RECUPERAÇÃO (PEDIDOS NÃO PAGOS) */}
+                          {/* ================================================================================= */}
+                          {!isOrderPaid && (
                             <div
-                              className={`p-3 rounded-xl border text-xs flex flex-col xl:flex-row xl:items-center justify-between gap-2.5 ${
-                                order.gateway_diagnosis?.severity === "error"
-                                  ? "bg-rose-950/30 border-rose-500/40 text-rose-200"
-                                  : order.gateway_diagnosis?.severity === "warn"
-                                  ? "bg-amber-950/30 border-amber-500/40 text-amber-200"
-                                  : "bg-slate-950/80 border-slate-800 text-slate-300"
+                              className={`p-3.5 rounded-2xl border-2 text-xs flex flex-col xl:flex-row xl:items-center justify-between gap-3 transition-all ${
+                                isPaymentFailedOrCancelled
+                                  ? "bg-rose-950/35 border-rose-500/50 text-rose-100"
+                                  : "bg-amber-950/30 border-amber-500/50 text-amber-100"
                               }`}
                             >
-                              <div className="space-y-0.5 min-w-0">
+                              <div className="space-y-1 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                                    Mercado Pago
+                                  <span
+                                    className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md border flex items-center gap-1 ${
+                                      isPaymentFailedOrCancelled
+                                        ? "bg-rose-500/25 text-rose-200 border-rose-400/50"
+                                        : "bg-amber-500/25 text-amber-200 border-amber-400/50"
+                                    }`}
+                                  >
+                                    <Clock className="w-3 h-3" />
+                                    <span>
+                                      {isPaymentFailedOrCancelled
+                                        ? "Cobrança com Falha / Expirada"
+                                        : "Pedido Aguardando Pagamento"}
+                                    </span>
                                   </span>
-                                  <strong className="font-extrabold text-white">
-                                    {order.gateway_diagnosis?.label || "Aguardando Confirmação"}
+                                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                                    Mercado Pago • {payMethod === "credit_card" ? "Cartão até 10x" : "Pix à Vista"}
+                                  </span>
+                                  <strong className="font-extrabold text-white text-xs sm:text-sm">
+                                    {order.gateway_diagnosis?.label || "Aguardando Confirmação de Pagamento"}
                                   </strong>
                                   {order.payment?.gateway_payment_id && (
-                                    <span className="text-[10px] font-mono text-slate-400">
+                                    <span className="text-[10px] font-mono text-slate-300 bg-slate-900/70 px-1.5 py-0.5 rounded border border-slate-700">
                                       ID #{order.payment.gateway_payment_id}
                                     </span>
                                   )}
                                   {order.payment?.expires_at && (
-                                    <span className="text-[10px] font-mono text-slate-400">
-                                      • Validade: {new Date(order.payment.expires_at).toLocaleString("pt-BR")}
+                                    <span className="text-[10px] font-mono text-slate-300">
+                                      • Expira: {new Date(order.payment.expires_at).toLocaleString("pt-BR")}
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-[11px] text-slate-300 leading-snug">
-                                  {order.gateway_diagnosis?.description || "Cobrança gerada e aguardando compensação."}
+                                <p className="text-[11px] text-slate-200 leading-snug">
+                                  {order.gateway_diagnosis?.description ||
+                                    "Você pode editar os itens, incluir valores adicionais com descrição específica, gerar um novo Pix/Link de Cartão e enviar ao cliente."}
                                 </p>
                               </div>
 
                               <div className="flex items-center gap-1.5 flex-wrap shrink-0">
+                                {/* BOTÃO PRINCIPAL: EDITAR ITENS / + VALOR ADICIONAL & GERAR NOVA CONDIÇÃO */}
                                 <button
                                   type="button"
-                                  disabled={Boolean(paymentActionOrderId)}
-                                  onClick={() => handleOrderPaymentAction(order, "sync")}
-                                  className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-[11px] flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                                  title="Consultar status ao vivo na API do Mercado Pago"
+                                  onClick={() => handleOpenEditOrder(order, "payment_proposal")}
+                                  className="px-3 py-1.5 rounded-xl bg-amber-500/25 hover:bg-amber-500/35 active:scale-95 text-amber-200 border border-amber-400/60 font-extrabold text-[11px] flex items-center gap-1.5 cursor-pointer shadow-sm"
+                                  title="Editar itens do pedido, adicionar valores extras com descrição específica e gerar nova condição de pagamento"
                                 >
-                                  <RefreshCw className={`w-3 h-3 ${paymentActionOrderId === `${order.$id}:sync` ? "animate-spin" : ""}`} />
-                                  <span>Sincronizar MP</span>
+                                  <Plus className="w-3.5 h-3.5" />
+                                  <span>Editar Itens / + Valor Adicional</span>
                                 </button>
 
                                 <button
                                   type="button"
                                   disabled={Boolean(paymentActionOrderId)}
                                   onClick={() => handleOrderPaymentAction(order, "regenerate_pix")}
-                                  className="px-2.5 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 font-bold text-[11px] flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                  className="px-2.5 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold text-[11px] flex items-center gap-1 cursor-pointer disabled:opacity-50"
                                   title="Gerar novo QR Code Pix válido por 24h no Mercado Pago"
                                 >
                                   <Zap className="w-3 h-3" />
-                                  <span>{paymentActionOrderId === `${order.$id}:regenerate_pix` ? "Gerando..." : "Novo Pix (24h)"}</span>
+                                  <span>
+                                    {paymentActionOrderId === `${order.$id}:regenerate_pix`
+                                      ? "Gerando..."
+                                      : "Novo Pix (24h)"}
+                                  </span>
                                 </button>
 
                                 <button
                                   type="button"
                                   disabled={Boolean(paymentActionOrderId)}
                                   onClick={() => handleOrderPaymentAction(order, "regenerate_card")}
-                                  className="px-2.5 py-1.5 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/40 font-bold text-[11px] flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                  className="px-2.5 py-1.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 font-bold text-[11px] flex items-center gap-1 cursor-pointer disabled:opacity-50"
                                   title="Gerar novo Link Checkout Pro de Cartão válido por 72h"
                                 >
                                   <CreditCard className="w-3 h-3" />
-                                  <span>{paymentActionOrderId === `${order.$id}:regenerate_card` ? "Gerando..." : "Novo Link Cartão (72h)"}</span>
+                                  <span>
+                                    {paymentActionOrderId === `${order.$id}:regenerate_card`
+                                      ? "Gerando..."
+                                      : "Novo Link Cartão (72h)"}
+                                  </span>
+                                </button>
+
+                                {waHref && (
+                                  <a
+                                    href={waHref}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[11px] flex items-center gap-1 cursor-pointer shadow-sm"
+                                    title="Abrir WhatsApp do cliente com o resumo completo dos itens, valores adicionais e link de pagamento"
+                                  >
+                                    <MessageCircle className="w-3.5 h-3.5" />
+                                    <span>Enviar ao Cliente (WhatsApp)</span>
+                                  </a>
+                                )}
+
+                                <button
+                                  type="button"
+                                  disabled={sendingWaOrderId === order.$id}
+                                  onClick={() => handleSendPaymentToCustomerWhatsAppApi(order)}
+                                  className="px-2.5 py-1.5 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 text-teal-200 border border-teal-500/40 font-bold text-[11px] flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                  title="Disparar cobrança automaticamente pelo WhatsApp da Loja (API FoodNext)"
+                                >
+                                  <Share2 className="w-3 h-3" />
+                                  <span>
+                                    {sendingWaOrderId === order.$id ? "Enviando..." : "Disparar Zap API"}
+                                  </span>
                                 </button>
 
                                 <button
                                   type="button"
                                   onClick={() => handleCopyCustomerPaymentLink(order)}
-                                  className="px-2.5 py-1.5 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 border border-indigo-500/40 font-bold text-[11px] flex items-center gap-1 cursor-pointer"
+                                  className="px-2.5 py-1.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 border border-indigo-500/40 font-bold text-[11px] flex items-center gap-1 cursor-pointer"
                                   title="Copiar link da página de pagamento (Pix + Cartão) para enviar ao cliente"
                                 >
                                   <Copy className="w-3 h-3" />
-                                  <span>{copiedPaymentLinkOrderId === order.$id ? "Link Copiado!" : "Copiar Link Pagto"}</span>
+                                  <span>
+                                    {copiedPaymentLinkOrderId === order.$id ? "Link Copiado!" : "Copiar Link Pagto"}
+                                  </span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={Boolean(paymentActionOrderId)}
+                                  onClick={() => handleOrderPaymentAction(order, "sync")}
+                                  className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-[11px] flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                  title="Consultar status ao vivo na API do Mercado Pago"
+                                >
+                                  <RefreshCw
+                                    className={`w-3 h-3 ${
+                                      paymentActionOrderId === `${order.$id}:sync` ? "animate-spin" : ""
+                                    }`}
+                                  />
+                                  <span>Sincronizar MP</span>
                                 </button>
                               </div>
                             </div>
@@ -2116,6 +2675,19 @@ export default function AdminPage() {
                                     <span>{statusInfo.label}</span>
                                   </span>
 
+                                  {!isOrderPaid && (
+                                    <span
+                                      className={`px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider border flex items-center gap-1 ${
+                                        isPaymentFailedOrCancelled
+                                          ? "bg-rose-500/20 text-rose-300 border-rose-500/50"
+                                          : "bg-amber-500/20 text-amber-300 border-amber-500/50"
+                                      }`}
+                                    >
+                                      <AlertCircle className="w-3.5 h-3.5" />
+                                      <span>{isPaymentFailedOrCancelled ? "NÃO PAGO / FALHA" : "AGUARDANDO PAGAMENTO"}</span>
+                                    </span>
+                                  )}
+
                                   {hasExecOrder && (
                                     <span className="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-400/50 flex items-center gap-1.5">
                                       <ClipboardCheck className="w-3.5 h-3.5 text-indigo-300" />
@@ -2181,6 +2753,18 @@ export default function AdminPage() {
                                   <Eye className="w-3.5 h-3.5" />
                                   <span>Ver Pedido Completo & Ficha CNC</span>
                                 </button>
+
+                                {!isOrderPaid && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditOrder(order, "payment_proposal")}
+                                    className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/25 transition-all shrink-0 cursor-pointer"
+                                    title="Editar itens, adicionar valores extras com descrição específica e gerar nova condição de pagamento para enviar ao cliente"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    <span>Editar Itens / + Valor Adicional & Nova Cobrança</span>
+                                  </button>
+                                )}
                               </div>
 
                               <div className="flex flex-wrap items-center gap-2">
@@ -2325,12 +2909,30 @@ export default function AdminPage() {
                               </p>
                             </div>
 
-                            {/* Box Demonstrativo Financeiro (O que o cliente pagou) */}
-                            <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1 text-[11px]">
+                            {/* Box Demonstrativo Financeiro (O que o cliente pagou ou falta pagar) */}
+                            <div
+                              className={`p-2.5 rounded-xl border space-y-1 text-[11px] ${
+                                isOrderPaid
+                                  ? "bg-emerald-950/25 border-emerald-500/40"
+                                  : isPaymentFailedOrCancelled
+                                  ? "bg-rose-950/25 border-rose-500/40"
+                                  : "bg-amber-950/25 border-amber-500/40"
+                              }`}
+                            >
                               <div className="flex justify-between text-slate-400">
-                                <span>Subtotal dos Gabinetes:</span>
+                                <span>Subtotal Produtos:</span>
                                 <span className="font-semibold text-slate-200">{formatBRL(order.subtotal_cents)}</span>
                               </div>
+                              {additionalCharges.map((chg) => (
+                                <div key={chg.id} className="flex justify-between text-amber-300 font-semibold">
+                                  <span className="truncate pr-2" title={chg.description}>
+                                    + {chg.quantity > 1 ? `${chg.quantity}x ` : ""}{chg.description}:
+                                  </span>
+                                  <span className="font-mono shrink-0">
+                                    + {formatBRL(chg.amountCents * Math.max(1, chg.quantity))}
+                                  </span>
+                                </div>
+                              ))}
                               {(order.discount_cents || addr?.discountCents) ? (
                                 <div className="flex justify-between text-emerald-400">
                                   <span>Cupom ({order.coupon_code || addr?.couponCode}):</span>
@@ -2347,9 +2949,19 @@ export default function AdminPage() {
                               </div>
                               <div className="pt-1.5 border-t border-slate-800 flex items-baseline justify-between">
                                 <span className="font-bold text-white">
-                                  Valor Pago ({payMethod === "credit_card" ? "Cartão" : "PIX"}):
+                                  {isOrderPaid
+                                    ? `Valor Pago (${payMethod === "credit_card" ? "Cartão" : "PIX"}):`
+                                    : `Valor a Receber (${payMethod === "credit_card" ? "Cartão" : "PIX"}):`}
                                 </span>
-                                <span className="text-base font-black text-emerald-400">
+                                <span
+                                  className={`text-base font-black ${
+                                    isOrderPaid
+                                      ? "text-emerald-400"
+                                      : isPaymentFailedOrCancelled
+                                      ? "text-rose-400"
+                                      : "text-amber-300"
+                                  }`}
+                                >
                                   {formatBRL(order.total_cents)}
                                 </span>
                               </div>
@@ -2396,6 +3008,16 @@ export default function AdminPage() {
                                   Expira em: {new Date(order.payment.expires_at).toLocaleString("pt-BR")}
                                 </p>
                               )}
+                              {!isOrderPaid && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditOrder(order, "payment_proposal")}
+                                  className="w-full px-2.5 py-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/50 font-black text-[10px] flex items-center justify-center gap-1.5 cursor-pointer"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                  <span>Editar Itens / + Valor Adicional & Nova Cobrança</span>
+                                </button>
+                              )}
                               <div className="grid grid-cols-2 gap-1.5 pt-1">
                                 <button
                                   type="button"
@@ -2433,6 +3055,32 @@ export default function AdminPage() {
                                   <span>Novo Cartão (72h)</span>
                                 </button>
                               </div>
+                              {!isOrderPaid && (
+                                <div className="grid grid-cols-2 gap-1.5 pt-1">
+                                  {waHref && (
+                                    <a
+                                      href={waHref}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="px-2 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10px] flex items-center justify-center gap-1 cursor-pointer"
+                                    >
+                                      <MessageCircle className="w-3 h-3" />
+                                      <span>Enviar no WhatsApp</span>
+                                    </a>
+                                  )}
+                                  <button
+                                    type="button"
+                                    disabled={sendingWaOrderId === order.$id}
+                                    onClick={() => handleSendPaymentToCustomerWhatsAppApi(order)}
+                                    className="px-2 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                                  >
+                                    <Send className="w-3 h-3" />
+                                    <span>
+                                      {sendingWaOrderId === order.$id ? "Enviando..." : "Disparar Zap API"}
+                                    </span>
+                                  </button>
+                                </div>
+                              )}
                               {order.payment_history && order.payment_history.length > 0 && (
                                 <div className="pt-2 border-t border-slate-800 space-y-1 max-h-36 overflow-y-auto">
                                   <span className="text-[9px] uppercase font-bold text-slate-400 block">
@@ -2476,11 +3124,11 @@ export default function AdminPage() {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => handleOpenEditOrder(order, "all")}
-                                  className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-slate-700 hover:border-amber-500/40 flex items-center gap-1 transition-colors cursor-pointer"
+                                  onClick={() => handleOpenEditOrder(order, "payment_proposal")}
+                                  className="text-[10px] font-extrabold px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 flex items-center gap-1 transition-colors cursor-pointer"
                                 >
-                                  <Edit2 className="w-3 h-3" />
-                                  <span>+ Observação / Editar Itens</span>
+                                  <Plus className="w-3 h-3" />
+                                  <span>+ Valor Adicional / Editar Itens</span>
                                 </button>
                               </div>
                             </div>
@@ -2517,6 +3165,11 @@ export default function AdminPage() {
                                 const cabinetCategory = getCabinetCategoryLabel(it.cabinet_name);
                                 const alertInfo = getItemAlertInfo(order, it, sheet, idx);
                                 const isBlackColor = (it.color_name || "").toLowerCase().includes("preto");
+                                const resolvedEq = resolveKitEquipmentSummary({
+                                  monitorName: it.monitor_name,
+                                  printerName: it.printer_name,
+                                  readerName: it.reader_name,
+                                });
 
                                 return (
                                   <div
@@ -2544,9 +3197,16 @@ export default function AdminPage() {
                                       {/* Identificação do Gabinete e Cor */}
                                       <div className="flex-1 min-w-0 space-y-1">
                                         <div className="flex flex-wrap items-center justify-between gap-1.5">
-                                          <span className="px-2 py-0.5 rounded-md bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 font-black text-[9px] uppercase tracking-wider">
-                                            {cabinetCategory}
-                                          </span>
+                                          <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span className="px-2 py-0.5 rounded-md bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 font-black text-[9px] uppercase tracking-wider">
+                                              {cabinetCategory}
+                                            </span>
+                                            {resolvedEq.isKit && (
+                                              <span className="px-2 py-0.5 rounded-md bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-black text-[9px] uppercase tracking-wider">
+                                                ⚡ Kit Completo (PC Touch + Impressora)
+                                              </span>
+                                            )}
+                                          </div>
                                           <div className="flex items-center gap-1.5">
                                             {alertInfo.hasDeviation ? (
                                               <span className="px-2 py-0.5 rounded-full bg-amber-500/25 border border-amber-400 text-amber-300 font-black text-[9px] uppercase flex items-center gap-1">
@@ -2588,7 +3248,7 @@ export default function AdminPage() {
                                       </div>
                                     </div>
 
-                                    {/* DESTAQUE DOS EQUIPAMENTOS ESCOLHIDOS: MONITOR, IMPRESSORA E LEITOR */}
+                                    {/* DESTAQUE DOS EQUIPAMENTOS ESCOLHIDOS: MONITOR, IMPRESSORA E LEITOR / ACESSÓRIOS DO KIT */}
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                       {/* MONITOR ESCOLHIDO (EM DESTAQUE) */}
                                       <div
@@ -2601,7 +3261,7 @@ export default function AdminPage() {
                                         <div className="flex items-center justify-between gap-1">
                                           <span className="text-[9px] font-black uppercase tracking-wider text-cyan-300 flex items-center gap-1">
                                             <Monitor className="w-3 h-3 shrink-0" />
-                                            <span>Monitor Escolhido</span>
+                                            <span>{resolvedEq.isKit ? "Monitor / PC do Kit" : "Monitor Escolhido"}</span>
                                           </span>
                                           {alertInfo.isCustomMonitor && (
                                             <span className="text-[8px] font-black px-1.5 py-0.2 rounded bg-amber-400 text-slate-950 uppercase">
@@ -2610,7 +3270,7 @@ export default function AdminPage() {
                                           )}
                                         </div>
                                         <p className="font-extrabold text-white text-xs leading-snug">
-                                          {it.monitor_name || "Nenhum"}
+                                          {resolvedEq.monitorDisplay || it.monitor_name || "Nenhum"}
                                         </p>
                                       </div>
 
@@ -2625,7 +3285,7 @@ export default function AdminPage() {
                                         <div className="flex items-center justify-between gap-1">
                                           <span className="text-[9px] font-black uppercase tracking-wider text-indigo-300 flex items-center gap-1">
                                             <Printer className="w-3 h-3 shrink-0" />
-                                            <span>Impressora Escolhida</span>
+                                            <span>{resolvedEq.isKit ? "Impressora do Kit" : "Impressora Escolhida"}</span>
                                           </span>
                                           {alertInfo.isCustomPrinter && (
                                             <span className="text-[8px] font-black px-1.5 py-0.2 rounded bg-amber-400 text-slate-950 uppercase">
@@ -2634,11 +3294,11 @@ export default function AdminPage() {
                                           )}
                                         </div>
                                         <p className="font-extrabold text-white text-xs leading-snug">
-                                          {it.printer_name || "Nenhuma"}
+                                          {resolvedEq.printerDisplay || it.printer_name || "Nenhuma"}
                                         </p>
                                       </div>
 
-                                      {/* LEITOR 2D / QR CODE */}
+                                      {/* LEITOR 2D / QR CODE OU ACESSÓRIOS DO KIT */}
                                       <div
                                         className={`p-2.5 rounded-xl border space-y-0.5 ${
                                           alertInfo.isCustomReader
@@ -2648,10 +3308,13 @@ export default function AdminPage() {
                                       >
                                         <span className="text-[9px] font-black uppercase tracking-wider text-purple-300 flex items-center gap-1">
                                           <QrCode className="w-3 h-3 shrink-0" />
-                                          <span>Leitor 2D / QR</span>
+                                          <span>{resolvedEq.isKit && !resolvedEq.readerDisplay ? "Itens Extras do Kit" : "Leitor 2D / QR"}</span>
                                         </span>
                                         <p className="font-bold text-slate-100 text-xs leading-snug">
-                                          {it.reader_name || "Sem leitor"}
+                                          {resolvedEq.readerDisplay ||
+                                            (resolvedEq.isKit
+                                              ? resolvedEq.kitExtraItems.join(" + ")
+                                              : it.reader_name || "Não incluído")}
                                         </p>
                                       </div>
 
@@ -2756,6 +3419,36 @@ export default function AdminPage() {
                                   </div>
                                 );
                               })}
+
+                              {/* Valores Adicionais com Descrição Específica (se houver) */}
+                              {additionalCharges.length > 0 && (
+                                <div className="p-3 rounded-2xl bg-amber-950/25 border-2 border-amber-500/40 space-y-2 text-[11px]">
+                                  <div className="flex items-center justify-between gap-2 border-b border-amber-500/30 pb-1.5">
+                                    <span className="font-black text-amber-300 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                                      <Plus className="w-3.5 h-3.5" />
+                                      <span>Valores Adicionais / Serviços Extras ({additionalCharges.length})</span>
+                                    </span>
+                                    <span className="font-black text-amber-300 font-mono text-xs">
+                                      + {formatBRL(additionalCharges.reduce((s, c) => s + c.amountCents * Math.max(1, c.quantity), 0))}
+                                    </span>
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    {additionalCharges.map((chg) => (
+                                      <div
+                                        key={chg.id}
+                                        className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-950/80 border border-amber-500/30"
+                                      >
+                                        <span className="font-bold text-white">
+                                          {chg.quantity > 1 ? `${chg.quantity}x ` : ""}{chg.description}
+                                        </span>
+                                        <span className="font-black text-amber-300 font-mono shrink-0">
+                                          + {formatBRL(chg.amountCents * Math.max(1, chg.quantity))}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -3086,6 +3779,11 @@ export default function AdminPage() {
                       const cabinetImg = getItemCabinetImage(item, sheet);
                       const cabinetCategory = getCabinetCategoryLabel(item.cabinet_name);
                       const alertInfo = getItemAlertInfo(selectedOrder, item, sheet, idx);
+                      const resolvedEq = resolveKitEquipmentSummary({
+                        monitorName: item.monitor_name,
+                        printerName: item.printer_name,
+                        readerName: item.reader_name,
+                      });
 
                       return (
                         <div
@@ -3110,9 +3808,16 @@ export default function AdminPage() {
                                 </span>
                               </div>
                               <div className="space-y-1">
-                                <span className="px-2 py-0.5 rounded-md bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 font-black text-[9px] uppercase tracking-wider inline-block">
-                                  {cabinetCategory}
-                                </span>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="px-2 py-0.5 rounded-md bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 font-black text-[9px] uppercase tracking-wider inline-block">
+                                    {cabinetCategory}
+                                  </span>
+                                  {resolvedEq.isKit && (
+                                    <span className="px-2 py-0.5 rounded-md bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-black text-[9px] uppercase tracking-wider inline-block">
+                                      ⚡ Kit Completo (PC Touch + Impressora)
+                                    </span>
+                                  )}
+                                </div>
                                 <h5 className="font-extrabold text-sm sm:text-base text-white">
                                   {item.quantity}x {item.cabinet_name}
                                 </h5>
@@ -3154,10 +3859,10 @@ export default function AdminPage() {
                             >
                               <span className="text-[10px] font-black uppercase text-cyan-300 flex items-center gap-1 mb-0.5">
                                 <Monitor className="w-3.5 h-3.5" />
-                                <span>Monitor Escolhido</span>
+                                <span>{resolvedEq.isKit ? "Monitor / PC do Kit" : "Monitor Escolhido"}</span>
                               </span>
                               <strong className="text-white text-xs sm:text-sm block">
-                                {item.monitor_name || "Nenhum"}
+                                {resolvedEq.monitorDisplay || item.monitor_name || "Nenhum"}
                               </strong>
                             </div>
                             <div
@@ -3169,19 +3874,22 @@ export default function AdminPage() {
                             >
                               <span className="text-[10px] font-black uppercase text-indigo-300 flex items-center gap-1 mb-0.5">
                                 <Printer className="w-3.5 h-3.5" />
-                                <span>Impressora Escolhida</span>
+                                <span>{resolvedEq.isKit ? "Impressora do Kit" : "Impressora Escolhida"}</span>
                               </span>
                               <strong className="text-white text-xs sm:text-sm block">
-                                {item.printer_name || "Nenhuma"}
+                                {resolvedEq.printerDisplay || item.printer_name || "Nenhuma"}
                               </strong>
                             </div>
                             <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-500/30">
                               <span className="text-[10px] font-black uppercase text-purple-300 flex items-center gap-1 mb-0.5">
                                 <QrCode className="w-3.5 h-3.5" />
-                                <span>Leitor / Scanner 2D</span>
+                                <span>{resolvedEq.isKit && !resolvedEq.readerDisplay ? "Itens Extras do Kit" : "Leitor / Scanner 2D"}</span>
                               </span>
                               <strong className="text-white text-xs sm:text-sm block">
-                                {item.reader_name || "Sem leitor frontal"}
+                                {resolvedEq.readerDisplay ||
+                                  (resolvedEq.isKit
+                                    ? resolvedEq.kitExtraItems.join(" + ")
+                                    : item.reader_name || "Não incluído")}
                               </strong>
                             </div>
                           </div>
@@ -3293,10 +4001,46 @@ export default function AdminPage() {
                         </div>
                       );
                     })}
+
+                    {/* Valores Adicionais no Modal (se houver) */}
+                    {getOrderAdditionalCharges(modalAddr).length > 0 && (
+                      <div className="p-4 rounded-2xl bg-amber-950/25 border-2 border-amber-500/40 space-y-2 text-xs">
+                        <div className="flex items-center justify-between border-b border-amber-500/30 pb-2">
+                          <span className="font-black text-amber-300 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                            <Plus className="w-4 h-4" />
+                            <span>Valores Adicionais / Serviços Extras ({getOrderAdditionalCharges(modalAddr).length})</span>
+                          </span>
+                          <span className="font-black text-amber-300 font-mono text-sm">
+                            +{" "}
+                            {formatBRL(
+                              getOrderAdditionalCharges(modalAddr).reduce(
+                                (s, c) => s + c.amountCents * Math.max(1, c.quantity),
+                                0
+                              )
+                            )}
+                          </span>
+                        </div>
+                        <div className="space-y-1.5">
+                          {getOrderAdditionalCharges(modalAddr).map((chg) => (
+                            <div
+                              key={chg.id}
+                              className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-950/90 border border-amber-500/30"
+                            >
+                              <span className="font-bold text-white">
+                                {chg.quantity > 1 ? `${chg.quantity}x ` : ""}{chg.description}
+                              </span>
+                              <span className="font-black text-amber-300 font-mono">
+                                + {formatBRL(chg.amountCents * Math.max(1, chg.quantity))}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* LINHA 3: DEMONSTRATIVO FINANCEIRO COMPLETO (O QUE O CLIENTE PAGOU) */}
+                {/* LINHA 3: DEMONSTRATIVO FINANCEIRO COMPLETO (O QUE O CLIENTE PAGOU OU FALTA PAGAR) */}
                 <div className="p-4 sm:p-5 bg-slate-950 rounded-2xl border border-slate-800 space-y-3 text-xs">
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
                     <div>
@@ -3311,33 +4055,49 @@ export default function AdminPage() {
                         </span>
                         <span
                           className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${
-                            selectedOrder.payment?.status === "paid" || selectedOrder.status === "paid"
+                            isOrderConfirmedPaid(selectedOrder)
                               ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
                               : "bg-amber-500/15 text-amber-300 border-amber-500/30"
                           }`}
                         >
-                          {selectedOrder.payment?.status === "paid" || selectedOrder.status === "paid"
+                          {isOrderConfirmedPaid(selectedOrder)
                             ? "PAGAMENTO CONFIRMADO / LIQUIDADO"
-                            : "AGUARDANDO COMPENSAÇÃO"}
+                            : "AGUARDANDO PAGAMENTO"}
                         </span>
                       </div>
                     </div>
 
-                    {selectedOrder.payment?.gateway_payment_id && (
-                      <div className="text-left sm:text-right font-mono text-[11px] text-slate-400">
-                        <div>Transação MP: #{selectedOrder.payment.gateway_payment_id}</div>
-                        {selectedOrder.payment.paid_at && (
-                          <div className="text-emerald-400">
-                            Pago em: {new Date(selectedOrder.payment.paid_at).toLocaleString("pt-BR")}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {!isOrderConfirmedPaid(selectedOrder) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const ord = selectedOrder;
+                            setSelectedOrder(null);
+                            handleOpenEditOrder(ord, "payment_proposal");
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Editar Itens / + Valor Adicional & Nova Cobrança</span>
+                        </button>
+                      )}
+                      {selectedOrder.payment?.gateway_payment_id && (
+                        <div className="text-left sm:text-right font-mono text-[11px] text-slate-400">
+                          <div>Transação MP: #{selectedOrder.payment.gateway_payment_id}</div>
+                          {selectedOrder.payment.paid_at && (
+                            <div className="text-emerald-400">
+                              Pago em: {new Date(selectedOrder.payment.paid_at).toLocaleString("pt-BR")}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                     <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
-                      <span className="text-slate-400 text-[11px] block">Subtotal dos Produtos</span>
+                      <span className="text-slate-400 text-[11px] block">Subtotal dos Produtos (+ Adicionais)</span>
                       <span className="text-base font-extrabold text-white font-mono">
                         {formatBRL(selectedOrder.subtotal_cents)}
                       </span>
@@ -3350,11 +4110,27 @@ export default function AdminPage() {
                         {selectedOrder.shipping_cents > 0 ? `+ ${formatBRL(selectedOrder.shipping_cents)}` : "R$ 0,00"}
                       </span>
                     </div>
-                    <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30">
-                      <span className="text-emerald-300 text-[11px] font-bold block">
-                        Valor Total Pago pelo Cliente
+                    <div
+                      className={`p-3 rounded-xl border ${
+                        isOrderConfirmedPaid(selectedOrder)
+                          ? "bg-emerald-950/30 border-emerald-500/30"
+                          : "bg-amber-950/30 border-amber-500/40"
+                      }`}
+                    >
+                      <span
+                        className={`text-[11px] font-bold block ${
+                          isOrderConfirmedPaid(selectedOrder) ? "text-emerald-300" : "text-amber-300"
+                        }`}
+                      >
+                        {isOrderConfirmedPaid(selectedOrder)
+                          ? "Valor Total Pago pelo Cliente"
+                          : "Valor Total a Receber (Aguardando Pagto)"}
                       </span>
-                      <span className="text-xl font-black text-emerald-400 font-mono">
+                      <span
+                        className={`text-xl font-black font-mono ${
+                          isOrderConfirmedPaid(selectedOrder) ? "text-emerald-400" : "text-amber-400"
+                        }`}
+                      >
                         {formatBRL(selectedOrder.total_cents)}
                       </span>
                     </div>

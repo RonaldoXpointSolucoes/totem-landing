@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getOrderWithDetails } from "@/lib/appwrite/server";
 import { translateMercadoPagoStatusDetail, verifyCheckoutStatusToken } from "@/lib/payments/mercadoPago";
 import { refreshMercadoPagoOrder } from "@/lib/payments/mercadoPagoStore";
+import { resolveKitEquipmentSummary } from "@/modules/catalog/kitDefaults";
 
 export const dynamic = "force-dynamic";
 const lastRefresh = new Map<string, number>();
@@ -83,7 +84,31 @@ export async function GET(req: Request) {
         expiresAt: orderDetails.payment?.expires_at || null,
         pixCode: orderDetails.payment?.pix_code || "",
         checkoutUrl: orderDetails.payment?.checkout_url || "",
+        subtotalCents: orderDetails.order.subtotal_cents || 0,
+        shippingCents: orderDetails.order.shipping_cents || 0,
+        discountCents: Number(orderDetails.order.discount_cents || parsedAddress.discountCents || 0),
         totalCents: orderDetails.order.total_cents,
+        items: (orderDetails.items || []).map((it: any) => {
+          const kitEq = resolveKitEquipmentSummary({
+            monitorName: it.monitor_name,
+            printerName: it.printer_name,
+            readerName: it.reader_name,
+          });
+          return {
+            id: it.$id,
+            cabinetName: it.cabinet_name,
+            colorName: it.color_name,
+            monitorName: kitEq.monitorDisplay,
+            printerName: kitEq.printerDisplay,
+            readerName: kitEq.hasReader ? kitEq.readerDisplay : "",
+            quantity: it.quantity || 1,
+            unitPriceCents: it.unit_price_cents || 0,
+            subtotalCents: it.subtotal_cents || 0,
+          };
+        }),
+        additionalCharges: Array.isArray(parsedAddress.additionalCharges)
+          ? parsedAddress.additionalCharges
+          : [],
         lastGatewayDiag: parsedAddress.lastGatewayDiag || null,
       },
       { headers: { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" } }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { calculateTotemPrice } from "@/modules/pricing/pricingEngine";
-import { isItemKit } from "@/modules/catalog/kitDefaults";
+import { isItemKit, resolveKitEquipmentSummary, mergeServerCatalogKitItems } from "@/modules/catalog/kitDefaults";
 import { calculateSelectiveCouponDiscount, CouponDiscountCalculation } from "@/modules/pricing/couponEngine";
 import { findUserByCoupon, updateWhitelistUser } from "@/lib/auth/whitelistStore";
 import { recordVoucherUsage } from "@/lib/vouchers/voucherStore";
@@ -36,6 +36,7 @@ interface RequestBody {
     colorName?: string;
     monitorId?: string | null;
     monitorName?: string | null;
+    kitItems?: Array<{ id?: string; selected?: boolean }>;
     customMonitor?: Partial<MonitorOption>;
     printerId?: string | null;
     printerName?: string | null;
@@ -149,7 +150,7 @@ export async function POST(req: Request) {
       const color =
         catalogColors.find((c: any) => c.id === rawItem.colorId || c.slug === rawItem.colorId);
       if (!color) return NextResponse.json({ error: "Acabamento inválido no carrinho." }, { status: 400 });
-      const monitor: MonitorOption | null = rawItem.monitorId
+      const rawMonitor: MonitorOption | null = rawItem.monitorId
         ? (catalogMonitors.find((m: any) => m.id === rawItem.monitorId) as MonitorOption | undefined) ||
           (String(rawItem.monitorId).startsWith("custom-mon-") || rawItem.customMonitor
             ? {
@@ -166,6 +167,10 @@ export async function POST(req: Request) {
               }
             : null)
         : null;
+      const monitor: MonitorOption | null =
+        rawMonitor && isItemKit(rawMonitor)
+          ? mergeServerCatalogKitItems(rawMonitor, rawItem.kitItems)
+          : rawMonitor;
       const printer = rawItem.printerId
         ? catalogPrinters.find((p: any) => p.id === rawItem.printerId) || null
         : null;
@@ -223,12 +228,18 @@ export async function POST(req: Request) {
 
       // 3. Montar Ficha Técnica de Fabricação para a Router CNC
       const customDims = monitor?.customDimensions;
+      const kitEq = resolveKitEquipmentSummary({
+        monitor,
+        printerName: printer?.displayName,
+        readerName: barcodeReader?.displayName,
+      });
+
       const screenSpecs = monitor
         ? {
-            monitorName: monitor.displayName,
+            monitorName: kitEq.isKit ? kitEq.monitorDisplay : monitor.displayName,
             screenCutoutMm: customDims
               ? `Monitor Inteiro: ${customDims.outerWidthCm}x${customDims.outerHeightCm}cm | Tela Visível (Corte): ${customDims.screenWidthCm}x${customDims.screenHeightCm}cm | Barras (Cima:${customDims.bezelTopCm}cm, Baixo:${customDims.bezelBottomCm}cm, Esq:${customDims.bezelLeftCm}cm, Dir:${customDims.bezelRightCm}cm)`
-              : `Abertura usinada para tela ${monitor.sizeInches || 21.5}" (tolerância de precisão CNC +1.5mm)`,
+              : `Abertura usinada para tela ${monitor.sizeInches || 23.8}" (tolerância de precisão CNC +1.5mm)`,
             vesaPattern: `Padrão VESA ${monitor.vesaPattern || "100x100"} mm com insertos roscados M4${customDims?.productUrl ? ` | Link: ${customDims.productUrl}` : ""}`,
           }
         : {
@@ -237,29 +248,31 @@ export async function POST(req: Request) {
             vesaPattern: "Furação universal VESA 75/100 pré-marcada a laser",
           };
 
-      const printerSpecs = printer
-        ? {
-            printerName: printer.displayName,
-            slotOpeningMm: `Rasgo de saída ${printer.paperWidthMm || 80}mm x 6 mm com chanfro ergonômico`,
-            rollSize: "Compartimento interno dedicado para bobina térmica 80mm",
-          }
-        : {
-            printerName: "Sem impressora instalada",
-            slotOpeningMm: "Painel cego sem abertura de bobina",
-            rollSize: "N/A",
-          };
+      const printerSpecs =
+        printer || kitEq.isKit
+          ? {
+              printerName: kitEq.isKit ? kitEq.printerDisplay : printer!.displayName,
+              slotOpeningMm: `Rasgo de saída ${printer?.paperWidthMm || 80}mm x 6 mm com chanfro ergonômico`,
+              rollSize: "Compartimento interno dedicado para bobina térmica 80mm",
+            }
+          : {
+              printerName: "Sem impressora instalada",
+              slotOpeningMm: "Painel cego sem abertura de bobina",
+              rollSize: "N/A",
+            };
 
-      const scannerSpecs = barcodeReader
-        ? {
-            hasScanner: true,
-            scannerName: barcodeReader.displayName,
-            windowSpecs: "Janela usinada 65 x 45 mm com visor acrílico cristal 2mm antirreflexo",
-          }
-        : {
-            hasScanner: false,
-            scannerName: "Sem leitor frontal",
-            windowSpecs: "Sem rasgo óptico",
-          };
+      const scannerSpecs =
+        barcodeReader || kitEq.hasReader
+          ? {
+              hasScanner: true,
+              scannerName: kitEq.hasReader ? kitEq.readerDisplay : barcodeReader!.displayName,
+              windowSpecs: "Janela usinada 65 x 45 mm com visor acrílico cristal 2mm antirreflexo",
+            }
+          : {
+              hasScanner: false,
+              scannerName: "Sem leitor frontal",
+              windowSpecs: "Sem rasgo óptico",
+            };
 
       const manufacturingSpec: ManufacturingSpec = {
         itemIndex: i + 1,
@@ -453,18 +466,29 @@ export async function POST(req: Request) {
         totalCents,
         status: "awaiting_payment",
         manufacturingSheetJson: JSON.stringify(manufacturingSheets),
-        items: validatedCartItems.map((item) => ({
-          cabinetName: item.configuration.model.name,
-          colorName: item.configuration.color.name,
-          monitorName:
-            (item.configuration.monitor?.displayName || "Nenhum") +
-            (item.configuration.includeAssemblyService ? " (100% Montado de Fábrica)" : ""),
-          printerName: item.configuration.printer?.displayName || "Nenhum",
-          readerName: item.configuration.barcodeReader?.displayName || "Nenhum",
-          unitPriceCents: item.unitPriceCents,
-          quantity: item.quantity,
-          subtotalCents: item.subtotalCents,
-        })),
+        items: validatedCartItems.map((item) => {
+          const kitEq = resolveKitEquipmentSummary({
+            monitor: item.configuration.monitor,
+            printerName: item.configuration.printer?.displayName,
+            readerName: item.configuration.barcodeReader?.displayName,
+          });
+          return {
+            cabinetName: item.configuration.model.name,
+            colorName: item.configuration.color.name,
+            monitorName:
+              (kitEq.isKit ? kitEq.monitorDisplay : item.configuration.monitor?.displayName || "Nenhum") +
+              (item.configuration.includeAssemblyService ? " (100% Montado de Fábrica)" : ""),
+            printerName: kitEq.isKit ? kitEq.printerDisplay : item.configuration.printer?.displayName || "Nenhum",
+            readerName: kitEq.hasReader
+              ? kitEq.readerDisplay
+              : kitEq.isKit
+              ? kitEq.accessoriesSummary || "Kit Completo (Coolers + Régua + Cabos)"
+              : "Nenhum",
+            unitPriceCents: item.unitPriceCents,
+            quantity: item.quantity,
+            subtotalCents: item.subtotalCents,
+          };
+        }),
         payment: {
           provider: "mercadopago",
           method: paymentMethod,

@@ -706,6 +706,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
             colorName: i.configuration.color.name,
             monitorId: i.configuration.monitor?.id || undefined,
             monitorName: i.configuration.monitor?.displayName || undefined,
+            kitItems: i.configuration.monitor?.kitItems || undefined,
             printerId: i.configuration.printer?.id || undefined,
             printerName: i.configuration.printer?.displayName || undefined,
             barcodeReaderId: i.configuration.barcodeReader?.id || undefined,
@@ -895,6 +896,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           colorName: i.configuration.color.name,
           monitorId: i.configuration.monitor?.id || null,
           monitorName: i.configuration.monitor?.displayName || null,
+          kitItems: i.configuration.monitor?.kitItems || undefined,
           customMonitor: i.configuration.monitor?.isCustom ? i.configuration.monitor : undefined,
           printerId: i.configuration.printer?.id || null,
           printerName: i.configuration.printer?.displayName || null,
@@ -2217,6 +2219,14 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                         <p className="text-[10px] text-slate-500 dark:text-slate-400">
                           {item.configuration.color.name} • Qtd: {item.quantity}
                         </p>
+                        {itemPricing.equipmentAdjustmentCents > 0 && (
+                          <p className="text-[10px] font-bold text-[#0071e3] dark:text-cyan-400 truncate">
+                            📦 + Kit/Periféricos: +{formatBRL(itemPricing.equipmentAdjustmentCents)}
+                            {Array.isArray(item.configuration.monitor?.kitItems)
+                              ? ` (${item.configuration.monitor.kitItems.filter((k) => k.selected).length} itens)`
+                              : ""}
+                          </p>
+                        )}
                         {item.configuration.includeAssemblyService && (
                           <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400">
                             🛠️ 100% Montado de Fábrica (+ R$ 999)
@@ -2242,16 +2252,14 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
               <div className="flex justify-between text-slate-600 dark:text-slate-400">
                 <span>Subtotal dos Gabinetes (no PIX):</span>
                 <span className="font-semibold text-slate-900 dark:text-slate-200">
-                  {formatBRL(appliedCoupon ? eligibleCabinetsSubtotalCents : totalPriceCents)}
+                  {formatBRL(eligibleCabinetsSubtotalCents)}
                 </span>
               </div>
 
-              {appliedCoupon && ineligibleSubtotalCents > 0 && (
-                <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                  <span>Kits & Periféricos (Integral):</span>
-                  <span className="font-semibold text-slate-900 dark:text-slate-200">
-                    {formatBRL(ineligibleSubtotalCents)}
-                  </span>
+              {ineligibleSubtotalCents > 0 && (
+                <div className="flex justify-between text-[#0071e3] dark:text-cyan-400 font-semibold">
+                  <span>+ Kits, Peças & Adicionais:</span>
+                  <span>+ {formatBRL(ineligibleSubtotalCents)}</span>
                 </div>
               )}
 

@@ -5,6 +5,7 @@ import { getAuthSession, LEGACY_ADMIN_COOKIE, LEGACY_SECRET } from "@/lib/auth/s
 import { getAllLocalOrders } from "@/lib/orders/orderStore";
 import { calculateShippingQuotes } from "@/modules/shipping";
 import { checkoutStatusToken, translateMercadoPagoStatusDetail } from "@/lib/payments/mercadoPago";
+import { resolveKitEquipmentSummary } from "@/modules/catalog/kitDefaults";
 
 async function verifyAdminAuth(): Promise<boolean> {
   const session = await getAuthSession();
@@ -124,8 +125,27 @@ export async function GET(req: Request) {
         customerPaymentUrl = `${site}/checkout/retorno?orderId=${encodeURIComponent(o.$id)}&token=${checkoutStatusToken(o.$id)}`;
       } catch {}
 
+      const normalizedItems = (o.items || []).map((it: any) => {
+        const resolved = resolveKitEquipmentSummary({
+          monitorName: it.monitor_name,
+          printerName: it.printer_name,
+          readerName: it.reader_name,
+        });
+        return {
+          ...it,
+          monitor_name: resolved.monitorDisplay,
+          printer_name: resolved.printerDisplay,
+          reader_name: resolved.isKit
+            ? resolved.hasReader
+              ? resolved.readerDisplay
+              : resolved.accessoriesSummary || "Kit Completo (Coolers + Régua + Cabos)"
+            : resolved.readerDisplay,
+        };
+      });
+
       orderMap.set(o.order_number, {
         ...o,
+        items: normalizedItems,
         delivery_address: parsedAddress || localMatch?.deliveryAddress || null,
         shipping_method: shippingMethod,
         manufacturing_sheets: parsedSheets.length ? parsedSheets : localMatch?.manufacturingSheets || [],
@@ -159,16 +179,28 @@ export async function GET(req: Request) {
           shipping_cents: o.shippingCents,
           total_cents: o.totalCents,
           $createdAt: o.createdAt,
-          items: o.items.map((it) => ({
-            cabinet_name: it.configuration.model.name,
-            color_name: it.configuration.color.name,
-            monitor_name: it.configuration.monitor?.displayName || "Nenhum",
-            printer_name: it.configuration.printer?.displayName || "Nenhum",
-            reader_name: it.configuration.barcodeReader?.displayName || "Nenhum",
-            quantity: it.quantity,
-            unit_price_cents: it.unitPriceCents,
-            subtotal_cents: it.subtotalCents,
-          })),
+          items: o.items.map((it) => {
+            const resolved = resolveKitEquipmentSummary({
+              monitor: it.configuration.monitor,
+              monitorName: it.configuration.monitor?.displayName,
+              printerName: it.configuration.printer?.displayName,
+              readerName: it.configuration.barcodeReader?.displayName,
+            });
+            return {
+              cabinet_name: it.configuration.model.name,
+              color_name: it.configuration.color.name,
+              monitor_name: resolved.monitorDisplay,
+              printer_name: resolved.printerDisplay,
+              reader_name: resolved.isKit
+                ? resolved.hasReader
+                  ? resolved.readerDisplay
+                  : resolved.accessoriesSummary || "Kit Completo (Coolers + Régua + Cabos)"
+                : resolved.readerDisplay,
+              quantity: it.quantity,
+              unit_price_cents: it.unitPriceCents,
+              subtotal_cents: it.subtotalCents,
+            };
+          }),
           payment: {
             provider: o.payment?.provider || "mercadopago",
             amount_cents: o.totalCents,

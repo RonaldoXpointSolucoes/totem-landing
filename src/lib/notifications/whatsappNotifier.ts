@@ -1,4 +1,5 @@
 import { formatBRL } from "@/modules/pricing/pricingEngine";
+import { resolveKitEquipmentSummary } from "@/modules/catalog/kitDefaults";
 import { OrderDetails } from "@/types/order";
 import { logEcosystemEvent } from "@/lib/logging/ecosystemLogger";
 
@@ -167,9 +168,14 @@ export async function notifyNewOrderOnWhatsApp(
     const itemsLines = order.items
       .map((item, idx) => {
         const cfg = item.configuration;
-        const monitorLabel = cfg.monitor?.displayName || "Sem monitor";
-        const printerLabel = cfg.printer?.displayName || "Sem impressora";
-        const readerLabel = cfg.barcodeReader?.displayName || "Sem leitor";
+        const kitEq = resolveKitEquipmentSummary({
+          monitor: cfg.monitor,
+          printerName: cfg.printer?.displayName,
+          readerName: cfg.barcodeReader?.displayName,
+        });
+        const monitorLabel = kitEq.isKit ? kitEq.monitorDisplay : cfg.monitor?.displayName || "Sem monitor";
+        const printerLabel = kitEq.isKit ? kitEq.printerDisplay : cfg.printer?.displayName || "Sem impressora";
+        const readerLine = kitEq.hasReader ? `\n   • Leitor: ${kitEq.readerDisplay}` : "";
         const assemblyLabel = cfg.includeAssemblyService ? "\n   🔧 *Montagem de Fábrica:* Sim (+ R$ 999,00)" : "";
 
         const customDims = cfg.monitor?.customDimensions;
@@ -186,8 +192,8 @@ export async function notifyNewOrderOnWhatsApp(
           `*${idx + 1}. ${item.quantity}x ${cfg.model.name}*\n` +
           `   • Cor: ${cfg.color.name}\n` +
           `   • Monitor: ${monitorLabel}\n` +
-          `   • Impressora: ${printerLabel}\n` +
-          `   • Leitor: ${readerLabel}` +
+          `   • Impressora: ${printerLabel}` +
+          readerLine +
           assemblyLabel +
           customDimsLabel +
           notesLabel +
@@ -313,4 +319,35 @@ export async function notifyPaymentConfirmedOnWhatsApp(params: {
     console.warn("Aviso ao enviar notificação de pagamento confirmado via WhatsApp:", err);
     return { sentCount: 0, results: [] };
   }
+}
+
+/**
+ * Envia uma mensagem direta via WhatsApp API (FoodNext) para o número do cliente
+ * (ex: nova condição de pagamento, itens editados ou acréscimos acordados).
+ */
+export async function sendDirectWhatsAppToCustomer(params: {
+  customerName: string;
+  customerWhatsapp: string;
+  message: string;
+  contextLabel?: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const digits = sanitizePhoneNumber(params.customerWhatsapp);
+  if (digits.length < 10) {
+    return { ok: false, error: "Número de WhatsApp do cliente inválido." };
+  }
+  const fullNumber = digits.startsWith("55") ? digits : `55${digits}`;
+  const res = await sendWhatsAppTextMessage(fullNumber, params.message);
+  try {
+    logEcosystemEvent({
+      category: "orders",
+      level: res.ok ? "info" : "warn",
+      action: res.ok ? "Cobrança WhatsApp Enviada ao Cliente" : "Falha no Envio WhatsApp ao Cliente",
+      target: params.contextLabel || params.customerName,
+      details: res.ok
+        ? `Nova condição de pagamento enviada para ${params.customerName} (${fullNumber}).`
+        : `Falha ao enviar mensagem para ${fullNumber}: ${res.error}`,
+      actor: "Admin / WhatsApp Notifier",
+    });
+  } catch {}
+  return res;
 }

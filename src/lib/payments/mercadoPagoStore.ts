@@ -601,6 +601,13 @@ export async function regenerateOrderPayment(params: {
     state: parsedAddress.state || "",
   };
 
+  const additionalCharges: Array<{ description: string; amountCents: number; quantity?: number }> =
+    Array.isArray(parsedAddress.additionalCharges) ? parsedAddress.additionalCharges : [];
+  const extrasSummary =
+    additionalCharges.length > 0
+      ? ` (+ ${additionalCharges.map((c) => c.description).join(", ")})`
+      : "";
+
   const attemptKey = `regen-${Date.now()}`;
   const created = await createMercadoPagoPayment({
     orderId: order.$id,
@@ -610,6 +617,7 @@ export async function regenerateOrderPayment(params: {
     deliveryAddress,
     method,
     attemptKey,
+    customDescription: `Pedido ${order.order_number} - Totem X-Point${extrasSummary}`,
   });
 
   await updateMercadoPagoPayment(order.$id, {

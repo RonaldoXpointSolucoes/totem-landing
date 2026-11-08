@@ -43,6 +43,26 @@ type StatusData = {
   checkoutUrl?: string;
   expiresAt?: string;
   paidAt?: string | null;
+  subtotalCents?: number;
+  shippingCents?: number;
+  discountCents?: number;
+  items?: {
+    id: string;
+    cabinetName: string;
+    colorName: string;
+    monitorName: string;
+    printerName: string;
+    readerName?: string;
+    quantity: number;
+    unitPriceCents: number;
+    subtotalCents: number;
+  }[];
+  additionalCharges?: {
+    id: string;
+    description: string;
+    amountCents: number;
+    quantity?: number;
+  }[];
 };
 
 function PaymentReturnContent() {
@@ -217,15 +237,85 @@ function PaymentReturnContent() {
             )}
           </div>
 
-          {/* Valor Total */}
+          {/* Resumo dos Itens, Adicionais e Valor Total */}
           {status && (
-            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-              <span className="text-[11px] uppercase tracking-wider text-slate-500 font-bold block">
-                Valor Total do Pedido
-              </span>
-              <span className="text-3xl font-black text-blue-600 dark:text-indigo-400 mt-0.5 block">
-                {formatBRL(status.totalCents)}
-              </span>
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-3 text-left">
+              {status.items && status.items.length > 0 && (
+                <div className="space-y-2 pb-3 border-b border-slate-200 dark:border-slate-800 text-xs">
+                  <span className="text-[10px] uppercase tracking-wider text-slate-500 font-extrabold block">
+                    Itens do Pedido ({status.items.length})
+                  </span>
+                  {status.items.map((it, idx) => (
+                    <div
+                      key={it.id || idx}
+                      className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 flex items-start justify-between gap-2"
+                    >
+                      <div className="space-y-0.5 min-w-0">
+                        <p className="font-bold text-slate-900 dark:text-white">
+                          {it.quantity}x {it.cabinetName} ({it.colorName})
+                        </p>
+                        <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                          • Monitor: <strong className="text-slate-800 dark:text-slate-200">{it.monitorName}</strong>
+                        </p>
+                        <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                          • Impressora: <strong className="text-slate-800 dark:text-slate-200">{it.printerName}</strong>
+                        </p>
+                        {it.readerName && (
+                          <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                            • Leitor: <strong className="text-slate-800 dark:text-slate-200">{it.readerName}</strong>
+                          </p>
+                        )}
+                      </div>
+                      <span className="font-extrabold text-slate-900 dark:text-white font-mono shrink-0">
+                        {formatBRL(it.subtotalCents)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {status.additionalCharges && status.additionalCharges.length > 0 && (
+                <div className="space-y-1.5 pb-3 border-b border-slate-200 dark:border-slate-800 text-xs">
+                  <span className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-400 font-extrabold block">
+                    Itens / Valores Adicionais Inclusos
+                  </span>
+                  {status.additionalCharges.map((ch, idx) => {
+                    const qty = ch.quantity || 1;
+                    const lineTotal = (ch.amountCents || 0) * qty;
+                    return (
+                      <div
+                        key={ch.id || idx}
+                        className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2"
+                      >
+                        <span className="font-semibold text-amber-900 dark:text-amber-200">
+                          + {ch.description} {qty > 1 ? `(${qty}x)` : ""}
+                        </span>
+                        <span className="font-extrabold text-amber-700 dark:text-amber-300 font-mono shrink-0">
+                          {formatBRL(lineTotal)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {typeof status.shippingCents === "number" && status.shippingCents > 0 && (
+                <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
+                  <span>Frete / Entrega:</span>
+                  <span className="font-bold font-mono text-slate-800 dark:text-slate-200">
+                    {formatBRL(status.shippingCents)}
+                  </span>
+                </div>
+              )}
+
+              <div className="text-center pt-1">
+                <span className="text-[11px] uppercase tracking-wider text-slate-500 font-bold block">
+                  Valor Total do Pedido
+                </span>
+                <span className="text-3xl font-black text-blue-600 dark:text-indigo-400 mt-0.5 block">
+                  {formatBRL(status.totalCents)}
+                </span>
+              </div>
             </div>
           )}
 

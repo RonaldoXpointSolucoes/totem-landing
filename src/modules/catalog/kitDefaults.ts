@@ -3,41 +3,64 @@ import { KitSubItem, MonitorOption } from "@/types/catalog";
 export const DEFAULT_KIT_SUB_ITEMS: KitSubItem[] = [
   {
     id: "kit-monitor-touch",
-    name: "Computador All-in-One Touch 23.8\" Core i5",
+    name: 'Computador All-in-One Touch 23.8" Core i5',
     category: "monitor",
-    description: "Display Touchscreen capacitivo com PC integrado Intel Core i5, 8GB RAM e SSD 240GB.",
-    image: "https://http2.mlstatic.com/D_NQ_NP_2X_657397-MLB91414180451_092025-F-computador-allinone-238-touch-screen-intel-core-i5-3320.webp",
-    priceCents: 249000, // R$ 2.490,00
+    description:
+      "Display Touchscreen capacitivo com PC integrado Intel Core i5, 8GB RAM e SSD NVMe 256GB.",
+    image:
+      "https://http2.mlstatic.com/D_NQ_NP_2X_657397-MLB91414180451_092025-F-computador-allinone-238-touch-screen-intel-core-i5-3320.webp",
+    priceCents: 279900, // R$ 2.799,00
     selected: true,
   },
   {
-    id: "kit-printer-epson",
-    name: "Impressora Térmica EPSON TM-T20X (80mm)",
+    id: "KIT-IMP-001",
+    name: "IMPRESSORA PDV - VT-8360 80mm",
     category: "printer",
-    description: "Impressora térmica homologada de alta velocidade com guilhotina e saída frontal.",
-    image: "https://http2.mlstatic.com/D_NQ_NP_2X_630729-MLA108925986834_032026-F.webp",
-    priceCents: 79000, // R$ 790,00
+    description:
+      "Impressora térmica homologada de alta velocidade 80mm com guilhotina e saída frontal.",
+    image:
+      "https://http2.mlstatic.com/D_NQ_NP_2X_726297-MLB117214728732_102026-F-impressora-nao-fiscal-termica-80mm-com-guilhotina-usb-rede.webp",
+    priceCents: 45000, // R$ 450,00
     selected: true,
   },
   {
-    id: "kit-reader-bematech",
-    name: "Leitor de Código de Barras Fixo 2D / QR Code",
-    category: "reader",
-    description: "Scanner óptico omnidirecional de embutir para leitura instantânea em smartphones e papel.",
-    image: "https://http2.mlstatic.com/D_NQ_NP_2X_925519-MLB95131543745_102025-F-leitor-de-codigo-de-barras-fixo-caixa-usb-2d-5v-preto-220v.webp",
-    priceCents: 49000, // R$ 490,00
+    id: "KIT-COOL-002",
+    name: "Kit 2 Coolers de Ventilação",
+    category: "accessory",
+    description:
+      "Conjunto com 2 coolers para circulação de ar e refrigeração interna do totem.",
+    image:
+      "https://http2.mlstatic.com/D_NQ_NP_2X_694664-MLB103480686980_012026-F-ventoinha-cooler-90x90x25-90mm-9cm-12v-020a.webp",
+    priceCents: 9200,
     selected: true,
   },
   {
     id: "kit-cabling-internal",
-    name: "Kit de Conexões, Cabos Blindados & Filtro Industrial",
+    name: "Kit Elétrico Completo (Régua, Botão Liga/Desliga, Cabos & Fixadores)",
     category: "accessory",
-    description: "Filtro de linha com aterramento, cabos blindados HDMI/USB, chave geral e fixadores CNC.",
+    description:
+      "Régua de energia, botão liga/desliga externo, cabo de força 20A, organizadores e fixadores.",
     image: ".webp",
-    priceCents: 18000, // R$ 180,00
+    priceCents: 27100,
     selected: true,
   },
 ];
+
+export interface ResolvedKitEquipment {
+  isKit: boolean;
+  monitorDisplay: string;
+  kitMonitorModel: string;
+  printerDisplay: string;
+  readerDisplay: string;
+  hasReader: boolean;
+  hasMonitorInKit: boolean;
+  hasPrinterInKit: boolean;
+  accessoriesSummary: string;
+  kitExtraItems: string[];
+  selectedItemsSummary: string;
+  selectedCount: number;
+  totalCount: number;
+}
 
 /**
  * Identifica se uma opção de monitor/equipamento corresponde ao Kit de Montagem
@@ -59,7 +82,7 @@ export function isItemKit(item?: MonitorOption | null): boolean {
  * Retorna os subitens efetivos do Kit (do objeto ou os padrões caso ainda não inicializado)
  */
 export function getEffectiveKitItems(item?: MonitorOption | null): KitSubItem[] {
-  if (!item) return DEFAULT_KIT_SUB_ITEMS;
+  if (!item) return DEFAULT_KIT_SUB_ITEMS.map((sub) => ({ ...sub }));
 
   // Se já possui kitItems no objeto
   if (Array.isArray(item.kitItems) && item.kitItems.length > 0) {
@@ -70,7 +93,7 @@ export function getEffectiveKitItems(item?: MonitorOption | null): KitSubItem[] 
   if (item.notes && item.notes.includes("kitItems")) {
     try {
       const parsed = JSON.parse(item.notes);
-      if (Array.isArray(parsed.kitItems)) {
+      if (Array.isArray(parsed.kitItems) && parsed.kitItems.length > 0) {
         return parsed.kitItems;
       }
     } catch (e) {}
@@ -80,9 +103,192 @@ export function getEffectiveKitItems(item?: MonitorOption | null): KitSubItem[] 
 }
 
 /**
+ * Mescla de forma segura e soberana no servidor os sub-itens enviados pelo cliente
+ * com os preços oficiais de catálogo do servidor (impedindo adulteração de preço
+ * mas respeitando quais itens o cliente marcou/desmarcou no Kit).
+ */
+export function mergeServerCatalogKitItems(
+  catalogMonitor: MonitorOption,
+  clientKitItems?: Array<{ id?: string; selected?: boolean }> | null
+): MonitorOption {
+  const authoritativeSubItems = getEffectiveKitItems(catalogMonitor);
+  if (!Array.isArray(clientKitItems) || clientKitItems.length === 0) {
+    return {
+      ...catalogMonitor,
+      kitItems: authoritativeSubItems.map((sub) => ({ ...sub })),
+    };
+  }
+
+  const clientSelectionMap = new Map<string, boolean>();
+  for (const ci of clientKitItems) {
+    if (ci && typeof ci.id === "string") {
+      clientSelectionMap.set(ci.id, Boolean(ci.selected));
+    }
+  }
+
+  const mergedKitItems: KitSubItem[] = authoritativeSubItems.map((serverSub) => {
+    const hasExplicitChoice = clientSelectionMap.has(serverSub.id);
+    return {
+      ...serverSub,
+      selected: hasExplicitChoice
+        ? Boolean(clientSelectionMap.get(serverSub.id))
+        : Boolean(serverSub.selected),
+    };
+  });
+
+  const mergedTotalCents = calculateKitTotalCents(mergedKitItems);
+
+  return {
+    ...catalogMonitor,
+    priceAdjustmentCents: mergedTotalCents,
+    kitItems: mergedKitItems,
+  };
+}
+
+/**
  * Calcula o somatório em centavos dos subitens selecionados do Kit
  */
 export function calculateKitTotalCents(kitItems?: KitSubItem[]): number {
   if (!Array.isArray(kitItems) || kitItems.length === 0) return 0;
-  return kitItems.filter((i) => i.selected).reduce((acc, i) => acc + (i.priceCents || 0), 0);
+  return kitItems
+    .filter((i) => i.selected)
+    .reduce((acc, i) => acc + (i.priceCents || 0), 0);
+}
+
+/**
+ * Resolve os nomes equivalentes de Monitor, Impressora, Leitor e Acessórios quando o cliente
+ * escolhe o "Kit de Montagem", respeitando rigorosamente os itens que foram marcados ou desmarcados.
+ */
+export function resolveKitEquipmentSummary(params: {
+  monitor?: MonitorOption | null;
+  monitorName?: string | null;
+  printerName?: string | null;
+  readerName?: string | null;
+}): ResolvedKitEquipment {
+  const rawMon = String(
+    params.monitorName || params.monitor?.displayName || ""
+  ).trim();
+  const rawPrt = String(params.printerName || "").trim();
+  const rawRdr = String(params.readerName || "").trim();
+
+  const isEmptyLabel = (val: string) => {
+    const low = val.toLowerCase();
+    return (
+      !low ||
+      low === "nenhum" ||
+      low === "nenhuma" ||
+      low === "sem impressora" ||
+      low === "sem impressora instalada" ||
+      low === "sem leitor" ||
+      low === "sem leitor frontal" ||
+      low === "padrão" ||
+      low === "padrao" ||
+      low === "—"
+    );
+  };
+
+  const isKit =
+    isItemKit(params.monitor) ||
+    rawMon.toLowerCase().includes("kit de montagem") ||
+    rawMon.toLowerCase().includes("kit personalizado") ||
+    rawMon.toLowerCase() === "kit" ||
+    rawPrt.toLowerCase().includes("(kit)");
+
+  if (!isKit) {
+    return {
+      isKit: false,
+      monitorDisplay: rawMon || "Nenhum",
+      kitMonitorModel: rawMon || "Nenhum",
+      printerDisplay: !isEmptyLabel(rawPrt) ? rawPrt : "Sem impressora",
+      readerDisplay: !isEmptyLabel(rawRdr) ? rawRdr : "Sem leitor",
+      hasReader: !isEmptyLabel(rawRdr),
+      hasMonitorInKit: Boolean(rawMon && !isEmptyLabel(rawMon)),
+      hasPrinterInKit: !isEmptyLabel(rawPrt),
+      accessoriesSummary: "",
+      kitExtraItems: [],
+      selectedItemsSummary: "",
+      selectedCount: 0,
+      totalCount: 0,
+    };
+  }
+
+  const hasExplicitKitObject = Boolean(
+    params.monitor && Array.isArray(params.monitor.kitItems) && params.monitor.kitItems.length > 0
+  );
+  const kitItems = getEffectiveKitItems(params.monitor);
+  const selectedSubItems = kitItems.filter((i) => i.selected !== false);
+  const monSub = selectedSubItems.find((i) => i.category === "monitor");
+  const prtSub = selectedSubItems.find((i) => i.category === "printer");
+  const rdrSub = selectedSubItems.find((i) => i.category === "reader");
+  const accSubs = selectedSubItems.filter((i) => i.category === "accessory");
+
+  const accessoriesSummary = accSubs.map((a) => a.name).join(" + ");
+  const selectedItemsSummary = selectedSubItems.map((s) => s.name).join(" + ");
+
+  // Se temos o objeto monitor.kitItems explícito, respeitamos se o cliente desmarcou o monitor ou impressora
+  const hasMonitorInKit = hasExplicitKitObject ? Boolean(monSub) : true;
+  const hasPrinterInKit = hasExplicitKitObject
+    ? Boolean(prtSub)
+    : !rawPrt.toLowerCase().includes("não inclusa") && !rawPrt.toLowerCase().includes("removida");
+
+  const kitMonitorModel = hasMonitorInKit
+    ? monSub?.name || 'Computador All-in-One Touch 23.8" Core i5'
+    : accSubs.length > 0
+    ? `Sem Monitor no Kit (Apenas: ${accessoriesSummary})`
+    : "Sem Monitor no Kit";
+
+  const kitPrinterModel = hasPrinterInKit
+    ? prtSub?.name || "IMPRESSORA PDV - VT-8360 80mm"
+    : "Não inclusa no Kit (Desmarcada)";
+
+  const kitReaderModel = rdrSub?.name || "";
+
+  let monitorDisplay: string;
+  if (
+    rawMon &&
+    rawMon.toLowerCase() !== "kit de montagem" &&
+    rawMon.toLowerCase() !== "kit"
+  ) {
+    monitorDisplay = rawMon;
+  } else if (hasMonitorInKit) {
+    monitorDisplay = `Kit de Montagem — ${kitMonitorModel}`;
+  } else if (accSubs.length > 0 || hasPrinterInKit) {
+    monitorDisplay = `Kit Parcial — ${kitMonitorModel}`;
+  } else {
+    monitorDisplay = "Kit de Montagem (Sem itens selecionados)";
+  }
+
+  const printerDisplay = !isEmptyLabel(rawPrt)
+    ? rawPrt
+    : !hasPrinterInKit
+    ? "Não inclusa no Kit (Desmarcada)"
+    : kitPrinterModel.toLowerCase().includes("kit")
+    ? kitPrinterModel
+    : `${kitPrinterModel} (Kit)`;
+
+  const hasValidRawReader =
+    !isEmptyLabel(rawRdr) && !rawRdr.toLowerCase().includes("coolers");
+  const readerDisplay = hasValidRawReader
+    ? rawRdr
+    : kitReaderModel
+    ? `${kitReaderModel} (Kit)`
+    : accessoriesSummary
+    ? `Acessórios do Kit: ${accessoriesSummary}`
+    : "";
+
+  return {
+    isKit: true,
+    monitorDisplay,
+    kitMonitorModel,
+    printerDisplay,
+    readerDisplay,
+    hasReader: Boolean(kitReaderModel || hasValidRawReader),
+    hasMonitorInKit,
+    hasPrinterInKit,
+    accessoriesSummary,
+    kitExtraItems: accSubs.map((a) => a.name),
+    selectedItemsSummary,
+    selectedCount: selectedSubItems.length,
+    totalCount: kitItems.length,
+  };
 }

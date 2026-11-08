@@ -440,11 +440,13 @@ export async function createMercadoPagoPayment(params: {
   deliveryAddress?: DeliveryAddress;
   method: "pix" | "credit_card";
   attemptKey?: string;
+  customDescription?: string;
 }) {
-  const { orderId, orderNumber, amountCents, customer, deliveryAddress, method, attemptKey } = params;
+  const { orderId, orderNumber, amountCents, customer, deliveryAddress, method, attemptKey, customDescription } = params;
   const site = (process.env.NEXT_PUBLIC_SITE_URL || "https://totem.xpointsolucoes.com.br").replace(/\/$/, "");
   const payer = buildMercadoPagoPayer(customer, deliveryAddress);
   const idempSuffix = attemptKey ? `-${attemptKey}` : "";
+  const effectiveDescription = (customDescription || `Pedido ${orderNumber} - Totem X-Point`).slice(0, 240);
 
   const common = {
     external_reference: orderId,
@@ -465,7 +467,7 @@ export async function createMercadoPagoPayment(params: {
       {
         ...common,
         transaction_amount: Number((amountCents / 100).toFixed(2)),
-        description: `Pedido ${orderNumber} - Totem X-Point`,
+        description: effectiveDescription,
         payment_method_id: "pix",
         date_of_expiration: expiresAt,
       },
@@ -519,7 +521,7 @@ export async function createMercadoPagoPayment(params: {
         {
           id: orderId,
           title: `Pedido ${orderNumber} - Gabinete Totem X-Point`,
-          description: `Equipamento de Autoatendimento - Pedido ${orderNumber}`,
+          description: effectiveDescription,
           category_id: "electronics",
           quantity: 1,
           currency_id: "BRL",

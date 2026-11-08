@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useCart } from "@/modules/cart/CartContext";
 import { formatBRL, calculateTotemPrice } from "@/modules/pricing/pricingEngine";
+import { resolveKitEquipmentSummary } from "@/modules/catalog/kitDefaults";
 import { Button, Card, Badge } from "@/components/ui";
 import {
   Copy,
@@ -416,7 +417,12 @@ export const CartView: React.FC<CartViewProps> = ({
           barcodeReader,
           includeAssemblyService: configuration.includeAssemblyService,
         });
-        const isKit = itemPrice.equipmentAdjustmentCents > 0;
+        const kitEq = resolveKitEquipmentSummary({
+          monitor,
+          printerName: printer?.displayName,
+          readerName: barcodeReader?.displayName,
+        });
+        const isKit = itemPrice.equipmentAdjustmentCents > 0 || kitEq.isKit;
         const modeLabel = isKit
           ? "Gabinete + Kit Completo de Periféricos"
           : "Apenas Gabinete CNC (-50% • Furação Sob Medida)";
@@ -436,9 +442,13 @@ export const CartView: React.FC<CartViewProps> = ({
               <div style="font-size:12px;color:#334155;line-height:1.5;">
                 • <strong>Modalidade:</strong> ${escapeHtml(modeLabel)}<br/>
                 • <strong>Acabamento / Cor:</strong> ${escapeHtml(color.name)}<br/>
-                • <strong>Monitor Touch VESA:</strong> ${escapeHtml(monitor?.displayName || "Padrão VESA Universal")}<br/>
-                • <strong>Impressora Térmica:</strong> ${escapeHtml(printer?.displayName || "Compartimento Padrão 80mm")}<br/>
-                • <strong>Leitor 2D QR/Barras:</strong> ${escapeHtml(barcodeReader ? barcodeReader.displayName : "Sem leitor adicional")}
+                • <strong>Monitor Touch VESA:</strong> ${escapeHtml(kitEq.monitorDisplay)}<br/>
+                • <strong>Impressora Térmica:</strong> ${escapeHtml(kitEq.printerDisplay)}
+                ${
+                  kitEq.hasReader
+                    ? `<br/>• <strong>Leitor 2D QR/Barras:</strong> ${escapeHtml(kitEq.readerDisplay)}`
+                    : ""
+                }
                 ${
                   configuration.includeAssemblyService
                     ? `<br/>• <strong style="color:#047857;">✓ Inclui Montagem Técnica Pronta de Fábrica (+ R$ 999,00)</strong>`
@@ -756,11 +766,16 @@ export const CartView: React.FC<CartViewProps> = ({
           barcodeReader,
           includeAssemblyService: configuration.includeAssemblyService,
         });
-        const isKit = p.equipmentAdjustmentCents > 0;
+        const kitEq = resolveKitEquipmentSummary({
+          monitor,
+          printerName: printer?.displayName,
+          readerName: barcodeReader?.displayName,
+        });
+        const isKit = p.equipmentAdjustmentCents > 0 || kitEq.isKit;
         return `${idx + 1}. *${quantity}x ${model.name}* (${color.name}) — ${
           isKit ? "Gabinete + Kit Completo" : "Apenas Gabinete (-50%)"
-        } | Tela: ${monitor?.displayName || "Padrão"} | Impressora: ${
-          printer?.displayName || "Padrão"
+        } | Tela: ${kitEq.monitorDisplay} | Impressora: ${kitEq.printerDisplay}${
+          kitEq.hasReader ? ` | Leitor: ${kitEq.readerDisplay}` : ""
         }${
           configuration.includeAssemblyService ? " | + Montagem Pronta" : ""
         } = *${formatBRL(p.pixTotalPriceCents * quantity)} no PIX*`;
@@ -914,30 +929,43 @@ export const CartView: React.FC<CartViewProps> = ({
                     </div>
 
                     {/* Especificação dos Componentes */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-400 mt-2">
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full border border-black/20 dark:border-slate-600 shrink-0"
-                          style={{ background: color.hexReference }}
-                        />
-                        <span className="truncate">Cor: <strong className="text-slate-900 dark:text-slate-200">{color.name}</strong></span>
-                      </div>
-                      <div className="truncate">
-                        Tela: <strong className="text-slate-900 dark:text-slate-200">{monitor?.displayName || "Nenhum"}</strong>
-                      </div>
-                      <div className="truncate">
-                        Impressora: <strong className="text-slate-900 dark:text-slate-200">{printer?.displayName || "Nenhuma"}</strong>
-                      </div>
-                      <div className="truncate">
-                        Leitor: <strong className="text-slate-900 dark:text-slate-200">{barcodeReader ? barcodeReader.displayName : "Sem leitor"}</strong>
-                      </div>
-                      {configuration.includeAssemblyService && (
-                        <div className="col-span-full flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400 pt-1">
-                          <Wrench className="w-3.5 h-3.5 shrink-0" />
-                          <span>Totem 100% Montado de Fábrica (+ R$ 999,00)</span>
+                    {(() => {
+                      const kitEq = resolveKitEquipmentSummary({
+                        monitor,
+                        printerName: printer?.displayName,
+                        readerName: barcodeReader?.displayName,
+                      });
+                      return (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-400 mt-2">
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className="w-2.5 h-2.5 rounded-full border border-black/20 dark:border-slate-600 shrink-0"
+                              style={{ background: color.hexReference }}
+                            />
+                            <span className="truncate">
+                              Cor: <strong className="text-slate-900 dark:text-slate-200">{color.name}</strong>
+                            </span>
+                          </div>
+                          <div className="truncate" title={kitEq.monitorDisplay}>
+                            Tela: <strong className="text-slate-900 dark:text-slate-200">{kitEq.monitorDisplay}</strong>
+                          </div>
+                          <div className="truncate" title={kitEq.printerDisplay}>
+                            Impressora: <strong className="text-slate-900 dark:text-slate-200">{kitEq.printerDisplay}</strong>
+                          </div>
+                          {kitEq.hasReader && (
+                            <div className="truncate" title={kitEq.readerDisplay}>
+                              Leitor: <strong className="text-slate-900 dark:text-slate-200">{kitEq.readerDisplay}</strong>
+                            </div>
+                          )}
+                          {configuration.includeAssemblyService && (
+                            <div className="col-span-full flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400 pt-1">
+                              <Wrench className="w-3.5 h-3.5 shrink-0" />
+                              <span>Totem 100% Montado de Fábrica (+ R$ 999,00)</span>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Barra Inferior do Card: Quantidade e Ações */}

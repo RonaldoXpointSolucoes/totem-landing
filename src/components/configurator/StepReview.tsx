@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { CabinetModel, ColorOption, MonitorOption, PrinterOption, BarcodeReaderOption } from "@/types/catalog";
 import { formatBRL, PriceBreakdown } from "@/modules/pricing/pricingEngine";
 import { Card, Button, Badge } from "@/components/ui";
-import { Edit3, ShoppingCart, ShieldCheck, Boxes, Check, PackageCheck, AlertCircle, Tag, Loader2, Zap, CreditCard, Wrench, Package, Sparkles } from "lucide-react";
+import { Edit3, ShoppingCart, ShieldCheck, Boxes, Check, PackageCheck, AlertCircle, Tag, Loader2, Zap, CreditCard, Wrench, Package, Sparkles, XCircle } from "lucide-react";
 import { isItemKit, getEffectiveKitItems, calculateKitTotalCents } from "@/modules/catalog/kitDefaults";
 import { useCart } from "@/modules/cart/CartContext";
 
@@ -21,6 +21,7 @@ interface StepReviewProps {
   customizationNotes?: string;
   onChangeNotes?: (notes: string) => void;
   onEditStep: (stepNumber: number) => void;
+  onRemoveKit?: () => void;
   onAddToCart: () => void;
 }
 
@@ -37,6 +38,7 @@ export const StepReview: React.FC<StepReviewProps> = ({
   customizationNotes = "",
   onChangeNotes,
   onEditStep,
+  onRemoveKit,
   onAddToCart,
 }) => {
   const { appliedCoupon, applyCoupon, removeCoupon, isApplyingCoupon, couponError } = useCart();
@@ -54,6 +56,7 @@ export const StepReview: React.FC<StepReviewProps> = ({
   const finalTotemPriceCents = Math.max(0, pricing.cardTotalPriceCents - itemDiscountCents);
   const reviewPixTotal = Math.max(0, pricing.pixTotalPriceCents - itemDiscountCents);
 
+  const monitorSubItem = kitItems.find((i) => i.category === "monitor");
   const printerSubItem = kitItems.find((i) => i.category === "printer");
   const readerSubItem = kitItems.find((i) => i.category === "reader");
 
@@ -231,22 +234,22 @@ export const StepReview: React.FC<StepReviewProps> = ({
           <div className="p-3 sm:p-4 rounded-xl bg-gradient-to-r from-blue-50/70 to-indigo-50/60 dark:from-indigo-950/40 dark:to-slate-900 border border-blue-200 dark:border-indigo-800/80 space-y-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-[#0071e3] text-white flex items-center justify-center">
+                <div className="w-7 h-7 rounded-lg bg-[#0071e3] text-white flex items-center justify-center shrink-0">
                   <Boxes className="w-4 h-4" />
                 </div>
                 <div>
                   <h4 className="text-xs sm:text-sm font-black text-[#1d1d1f] dark:text-white">
-                    Pacote Hardware: Kit de Montagem
+                    Você adicionou o Kit de Montagem junto com o Gabinete
                   </h4>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                    {activeKitItems.length} de {kitItems.length} componentes inclusos no pedido
+                  <p className="text-[10px] text-slate-600 dark:text-slate-400">
+                    Gabinete ({formatBRL(model.pixPriceCents || model.basePriceCents)} no PIX) + {activeKitItems.length} de {kitItems.length} peças do Kit (+ {formatBRL(kitTotalCents)})
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs sm:text-sm font-black text-[#0071e3] dark:text-cyan-400">
-                  {formatBRL(kitTotalCents)}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xs sm:text-sm font-black text-[#0071e3] dark:text-cyan-400 mr-1">
+                  + {formatBRL(kitTotalCents)}
                 </span>
                 <button
                   onClick={() => onEditStep(3)}
@@ -254,8 +257,19 @@ export const StepReview: React.FC<StepReviewProps> = ({
                   title="Personalizar componentes do Kit"
                 >
                   <Edit3 className="w-3 h-3" />
-                  <span>Personalizar Kit</span>
+                  <span>Editar Peças do Kit</span>
                 </button>
+                {onRemoveKit && (
+                  <button
+                    type="button"
+                    onClick={onRemoveKit}
+                    className="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-300 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-xs"
+                    title="Remover o Kit e comprar somente o Gabinete"
+                  >
+                    <XCircle className="w-3 h-3" />
+                    <span>Remover Kit (Só Gabinete)</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -271,7 +285,7 @@ export const StepReview: React.FC<StepReviewProps> = ({
                   }`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    {sub.image && (
+                    {sub.image && sub.image !== ".webp" && (
                       <div className="w-8 h-8 rounded-md border border-black/10 bg-white p-0.5 shrink-0 flex items-center justify-center overflow-hidden">
                         <img src={sub.image} alt={sub.name} className="w-full h-full object-contain" />
                       </div>
@@ -281,7 +295,7 @@ export const StepReview: React.FC<StepReviewProps> = ({
                         {sub.name}
                       </p>
                       <span className="text-[10px] text-slate-500">
-                        {sub.selected ? formatBRL(sub.priceCents) : "Removido do Kit"}
+                        {sub.selected ? `+ ${formatBRL(sub.priceCents)} (Incluso)` : "Não incluso (Desmarcado)"}
                       </span>
                     </div>
                   </div>
@@ -451,11 +465,24 @@ export const StepReview: React.FC<StepReviewProps> = ({
           {/* Monitor / Kit */}
           <div className="py-1.5 flex items-center justify-between gap-2 border-b border-black/5 dark:border-slate-800/60">
             <span className="text-slate-500 font-medium">
-              {isKit ? "Equipamento Display:" : "Monitor Touch:"}
+              {isKit ? "Monitor do Kit:" : "Monitor Touch:"}
             </span>
             <div className="flex items-center gap-1.5 min-w-0">
-              <strong className="text-[#1d1d1f] dark:text-white truncate max-w-[140px]">
-                {isKit ? `Kit de Montagem (${activeKitItems.length} itens)` : monitor?.displayName || "—"}
+              <strong
+                className="text-[#1d1d1f] dark:text-white truncate max-w-[190px]"
+                title={
+                  isKit
+                    ? monitorSubItem?.selected
+                      ? monitorSubItem.name
+                      : "Não incluso no Kit (Desmarcado)"
+                    : monitor?.displayName || "—"
+                }
+              >
+                {isKit
+                  ? monitorSubItem?.selected
+                    ? monitorSubItem.name
+                    : "Não incluso no Kit"
+                  : monitor?.displayName || "—"}
               </strong>
               {!isKit && (monitor?.priceAdjustmentCents || 0) > 0 && (
                 <span className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 shrink-0">
@@ -476,9 +503,12 @@ export const StepReview: React.FC<StepReviewProps> = ({
           <div className="py-1.5 flex items-center justify-between gap-2 border-b border-black/5 dark:border-slate-800/60">
             <span className="text-slate-500 font-medium">Impressora Térmica:</span>
             <div className="flex items-center gap-1.5 min-w-0">
-              <strong className="text-[#1d1d1f] dark:text-white truncate max-w-[140px]">
+              <strong
+                className="text-[#1d1d1f] dark:text-white truncate max-w-[190px]"
+                title={isKit ? (printerSubItem?.selected ? printerSubItem.name : "Não inclusa no Kit") : printer?.displayName || "—"}
+              >
                 {isKit
-                  ? (printerSubItem?.selected ? "Inclusa no Kit (80mm)" : "Não inclusa no Kit")
+                  ? (printerSubItem?.selected ? printerSubItem.name : "Não inclusa no Kit")
                   : printer?.displayName || "—"}
               </strong>
               {!isKit && (printer?.priceAdjustmentCents || 0) > 0 && (
@@ -496,29 +526,31 @@ export const StepReview: React.FC<StepReviewProps> = ({
             </div>
           </div>
 
-          {/* Leitor */}
-          <div className="py-1.5 flex items-center justify-between gap-2 border-b border-black/5 dark:border-slate-800/60">
-            <span className="text-slate-500 font-medium">Janela de Leitor 2D:</span>
-            <div className="flex items-center gap-1.5 min-w-0">
-              <strong className="text-[#1d1d1f] dark:text-white truncate max-w-[140px]">
-                {isKit
-                  ? (readerSubItem?.selected ? "Incluso no Kit (2D QR Code)" : "Não incluso no Kit")
-                  : (useReader ? reader?.displayName || "Sim" : "Sem leitor")}
-              </strong>
-              {!isKit && useReader && (reader?.priceAdjustmentCents || 0) > 0 && (
-                <span className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 shrink-0">
-                  (+{formatBRL(reader?.priceAdjustmentCents || 0)})
-                </span>
-              )}
-              <button
-                onClick={() => onEditStep(isKit ? 3 : 5)}
-                className="p-1 rounded-lg hover:bg-black/5 text-[#0071e3] transition-colors"
-                title={isKit ? "Personalizar no Kit" : "Alterar Leitor"}
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-              </button>
+          {/* Leitor (exibido apenas quando houver leitor no kit ou selecionado avulso) */}
+          {(!isKit || Boolean(readerSubItem?.selected)) && (
+            <div className="py-1.5 flex items-center justify-between gap-2 border-b border-black/5 dark:border-slate-800/60">
+              <span className="text-slate-500 font-medium">Janela de Leitor 2D:</span>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <strong className="text-[#1d1d1f] dark:text-white truncate max-w-[160px]">
+                  {isKit
+                    ? (readerSubItem?.name || "Incluso no Kit (2D QR Code)")
+                    : (useReader ? reader?.displayName || "Sim" : "Sem leitor")}
+                </strong>
+                {!isKit && useReader && (reader?.priceAdjustmentCents || 0) > 0 && (
+                  <span className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 shrink-0">
+                    (+{formatBRL(reader?.priceAdjustmentCents || 0)})
+                  </span>
+                )}
+                <button
+                  onClick={() => onEditStep(isKit ? 3 : 5)}
+                  className="p-1 rounded-lg hover:bg-black/5 text-[#0071e3] transition-colors"
+                  title={isKit ? "Personalizar no Kit" : "Alterar Leitor"}
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Encaixes e Furações */}
           <div className="py-1.5 flex items-center justify-between gap-2 border-b border-black/5 dark:border-slate-800/60">
