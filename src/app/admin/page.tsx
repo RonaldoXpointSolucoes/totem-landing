@@ -3270,25 +3270,27 @@ export default function AdminPage() {
                                 </p>
                               </div>
 
-                              {(addr as any)?.correiosShipment?.volumes?.length > 0 && (
+                              {(addr as any)?.correiosShipment?.volumes?.some((v: any) => v.trackingCode && v.prepostagemId) && (
                                 <div className="pt-1.5 border-t border-slate-800 space-y-1">
                                   <div className="flex items-center justify-between text-[10px]">
                                     <span className="font-black uppercase text-amber-300">
-                                      Rastreio Contrato {(addr as any).correiosShipment.contractNumber}:
+                                      Rastreio Oficial CWS {(addr as any).correiosShipment.contractNumber}:
                                     </span>
                                     <span className="text-emerald-400 font-bold">
                                       {(addr as any).correiosShipment.volumes.length} vol(s)
                                     </span>
                                   </div>
                                   <div className="flex flex-wrap gap-1">
-                                    {(addr as any).correiosShipment.volumes.map((v: any, vi: number) => (
-                                      <span
-                                        key={vi}
-                                        className="px-2 py-0.5 rounded bg-slate-950 border border-amber-500/40 text-amber-300 font-mono text-[10px] font-bold"
-                                      >
-                                        {v.trackingCode}
-                                      </span>
-                                    ))}
+                                    {(addr as any).correiosShipment.volumes
+                                      .filter((v: any) => v.trackingCode && v.prepostagemId)
+                                      .map((v: any, vi: number) => (
+                                        <span
+                                          key={vi}
+                                          className="px-2 py-0.5 rounded bg-slate-950 border border-amber-500/40 text-amber-300 font-mono text-[10px] font-bold"
+                                        >
+                                          {v.trackingCode}
+                                        </span>
+                                      ))}
                                   </div>
                                 </div>
                               )}

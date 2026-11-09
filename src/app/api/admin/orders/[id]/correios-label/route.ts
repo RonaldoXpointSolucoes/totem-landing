@@ -9,6 +9,8 @@ import {
   authenticateCorreiosCws,
   buildDefaultVolumesFromOrder,
   launchOrderCorreiosPrepostagem,
+  sanitizeExistingShipment,
+  lookupDneCep,
 } from "@/modules/shipping/correiosPrepostagemService";
 import { logEcosystemEvent } from "@/lib/logging/ecosystemLogger";
 
@@ -95,7 +97,58 @@ export async function GET(
       delivery_address: orderData.deliveryAddress,
     });
 
-    const existingShipment = orderData.deliveryAddress?.correiosShipment || null;
+    const rawExistingShipment = orderData.deliveryAddress?.correiosShipment || null;
+    const existingShipment = sanitizeExistingShipment(rawExistingShipment);
+
+    if (
+      rawExistingShipment &&
+      existingShipment &&
+      JSON.stringify(rawExistingShipment.volumes) !== JSON.stringify(existingShipment.volumes)
+    ) {
+      const cleanedAddr = {
+        ...(orderData.deliveryAddress || {}),
+        correiosShipment: existingShipment,
+      };
+      try {
+        await updateOrderAdmin(orderData.id, {
+          delivery_address_json: JSON.stringify(cleanedAddr),
+        });
+      } catch {}
+      updateLocalOrderAdmin(orderData.orderNumber, {
+        deliveryAddress: cleanedAddr,
+      });
+    }
+
+    const baseRecipient = existingShipment?.recipient || {
+      name: orderData.customerName,
+      document: orderData.customerDocument,
+      phone: orderData.customerWhatsapp,
+      email: orderData.customerEmail,
+      cep: orderData.deliveryAddress?.cep || "",
+      street: orderData.deliveryAddress?.street || "",
+      number: orderData.deliveryAddress?.number || "",
+      complement: orderData.deliveryAddress?.complement || "",
+      neighborhood: orderData.deliveryAddress?.neighborhood || "",
+      city: orderData.deliveryAddress?.city || "",
+      state: orderData.deliveryAddress?.state || "SP",
+    };
+
+    if (baseRecipient.cep && baseRecipient.cep.replace(/\D/g, "").length === 8) {
+      const dne = await lookupDneCep(baseRecipient.cep);
+      if (dne.ok) {
+        if (!baseRecipient.street && dne.logradouro) baseRecipient.street = dne.logradouro;
+        if (
+          dne.bairro &&
+          (!baseRecipient.neighborhood ||
+            (dne.bairro.length > baseRecipient.neighborhood.length &&
+              dne.bairro.toLowerCase().startsWith(baseRecipient.neighborhood.toLowerCase().slice(0, 10))))
+        ) {
+          baseRecipient.neighborhood = dne.bairro;
+        }
+        if (!baseRecipient.city && dne.localidade) baseRecipient.city = dne.localidade;
+        if (!baseRecipient.state && dne.uf) baseRecipient.state = dne.uf;
+      }
+    }
 
     return NextResponse.json({
       ok: true,
@@ -109,22 +162,11 @@ export async function GET(
         orderNumber: orderData.orderNumber,
         serviceCode: existingShipment?.serviceCode || defaultPlan.serviceCode,
         serviceName: existingShipment?.serviceName || defaultPlan.serviceName,
+        pickupAddressId: existingShipment?.pickupAddressId || config.selectedPickupAddressId,
         invoiceNumber: existingShipment?.invoiceNumber || "",
         invoiceKey: existingShipment?.invoiceKey || "",
         observations: existingShipment?.observations || `Pedido #${orderData.orderNumber}`,
-        recipient: existingShipment?.recipient || {
-          name: orderData.customerName,
-          document: orderData.customerDocument,
-          phone: orderData.customerWhatsapp,
-          email: orderData.customerEmail,
-          cep: orderData.deliveryAddress?.cep || "",
-          street: orderData.deliveryAddress?.street || "",
-          number: orderData.deliveryAddress?.number || "",
-          complement: orderData.deliveryAddress?.complement || "",
-          neighborhood: orderData.deliveryAddress?.neighborhood || "",
-          city: orderData.deliveryAddress?.city || "",
-          state: orderData.deliveryAddress?.state || "SP",
-        },
+        recipient: baseRecipient,
         volumes: existingShipment?.volumes?.length ? existingShipment.volumes : defaultPlan.volumes,
       },
     });
@@ -150,17 +192,20 @@ export async function POST(
     const body = await req.json();
     const action = body.action || "generate_label";
 
-    if (action === "save_config") {
+    if (action === "save_config" || action === "save_pickup_addresses") {
       const saved = saveCorreiosContractConfig(body.config || {});
       let authCheck: any = null;
-      if (saved.cwsPassword && saved.cwsPassword.trim()) {
+      if (action === "save_config" && saved.cwsPassword && saved.cwsPassword.trim()) {
         authCheck = await authenticateCorreiosCws(saved);
       }
       return NextResponse.json({
         ok: true,
-        message: authCheck?.ok
-          ? "Configurações do Contrato Correios salvas e conexão CWS autenticada com sucesso!"
-          : "Configurações do Contrato Correios salvas com sucesso!",
+        message:
+          action === "save_pickup_addresses"
+            ? "Endereço de coleta salvo e definido como ativo!"
+            : authCheck?.ok
+            ? `Módulo CWS Correios Ativado e Autenticado com Sucesso (Cartão ${saved.postcardNumber})!`
+            : "Configurações do Contrato Correios salvas com sucesso!",
         contractConfig: {
           ...saved,
           hasCwsPassword: Boolean(saved.cwsPassword && saved.cwsPassword.trim()),
@@ -174,19 +219,28 @@ export async function POST(
         saveCorreiosContractConfig(body.config);
       }
       const authRes = await authenticateCorreiosCws(body.config);
+      const updatedCfg = getCorreiosContractConfig();
       return NextResponse.json({
         ok: authRes.ok,
         expiresAt: authRes.expiresAt,
         error: authRes.error,
+        statusCode: authRes.statusCode,
+        endpoint: authRes.endpoint,
+        durationMs: authRes.durationMs,
+        requestPayload: authRes.requestPayload,
+        responsePayload: authRes.responsePayload,
+        contractConfig: {
+          ...updatedCfg,
+          hasCwsPassword: Boolean(updatedCfg.cwsPassword && updatedCfg.cwsPassword.trim()),
+        },
         message: authRes.ok
-          ? `Conexão com a API CWS dos Correios validada com sucesso! Cartão ${
-              body.config?.postcardNumber || getCorreiosContractConfig().postcardNumber
-            } ativo.`
+          ? `Módulo CWS Correios ATIVO! Autenticação validada com sucesso (HTTP ${authRes.statusCode || 201}) para o Cartão ${
+              updatedCfg.postcardNumber
+            }.`
           : authRes.error,
       });
     }
 
-    // Ação principal: Lançar Pré-Postagem CWS e/ou Gerar Etiqueta Simplificada
     const orderData = await resolveOrderData(id);
     const defaultPlan = buildDefaultVolumesFromOrder({
       items: orderData.items,
@@ -203,7 +257,7 @@ export async function POST(
       email: orderData.customerEmail,
       cep: orderData.deliveryAddress?.cep || "",
       street: orderData.deliveryAddress?.street || "",
-      number: orderData.deliveryAddress?.number || "S/N",
+      number: orderData.deliveryAddress?.number || "SN",
       complement: orderData.deliveryAddress?.complement || "",
       neighborhood: orderData.deliveryAddress?.neighborhood || "Centro",
       city: orderData.deliveryAddress?.city || "",
@@ -218,6 +272,8 @@ export async function POST(
       orderNumber: orderData.orderNumber,
       mode: body.mode === "simplified" ? "simplified" : "cws_live",
       serviceCode: body.serviceCode || defaultPlan.serviceCode,
+      pickupAddressId: body.pickupAddressId,
+      customSender: body.customSender,
       invoiceNumber: body.invoiceNumber || "",
       invoiceKey: body.invoiceKey || "",
       observations: body.observations || `Pedido #${orderData.orderNumber}`,
@@ -225,16 +281,46 @@ export async function POST(
       volumes: volumesInput,
     });
 
-    // Salva os dados da etiqueta e rastreio dentro de delivery_address_json do pedido
+    if (!launchRes.ok) {
+      try {
+        const failedStep = launchRes.breadcrumbs.find((b) => b.status === "error");
+        logEcosystemEvent({
+          category: "orders",
+          level: "error",
+          action: "Falha no Lançamento API Correios CWS",
+          target: `Pedido #${orderData.orderNumber}`,
+          details: `Falha na Etapa ${failedStep?.step || "?"}/7 (${failedStep?.title || "CWS"}): ${
+            launchRes.error || launchRes.message
+          }`,
+          actor: "Admin",
+          metadata: {
+            orderId: orderData.id,
+            orderNumber: orderData.orderNumber,
+            failedStep: failedStep?.code,
+            breadcrumbs: launchRes.breadcrumbs,
+          },
+        });
+      } catch {}
+
+      return NextResponse.json({
+        ok: false,
+        modeUsed: launchRes.modeUsed,
+        error: launchRes.error || launchRes.message,
+        message: launchRes.message,
+        breadcrumbs: launchRes.breadcrumbs,
+        shipment: launchRes.shipment,
+      });
+    }
+
     const updatedDeliveryAddress = {
       ...(orderData.deliveryAddress || {}),
-      cep: recipientInput.cep || orderData.deliveryAddress?.cep || "",
-      street: recipientInput.street || orderData.deliveryAddress?.street || "",
-      number: recipientInput.number || orderData.deliveryAddress?.number || "",
-      complement: recipientInput.complement ?? orderData.deliveryAddress?.complement ?? "",
-      neighborhood: recipientInput.neighborhood || orderData.deliveryAddress?.neighborhood || "",
-      city: recipientInput.city || orderData.deliveryAddress?.city || "",
-      state: recipientInput.state || orderData.deliveryAddress?.state || "SP",
+      cep: launchRes.shipment.recipient.cep || orderData.deliveryAddress?.cep || "",
+      street: launchRes.shipment.recipient.street || orderData.deliveryAddress?.street || "",
+      number: launchRes.shipment.recipient.number || orderData.deliveryAddress?.number || "",
+      complement: launchRes.shipment.recipient.complement ?? orderData.deliveryAddress?.complement ?? "",
+      neighborhood: launchRes.shipment.recipient.neighborhood || orderData.deliveryAddress?.neighborhood || "",
+      city: launchRes.shipment.recipient.city || orderData.deliveryAddress?.city || "",
+      state: launchRes.shipment.recipient.state || orderData.deliveryAddress?.state || "SP",
       correiosShipment: launchRes.shipment,
     };
 
@@ -251,14 +337,18 @@ export async function POST(
     });
 
     try {
-      const trackingList = launchRes.shipment.volumes.map((v) => v.trackingCode).filter(Boolean).join(", ");
+      const trackingList =
+        launchRes.shipment.volumes
+          .map((v) => v.trackingCode)
+          .filter(Boolean)
+          .join(", ") || "Sem código CWS (Endereçamento Simplificado)";
       logEcosystemEvent({
         category: "orders",
         level: "info",
         action:
           launchRes.modeUsed === "cws_live"
-            ? "Pré-Postagem Correios CWS Lançada"
-            : "Etiqueta Correios Simplificada Gerada",
+            ? "Pré-Postagem Oficial Correios CWS Lançada"
+            : "Etiqueta de Endereçamento Simplificada Gerada",
         target: `Pedido #${orderData.orderNumber}`,
         details: `${launchRes.shipment.serviceName} (Contrato ${launchRes.shipment.contractNumber}) • ${launchRes.shipment.volumes.length} volume(s) • Rastreio: ${trackingList}`,
         actor: "Admin",
@@ -268,6 +358,7 @@ export async function POST(
           modeUsed: launchRes.modeUsed,
           serviceCode: launchRes.shipment.serviceCode,
           trackingCodes: launchRes.shipment.volumes.map((v) => v.trackingCode),
+          breadcrumbs: launchRes.breadcrumbs,
         },
       });
     } catch {}
@@ -275,13 +366,13 @@ export async function POST(
     return NextResponse.json({
       ok: true,
       modeUsed: launchRes.modeUsed,
-      fallbackReason: launchRes.fallbackReason,
       shipment: launchRes.shipment,
+      breadcrumbs: launchRes.breadcrumbs,
       message: launchRes.message,
     });
   } catch (error: any) {
     return NextResponse.json(
-      { ok: false, error: "Erro ao processar etiqueta Correios: " + error?.message },
+      { ok: false, error: "Erro interno ao processar etiqueta Correios: " + error?.message },
       { status: 500 }
     );
   }
