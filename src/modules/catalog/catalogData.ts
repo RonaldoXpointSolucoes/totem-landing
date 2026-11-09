@@ -5,6 +5,7 @@ import {
   PrinterOption,
   BarcodeReaderOption,
 } from "@/types/catalog";
+import { DEFAULT_KIT_SUB_ITEMS } from "./kitDefaults";
 
 export const CABINET_MODELS: CabinetModel[] = [
   {
@@ -58,10 +59,10 @@ export const CABINET_MODELS: CabinetModel[] = [
     slug: "countertop",
     description:
       "Formato compacto e altamente ergonômico, ideal para checkouts expressos, balcões de atendimento, recepções clínicas e pagamentos rápidos.",
-    basePriceCents: 115000, // R$ 1.150,00 em até 10x no cartão
-    pixPriceCents: 95000, // R$ 950,00 à vista no PIX
-    targetNetCents: 95000,
-    anchorPriceCents: 133000,
+    basePriceCents: 133000, // R$ 1.330,00 em até 10x no cartão
+    pixPriceCents: 110000, // R$ 1.100,00 à vista no PIX
+    targetNetCents: 110000,
+    anchorPriceCents: 154000,
     maxInstallments: 10,
     active: true,
     sortOrder: 2,
@@ -171,7 +172,8 @@ export const HOMOLOGATED_MONITORS: MonitorOption[] = [
     active: true,
     sortOrder: 1,
     isKit: true,
-    priceAdjustmentCents: 395000,
+    priceAdjustmentCents: 361200,
+    kitItems: DEFAULT_KIT_SUB_ITEMS,
     image: "/images/totems/kit-completo.webp",
   },
   {

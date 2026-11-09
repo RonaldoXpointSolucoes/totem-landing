@@ -41,15 +41,18 @@ export const KitCustomizationModal: React.FC<KitCustomizationModalProps> = ({
   cabinetBaseCardCents = 133000,
 }) => {
   const [items, setItems] = useState<KitSubItem[]>(initialItems);
+  const [hasModifiedItems, setHasModifiedItems] = useState(false);
 
   // Sincronizar sempre que abrir com os itens fornecidos
   useEffect(() => {
     if (isOpen) {
       setItems(initialItems.map((item) => ({ ...item })));
+      setHasModifiedItems(false);
     }
   }, [isOpen, initialItems]);
 
   const handleToggleItem = (id: string) => {
+    setHasModifiedItems(true);
     setItems((prev) =>
       prev.map((item) =>
         item.id === id ? { ...item, selected: !item.selected } : item
@@ -58,10 +61,12 @@ export const KitCustomizationModal: React.FC<KitCustomizationModalProps> = ({
   };
 
   const handleSelectAll = (select: boolean) => {
+    setHasModifiedItems(true);
     setItems((prev) => prev.map((item) => ({ ...item, selected: select })));
   };
 
   const handleResetToDefault = () => {
+    setHasModifiedItems(true);
     setItems(initialItems.map((item) => ({ ...item, selected: true })));
   };
 
@@ -78,6 +83,19 @@ export const KitCustomizationModal: React.FC<KitCustomizationModalProps> = ({
       return;
     }
     onSave(items);
+    onClose();
+  };
+
+  // Se o cliente desmarcou itens dentro do modal e fechou no "X" ou clicou fora,
+  // aplicamos imediatamente as alterações feitas para nunca perder os itens desmarcados!
+  const handleDismissModal = () => {
+    if (hasModifiedItems) {
+      if (selectedCount === 0 && onRemoveKit) {
+        onRemoveKit();
+      } else {
+        onSave(items);
+      }
+    }
     onClose();
   };
 
@@ -124,12 +142,12 @@ export const KitCustomizationModal: React.FC<KitCustomizationModalProps> = ({
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleDismissModal}
       className="max-w-2xl sm:max-w-2xl p-4 sm:p-6"
     >
-      <div className="space-y-4">
+      <div className="space-y-3.5">
         {/* Cabeçalho Didático de Confirmação */}
-        <div className="space-y-2 pb-3 border-b border-black/10 dark:border-slate-800">
+        <div className="space-y-2 pb-3 border-b border-black/10 dark:border-slate-800 pr-8">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0">
@@ -235,8 +253,8 @@ export const KitCustomizationModal: React.FC<KitCustomizationModalProps> = ({
           </div>
         </div>
 
-        {/* Lista de Sub-Itens */}
-        <div className="space-y-2">
+        {/* Lista de Sub-Itens com Rolagem Própria para Manter o Rodapé Sempre Visível */}
+        <div className="space-y-2 max-h-[38vh] sm:max-h-[42vh] overflow-y-auto pr-1">
           {items.map((item) => {
             const Icon = getItemIcon(item.category);
             return (

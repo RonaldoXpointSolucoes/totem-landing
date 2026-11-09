@@ -507,15 +507,44 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
                   </div>
                 </div>
 
-                {/* Lista Visual Rápida dos 4 Componentes do Kit */}
+                {/* Lista Visual Rápida dos Componentes do Kit (Clicável para marcar/desmarcar direto) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-2 border-t border-black/5 dark:border-slate-800">
                   {kitItems.map((sub) => (
                     <div
                       key={sub.id}
-                      className={`px-2.5 py-1.5 rounded-lg border text-[11px] flex items-center justify-between gap-2 ${
+                      onClick={(e) => {
+                        if (isSelected) {
+                          e.stopPropagation();
+                          const nextItems = kitItems.map((item) =>
+                            item.id === sub.id ? { ...item, selected: !item.selected } : item
+                          );
+                          const nextCount = nextItems.filter((i) => i.selected).length;
+                          if (nextCount === 0) {
+                            handleRemoveKit();
+                          } else {
+                            const nextTotal = calculateKitTotalCents(nextItems);
+                            onSelectMonitor({
+                              ...mon,
+                              ...(selectedMonitor || {}),
+                              isKit: true,
+                              kitItems: nextItems,
+                              priceAdjustmentCents: nextTotal,
+                              notes: JSON.stringify({ kitItems: nextItems }),
+                            });
+                          }
+                        }
+                      }}
+                      title={
+                        isSelected
+                          ? sub.selected
+                            ? `Clique para remover "${sub.name}" do Kit`
+                            : `Clique para incluir "${sub.name}" no Kit`
+                          : "Clique para personalizar as peças do Kit"
+                      }
+                      className={`px-2.5 py-1.5 rounded-lg border text-[11px] flex items-center justify-between gap-2 transition-all ${
                         sub.selected
-                          ? "bg-blue-50/60 dark:bg-indigo-950/30 border-blue-200/80 dark:border-indigo-800/80 text-slate-800 dark:text-slate-200"
-                          : "bg-slate-50 dark:bg-slate-950/40 border-black/5 text-slate-400 line-through opacity-60"
+                          ? "bg-blue-50/60 dark:bg-indigo-950/30 border-blue-200/80 dark:border-indigo-800/80 text-slate-800 dark:text-slate-200 hover:border-[#0071e3]"
+                          : "bg-slate-50 dark:bg-slate-950/40 border-black/5 text-slate-400 line-through opacity-60 hover:opacity-90"
                       }`}
                     >
                       <span className="truncate font-semibold">
@@ -523,7 +552,7 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
                         {sub.name}
                       </span>
                       <span className="font-black text-[#0071e3] dark:text-cyan-400 shrink-0">
-                        +{formatBRL(sub.priceCents)}
+                        {sub.selected ? `+${formatBRL(sub.priceCents)}` : "Removido"}
                       </span>
                     </div>
                   ))}

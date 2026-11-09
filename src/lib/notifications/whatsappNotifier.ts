@@ -188,6 +188,23 @@ export async function notifyNewOrderOnWhatsApp(
             ? `\n   ⚠️ *Obs. do Item:* ${cfg.customizationNotes.trim()}`
             : "";
 
+        const checklistToDeliver = [
+          `✅ ${item.quantity}x ${cfg.model.name} (${cfg.color.name})`,
+          ...(kitEq.isKit
+            ? kitEq.includedSubItems.map(
+                (sub) => `✅ ${item.quantity}x ${sub.name}${sub.priceCents > 0 ? ` (+${formatBRL(sub.priceCents)})` : ""}`
+              )
+            : []),
+        ].join("\n   ");
+
+        const checklistRemoved =
+          kitEq.isKit && kitEq.removedSubItems.length > 0
+            ? `\n   🚨 *NÃO ENVIAR (Removido pelo Cliente):*\n   ` +
+              kitEq.removedSubItems.map((rem) => `❌ ${rem.name} (Não cobrado)`).join("\n   ")
+            : !kitEq.isKit
+            ? `\n   ℹ️ *Apenas Gabinete Físico:* Não enviar equipamentos eletrônicos (somente furação CNC)`
+            : "";
+
         return (
           `*${idx + 1}. ${item.quantity}x ${cfg.model.name}*\n` +
           `   • Cor: ${cfg.color.name}\n` +
@@ -197,6 +214,8 @@ export async function notifyNewOrderOnWhatsApp(
           assemblyLabel +
           customDimsLabel +
           notesLabel +
+          `\n   📋 *Checklist — O que entregar junto c/ Gabinete:*\n   ${checklistToDeliver}` +
+          checklistRemoved +
           `\n   • Subtotal Item: *${formatBRL(item.subtotalCents)}*`
         );
       })

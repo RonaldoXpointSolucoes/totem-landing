@@ -5,7 +5,7 @@ import { getAuthSession, LEGACY_ADMIN_COOKIE, LEGACY_SECRET } from "@/lib/auth/s
 import { getAllLocalOrders } from "@/lib/orders/orderStore";
 import { calculateShippingQuotes } from "@/modules/shipping";
 import { checkoutStatusToken, translateMercadoPagoStatusDetail } from "@/lib/payments/mercadoPago";
-import { resolveKitEquipmentSummary } from "@/modules/catalog/kitDefaults";
+import { resolveKitEquipmentSummary, buildOrderDeliveryChecklist } from "@/modules/catalog/kitDefaults";
 
 async function verifyAdminAuth(): Promise<boolean> {
   const session = await getAuthSession();
@@ -125,12 +125,27 @@ export async function GET(req: Request) {
         customerPaymentUrl = `${site}/checkout/retorno?orderId=${encodeURIComponent(o.$id)}&token=${checkoutStatusToken(o.$id)}`;
       } catch {}
 
-      const normalizedItems = (o.items || []).map((it: any) => {
+      const normalizedItems = (o.items || []).map((it: any, idx: number) => {
+        const sheet = parsedSheets[idx] || parsedSheets[0] || null;
+        const kitSnapshot = Array.isArray(sheet?.kitItemsSnapshot) ? sheet.kitItemsSnapshot : null;
         const resolved = resolveKitEquipmentSummary({
+          kitItemsSnapshot: kitSnapshot,
           monitorName: it.monitor_name,
           printerName: it.printer_name,
           readerName: it.reader_name,
         });
+        const deliveryChecklist =
+          Array.isArray(sheet?.deliveryChecklist) && sheet.deliveryChecklist.length > 0
+            ? sheet.deliveryChecklist
+            : buildOrderDeliveryChecklist({
+                cabinetName: it.cabinet_name,
+                colorName: it.color_name,
+                quantity: it.quantity || 1,
+                kitItemsSnapshot: kitSnapshot,
+                monitorName: it.monitor_name,
+                printerName: it.printer_name,
+                readerName: it.reader_name,
+              });
         return {
           ...it,
           monitor_name: resolved.monitorDisplay,
@@ -140,6 +155,11 @@ export async function GET(req: Request) {
               ? resolved.readerDisplay
               : resolved.accessoriesSummary || "Kit Completo (Coolers + Régua + Cabos)"
             : resolved.readerDisplay,
+          is_kit: resolved.isKit,
+          has_monitor_in_kit: resolved.hasMonitorInKit,
+          has_printer_in_kit: resolved.hasPrinterInKit,
+          kit_items_snapshot: kitSnapshot || resolved.includedSubItems.concat(resolved.removedSubItems),
+          delivery_checklist: deliveryChecklist,
         };
       });
 
@@ -186,6 +206,16 @@ export async function GET(req: Request) {
               printerName: it.configuration.printer?.displayName,
               readerName: it.configuration.barcodeReader?.displayName,
             });
+            const deliveryChecklist = buildOrderDeliveryChecklist({
+              cabinetName: it.configuration.model.name,
+              colorName: it.configuration.color.name,
+              quantity: it.quantity || 1,
+              monitor: it.configuration.monitor,
+              monitorName: it.configuration.monitor?.displayName,
+              printerName: it.configuration.printer?.displayName,
+              readerName: it.configuration.barcodeReader?.displayName,
+              includeAssemblyService: it.configuration.includeAssemblyService,
+            });
             return {
               cabinet_name: it.configuration.model.name,
               color_name: it.configuration.color.name,
@@ -196,6 +226,10 @@ export async function GET(req: Request) {
                   ? resolved.readerDisplay
                   : resolved.accessoriesSummary || "Kit Completo (Coolers + Régua + Cabos)"
                 : resolved.readerDisplay,
+              is_kit: resolved.isKit,
+              has_monitor_in_kit: resolved.hasMonitorInKit,
+              has_printer_in_kit: resolved.hasPrinterInKit,
+              delivery_checklist: deliveryChecklist,
               quantity: it.quantity,
               unit_price_cents: it.unitPriceCents,
               subtotal_cents: it.subtotalCents,

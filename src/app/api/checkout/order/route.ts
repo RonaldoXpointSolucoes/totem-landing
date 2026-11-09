@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { calculateTotemPrice } from "@/modules/pricing/pricingEngine";
-import { isItemKit, resolveKitEquipmentSummary, mergeServerCatalogKitItems } from "@/modules/catalog/kitDefaults";
+import {
+  isItemKit,
+  resolveKitEquipmentSummary,
+  mergeServerCatalogKitItems,
+  getEffectiveKitItems,
+  buildOrderDeliveryChecklist,
+} from "@/modules/catalog/kitDefaults";
 import { calculateSelectiveCouponDiscount, CouponDiscountCalculation } from "@/modules/pricing/couponEngine";
 import { findUserByCoupon, updateWhitelistUser } from "@/lib/auth/whitelistStore";
 import { recordVoucherUsage } from "@/lib/vouchers/voucherStore";
@@ -274,6 +280,16 @@ export async function POST(req: Request) {
               windowSpecs: "Sem rasgo óptico",
             };
 
+      const deliveryChecklist = buildOrderDeliveryChecklist({
+        cabinetName: model.name,
+        colorName: color.name,
+        quantity,
+        monitor,
+        printerName: printer?.displayName,
+        readerName: barcodeReader?.displayName,
+        includeAssemblyService,
+      });
+
       const manufacturingSpec: ManufacturingSpec = {
         itemIndex: i + 1,
         cabinetModelName: model.name,
@@ -290,7 +306,16 @@ export async function POST(req: Request) {
         customDimensions: customDims || null,
         assemblyService: includeAssemblyService
           ? "Serviço de Montagem Especializada Contratado (+ R$ 999,00) — Entregar Totem 100% montado, cabeado e testado em bancada (Pronto para ligar na tomada)"
-          : "Montagem Própria pelo Cliente (Enviar gabinete usinado e periféricos do kit em embalagens originais lacradas)",
+          : kitEq.isKit
+          ? `Montagem Própria pelo Cliente — Enviar Gabinete + ${kitEq.selectedCount} itens selecionados do Kit (${kitEq.selectedItemsSummary || "Nenhum"})${
+              kitEq.removedSubItems.length > 0
+                ? ` • ATENÇÃO: NÃO ENVIAR (${kitEq.removedItemsSummary})`
+                : ""
+            }`
+          : "Apenas Gabinete Físico (Sem envio de equipamentos eletrônicos • Somente furação CNC)",
+        isKit: kitEq.isKit,
+        kitItemsSnapshot: kitEq.isKit ? getEffectiveKitItems(monitor) : [],
+        deliveryChecklist,
         status: "ready_for_cutting",
       };
 

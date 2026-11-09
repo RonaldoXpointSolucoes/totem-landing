@@ -10,7 +10,7 @@ import {
 } from "@/modules/catalog/catalogData";
 import { calculateTotemPrice, formatBRL } from "@/modules/pricing/pricingEngine";
 import { CabinetModel, ColorOption, MonitorOption, PrinterOption, BarcodeReaderOption } from "@/types/catalog";
-import { isItemKit, getEffectiveKitItems, calculateKitTotalCents } from "@/modules/catalog/kitDefaults";
+import { isItemKit, getEffectiveKitItems, calculateKitTotalCents, mergeServerCatalogKitItems } from "@/modules/catalog/kitDefaults";
 import { TotemConfiguration } from "@/types/order";
 import { useCart } from "@/modules/cart/CartContext";
 import { StepModel } from "./StepModel";
@@ -70,12 +70,38 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
       .then((res) => res.json())
       .then((res) => {
         if (res?.ok && res.data) {
+          const freshModels: CabinetModel[] = res.data.cabinetModels?.length ? res.data.cabinetModels : CABINET_MODELS;
+          const freshColors: ColorOption[] = res.data.colors?.length ? res.data.colors : COLOR_OPTIONS;
+          const freshMonitors: MonitorOption[] = res.data.monitors?.length ? res.data.monitors : HOMOLOGATED_MONITORS;
+          const freshPrinters: PrinterOption[] = res.data.printers?.length ? res.data.printers : HOMOLOGATED_PRINTERS;
+          const freshReaders: BarcodeReaderOption[] = res.data.barcodeReaders?.length ? res.data.barcodeReaders : HOMOLOGATED_READERS;
+
           setCatalog({
-            models: res.data.cabinetModels?.length ? res.data.cabinetModels : CABINET_MODELS,
-            colors: res.data.colors?.length ? res.data.colors : COLOR_OPTIONS,
-            monitors: res.data.monitors?.length ? res.data.monitors : HOMOLOGATED_MONITORS,
-            printers: res.data.printers?.length ? res.data.printers : HOMOLOGATED_PRINTERS,
-            readers: res.data.barcodeReaders?.length ? res.data.barcodeReaders : HOMOLOGATED_READERS,
+            models: freshModels,
+            colors: freshColors,
+            monitors: freshMonitors,
+            printers: freshPrinters,
+            readers: freshReaders,
+          });
+
+          setSelectedModel((prev) => {
+            const match = freshModels.find((m) => m.id === prev.id || m.slug === prev.slug);
+            return match || prev;
+          });
+          setSelectedColor((prev) => {
+            const match = freshColors.find((c) => c.id === prev.id || c.slug === prev.slug);
+            return match || prev;
+          });
+          setSelectedMonitor((prev) => {
+            if (!prev) return prev;
+            const match = freshMonitors.find(
+              (m) => m.id === prev.id || (isItemKit(prev) && isItemKit(m))
+            );
+            if (!match) return prev;
+            if (isItemKit(prev)) {
+              return mergeServerCatalogKitItems(match, prev.kitItems);
+            }
+            return match;
           });
         }
       })

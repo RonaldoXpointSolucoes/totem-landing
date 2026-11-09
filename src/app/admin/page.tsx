@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
 import { siteConfig } from "@/config/site";
-import { resolveKitEquipmentSummary } from "@/modules/catalog/kitDefaults";
+import { resolveKitEquipmentSummary, buildOrderDeliveryChecklist, DeliveryChecklistItem } from "@/modules/catalog/kitDefaults";
 import { CatalogManager } from "@/components/admin/CatalogManager";
 import { MarketingSettingsManager } from "@/components/admin/MarketingSettingsManager";
 import { TeamManager } from "@/components/admin/TeamManager";
@@ -2204,6 +2204,10 @@ export default function AdminPage() {
                   const totalItemsQty = (order.items || []).reduce((acc, curr) => acc + (curr.quantity || 1), 0) || 1;
                   const resolvedFirstItem = firstItem
                     ? resolveKitEquipmentSummary({
+                        kitItemsSnapshot:
+                          (firstItem as any).kit_items_snapshot ||
+                          firstSheet?.kitItemsSnapshot ||
+                          null,
                         monitorName: firstItem.monitor_name,
                         printerName: firstItem.printer_name,
                         readerName: firstItem.reader_name,
@@ -2296,13 +2300,35 @@ export default function AdminPage() {
                                     </span>
                                   )}
                                   {resolvedFirstItem?.monitorDisplay && (
-                                    <span className="px-2 py-0.5 rounded-md bg-cyan-950/60 text-cyan-300 border border-cyan-500/35 font-bold">
-                                      Monitor: {resolvedFirstItem.monitorDisplay}
+                                    <span
+                                      className={`px-2 py-0.5 rounded-md font-bold border ${
+                                        resolvedFirstItem.isKit && !resolvedFirstItem.hasMonitorInKit
+                                          ? "bg-rose-950/70 text-rose-300 border-rose-500/50"
+                                          : "bg-cyan-950/60 text-cyan-300 border-cyan-500/35"
+                                      }`}
+                                    >
+                                      {resolvedFirstItem.isKit && !resolvedFirstItem.hasMonitorInKit
+                                        ? "❌ Monitor: Removido do Kit pelo Cliente (Não enviar tela)"
+                                        : `Monitor: ${resolvedFirstItem.monitorDisplay}`}
                                     </span>
                                   )}
                                   {resolvedFirstItem?.printerDisplay && (
-                                    <span className="px-2 py-0.5 rounded-md bg-indigo-950/60 text-indigo-300 border border-indigo-500/35 font-bold">
-                                      Impressora: {resolvedFirstItem.printerDisplay}
+                                    <span
+                                      className={`px-2 py-0.5 rounded-md font-bold border ${
+                                        resolvedFirstItem.isKit && !resolvedFirstItem.hasPrinterInKit
+                                          ? "bg-rose-950/70 text-rose-300 border-rose-500/50"
+                                          : "bg-indigo-950/60 text-indigo-300 border-indigo-500/35"
+                                      }`}
+                                    >
+                                      {resolvedFirstItem.isKit && !resolvedFirstItem.hasPrinterInKit
+                                        ? "❌ Impressora: Removida do Kit pelo Cliente (Não enviar)"
+                                        : `Impressora: ${resolvedFirstItem.printerDisplay}`}
+                                    </span>
+                                  )}
+                                  {resolvedFirstItem?.isKit && resolvedFirstItem.includedSubItems.length > 0 && (
+                                    <span className="px-2 py-0.5 rounded-md bg-emerald-950/60 text-emerald-300 border border-emerald-500/40 font-bold">
+                                      ✅ Enviar junto c/ Gabinete ({resolvedFirstItem.selectedCount} itens):{" "}
+                                      {resolvedFirstItem.includedSubItems.map((s) => s.name).join(" + ")}
                                     </span>
                                   )}
                                   {resolvedFirstItem?.hasReader && resolvedFirstItem.readerDisplay && (
@@ -3178,11 +3204,38 @@ export default function AdminPage() {
                                 const cabinetCategory = getCabinetCategoryLabel(it.cabinet_name);
                                 const alertInfo = getItemAlertInfo(order, it, sheet, idx);
                                 const isBlackColor = (it.color_name || "").toLowerCase().includes("preto");
+                                const kitSnapshot =
+                                  (it as any).kit_items_snapshot ||
+                                  sheet?.kitItemsSnapshot ||
+                                  null;
                                 const resolvedEq = resolveKitEquipmentSummary({
+                                  kitItemsSnapshot: kitSnapshot,
                                   monitorName: it.monitor_name,
                                   printerName: it.printer_name,
                                   readerName: it.reader_name,
                                 });
+                                const itemChecklist: DeliveryChecklistItem[] =
+                                  Array.isArray((it as any).delivery_checklist) &&
+                                  (it as any).delivery_checklist.length > 0
+                                    ? (it as any).delivery_checklist
+                                    : Array.isArray(sheet?.deliveryChecklist) &&
+                                      sheet.deliveryChecklist.length > 0
+                                    ? sheet.deliveryChecklist
+                                    : buildOrderDeliveryChecklist({
+                                        cabinetName: it.cabinet_name,
+                                        colorName: it.color_name,
+                                        quantity: it.quantity || 1,
+                                        kitItemsSnapshot: kitSnapshot,
+                                        monitorName: it.monitor_name,
+                                        printerName: it.printer_name,
+                                        readerName: it.reader_name,
+                                        includeAssemblyService: Boolean(
+                                          sheet?.assemblyService?.includes("Montagem Especializada") ||
+                                            it.monitor_name?.includes("100% Montado")
+                                        ),
+                                      });
+                                const checklistToDeliver = itemChecklist.filter((c) => c.included);
+                                const checklistNotToDeliver = itemChecklist.filter((c) => !c.included);
 
                                 return (
                                   <div
@@ -3215,8 +3268,16 @@ export default function AdminPage() {
                                               {cabinetCategory}
                                             </span>
                                             {resolvedEq.isKit && (
-                                              <span className="px-2 py-0.5 rounded-md bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-black text-[9px] uppercase tracking-wider">
-                                                ⚡ Kit Completo (PC Touch + Impressora)
+                                              <span
+                                                className={`px-2 py-0.5 rounded-md font-black text-[9px] uppercase tracking-wider border ${
+                                                  resolvedEq.removedSubItems.length > 0
+                                                    ? "bg-amber-500/20 border-amber-400/60 text-amber-300"
+                                                    : "bg-cyan-500/20 border-cyan-500/40 text-cyan-300"
+                                                }`}
+                                              >
+                                                {resolvedEq.removedSubItems.length > 0
+                                                  ? `⚠️ Kit Personalizado (${resolvedEq.selectedCount} de ${resolvedEq.totalCount} itens • ${resolvedEq.removedSubItems.length} removido(s))`
+                                                  : `⚡ Kit Completo (${resolvedEq.selectedCount} itens inclusos)`}
                                               </span>
                                             )}
                                           </div>
@@ -3266,48 +3327,76 @@ export default function AdminPage() {
                                       {/* MONITOR ESCOLHIDO (EM DESTAQUE) */}
                                       <div
                                         className={`p-2.5 rounded-xl border space-y-0.5 ${
-                                          alertInfo.isCustomMonitor
+                                          resolvedEq.isKit && !resolvedEq.hasMonitorInKit
+                                            ? "bg-rose-950/60 border-2 border-rose-500/60"
+                                            : alertInfo.isCustomMonitor
                                             ? "bg-amber-500/20 border-2 border-amber-400"
                                             : "bg-cyan-950/55 border-cyan-500/40"
                                         }`}
                                       >
                                         <div className="flex items-center justify-between gap-1">
-                                          <span className="text-[9px] font-black uppercase tracking-wider text-cyan-300 flex items-center gap-1">
+                                          <span
+                                            className={`text-[9px] font-black uppercase tracking-wider flex items-center gap-1 ${
+                                              resolvedEq.isKit && !resolvedEq.hasMonitorInKit
+                                                ? "text-rose-300"
+                                                : "text-cyan-300"
+                                            }`}
+                                          >
                                             <Monitor className="w-3 h-3 shrink-0" />
                                             <span>{resolvedEq.isKit ? "Monitor / PC do Kit" : "Monitor Escolhido"}</span>
                                           </span>
-                                          {alertInfo.isCustomMonitor && (
+                                          {resolvedEq.isKit && !resolvedEq.hasMonitorInKit ? (
+                                            <span className="text-[8px] font-black px-1.5 py-0.2 rounded bg-rose-500 text-white uppercase">
+                                              NÃO ENVIAR TELA
+                                            </span>
+                                          ) : alertInfo.isCustomMonitor ? (
                                             <span className="text-[8px] font-black px-1.5 py-0.2 rounded bg-amber-400 text-slate-950 uppercase">
                                               SOB MEDIDA
                                             </span>
-                                          )}
+                                          ) : null}
                                         </div>
                                         <p className="font-extrabold text-white text-xs leading-snug">
-                                          {resolvedEq.monitorDisplay || it.monitor_name || "Nenhum"}
+                                          {resolvedEq.isKit && !resolvedEq.hasMonitorInKit
+                                            ? "❌ REMOVIDO PELO CLIENTE (Não enviar Computador All-in-One Touch)"
+                                            : resolvedEq.monitorDisplay || it.monitor_name || "Nenhum"}
                                         </p>
                                       </div>
 
                                       {/* IMPRESSORA ESCOLHIDA (EM DESTAQUE) */}
                                       <div
                                         className={`p-2.5 rounded-xl border space-y-0.5 ${
-                                          alertInfo.isCustomPrinter
+                                          resolvedEq.isKit && !resolvedEq.hasPrinterInKit
+                                            ? "bg-rose-950/60 border-2 border-rose-500/60"
+                                            : alertInfo.isCustomPrinter
                                             ? "bg-amber-500/20 border-2 border-amber-400"
                                             : "bg-indigo-950/55 border-indigo-500/40"
                                         }`}
                                       >
                                         <div className="flex items-center justify-between gap-1">
-                                          <span className="text-[9px] font-black uppercase tracking-wider text-indigo-300 flex items-center gap-1">
+                                          <span
+                                            className={`text-[9px] font-black uppercase tracking-wider flex items-center gap-1 ${
+                                              resolvedEq.isKit && !resolvedEq.hasPrinterInKit
+                                                ? "text-rose-300"
+                                                : "text-indigo-300"
+                                            }`}
+                                          >
                                             <Printer className="w-3 h-3 shrink-0" />
                                             <span>{resolvedEq.isKit ? "Impressora do Kit" : "Impressora Escolhida"}</span>
                                           </span>
-                                          {alertInfo.isCustomPrinter && (
+                                          {resolvedEq.isKit && !resolvedEq.hasPrinterInKit ? (
+                                            <span className="text-[8px] font-black px-1.5 py-0.2 rounded bg-rose-500 text-white uppercase">
+                                              NÃO ENVIAR IMPRESSORA
+                                            </span>
+                                          ) : alertInfo.isCustomPrinter ? (
                                             <span className="text-[8px] font-black px-1.5 py-0.2 rounded bg-amber-400 text-slate-950 uppercase">
                                               ESPECIAL
                                             </span>
-                                          )}
+                                          ) : null}
                                         </div>
                                         <p className="font-extrabold text-white text-xs leading-snug">
-                                          {resolvedEq.printerDisplay || it.printer_name || "Nenhuma"}
+                                          {resolvedEq.isKit && !resolvedEq.hasPrinterInKit
+                                            ? "❌ REMOVIDA PELO CLIENTE (Não enviar Impressora Térmica)"
+                                            : resolvedEq.printerDisplay || it.printer_name || "Nenhuma"}
                                         </p>
                                       </div>
 
@@ -3321,7 +3410,7 @@ export default function AdminPage() {
                                       >
                                         <span className="text-[9px] font-black uppercase tracking-wider text-purple-300 flex items-center gap-1">
                                           <QrCode className="w-3 h-3 shrink-0" />
-                                          <span>{resolvedEq.isKit && !resolvedEq.hasReader ? "Itens Extras do Kit" : "Leitor 2D / QR"}</span>
+                                          <span>{resolvedEq.isKit && !resolvedEq.hasReader ? "Acessórios Inclusos no Kit" : "Leitor 2D / QR"}</span>
                                         </span>
                                         <p className="font-bold text-slate-100 text-xs leading-snug">
                                           {resolvedEq.hasReader
@@ -3347,6 +3436,89 @@ export default function AdminPage() {
                                           <p className="font-bold text-white text-xs leading-snug">
                                             ⚙️ ATENÇÃO PRODUÇÃO / BANCADA: O cliente contratou a montagem completa deste totem. Entregar 100% montado de fábrica, com componentes fixados, fiação travada e testado em bancada. Não despachar em caixas desmontadas!
                                           </p>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* 📦 CHECKLIST EXPLÍCITO DE ENTREGA / EXPEDIÇÃO (O QUE ENTREGAR JUNTO COM O GABINETE) */}
+                                    <div className="p-3 rounded-xl bg-slate-950/90 border-2 border-emerald-500/40 space-y-2.5">
+                                      <div className="flex flex-wrap items-center justify-between gap-2 pb-1.5 border-b border-slate-800">
+                                        <div className="flex items-center gap-1.5">
+                                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                                          <span className="font-black text-emerald-300 uppercase tracking-wider text-[10px] sm:text-[11px]">
+                                            📋 CHECKLIST DE ENTREGA / EXPEDIÇÃO — O QUE ENTREGAR JUNTO COM O GABINETE
+                                          </span>
+                                        </div>
+                                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/35 text-emerald-300 font-black text-[9px] uppercase">
+                                          {checklistToDeliver.length} {checklistToDeliver.length === 1 ? "item para entregar" : "itens para entregar"}
+                                        </span>
+                                      </div>
+
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                        {checklistToDeliver.map((chk) => (
+                                          <div
+                                            key={chk.id}
+                                            className="p-2 rounded-lg bg-emerald-950/35 border border-emerald-500/35 flex items-center justify-between gap-2"
+                                          >
+                                            <div className="flex items-start gap-2 min-w-0">
+                                              <span className="w-4 h-4 rounded bg-emerald-500 text-slate-950 font-black text-[10px] flex items-center justify-center shrink-0 mt-0.5">
+                                                ✓
+                                              </span>
+                                              <div className="min-w-0">
+                                                <p className="font-extrabold text-white text-[11px] leading-snug">
+                                                  {chk.quantity}x {chk.name}
+                                                </p>
+                                                <span className="text-[9px] font-bold text-emerald-400 uppercase">
+                                                  {chk.badgeLabel}
+                                                </span>
+                                              </div>
+                                            </div>
+                                            {chk.priceCents > 0 && (
+                                              <span className="font-black text-emerald-300 font-mono text-[10px] shrink-0">
+                                                +{formatBRL(chk.priceCents)}
+                                              </span>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+
+                                      {checklistNotToDeliver.length > 0 && (
+                                        <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+                                          <span className="text-[10px] font-black uppercase tracking-wider text-rose-400 flex items-center gap-1">
+                                            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                            <span>
+                                              {resolvedEq.isKit
+                                                ? "❌ ITENS REMOVIDOS PELO CLIENTE (NÃO SEPARAR E NÃO ENVIAR):"
+                                                : "ℹ️ OBSERVAÇÃO DE EXPEDIÇÃO (APENAS GABINETE FÍSICO):"}
+                                            </span>
+                                          </span>
+                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                            {checklistNotToDeliver.map((rem) => (
+                                              <div
+                                                key={rem.id}
+                                                className="p-2 rounded-lg bg-rose-950/35 border border-rose-500/40 flex items-center justify-between gap-2"
+                                              >
+                                                <div className="flex items-start gap-2 min-w-0">
+                                                  <span className="w-4 h-4 rounded bg-rose-500/80 text-white font-black text-[10px] flex items-center justify-center shrink-0 mt-0.5">
+                                                    ✕
+                                                  </span>
+                                                  <div className="min-w-0">
+                                                    <p className="font-bold text-rose-200 text-[11px] line-through leading-snug">
+                                                      {rem.name}
+                                                    </p>
+                                                    <span className="text-[9px] font-black text-rose-400 uppercase">
+                                                      {rem.badgeLabel}
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                                {rem.priceCents > 0 && (
+                                                  <span className="text-[10px] font-mono text-rose-400 line-through shrink-0">
+                                                    {formatBRL(rem.priceCents)}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            ))}
+                                          </div>
                                         </div>
                                       )}
                                     </div>
@@ -3793,11 +3965,38 @@ export default function AdminPage() {
                       const cabinetImg = getItemCabinetImage(item, sheet);
                       const cabinetCategory = getCabinetCategoryLabel(item.cabinet_name);
                       const alertInfo = getItemAlertInfo(selectedOrder, item, sheet, idx);
+                      const modalKitSnapshot =
+                        (item as any).kit_items_snapshot ||
+                        sheet?.kitItemsSnapshot ||
+                        null;
                       const resolvedEq = resolveKitEquipmentSummary({
+                        kitItemsSnapshot: modalKitSnapshot,
                         monitorName: item.monitor_name,
                         printerName: item.printer_name,
                         readerName: item.reader_name,
                       });
+                      const modalChecklist: DeliveryChecklistItem[] =
+                        Array.isArray((item as any).delivery_checklist) &&
+                        (item as any).delivery_checklist.length > 0
+                          ? (item as any).delivery_checklist
+                          : Array.isArray(sheet?.deliveryChecklist) &&
+                            sheet.deliveryChecklist.length > 0
+                          ? sheet.deliveryChecklist
+                          : buildOrderDeliveryChecklist({
+                              cabinetName: item.cabinet_name,
+                              colorName: item.color_name,
+                              quantity: item.quantity || 1,
+                              kitItemsSnapshot: modalKitSnapshot,
+                              monitorName: item.monitor_name,
+                              printerName: item.printer_name,
+                              readerName: item.reader_name,
+                              includeAssemblyService: Boolean(
+                                sheet?.assemblyService?.includes("Montagem Especializada") ||
+                                  item.monitor_name?.includes("100% Montado")
+                              ),
+                            });
+                      const modalToDeliver = modalChecklist.filter((c) => c.included);
+                      const modalNotToDeliver = modalChecklist.filter((c) => !c.included);
 
                       return (
                         <div
@@ -3827,8 +4026,16 @@ export default function AdminPage() {
                                     {cabinetCategory}
                                   </span>
                                   {resolvedEq.isKit && (
-                                    <span className="px-2 py-0.5 rounded-md bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-black text-[9px] uppercase tracking-wider inline-block">
-                                      ⚡ Kit Completo (PC Touch + Impressora)
+                                    <span
+                                      className={`px-2 py-0.5 rounded-md font-black text-[9px] uppercase tracking-wider inline-block border ${
+                                        resolvedEq.removedSubItems.length > 0
+                                          ? "bg-amber-500/20 border-amber-400/60 text-amber-300"
+                                          : "bg-cyan-500/20 border-cyan-500/40 text-cyan-300"
+                                      }`}
+                                    >
+                                      {resolvedEq.removedSubItems.length > 0
+                                        ? `⚠️ Kit Personalizado (${resolvedEq.selectedCount} de ${resolvedEq.totalCount} itens • ${resolvedEq.removedSubItems.length} removido(s))`
+                                        : `⚡ Kit Completo (${resolvedEq.selectedCount} itens inclusos)`}
                                     </span>
                                   )}
                                 </div>
@@ -3866,38 +4073,58 @@ export default function AdminPage() {
                             </div>
                             <div
                               className={`p-3 rounded-xl border ${
-                                alertInfo.isCustomMonitor
+                                resolvedEq.isKit && !resolvedEq.hasMonitorInKit
+                                  ? "bg-rose-950/60 border-2 border-rose-500/60"
+                                  : alertInfo.isCustomMonitor
                                   ? "bg-amber-500/20 border-2 border-amber-400"
                                   : "bg-cyan-950/60 border-cyan-500/40"
                               }`}
                             >
-                              <span className="text-[10px] font-black uppercase text-cyan-300 flex items-center gap-1 mb-0.5">
+                              <span
+                                className={`text-[10px] font-black uppercase flex items-center gap-1 mb-0.5 ${
+                                  resolvedEq.isKit && !resolvedEq.hasMonitorInKit
+                                    ? "text-rose-300"
+                                    : "text-cyan-300"
+                                }`}
+                              >
                                 <Monitor className="w-3.5 h-3.5" />
                                 <span>{resolvedEq.isKit ? "Monitor / PC do Kit" : "Monitor Escolhido"}</span>
                               </span>
                               <strong className="text-white text-xs sm:text-sm block">
-                                {resolvedEq.monitorDisplay || item.monitor_name || "Nenhum"}
+                                {resolvedEq.isKit && !resolvedEq.hasMonitorInKit
+                                  ? "❌ REMOVIDO PELO CLIENTE (Não enviar tela)"
+                                  : resolvedEq.monitorDisplay || item.monitor_name || "Nenhum"}
                               </strong>
                             </div>
                             <div
                               className={`p-3 rounded-xl border ${
-                                alertInfo.isCustomPrinter
+                                resolvedEq.isKit && !resolvedEq.hasPrinterInKit
+                                  ? "bg-rose-950/60 border-2 border-rose-500/60"
+                                  : alertInfo.isCustomPrinter
                                   ? "bg-amber-500/20 border-2 border-amber-400"
                                   : "bg-indigo-950/60 border-indigo-500/40"
                               }`}
                             >
-                              <span className="text-[10px] font-black uppercase text-indigo-300 flex items-center gap-1 mb-0.5">
+                              <span
+                                className={`text-[10px] font-black uppercase flex items-center gap-1 mb-0.5 ${
+                                  resolvedEq.isKit && !resolvedEq.hasPrinterInKit
+                                    ? "text-rose-300"
+                                    : "text-indigo-300"
+                                }`}
+                              >
                                 <Printer className="w-3.5 h-3.5" />
                                 <span>{resolvedEq.isKit ? "Impressora do Kit" : "Impressora Escolhida"}</span>
                               </span>
                               <strong className="text-white text-xs sm:text-sm block">
-                                {resolvedEq.printerDisplay || item.printer_name || "Nenhuma"}
+                                {resolvedEq.isKit && !resolvedEq.hasPrinterInKit
+                                  ? "❌ REMOVIDA PELO CLIENTE (Não enviar impressora)"
+                                  : resolvedEq.printerDisplay || item.printer_name || "Nenhuma"}
                               </strong>
                             </div>
                             <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-500/30">
                               <span className="text-[10px] font-black uppercase text-purple-300 flex items-center gap-1 mb-0.5">
                                 <QrCode className="w-3.5 h-3.5" />
-                                <span>{resolvedEq.isKit && !resolvedEq.hasReader ? "Itens Extras do Kit" : "Leitor / Scanner 2D"}</span>
+                                <span>{resolvedEq.isKit && !resolvedEq.hasReader ? "Acessórios do Kit" : "Leitor / Scanner 2D"}</span>
                               </span>
                               <strong className="text-white text-xs sm:text-sm block">
                                 {resolvedEq.hasReader
@@ -3907,6 +4134,89 @@ export default function AdminPage() {
                                   : item.reader_name || "Não incluído"}
                               </strong>
                             </div>
+                          </div>
+
+                          {/* 📋 CHECKLIST DE ENTREGA / EXPEDIÇÃO NO MODAL */}
+                          <div className="p-3.5 rounded-xl bg-slate-900/95 border-2 border-emerald-500/45 space-y-2.5">
+                            <div className="flex flex-wrap items-center justify-between gap-2 pb-1.5 border-b border-slate-800">
+                              <div className="flex items-center gap-1.5">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                                <span className="font-black text-emerald-300 uppercase tracking-wider text-[11px]">
+                                  📋 CHECKLIST DE ENTREGA / EXPEDIÇÃO — O QUE ENTREGAR JUNTO COM O GABINETE
+                                </span>
+                              </div>
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/35 text-emerald-300 font-black text-[10px] uppercase">
+                                {modalToDeliver.length} {modalToDeliver.length === 1 ? "item para separar" : "itens para separar"}
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                              {modalToDeliver.map((chk) => (
+                                <div
+                                  key={chk.id}
+                                  className="p-2 rounded-lg bg-emerald-950/40 border border-emerald-500/40 flex items-center justify-between gap-2"
+                                >
+                                  <div className="flex items-start gap-2 min-w-0">
+                                    <span className="w-4 h-4 rounded bg-emerald-500 text-slate-950 font-black text-[10px] flex items-center justify-center shrink-0 mt-0.5">
+                                      ✓
+                                    </span>
+                                    <div className="min-w-0">
+                                      <p className="font-extrabold text-white text-xs leading-snug">
+                                        {chk.quantity}x {chk.name}
+                                      </p>
+                                      <span className="text-[9px] font-bold text-emerald-400 uppercase">
+                                        {chk.badgeLabel}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  {chk.priceCents > 0 && (
+                                    <span className="font-black text-emerald-300 font-mono text-[10px] shrink-0">
+                                      +{formatBRL(chk.priceCents)}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+
+                            {modalNotToDeliver.length > 0 && (
+                              <div className="pt-2 border-t border-slate-800 space-y-1.5">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-rose-400 flex items-center gap-1">
+                                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                  <span>
+                                    {resolvedEq.isKit
+                                      ? "❌ ITENS REMOVIDOS PELO CLIENTE (NÃO SEPARAR E NÃO ENVIAR):"
+                                      : "ℹ️ OBSERVAÇÃO DE EXPEDIÇÃO (APENAS GABINETE FÍSICO):"}
+                                  </span>
+                                </span>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                  {modalNotToDeliver.map((rem) => (
+                                    <div
+                                      key={rem.id}
+                                      className="p-2 rounded-lg bg-rose-950/40 border border-rose-500/45 flex items-center justify-between gap-2"
+                                    >
+                                      <div className="flex items-start gap-2 min-w-0">
+                                        <span className="w-4 h-4 rounded bg-rose-500 text-white font-black text-[10px] flex items-center justify-center shrink-0 mt-0.5">
+                                          ✕
+                                        </span>
+                                        <div className="min-w-0">
+                                          <p className="font-bold text-rose-200 text-xs line-through leading-snug">
+                                            {rem.name}
+                                          </p>
+                                          <span className="text-[9px] font-black text-rose-400 uppercase">
+                                            {rem.badgeLabel}
+                                          </span>
+                                        </div>
+                                      </div>
+                                      {rem.priceCents > 0 && (
+                                        <span className="text-[10px] font-mono text-rose-400 line-through shrink-0">
+                                          {formatBRL(rem.priceCents)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
 
                           {/* Alerta de Evidência de Item Fora do Padrão / Observação no Modal */}

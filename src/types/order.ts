@@ -1,4 +1,5 @@
-import { CabinetModel, ColorOption, MonitorOption, PrinterOption, BarcodeReaderOption } from "./catalog";
+import { CabinetModel, ColorOption, MonitorOption, PrinterOption, BarcodeReaderOption, KitSubItem } from "./catalog";
+import { DeliveryChecklistItem } from "@/modules/catalog/kitDefaults";
 
 export interface TotemConfiguration {
   model: CabinetModel;
@@ -80,6 +81,9 @@ export interface ManufacturingSpec {
   isCustomMonitor?: boolean;
   customDimensions?: any;
   assemblyService?: string;
+  isKit?: boolean;
+  kitItemsSnapshot?: KitSubItem[];
+  deliveryChecklist?: DeliveryChecklistItem[];
   status: "ready_for_cutting" | "machining" | "assembly" | "quality_check";
 }
 
