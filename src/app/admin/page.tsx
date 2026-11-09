@@ -6,6 +6,8 @@ import { siteConfig } from "@/config/site";
 import {
   resolveKitEquipmentSummary,
   buildOrderDeliveryChecklist,
+  resolveCabinetBasePricing,
+  buildOrderFinancialBreakdown,
   DeliveryChecklistItem,
   DEFAULT_KIT_SUB_ITEMS,
 } from "@/modules/catalog/kitDefaults";
@@ -340,9 +342,12 @@ export default function AdminPage() {
 
   // Dados e Filtros de Pedidos sincronizados com a URL (?status=... & ?q=... & ?view=...)
   const [orders, setOrders] = useState<OrderRecord[]>([]);
+  const [orderStatusCounts, setOrderStatusCounts] = useState<Record<string, number>>({});
+  const [totalAllOrdersCount, setTotalAllOrdersCount] = useState<number>(0);
   const [statusFilter, setStatusFilter] = useUrlParamState<string>("status", "all", {
     validValues: [
       "all",
+      "ads",
       "awaiting_custom_analysis",
       "custom_approved",
       "awaiting_payment",
@@ -713,12 +718,23 @@ export default function AdminPage() {
   const loadOrders = async (status = statusFilter) => {
     setIsLoadingOrders(true);
     try {
-      const url = status && status !== "all" ? `/api/admin/orders?status=${status}` : `/api/admin/orders`;
+      const url =
+        status && status !== "all" && status !== "ads"
+          ? `/api/admin/orders?status=${status}`
+          : `/api/admin/orders`;
       const res = await fetch(url);
       const json = await res.json();
       if (json.ok) {
         const fetchedOrders: OrderRecord[] = json.data || [];
         setOrders(fetchedOrders);
+        if (json.statusCounts && typeof json.statusCounts === "object") {
+          setOrderStatusCounts(json.statusCounts);
+        }
+        if (typeof json.totalAll === "number") {
+          setTotalAllOrdersCount(json.totalAll);
+        } else if (!status || status === "all" || status === "ads") {
+          setTotalAllOrdersCount(fetchedOrders.length);
+        }
         const modalOrderId = readUrlParam("modalOrder");
         if (modalOrderId && !selectedOrder) {
           const found = fetchedOrders.find(
@@ -1701,6 +1717,7 @@ export default function AdminPage() {
         setSaveSuccessMsg(`Pedido ${deletingOrder.order_number} excluído com sucesso!`);
         setTimeout(() => setSaveSuccessMsg(""), 4000);
         setDeletingOrder(null);
+        loadOrders(statusFilter);
       } else {
         alert(json.error || "Erro ao excluir pedido.");
       }
@@ -1998,7 +2015,7 @@ export default function AdminPage() {
             <Package className="w-4 h-4" />
             <span>Pedidos & Produção CNC</span>
             <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-black/30 text-white font-bold">
-              {orders.length}
+              {totalAllOrdersCount || orders.length}
             </span>
           </button>
 
@@ -2123,20 +2140,29 @@ export default function AdminPage() {
           <div className="space-y-5">
             {/* Barra de Filtros, Busca e Modo de Visualização */}
             <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
-              {/* Filtros por Status */}
+              {/* Filtros por Status (Todos com Badge de Contagem) */}
               <div className="flex items-center flex-wrap gap-1.5">
                 <button
                   onClick={() => {
                     setStatusFilter("all");
                     loadOrders("all");
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-all border inline-flex items-center gap-1.5 cursor-pointer ${
                     statusFilter === "all"
-                      ? "bg-slate-200 text-slate-900"
-                      : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800"
+                      ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
+                      : "bg-slate-900 text-slate-400 hover:bg-slate-800 border-slate-800"
                   }`}
                 >
-                  Todos ({orders.length})
+                  <span>Todos</span>
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold leading-none ${
+                      statusFilter === "all"
+                        ? "bg-white/25 text-white"
+                        : "bg-slate-800 text-slate-200 border border-slate-700"
+                    }`}
+                  >
+                    {totalAllOrdersCount || orders.length}
+                  </span>
                 </button>
                 <button
                   onClick={() => {
@@ -2144,31 +2170,58 @@ export default function AdminPage() {
                     loadAdsLeads(true);
                   }}
                   title="Carrinhos Abandonados, Conversões Google Ads e Leads do Checkout (Clique para atualizar)"
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold shrink-0 transition-all border flex items-center gap-1.5 cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-extrabold shrink-0 transition-all border inline-flex items-center gap-1.5 cursor-pointer ${
                     statusFilter === "ads"
                       ? "bg-gradient-to-r from-indigo-600 to-cyan-600 text-white border-cyan-400 shadow-lg shadow-indigo-500/25"
                       : "bg-slate-900 text-cyan-400 hover:bg-slate-800 border-cyan-500/40"
                   }`}
                 >
                   <Target className={`w-3.5 h-3.5 ${isLoadingAdsLeads && statusFilter === "ads" ? "animate-spin" : ""}`} />
-                  <span>ADS ({adsRecords.length || 8})</span>
-                </button>
-                {Object.entries(STATUS_CONFIG).map(([key, config]) => (
-                  <button
-                    key={key}
-                    onClick={() => {
-                      setStatusFilter(key);
-                      loadOrders(key);
-                    }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-all border cursor-pointer ${
-                      statusFilter === key
-                        ? "bg-indigo-600 text-white border-indigo-500"
-                        : "bg-slate-900 text-slate-400 hover:bg-slate-800 border-slate-800"
+                  <span>ADS</span>
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold leading-none ${
+                      statusFilter === "ads"
+                        ? "bg-white/25 text-white"
+                        : "bg-cyan-500/20 text-cyan-300 border border-cyan-500/35"
                     }`}
                   >
-                    {config.label}
-                  </button>
-                ))}
+                    {adsRecords.length || 0}
+                  </span>
+                </button>
+                {Object.entries(STATUS_CONFIG).map(([key, config]) => {
+                  const count =
+                    typeof orderStatusCounts[key] === "number"
+                      ? orderStatusCounts[key]
+                      : orders.filter((o) => o.status === key).length;
+                  const isActive = statusFilter === key;
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => {
+                        setStatusFilter(key);
+                        loadOrders(key);
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-all border inline-flex items-center gap-1.5 cursor-pointer ${
+                        isActive
+                          ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
+                          : "bg-slate-900 text-slate-400 hover:bg-slate-800 border-slate-800"
+                      }`}
+                    >
+                      <span>{config.label}</span>
+                      <span
+                        className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold leading-none ${
+                          isActive
+                            ? "bg-white/25 text-white"
+                            : count > 0
+                            ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/35"
+                            : "bg-slate-800/80 text-slate-400 border border-slate-700/70"
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
@@ -2292,6 +2345,18 @@ export default function AdminPage() {
                       })
                     : null;
 
+                  const orderFinancialBreakdown = buildOrderFinancialBreakdown({
+                    items: (order.items || []) as any,
+                    sheets: sheets as any,
+                    additionalCharges,
+                    discountCents: order.discount_cents || addr?.discountCents || 0,
+                    couponCode: order.coupon_code || addr?.couponCode || null,
+                    shippingCents: order.shipping_cents || 0,
+                    shippingName: shipping.name,
+                    paymentMethod: payMethod,
+                    orderTotalCents: order.total_cents,
+                  });
+
                   const isPaymentFailedOrCancelled =
                     !isOrderPaid &&
                     (order.status === "cancelled" || order.gateway_diagnosis?.severity === "error");
@@ -2299,448 +2364,236 @@ export default function AdminPage() {
                   return (
                     <div
                       key={order.$id}
-                      className={`bg-slate-900/90 border transition-all shadow-xl overflow-hidden ${
-                        isExpanded ? "rounded-3xl p-4 sm:p-6 space-y-4" : "rounded-2xl p-4 sm:p-5"
+                      className={`bg-slate-900/90 border transition-all shadow-lg overflow-hidden ${
+                        isExpanded ? "rounded-3xl p-4 sm:p-6 space-y-4" : "rounded-2xl px-4 py-3 sm:px-5 sm:py-3.5"
                       } ${
                         orderHasAnyDeviation
-                          ? "border-amber-400/80 border-l-4 border-l-amber-400 hover:border-amber-400 shadow-amber-500/10"
+                          ? "border-amber-400/80 border-l-4 border-l-amber-400 hover:border-amber-400 shadow-amber-500/5"
                           : isPaymentFailedOrCancelled
-                          ? "border-rose-500/45 border-l-4 border-l-rose-500 hover:border-rose-500/70 bg-gradient-to-r from-rose-950/20 via-slate-900/90 to-slate-900/90"
+                          ? "border-rose-500/45 border-l-4 border-l-rose-500 hover:border-rose-500/70"
                           : !isOrderPaid
-                          ? "border-amber-500/45 border-l-4 border-l-amber-500 hover:border-amber-500/70 bg-gradient-to-r from-amber-950/20 via-slate-900/90 to-slate-900/90"
+                          ? "border-amber-500/45 border-l-4 border-l-amber-500 hover:border-amber-500/70"
                           : "border-slate-800 border-l-4 border-l-emerald-500/80 hover:border-indigo-500/50"
                       }`}
                     >
                       {!isExpanded ? (
-                        /* ======================================================== */
-                        /* MODO: LISTA SIMPLIFICADA (CLIENTE À ESQUERDA / PEDIDO À DIREITA) */
-                        /* ======================================================== */
-                        <div className="space-y-3.5">
-                          {/* Linha Principal Responsiva: [1. Cliente à Esquerda] | [2. Gabinetes ao Centro] | [3. Pedido & Valores à Direita] */}
-                          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
-                            {/* BLOCO 1 (ESQUERDA): CLIENTE EM DESTAQUE COM FONTE MAIOR */}
-                            <div className="lg:col-span-4 flex items-center justify-between sm:justify-start gap-3.5 min-w-0">
-                              <div
-                                className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 font-black text-base shadow-inner border ${
-                                  !isOrderPaid
-                                    ? "bg-amber-500/15 border-amber-500/35 text-amber-300"
-                                    : "bg-indigo-500/15 border-indigo-500/30 text-indigo-300"
-                                }`}
-                              >
-                                {(order.customer_name || "C").trim().charAt(0).toUpperCase()}
-                              </div>
-                              <div className="min-w-0 flex-1 space-y-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <p className="font-black text-white text-lg sm:text-xl tracking-tight leading-tight break-words">
-                                    {order.customer_name || "Cliente não informado"}
-                                  </p>
-                                  {waHref && (
-                                    <a
-                                      href={waHref}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="p-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 active:scale-95 text-emerald-400 border border-emerald-500/30 transition-all shrink-0"
-                                      title="Falar com o cliente no WhatsApp (com resumo do pedido)"
-                                    >
-                                      <MessageCircle className="w-4 h-4" />
-                                    </a>
-                                  )}
-                                </div>
-                                <p className="text-xs sm:text-[13px] text-slate-300 font-mono flex items-center flex-wrap gap-1.5">
-                                  <span className="font-semibold text-slate-200">{order.customer_document || "—"}</span>
-                                  {addr?.city && (
-                                    <span className="text-slate-400 font-sans font-medium">
-                                      • {addr.city}/{addr.state || "SP"}
-                                    </span>
-                                  )}
-                                </p>
-                              </div>
-                            </div>
-
-                            {/* BLOCO 2 (CENTRO): GABINETES E EQUIPAMENTOS (COM MODELOS REAIS DO KIT + ADICIONAIS) */}
-                            <div className="lg:col-span-4 flex items-center gap-3 lg:border-l lg:border-r lg:border-slate-800/80 lg:px-4 min-w-0">
-                              {firstItemThumb && (
-                                <div className="w-12 h-12 rounded-xl bg-white border border-slate-700 overflow-hidden flex items-center justify-center p-1 shrink-0 shadow-sm">
-                                  <img src={firstItemThumb} alt="Gabinete" className="w-full h-full object-contain" />
-                                </div>
-                              )}
-                              <div className="text-xs space-y-1 min-w-0 flex-1">
-                                <p className="font-extrabold text-slate-100 leading-snug">
-                                  {totalItemsQty} {totalItemsQty > 1 ? "gabinetes" : "gabinete"}{" "}
-                                  <span className="font-normal text-slate-400">
-                                    ({order.items?.map((it) => it.cabinet_name).join(", ") || "Configuração Padrão"})
-                                  </span>
-                                </p>
-                                <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
-                                  {firstItem?.color_name && (
-                                    <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-200 border border-slate-700 font-semibold">
-                                      {firstItem.color_name}
-                                    </span>
-                                  )}
-                                  {resolvedFirstItem?.monitorDisplay && (
-                                    <span
-                                      className={`px-2 py-0.5 rounded-md font-bold border ${
-                                        resolvedFirstItem.isKit && !resolvedFirstItem.hasMonitorInKit
-                                          ? "bg-rose-950/70 text-rose-300 border-rose-500/50"
-                                          : "bg-cyan-950/60 text-cyan-300 border-cyan-500/35"
-                                      }`}
-                                    >
-                                      {resolvedFirstItem.isKit && !resolvedFirstItem.hasMonitorInKit
-                                        ? "❌ Monitor: Removido do Kit pelo Cliente (Não enviar tela)"
-                                        : `Monitor: ${resolvedFirstItem.monitorDisplay}`}
-                                    </span>
-                                  )}
-                                  {resolvedFirstItem?.printerDisplay && (
-                                    <span
-                                      className={`px-2 py-0.5 rounded-md font-bold border ${
-                                        resolvedFirstItem.isKit && !resolvedFirstItem.hasPrinterInKit
-                                          ? "bg-rose-950/70 text-rose-300 border-rose-500/50"
-                                          : "bg-indigo-950/60 text-indigo-300 border-indigo-500/35"
-                                      }`}
-                                    >
-                                      {resolvedFirstItem.isKit && !resolvedFirstItem.hasPrinterInKit
-                                        ? "❌ Impressora: Removida do Kit pelo Cliente (Não enviar)"
-                                        : `Impressora: ${resolvedFirstItem.printerDisplay}`}
-                                    </span>
-                                  )}
-                                  {resolvedFirstItem?.isKit && resolvedFirstItem.includedSubItems.length > 0 && (
-                                    <span className="px-2 py-0.5 rounded-md bg-emerald-950/60 text-emerald-300 border border-emerald-500/40 font-bold">
-                                      ✅ Enviar junto c/ Gabinete ({resolvedFirstItem.selectedCount} itens):{" "}
-                                      {resolvedFirstItem.includedSubItems.map((s) => s.name).join(" + ")}
-                                    </span>
-                                  )}
-                                  {resolvedFirstItem?.hasReader && resolvedFirstItem.readerDisplay && (
-                                    <span className="px-2 py-0.5 rounded-md bg-purple-950/50 text-purple-300 border border-purple-500/35 font-semibold">
-                                      Leitor: {resolvedFirstItem.readerDisplay}
-                                    </span>
-                                  )}
-                                  {Boolean(
-                                    firstSheet?.assemblyService?.includes("Montagem Especializada") ||
-                                      firstItem?.monitor_name?.includes("100% Montado")
-                                  ) && (
-                                    <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold flex items-center gap-1">
-                                      <Wrench className="w-2.5 h-2.5" />
-                                      Montagem de Fábrica (+R$ 999)
-                                    </span>
-                                  )}
-                                  {additionalCharges.map((ch) => (
-                                    <span
-                                      key={ch.id}
-                                      className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-200 border border-amber-400/50 font-extrabold"
-                                      title={`Valor Adicional: ${ch.description}`}
-                                    >
-                                      + {ch.quantity > 1 ? `${ch.quantity}x ` : ""}
-                                      {ch.description} ({formatBRL(ch.amountCents * Math.max(1, ch.quantity || 1))})
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* BLOCO 3 (DIREITA): DADOS DO PEDIDO À DIREITA + VALOR COM DESTAQUE PAGO VS PENDENTE */}
-                            <div className="lg:col-span-4 flex flex-col sm:flex-row lg:flex-col xl:flex-row items-start sm:items-center lg:items-end xl:items-center justify-between lg:justify-end gap-3 min-w-0">
-                              {/* Metadados do Pedido à Direita */}
-                              <div className="space-y-1 text-left sm:text-right min-w-0">
-                                <div className="flex items-center sm:justify-end gap-2 flex-wrap">
-                                  <span className="font-extrabold text-white text-sm sm:text-base font-mono tracking-tight">
-                                    {order.order_number}
-                                  </span>
-                                  <span
-                                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border inline-flex items-center gap-1 ${statusInfo.color}`}
-                                  >
-                                    <StatusIcon className="w-3 h-3" />
-                                    <span>{statusInfo.label}</span>
-                                  </span>
-                                  {orderHasAnyDeviation && (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-400 inline-flex items-center gap-1 animate-pulse">
-                                      <AlertTriangle className="w-3 h-3" />
-                                      <span>Atenção Fábrica</span>
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="flex items-center sm:justify-end gap-1.5 flex-wrap text-[11px] text-slate-400 font-mono">
-                                  <span>{new Date(order.$createdAt).toLocaleString("pt-BR")}</span>
-                                  <span>•</span>
-                                  <span className="text-slate-200 font-bold font-sans">
-                                    {payMethod === "credit_card" ? "Cartão de Crédito" : "Pix à Vista"}
-                                  </span>
-                                  <span>•</span>
-                                  <span className="text-cyan-400 font-sans font-semibold">{shipping.name}</span>
-                                </div>
-                              </div>
-
-                              {/* Box de Valor (Diferenciação Visual Clara: Pendente vs Pago) */}
-                              <div
-                                className={`sm:pl-3.5 text-left sm:text-right shrink-0 rounded-xl px-3 py-2 border ${
-                                  isOrderPaid
-                                    ? "bg-emerald-950/30 border-emerald-500/35"
-                                    : isPaymentFailedOrCancelled
-                                    ? "bg-rose-950/35 border-rose-500/45"
-                                    : "bg-amber-950/35 border-amber-500/45"
-                                }`}
-                              >
-                                <span
-                                  className={`text-[9px] font-black uppercase tracking-wider flex items-center sm:justify-end gap-1 ${
-                                    isOrderPaid
-                                      ? "text-emerald-300"
-                                      : isPaymentFailedOrCancelled
-                                      ? "text-rose-300"
-                                      : "text-amber-300"
-                                  }`}
-                                >
-                                  {isOrderPaid ? (
-                                    <>
-                                      <CheckCircle2 className="w-3 h-3" />
-                                      <span>Valor Pago</span>
-                                    </>
-                                  ) : isPaymentFailedOrCancelled ? (
-                                    <>
-                                      <AlertCircle className="w-3 h-3" />
-                                      <span>Não Pago / Falha</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Clock className="w-3 h-3" />
-                                      <span>Aguardando Pagto</span>
-                                    </>
-                                  )}
-                                </span>
-                                <span
-                                  className={`text-base sm:text-lg font-black font-mono block leading-tight mt-0.5 ${
-                                    isOrderPaid
-                                      ? "text-emerald-400"
-                                      : isPaymentFailedOrCancelled
-                                      ? "text-rose-400"
-                                      : "text-amber-400"
-                                  }`}
-                                >
-                                  {formatBRL(order.total_cents)}
-                                </span>
-                                <span className="text-[10px] text-slate-400 block">
-                                  Frete: {order.shipping_cents > 0 ? formatBRL(order.shipping_cents) : "Isento"}
-                                  {additionalChargesTotalCents > 0
-                                    ? ` • +${formatBRL(additionalChargesTotalCents)} extra`
-                                    : ""}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* ================================================================================= */}
-                          {/* FAIXA PREMIUM DE COBRANÇA, EDIÇÃO DE ADICIONAIS & RECUPERAÇÃO (PEDIDOS NÃO PAGOS) */}
-                          {/* ================================================================================= */}
-                          {!isOrderPaid && (
+                        /* ========================================================================= */
+                        /* MODO: LISTA SIMPLIFICADA EM UMA LINHA (SOMENTE OS ITENS MAIS IMPORTANTES) */
+                        /* ========================================================================= */
+                        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+                          {/* 1. CLIENTE, WHATSAPP & CIDADE/UF */}
+                          <div className="xl:w-[25%] flex items-center gap-3 min-w-0">
                             <div
-                              className={`p-3.5 rounded-2xl border-2 text-xs flex flex-col xl:flex-row xl:items-center justify-between gap-3 transition-all ${
-                                isPaymentFailedOrCancelled
-                                  ? "bg-rose-950/35 border-rose-500/50 text-rose-100"
-                                  : "bg-amber-950/30 border-amber-500/50 text-amber-100"
+                              className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-black text-sm border ${
+                                isOrderPaid
+                                  ? "bg-emerald-500/15 border-emerald-500/35 text-emerald-300"
+                                  : isPaymentFailedOrCancelled
+                                  ? "bg-rose-500/15 border-rose-500/35 text-rose-300"
+                                  : "bg-amber-500/15 border-amber-500/35 text-amber-300"
                               }`}
                             >
-                              <div className="space-y-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span
-                                    className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md border flex items-center gap-1 ${
-                                      isPaymentFailedOrCancelled
-                                        ? "bg-rose-500/25 text-rose-200 border-rose-400/50"
-                                        : "bg-amber-500/25 text-amber-200 border-amber-400/50"
-                                    }`}
-                                  >
-                                    <Clock className="w-3 h-3" />
-                                    <span>
-                                      {isPaymentFailedOrCancelled
-                                        ? "Cobrança com Falha / Expirada"
-                                        : "Pedido Aguardando Pagamento"}
-                                    </span>
-                                  </span>
-                                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                                    Mercado Pago • {payMethod === "credit_card" ? "Cartão até 10x" : "Pix à Vista"}
-                                  </span>
-                                  <strong className="font-extrabold text-white text-xs sm:text-sm">
-                                    {order.gateway_diagnosis?.label || "Aguardando Confirmação de Pagamento"}
-                                  </strong>
-                                  {order.payment?.gateway_payment_id && (
-                                    <span className="text-[10px] font-mono text-slate-300 bg-slate-900/70 px-1.5 py-0.5 rounded border border-slate-700">
-                                      ID #{order.payment.gateway_payment_id}
-                                    </span>
-                                  )}
-                                  {order.payment?.expires_at && (
-                                    <span className="text-[10px] font-mono text-slate-300">
-                                      • Expira: {new Date(order.payment.expires_at).toLocaleString("pt-BR")}
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-[11px] text-slate-200 leading-snug">
-                                  {order.gateway_diagnosis?.description ||
-                                    "Você pode editar os itens, incluir valores adicionais com descrição específica, gerar um novo Pix/Link de Cartão e enviar ao cliente."}
+                              {(order.customer_name || "C").trim().charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <p
+                                  className="font-extrabold text-white text-sm sm:text-base tracking-tight truncate"
+                                  title={order.customer_name || "Cliente não informado"}
+                                >
+                                  {order.customer_name || "Cliente não informado"}
                                 </p>
-                              </div>
-
-                              <div className="flex items-center gap-1.5 flex-wrap shrink-0">
-                                {/* BOTÃO PRINCIPAL: EDITAR ITENS / + VALOR ADICIONAL & GERAR NOVA CONDIÇÃO */}
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenEditOrder(order, "payment_proposal")}
-                                  className="px-3 py-1.5 rounded-xl bg-amber-500/25 hover:bg-amber-500/35 active:scale-95 text-amber-200 border border-amber-400/60 font-extrabold text-[11px] flex items-center gap-1.5 cursor-pointer shadow-sm"
-                                  title="Editar itens do pedido, adicionar valores extras com descrição específica e gerar nova condição de pagamento"
-                                >
-                                  <Plus className="w-3.5 h-3.5" />
-                                  <span>Editar Itens / + Valor Adicional</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  disabled={Boolean(paymentActionOrderId)}
-                                  onClick={() => handleOrderPaymentAction(order, "regenerate_pix")}
-                                  className="px-2.5 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold text-[11px] flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                                  title="Gerar novo QR Code Pix válido por 24h no Mercado Pago"
-                                >
-                                  <Zap className="w-3 h-3" />
-                                  <span>
-                                    {paymentActionOrderId === `${order.$id}:regenerate_pix`
-                                      ? "Gerando..."
-                                      : "Novo Pix (24h)"}
-                                  </span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  disabled={Boolean(paymentActionOrderId)}
-                                  onClick={() => handleOrderPaymentAction(order, "regenerate_card")}
-                                  className="px-2.5 py-1.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 font-bold text-[11px] flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                                  title="Gerar novo Link Checkout Pro de Cartão válido por 72h"
-                                >
-                                  <CreditCard className="w-3 h-3" />
-                                  <span>
-                                    {paymentActionOrderId === `${order.$id}:regenerate_card`
-                                      ? "Gerando..."
-                                      : "Novo Link Cartão (72h)"}
-                                  </span>
-                                </button>
-
                                 {waHref && (
                                   <a
                                     href={waHref}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[11px] flex items-center gap-1 cursor-pointer shadow-sm"
-                                    title="Abrir WhatsApp do cliente com o resumo completo dos itens, valores adicionais e link de pagamento"
+                                    className="p-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 transition-all shrink-0"
+                                    title="Falar com o cliente no WhatsApp"
                                   >
                                     <MessageCircle className="w-3.5 h-3.5" />
-                                    <span>Enviar ao Cliente (WhatsApp)</span>
                                   </a>
                                 )}
-
-                                <button
-                                  type="button"
-                                  disabled={sendingWaOrderId === order.$id}
-                                  onClick={() => handleSendPaymentToCustomerWhatsAppApi(order)}
-                                  className="px-2.5 py-1.5 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 text-teal-200 border border-teal-500/40 font-bold text-[11px] flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                                  title="Disparar cobrança automaticamente pelo WhatsApp da Loja (API FoodNext)"
-                                >
-                                  <Share2 className="w-3 h-3" />
-                                  <span>
-                                    {sendingWaOrderId === order.$id ? "Enviando..." : "Disparar Zap API"}
+                              </div>
+                              <p className="text-[11px] text-slate-400 font-mono truncate">
+                                <span className="text-slate-300 font-semibold">{order.customer_document || "—"}</span>
+                                {addr?.city ? (
+                                  <span className="font-sans">
+                                    {" "}• {addr.city}/{addr.state || "SP"}
                                   </span>
-                                </button>
+                                ) : null}
+                              </p>
+                            </div>
+                          </div>
 
-                                <button
-                                  type="button"
-                                  onClick={() => handleCopyCustomerPaymentLink(order)}
-                                  className="px-2.5 py-1.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 border border-indigo-500/40 font-bold text-[11px] flex items-center gap-1 cursor-pointer"
-                                  title="Copiar link da página de pagamento (Pix + Cartão) para enviar ao cliente"
-                                >
-                                  <Copy className="w-3 h-3" />
-                                  <span>
-                                    {copiedPaymentLinkOrderId === order.$id ? "Link Copiado!" : "Copiar Link Pagto"}
+                          {/* 2. ITEM PRINCIPAL RESUMIDO (GABINETE + COR + EQUIPAMENTO PRINCIPAL) */}
+                          <div className="xl:w-[28%] flex items-center gap-2.5 xl:border-l xl:border-slate-800/80 xl:pl-3.5 min-w-0">
+                            {firstItemThumb && (
+                              <div className="w-10 h-10 rounded-lg bg-white border border-slate-700 overflow-hidden flex items-center justify-center p-0.5 shrink-0">
+                                <img src={firstItemThumb} alt="Gabinete" className="w-full h-full object-contain" />
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1 space-y-0.5">
+                              <p className="font-bold text-slate-100 text-xs truncate">
+                                {totalItemsQty}x{" "}
+                                {order.items?.map((it) => it.cabinet_name).join(", ") || "Gabinete Padrão"}
+                              </p>
+                              <div className="flex items-center gap-1 flex-wrap text-[10px]">
+                                {firstItem?.color_name && (
+                                  <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-200 border border-slate-700 font-semibold truncate max-w-[140px]">
+                                    {firstItem.color_name}
                                   </span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  disabled={Boolean(paymentActionOrderId)}
-                                  onClick={() => handleOrderPaymentAction(order, "sync")}
-                                  className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-[11px] flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                                  title="Consultar status ao vivo na API do Mercado Pago"
-                                >
-                                  <RefreshCw
-                                    className={`w-3 h-3 ${
-                                      paymentActionOrderId === `${order.$id}:sync` ? "animate-spin" : ""
+                                )}
+                                {resolvedFirstItem?.isKit ? (
+                                  <span
+                                    className={`px-1.5 py-0.5 rounded font-bold border truncate max-w-[190px] ${
+                                      !resolvedFirstItem.hasMonitorInKit || !resolvedFirstItem.hasPrinterInKit
+                                        ? "bg-amber-500/15 text-amber-300 border-amber-500/40"
+                                        : "bg-cyan-950/60 text-cyan-300 border-cyan-500/35"
                                     }`}
-                                  />
-                                  <span>Sincronizar MP</span>
-                                </button>
+                                    title={`Monitor: ${resolvedFirstItem.monitorDisplay} | Impressora: ${resolvedFirstItem.printerDisplay}`}
+                                  >
+                                    {!resolvedFirstItem.hasMonitorInKit && !resolvedFirstItem.hasPrinterInKit
+                                      ? "Kit s/ Tela & s/ Impr."
+                                      : !resolvedFirstItem.hasMonitorInKit
+                                      ? "Kit s/ Tela (+ Impr. 80mm)"
+                                      : !resolvedFirstItem.hasPrinterInKit
+                                      ? "Kit Touch 23.8\" (s/ Impr.)"
+                                      : "Kit Completo (Touch 23.8\" + Impr.)"}
+                                  </span>
+                                ) : resolvedFirstItem?.monitorDisplay ? (
+                                  <span
+                                    className="px-1.5 py-0.5 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-500/35 font-semibold truncate max-w-[180px]"
+                                    title={resolvedFirstItem.monitorDisplay}
+                                  >
+                                    {resolvedFirstItem.monitorDisplay}
+                                  </span>
+                                ) : null}
+                                {additionalChargesTotalCents > 0 && (
+                                  <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-400/50 font-extrabold">
+                                    +{formatBRL(additionalChargesTotalCents)} extra
+                                  </span>
+                                )}
                               </div>
                             </div>
-                          )}
+                          </div>
 
-                          {/* Barra Inferior Compacta de Ações Rápidas (100% Contida no Card) */}
-                          <div className="pt-3 border-t border-slate-800/70 flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <button
-                                type="button"
-                                onClick={() => toggleOrderExpanded(order.$id)}
-                                className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-600/25 transition-all cursor-pointer"
-                                title="Ver dados completos deste pedido em 3 colunas"
+                          {/* 3. NÚMERO DO PEDIDO, DATA, FRETE & STATUS */}
+                          <div className="xl:w-[21%] xl:border-l xl:border-slate-800/80 xl:pl-3.5 min-w-0 space-y-0.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-extrabold text-white text-xs sm:text-sm font-mono tracking-tight">
+                                {order.order_number}
+                              </span>
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold border inline-flex items-center gap-1 ${statusInfo.color}`}
                               >
-                                <Eye className="w-3.5 h-3.5" />
-                                <span>Ver em Detalhes</span>
-                                <ChevronDown className="w-3.5 h-3.5" />
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEditOrder(order, "execution")}
-                                className="px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 active:scale-95 text-emerald-300 border border-emerald-500/30 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
-                                title="Abrir Ordem de Execução (Fotos, Vídeos e Ficha Técnica)"
-                              >
-                                <Camera className="w-3.5 h-3.5" />
-                                <span className="hidden sm:inline">Ordem de Execução</span>
-                              </button>
+                                <StatusIcon className="w-2.5 h-2.5" />
+                                <span>{statusInfo.label}</span>
+                              </span>
+                              {orderHasAnyDeviation && (
+                                <span
+                                  className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-amber-500/20 text-amber-300 border border-amber-400 inline-flex items-center gap-0.5"
+                                  title="Pedido com personalização no Kit ou observação para a fábrica"
+                                >
+                                  <AlertTriangle className="w-2.5 h-2.5" />
+                                  <span>Atenção</span>
+                                </span>
+                              )}
                             </div>
+                            <p className="text-[11px] text-slate-400 font-mono truncate">
+                              {new Date(order.$createdAt).toLocaleString("pt-BR", {
+                                day: "2-digit",
+                                month: "2-digit",
+                                year: "2-digit",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}{" "}
+                              • <span className="text-cyan-400 font-sans font-semibold">{shipping.name.split(" (")[0]}</span>
+                            </p>
+                          </div>
 
-                            <div className="flex items-center gap-2 flex-wrap">
-                              {/* Seletor rápido de Status */}
-                              <select
-                                id={`order-status-simplified-${order.$id}`}
-                                name={`orderStatus-${order.$id}`}
-                                aria-label={`Mudar status do pedido ${order.order_number}`}
-                                value={order.status}
-                                onChange={(e) => handleUpdateOrderStatus(order.$id, e.target.value)}
-                                className="bg-slate-950 border border-slate-800 text-xs rounded-xl px-2.5 py-2 text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"
-                              >
-                                {Object.entries(STATUS_CONFIG).map(([k, cfg]) => (
-                                  <option key={k} value={k}>
-                                    Mudar: {cfg.label}
-                                  </option>
-                                ))}
-                              </select>
+                          {/* 4. VALOR TOTAL & MÉTODO DE PAGAMENTO */}
+                          <div className="xl:w-[13%] xl:border-l xl:border-slate-800/80 xl:pl-3.5 shrink-0 flex xl:flex-col items-center xl:items-end justify-between gap-2">
+                            <span
+                              className={`text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1 ${
+                                isOrderPaid
+                                  ? "text-emerald-400"
+                                  : isPaymentFailedOrCancelled
+                                  ? "text-rose-400"
+                                  : "text-amber-400"
+                              }`}
+                            >
+                              {isOrderPaid ? (
+                                <>
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  <span>Pago ({payMethod === "credit_card" ? "Cartão" : "Pix"})</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Clock className="w-3 h-3" />
+                                  <span>{payMethod === "credit_card" ? "Cartão" : "Pix"}</span>
+                                </>
+                              )}
+                            </span>
+                            <span
+                              className={`text-sm sm:text-base font-black font-mono leading-tight ${
+                                isOrderPaid
+                                  ? "text-emerald-400"
+                                  : isPaymentFailedOrCancelled
+                                  ? "text-rose-400"
+                                  : "text-amber-400"
+                              }`}
+                            >
+                              {formatBRL(order.total_cents)}
+                            </span>
+                          </div>
 
-                              {/* Botão Editar Pedido */}
+                          {/* 5. AÇÕES RÁPIDAS NA MESMA LINHA (SÓ EXPANDE AO CLICAR EM DETALHES) */}
+                          <div className="shrink-0 flex items-center justify-end gap-1.5 pt-2 xl:pt-0 border-t xl:border-t-0 border-slate-800/70">
+                            <button
+                              type="button"
+                              onClick={() => toggleOrderExpanded(order.$id)}
+                              className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-extrabold text-xs inline-flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                              title="Clique para abrir todos os detalhes, cobrança Mercado Pago e as 3 colunas do pedido"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Detalhes</span>
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            </button>
+
+                            {!isOrderPaid && (
                               <button
                                 type="button"
-                                onClick={() => handleOpenEditOrder(order, "all")}
-                                className="p-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 border border-amber-500/30 transition-all cursor-pointer"
-                                title="Editar dados deste pedido"
+                                onClick={() => handleOpenEditOrder(order, "payment_proposal")}
+                                className="px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 border border-amber-500/35 font-bold text-xs inline-flex items-center gap-1 transition-all cursor-pointer"
+                                title="Editar itens, adicionar valores extras e gerar nova condição de pagamento"
                               >
-                                <Edit2 className="w-3.5 h-3.5" />
+                                <Plus className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Cobrança</span>
                               </button>
+                            )}
 
-                              {/* Botão Excluir Pedido */}
-                              <button
-                                type="button"
-                                onClick={() => setDeletingOrder(order)}
-                                className="p-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 active:scale-95 text-rose-400 border border-rose-500/30 transition-all cursor-pointer"
-                                title="Excluir este pedido permanentemente"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditOrder(order, "all")}
+                              className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 border border-slate-700 transition-all cursor-pointer"
+                              title="Editar dados deste pedido"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setDeletingOrder(order)}
+                              className="p-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 active:scale-95 text-rose-400 border border-rose-500/30 transition-all cursor-pointer"
+                              title="Excluir este pedido permanentemente"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </div>
                       ) : (
                         /* ======================================================== */
-                        /* MODO: VISÃO DETALHADA COMPLETA (3 COLUNAS DE FÁBRICA)   */
+                        /* MODO: VISÃO DETALHADA COMPLETA (AO CLICAR EM DETALHES)  */
                         /* ======================================================== */
                         <>
                           {/* Topo do Card: Cliente em Destaque à Esquerda | Dados do Pedido à Direita */}
@@ -2845,7 +2698,7 @@ export default function AdminPage() {
                                     type="button"
                                     onClick={() => toggleOrderExpanded(order.$id)}
                                     className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white border border-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
-                                    title="Recolher para lista simplificada"
+                                    title="Recolher para lista simplificada em uma linha"
                                   >
                                     <ChevronUp className="w-3.5 h-3.5" />
                                     <span>Recolher Detalhes</span>
@@ -2925,6 +2778,151 @@ export default function AdminPage() {
                               </div>
                             </div>
                           </div>
+
+                          {/* Faixa de Cobrança, Edição de Adicionais & Recuperação Mercado Pago (Visível nos Detalhes) */}
+                          {!isOrderPaid && (
+                            <div
+                              className={`p-3.5 rounded-2xl border-2 text-xs flex flex-col xl:flex-row xl:items-center justify-between gap-3 transition-all ${
+                                isPaymentFailedOrCancelled
+                                  ? "bg-rose-950/35 border-rose-500/50 text-rose-100"
+                                  : "bg-amber-950/30 border-amber-500/50 text-amber-100"
+                              }`}
+                            >
+                              <div className="space-y-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span
+                                    className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md border flex items-center gap-1 ${
+                                      isPaymentFailedOrCancelled
+                                        ? "bg-rose-500/25 text-rose-200 border-rose-400/50"
+                                        : "bg-amber-500/25 text-amber-200 border-amber-400/50"
+                                    }`}
+                                  >
+                                    <Clock className="w-3 h-3" />
+                                    <span>
+                                      {isPaymentFailedOrCancelled
+                                        ? "Cobrança com Falha / Expirada"
+                                        : "Pedido Aguardando Pagamento"}
+                                    </span>
+                                  </span>
+                                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                                    Mercado Pago • {payMethod === "credit_card" ? "Cartão até 10x" : "Pix à Vista"}
+                                  </span>
+                                  <strong className="font-extrabold text-white text-xs sm:text-sm">
+                                    {order.gateway_diagnosis?.label || "Aguardando Confirmação de Pagamento"}
+                                  </strong>
+                                  {order.payment?.gateway_payment_id && (
+                                    <span className="text-[10px] font-mono text-slate-300 bg-slate-900/70 px-1.5 py-0.5 rounded border border-slate-700">
+                                      ID #{order.payment.gateway_payment_id}
+                                    </span>
+                                  )}
+                                  {order.payment?.expires_at && (
+                                    <span className="text-[10px] font-mono text-slate-300">
+                                      • Expira: {new Date(order.payment.expires_at).toLocaleString("pt-BR")}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-slate-200 leading-snug">
+                                  {order.gateway_diagnosis?.description ||
+                                    "Você pode editar os itens, incluir valores adicionais com descrição específica, gerar um novo Pix/Link de Cartão e enviar ao cliente."}
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 flex-wrap shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditOrder(order, "payment_proposal")}
+                                  className="px-3 py-1.5 rounded-xl bg-amber-500/25 hover:bg-amber-500/35 active:scale-95 text-amber-200 border border-amber-400/60 font-extrabold text-[11px] flex items-center gap-1.5 cursor-pointer shadow-sm"
+                                  title="Editar itens do pedido, adicionar valores extras com descrição específica e gerar nova condição de pagamento"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                  <span>Editar Itens / + Valor Adicional</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={Boolean(paymentActionOrderId)}
+                                  onClick={() => handleOrderPaymentAction(order, "regenerate_pix")}
+                                  className="px-2.5 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold text-[11px] flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                  title="Gerar novo QR Code Pix válido por 24h no Mercado Pago"
+                                >
+                                  <Zap className="w-3 h-3" />
+                                  <span>
+                                    {paymentActionOrderId === `${order.$id}:regenerate_pix`
+                                      ? "Gerando..."
+                                      : "Novo Pix (24h)"}
+                                  </span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={Boolean(paymentActionOrderId)}
+                                  onClick={() => handleOrderPaymentAction(order, "regenerate_card")}
+                                  className="px-2.5 py-1.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 font-bold text-[11px] flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                  title="Gerar novo Link Checkout Pro de Cartão válido por 72h"
+                                >
+                                  <CreditCard className="w-3 h-3" />
+                                  <span>
+                                    {paymentActionOrderId === `${order.$id}:regenerate_card`
+                                      ? "Gerando..."
+                                      : "Novo Link Cartão (72h)"}
+                                  </span>
+                                </button>
+
+                                {waHref && (
+                                  <a
+                                    href={waHref}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[11px] flex items-center gap-1 cursor-pointer shadow-sm"
+                                    title="Abrir WhatsApp do cliente com o resumo completo dos itens, valores adicionais e link de pagamento"
+                                  >
+                                    <MessageCircle className="w-3.5 h-3.5" />
+                                    <span>Enviar ao Cliente (WhatsApp)</span>
+                                  </a>
+                                )}
+
+                                <button
+                                  type="button"
+                                  disabled={sendingWaOrderId === order.$id}
+                                  onClick={() => handleSendPaymentToCustomerWhatsAppApi(order)}
+                                  className="px-2.5 py-1.5 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 text-teal-200 border border-teal-500/40 font-bold text-[11px] flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                  title="Disparar cobrança automaticamente pelo WhatsApp da Loja (API FoodNext)"
+                                >
+                                  <Share2 className="w-3 h-3" />
+                                  <span>
+                                    {sendingWaOrderId === order.$id ? "Enviando..." : "Disparar Zap API"}
+                                  </span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyCustomerPaymentLink(order)}
+                                  className="px-2.5 py-1.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 border border-indigo-500/40 font-bold text-[11px] flex items-center gap-1 cursor-pointer"
+                                  title="Copiar link da página de pagamento (Pix + Cartão) para enviar ao cliente"
+                                >
+                                  <Copy className="w-3 h-3" />
+                                  <span>
+                                    {copiedPaymentLinkOrderId === order.$id ? "Link Copiado!" : "Copiar Link Pagto"}
+                                  </span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={Boolean(paymentActionOrderId)}
+                                  onClick={() => handleOrderPaymentAction(order, "sync")}
+                                  className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-[11px] flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                  title="Consultar status ao vivo na API do Mercado Pago"
+                                >
+                                  <RefreshCw
+                                    className={`w-3 h-3 ${
+                                      paymentActionOrderId === `${order.$id}:sync` ? "animate-spin" : ""
+                                    }`}
+                                  />
+                                  <span>Sincronizar MP</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
 
                       {/* Painel de Conferência em 3 Colunas: (1) Cliente & Endereço [3 cols], (2) Entrega & Pagamento [3 cols], (3) Detalhes na Escolha & Alertas [6 cols] */}
                       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 text-xs">
@@ -3026,9 +3024,9 @@ export default function AdminPage() {
                               </p>
                             </div>
 
-                            {/* Box Demonstrativo Financeiro (O que o cliente pagou ou falta pagar) */}
+                            {/* Box Demonstrativo Financeiro em Ordem (01, 02, 03, 04...) */}
                             <div
-                              className={`p-2.5 rounded-xl border space-y-1 text-[11px] ${
+                              className={`p-3 rounded-xl border space-y-1.5 text-[11px] ${
                                 isOrderPaid
                                   ? "bg-emerald-950/25 border-emerald-500/40"
                                   : isPaymentFailedOrCancelled
@@ -3036,34 +3034,85 @@ export default function AdminPage() {
                                   : "bg-amber-950/25 border-amber-500/40"
                               }`}
                             >
-                              <div className="flex justify-between text-slate-400">
-                                <span>Subtotal Produtos:</span>
-                                <span className="font-semibold text-slate-200">{formatBRL(order.subtotal_cents)}</span>
-                              </div>
-                              {additionalCharges.map((chg) => (
-                                <div key={chg.id} className="flex justify-between text-amber-300 font-semibold">
-                                  <span className="truncate pr-2" title={chg.description}>
-                                    + {chg.quantity > 1 ? `${chg.quantity}x ` : ""}{chg.description}:
-                                  </span>
-                                  <span className="font-mono shrink-0">
-                                    + {formatBRL(chg.amountCents * Math.max(1, chg.quantity))}
-                                  </span>
-                                </div>
-                              ))}
-                              {(order.discount_cents || addr?.discountCents) ? (
-                                <div className="flex justify-between text-emerald-400">
-                                  <span>Cupom ({order.coupon_code || addr?.couponCode}):</span>
-                                  <span className="font-bold">
-                                    - {formatBRL(order.discount_cents || addr?.discountCents || 0)}
-                                  </span>
-                                </div>
-                              ) : null}
-                              <div className="flex justify-between text-slate-400">
-                                <span>Frete ({shipping.name.split(" ")[0]}):</span>
-                                <span className="font-semibold text-slate-200">
-                                  {order.shipping_cents > 0 ? `+ ${formatBRL(order.shipping_cents)}` : "R$ 0,00"}
+                              <div className="flex items-center justify-between border-b border-slate-800/80 pb-1">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-amber-300">
+                                  🧾 Composição do Valor (Em Ordem):
+                                </span>
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-300 uppercase">
+                                  {payMethod === "credit_card" ? "Tabela Cartão" : "Tabela PIX"}
                                 </span>
                               </div>
+
+                              <div className="space-y-1 pt-0.5">
+                                {orderFinancialBreakdown.lines
+                                  .filter((ln) => !ln.isCardDiff)
+                                  .map((ln) => (
+                                    <div key={ln.stepNumber} className="flex items-start justify-between gap-2">
+                                      <span
+                                        className={`leading-snug ${
+                                          ln.isDiscount
+                                            ? "text-emerald-400 font-semibold"
+                                            : ln.isShipping
+                                            ? "text-cyan-300 font-semibold"
+                                            : "text-slate-200 font-semibold"
+                                        }`}
+                                      >
+                                        <strong className="text-slate-400 font-mono mr-1">{ln.stepNumber}.</strong>
+                                        {ln.label}:
+                                      </span>
+                                      <span
+                                        className={`font-mono font-bold shrink-0 ${
+                                          ln.isDiscount
+                                            ? "text-emerald-400"
+                                            : ln.isShipping
+                                            ? "text-cyan-300"
+                                            : "text-white"
+                                        }`}
+                                      >
+                                        {ln.isDiscount
+                                          ? `- ${formatBRL(ln.amountCents)}`
+                                          : ln.isAddition || ln.isShipping
+                                          ? `+ ${formatBRL(ln.amountCents)}`
+                                          : formatBRL(ln.amountCents)}
+                                      </span>
+                                    </div>
+                                  ))}
+                              </div>
+
+                              {/* Subtotal / Total na Tabela PIX à Vista */}
+                              <div className="pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-emerald-300">
+                                <span className="font-extrabold text-[11px]">
+                                  ⚡ Total na Tabela PIX à Vista:
+                                </span>
+                                <span className="font-mono font-black text-xs text-emerald-400">
+                                  {formatBRL(orderFinancialBreakdown.pixTotalCents)}
+                                </span>
+                              </div>
+
+                              {/* Se for Cartão de Crédito, exibe explicitamente o passo 04 (+ R$ 230,00) */}
+                              {orderFinancialBreakdown.isCreditCard &&
+                                orderFinancialBreakdown.lines
+                                  .filter((ln) => ln.isCardDiff)
+                                  .map((ln) => (
+                                    <div
+                                      key={ln.stepNumber}
+                                      className="p-2 rounded-lg bg-blue-950/45 border border-blue-500/40 space-y-0.5"
+                                    >
+                                      <div className="flex items-start justify-between gap-2 text-blue-200">
+                                        <span className="font-bold leading-snug text-[10px]">
+                                          <strong className="text-blue-400 font-mono mr-1">{ln.stepNumber}.</strong>
+                                          {ln.label}:
+                                        </span>
+                                        <span className="font-mono font-black text-blue-300 shrink-0 text-[11px]">
+                                          + {formatBRL(ln.amountCents)}
+                                        </span>
+                                      </div>
+                                      {ln.subLabel && (
+                                        <p className="text-[9px] text-blue-300/80 leading-tight">{ln.subLabel}</p>
+                                      )}
+                                    </div>
+                                  ))}
+
                               <div className="pt-1.5 border-t border-slate-800 flex items-baseline justify-between">
                                 <span className="font-bold text-white">
                                   {isOrderPaid
@@ -3071,7 +3120,7 @@ export default function AdminPage() {
                                     : `Valor a Receber (${payMethod === "credit_card" ? "Cartão" : "PIX"}):`}
                                 </span>
                                 <span
-                                  className={`text-base font-black ${
+                                  className={`text-base font-black font-mono ${
                                     isOrderPaid
                                       ? "text-emerald-400"
                                       : isPaymentFailedOrCancelled
@@ -3292,7 +3341,9 @@ export default function AdminPage() {
                                   printerName: it.printer_name,
                                   readerName: it.reader_name,
                                 });
-                                const itemChecklist: DeliveryChecklistItem[] =
+                                const cabPricing = resolveCabinetBasePricing(it.cabinet_name, it.color_name);
+                                const itemQty = Math.max(1, Number(it.quantity) || 1);
+                                const rawChecklist: DeliveryChecklistItem[] =
                                   Array.isArray((it as any).delivery_checklist) &&
                                   (it as any).delivery_checklist.length > 0
                                     ? (it as any).delivery_checklist
@@ -3302,7 +3353,7 @@ export default function AdminPage() {
                                     : buildOrderDeliveryChecklist({
                                         cabinetName: it.cabinet_name,
                                         colorName: it.color_name,
-                                        quantity: it.quantity || 1,
+                                        quantity: itemQty,
                                         kitItemsSnapshot: kitSnapshot,
                                         monitorName: it.monitor_name,
                                         printerName: it.printer_name,
@@ -3312,6 +3363,15 @@ export default function AdminPage() {
                                             it.monitor_name?.includes("100% Montado")
                                         ),
                                       });
+                                const itemChecklist: DeliveryChecklistItem[] = rawChecklist.map((chk) =>
+                                  chk.id === "chk-cabinet" && (!chk.priceCents || chk.priceCents <= 0)
+                                    ? {
+                                        ...chk,
+                                        priceCents: cabPricing.pixCabinetWithColorCents * itemQty,
+                                        badgeLabel: "OBRIGATÓRIO • ESTRUTURA FÍSICA (BASE PIX)",
+                                      }
+                                    : chk
+                                );
                                 const checklistToDeliver = itemChecklist.filter((c) => c.included);
                                 const checklistNotToDeliver = itemChecklist.filter((c) => !c.included);
 
@@ -3379,6 +3439,26 @@ export default function AdminPage() {
                                         <p className="font-extrabold text-white text-xs sm:text-sm leading-tight">
                                           {it.quantity}x {it.cabinet_name}
                                         </p>
+
+                                        {/* Mini-resumo claro de como se forma o subtotal deste item */}
+                                        <div className="flex flex-wrap items-center gap-1.5 text-[10px] pt-0.5">
+                                          <span className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-slate-300 font-mono">
+                                            01. Gabinete (PIX):{" "}
+                                            <strong className="text-white">{formatBRL(cabPricing.pixCabinetWithColorCents * itemQty)}</strong>
+                                          </span>
+                                          {resolvedEq.isKit && (
+                                            <span className="px-2 py-0.5 rounded bg-cyan-950/50 border border-cyan-500/35 text-cyan-200 font-mono">
+                                              02. Kit ({resolvedEq.selectedCount}/{resolvedEq.totalCount}):{" "}
+                                              <strong className="text-cyan-300">+{formatBRL(resolvedEq.kitPriceCents * itemQty)}</strong>
+                                            </span>
+                                          )}
+                                          {payMethod === "credit_card" && cabPricing.cardAdditionCents > 0 && (
+                                            <span className="px-2 py-0.5 rounded bg-blue-950/60 border border-blue-500/40 text-blue-200 font-mono">
+                                              Acrésc. Cartão:{" "}
+                                              <strong className="text-blue-300">+{formatBRL(cabPricing.cardAdditionCents * itemQty)}</strong>
+                                            </span>
+                                          )}
+                                        </div>
 
                                         <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-300 pt-0.5">
                                           <span className="inline-flex items-center gap-1.5 bg-slate-950 px-2 py-0.5 rounded-lg border border-slate-800">
@@ -3551,9 +3631,15 @@ export default function AdminPage() {
                                                 </span>
                                               </div>
                                             </div>
-                                            {chk.priceCents > 0 && (
+                                            {chk.priceCents > 0 ? (
                                               <span className="font-black text-emerald-300 font-mono text-[10px] shrink-0">
-                                                +{formatBRL(chk.priceCents)}
+                                                {chk.id === "chk-cabinet"
+                                                  ? formatBRL(chk.priceCents)
+                                                  : `+${formatBRL(chk.priceCents)}`}
+                                              </span>
+                                            ) : (
+                                              <span className="font-bold text-emerald-400/75 font-mono text-[9px] shrink-0">
+                                                Incluso (R$ 0,00)
                                               </span>
                                             )}
                                           </div>
@@ -3599,6 +3685,110 @@ export default function AdminPage() {
                                           </div>
                                         </div>
                                       )}
+
+                                      {/* 🧾 MEMÓRIA DE CÁLCULO EM ORDEM (PROVA REAL DOS VALORES DO PEDIDO) */}
+                                      <div className="pt-2.5 border-t-2 border-slate-800 space-y-2">
+                                        <div className="p-3 rounded-xl bg-slate-900/95 border border-amber-500/45 space-y-2">
+                                          <div className="flex flex-wrap items-center justify-between gap-2 pb-1.5 border-b border-slate-800">
+                                            <span className="font-black text-amber-300 uppercase tracking-wider text-[10px] sm:text-[11px]">
+                                              🧾 MEMÓRIA DE CÁLCULO EM ORDEM — COMO CHEGAMOS EM {formatBRL(order.total_cents)}
+                                            </span>
+                                            <span className="px-2 py-0.5 rounded bg-amber-500/20 border border-amber-400/40 text-amber-200 font-black text-[9px] uppercase">
+                                              {payMethod === "credit_card"
+                                                ? "Modalidade: Cartão de Crédito (até 10x)"
+                                                : "Modalidade: PIX à Vista"}
+                                            </span>
+                                          </div>
+
+                                          <div className="space-y-1.5 text-[11px]">
+                                            {orderFinancialBreakdown.lines
+                                              .filter((ln) => !ln.isCardDiff)
+                                              .map((ln) => (
+                                                <div
+                                                  key={ln.stepNumber}
+                                                  className="p-2 rounded-lg bg-slate-950/90 border border-slate-800/90 flex items-center justify-between gap-2"
+                                                >
+                                                  <div className="min-w-0">
+                                                    <p className="font-extrabold text-white text-[11px] leading-snug">
+                                                      <span className="text-amber-400 font-mono mr-1.5">{ln.stepNumber} -</span>
+                                                      {ln.label}
+                                                    </p>
+                                                    {ln.subLabel && (
+                                                      <p className="text-[9px] text-slate-400 leading-tight mt-0.5">
+                                                        {ln.subLabel}
+                                                      </p>
+                                                    )}
+                                                  </div>
+                                                  <span
+                                                    className={`font-black font-mono text-xs shrink-0 ${
+                                                      ln.isDiscount
+                                                        ? "text-emerald-400"
+                                                        : ln.isShipping
+                                                        ? "text-cyan-300"
+                                                        : "text-emerald-300"
+                                                    }`}
+                                                  >
+                                                    {ln.isDiscount
+                                                      ? `- ${formatBRL(ln.amountCents)}`
+                                                      : ln.isAddition || ln.isShipping
+                                                      ? `+ ${formatBRL(ln.amountCents)}`
+                                                      : formatBRL(ln.amountCents)}
+                                                  </span>
+                                                </div>
+                                              ))}
+
+                                            {/* Linha Subtotal / Total na Tabela PIX */}
+                                            <div className="p-2 rounded-lg bg-emerald-950/40 border border-emerald-500/40 flex items-center justify-between gap-2">
+                                              <span className="font-black text-emerald-300 text-[11px] uppercase">
+                                                ⚡ Total se pago no PIX à vista (Soma 01 a{" "}
+                                                {String(orderFinancialBreakdown.lines.filter((l) => !l.isCardDiff).length).padStart(2, "0")}):
+                                              </span>
+                                              <span className="font-black font-mono text-sm text-emerald-400 shrink-0">
+                                                {formatBRL(orderFinancialBreakdown.pixTotalCents)}
+                                              </span>
+                                            </div>
+
+                                            {/* Linha 04 (Quando for Cartão): explica exatamente os + R$ 230,00 */}
+                                            {orderFinancialBreakdown.isCreditCard &&
+                                              orderFinancialBreakdown.lines
+                                                .filter((ln) => ln.isCardDiff)
+                                                .map((ln) => (
+                                                  <div
+                                                    key={ln.stepNumber}
+                                                    className="p-2.5 rounded-lg bg-blue-950/55 border-2 border-blue-500/50 flex items-center justify-between gap-2"
+                                                  >
+                                                    <div className="min-w-0">
+                                                      <p className="font-extrabold text-blue-200 text-[11px] leading-snug">
+                                                        <span className="text-blue-400 font-mono mr-1.5">{ln.stepNumber} -</span>
+                                                        {ln.label}
+                                                      </p>
+                                                      <p className="text-[10px] text-blue-300/90 leading-tight mt-0.5">
+                                                        No Cartão o {it.cabinet_name} custa{" "}
+                                                        <strong>{formatBRL(cabPricing.cardCabinetWithColorCents * itemQty)}</strong> (vs{" "}
+                                                        <strong>{formatBRL(cabPricing.pixCabinetWithColorCents * itemQty)}</strong> no PIX) ={" "}
+                                                        <strong>+{formatBRL(ln.amountCents)}</strong> de diferença da tabela Cartão.
+                                                      </p>
+                                                    </div>
+                                                    <span className="font-black font-mono text-xs sm:text-sm text-blue-300 shrink-0">
+                                                      + {formatBRL(ln.amountCents)}
+                                                    </span>
+                                                  </div>
+                                                ))}
+
+                                            {/* Linha Final: Total do Pedido */}
+                                            <div className="p-2.5 rounded-lg bg-amber-500/20 border-2 border-amber-400/70 flex items-center justify-between gap-2">
+                                              <span className="font-black text-white text-xs uppercase">
+                                                {payMethod === "credit_card"
+                                                  ? "💳 TOTAL DO PEDIDO NO CARTÃO DE CRÉDITO:"
+                                                  : "⚡ TOTAL DO PEDIDO NO PIX À VISTA:"}
+                                              </span>
+                                              <span className="font-black font-mono text-base sm:text-lg text-amber-300 shrink-0">
+                                                {formatBRL(order.total_cents)}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
                                     </div>
 
                                     {/* 🚨 CAIXA DE ALTA EVIDÊNCIA: ITEM FORA DO PADRÃO / MEDIDAS ESPECIAIS / OBSERVAÇÃO DO CLIENTE / FOTOS & VÍDEOS DO ITEM */}
@@ -4053,7 +4243,9 @@ export default function AdminPage() {
                         printerName: item.printer_name,
                         readerName: item.reader_name,
                       });
-                      const modalChecklist: DeliveryChecklistItem[] =
+                      const modalCabPricing = resolveCabinetBasePricing(item.cabinet_name, item.color_name);
+                      const modalItemQty = Math.max(1, Number(item.quantity) || 1);
+                      const rawModalChecklist: DeliveryChecklistItem[] =
                         Array.isArray((item as any).delivery_checklist) &&
                         (item as any).delivery_checklist.length > 0
                           ? (item as any).delivery_checklist
@@ -4063,7 +4255,7 @@ export default function AdminPage() {
                           : buildOrderDeliveryChecklist({
                               cabinetName: item.cabinet_name,
                               colorName: item.color_name,
-                              quantity: item.quantity || 1,
+                              quantity: modalItemQty,
                               kitItemsSnapshot: modalKitSnapshot,
                               monitorName: item.monitor_name,
                               printerName: item.printer_name,
@@ -4073,6 +4265,15 @@ export default function AdminPage() {
                                   item.monitor_name?.includes("100% Montado")
                               ),
                             });
+                      const modalChecklist: DeliveryChecklistItem[] = rawModalChecklist.map((chk) =>
+                        chk.id === "chk-cabinet" && (!chk.priceCents || chk.priceCents <= 0)
+                          ? {
+                              ...chk,
+                              priceCents: modalCabPricing.pixCabinetWithColorCents * modalItemQty,
+                              badgeLabel: "OBRIGATÓRIO • ESTRUTURA FÍSICA (BASE PIX)",
+                            }
+                          : chk
+                      );
                       const modalToDeliver = modalChecklist.filter((c) => c.included);
                       const modalNotToDeliver = modalChecklist.filter((c) => !c.included);
 
@@ -4247,9 +4448,15 @@ export default function AdminPage() {
                                       </span>
                                     </div>
                                   </div>
-                                  {chk.priceCents > 0 && (
+                                  {chk.priceCents > 0 ? (
                                     <span className="font-black text-emerald-300 font-mono text-[10px] shrink-0">
-                                      +{formatBRL(chk.priceCents)}
+                                      {chk.id === "chk-cabinet"
+                                        ? formatBRL(chk.priceCents)
+                                        : `+${formatBRL(chk.priceCents)}`}
+                                    </span>
+                                  ) : (
+                                    <span className="font-bold text-emerald-400/75 font-mono text-[9px] shrink-0">
+                                      Incluso (R$ 0,00)
                                     </span>
                                   )}
                                 </div>
@@ -4497,6 +4704,101 @@ export default function AdminPage() {
                       )}
                     </div>
                   </div>
+
+                  {(() => {
+                    const modalFin = buildOrderFinancialBreakdown({
+                      items: (selectedOrder.items || []) as any,
+                      sheets: modalSheets as any,
+                      additionalCharges: getOrderAdditionalCharges(selectedOrder),
+                      discountCents: selectedOrder.discount_cents || modalAddr?.discountCents || 0,
+                      couponCode: selectedOrder.coupon_code || modalAddr?.couponCode || null,
+                      shippingCents: selectedOrder.shipping_cents || 0,
+                      shippingName: modalShipping.name,
+                      paymentMethod: modalPayMethod,
+                      orderTotalCents: selectedOrder.total_cents,
+                    });
+
+                    return (
+                      <div className="p-3.5 rounded-xl bg-slate-900/95 border border-amber-500/40 space-y-2 text-xs">
+                        <div className="flex flex-wrap items-center justify-between gap-2 pb-1.5 border-b border-slate-800">
+                          <span className="font-black text-amber-300 uppercase tracking-wider text-[11px]">
+                            🧾 Composição Detalhada do Pedido (Em Ordem):
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-300">
+                            Soma passo a passo dos itens e encargos
+                          </span>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          {modalFin.lines
+                            .filter((ln) => !ln.isCardDiff)
+                            .map((ln) => (
+                              <div
+                                key={ln.stepNumber}
+                                className="p-2 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between gap-2"
+                              >
+                                <div className="min-w-0">
+                                  <p className="font-extrabold text-white text-xs">
+                                    <span className="text-amber-400 font-mono mr-1.5">{ln.stepNumber} -</span>
+                                    {ln.label}
+                                  </p>
+                                  {ln.subLabel && (
+                                    <p className="text-[10px] text-slate-400 leading-tight mt-0.5">{ln.subLabel}</p>
+                                  )}
+                                </div>
+                                <span
+                                  className={`font-black font-mono text-xs shrink-0 ${
+                                    ln.isDiscount
+                                      ? "text-emerald-400"
+                                      : ln.isShipping
+                                      ? "text-cyan-300"
+                                      : "text-emerald-300"
+                                  }`}
+                                >
+                                  {ln.isDiscount
+                                    ? `- ${formatBRL(ln.amountCents)}`
+                                    : ln.isAddition || ln.isShipping
+                                    ? `+ ${formatBRL(ln.amountCents)}`
+                                    : formatBRL(ln.amountCents)}
+                                </span>
+                              </div>
+                            ))}
+
+                          <div className="p-2 rounded-lg bg-emerald-950/35 border border-emerald-500/35 flex items-center justify-between gap-2">
+                            <span className="font-black text-emerald-300 text-xs uppercase">
+                              ⚡ Total na Tabela PIX à Vista:
+                            </span>
+                            <span className="font-black font-mono text-sm text-emerald-400 shrink-0">
+                              {formatBRL(modalFin.pixTotalCents)}
+                            </span>
+                          </div>
+
+                          {modalFin.isCreditCard &&
+                            modalFin.lines
+                              .filter((ln) => ln.isCardDiff)
+                              .map((ln) => (
+                                <div
+                                  key={ln.stepNumber}
+                                  className="p-2.5 rounded-lg bg-blue-950/50 border border-blue-500/45 flex items-center justify-between gap-2"
+                                >
+                                  <div className="min-w-0">
+                                    <p className="font-extrabold text-blue-200 text-xs">
+                                      <span className="text-blue-400 font-mono mr-1.5">{ln.stepNumber} -</span>
+                                      {ln.label}
+                                    </p>
+                                    {ln.subLabel && (
+                                      <p className="text-[10px] text-blue-300/85 leading-tight mt-0.5">{ln.subLabel}</p>
+                                    )}
+                                  </div>
+                                  <span className="font-black font-mono text-sm text-blue-300 shrink-0">
+                                    + {formatBRL(ln.amountCents)}
+                                  </span>
+                                </div>
+                              ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                     <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">

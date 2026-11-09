@@ -158,6 +158,7 @@ export interface ResolvedKitEquipment {
   removedSubItems: KitSubItem[];
   selectedCount: number;
   totalCount: number;
+  kitPriceCents: number;
 }
 
 /**
@@ -343,6 +344,7 @@ export function resolveKitEquipmentSummary(params: {
       removedSubItems: [],
       selectedCount: 0,
       totalCount: 0,
+      kitPriceCents: 0,
     };
   }
 
@@ -453,6 +455,309 @@ export function resolveKitEquipmentSummary(params: {
     removedSubItems,
     selectedCount: selectedSubItems.length,
     totalCount: kitItems.length,
+    kitPriceCents: calculateKitTotalCents(selectedSubItems),
+  };
+}
+
+/**
+ * Resolve os valores oficiais de tabela do Gabinete (Preço Base PIX, Preço Base Cartão,
+ * Diferença da Modalidade Cartão e Adicional de Cor/Acabamento) a partir do nome.
+ */
+export function resolveCabinetBasePricing(
+  cabinetName?: string | null,
+  colorName?: string | null
+): {
+  pixBaseCents: number;
+  cardBaseCents: number;
+  cardAdditionCents: number;
+  colorAdjustmentCents: number;
+  pixCabinetWithColorCents: number;
+  cardCabinetWithColorCents: number;
+} {
+  const cabNorm = (cabinetName || "").toLowerCase();
+  let pixBaseCents = 110000; // Gabinete de Balcão (R$ 1.100,00 no PIX)
+  let cardBaseCents = 133000; // Gabinete de Balcão (R$ 1.330,00 no Cartão)
+
+  if (cabNorm.includes("parede")) {
+    pixBaseCents = 99000; // R$ 990,00 no PIX
+    cardBaseCents = 120000; // R$ 1.200,00 no Cartão
+  } else if (cabNorm.includes("piso")) {
+    pixBaseCents = 159000; // R$ 1.590,00 no PIX
+    cardBaseCents = 193000; // R$ 1.930,00 no Cartão
+  }
+
+  const colNorm = (colorName || "").toLowerCase();
+  let colorAdjustmentCents = 0;
+  if (colNorm.includes("bicolor") || colNorm.includes("black & white")) {
+    colorAdjustmentCents = 12000; // + R$ 120,00
+  } else if (colNorm.includes("preto")) {
+    colorAdjustmentCents = 18000; // + R$ 180,00
+  }
+
+  const cardAdditionCents = Math.max(0, cardBaseCents - pixBaseCents);
+
+  return {
+    pixBaseCents,
+    cardBaseCents,
+    cardAdditionCents,
+    colorAdjustmentCents,
+    pixCabinetWithColorCents: pixBaseCents + colorAdjustmentCents,
+    cardCabinetWithColorCents: cardBaseCents + colorAdjustmentCents,
+  };
+}
+
+export interface OrderFinancialStepLine {
+  stepNumber: string; // "01", "02", "03"...
+  label: string;
+  subLabel?: string;
+  amountCents: number;
+  isAddition?: boolean;
+  isDiscount?: boolean;
+  isCardDiff?: boolean;
+  isShipping?: boolean;
+  isZeroIncluded?: boolean;
+}
+
+export interface OrderFinancialBreakdownResult {
+  lines: OrderFinancialStepLine[];
+  pixProductsSubtotalCents: number;
+  cardProductsSubtotalCents: number;
+  cardTotalDiffCents: number;
+  additionalChargesCents: number;
+  discountCents: number;
+  shippingCents: number;
+  pixTotalCents: number;
+  cardTotalCents: number;
+  activeTotalCents: number;
+  isCreditCard: boolean;
+}
+
+/**
+ * Constrói o Demonstrativo / Memória de Cálculo em Ordem (01, 02, 03, 04...)
+ * explicando exatamente como se chega no valor no PIX e no valor no Cartão.
+ */
+export function buildOrderFinancialBreakdown(params: {
+  items: Array<{
+    cabinet_name: string;
+    color_name: string;
+    quantity: number;
+    unit_price_cents?: number;
+    subtotal_cents?: number;
+    monitor_name?: string;
+    printer_name?: string;
+    reader_name?: string;
+    kit_items_snapshot?: KitSubItem[] | null;
+  }>;
+  sheets?: Array<{
+    kitItemsSnapshot?: KitSubItem[] | null;
+    assemblyService?: string | null;
+  }> | null;
+  additionalCharges?: Array<{
+    id: string;
+    description: string;
+    amountCents: number;
+    quantity?: number;
+  }> | null;
+  discountCents?: number;
+  couponCode?: string | null;
+  shippingCents?: number;
+  shippingName?: string | null;
+  paymentMethod?: "pix" | "credit_card" | string | null;
+  orderTotalCents?: number;
+}): OrderFinancialBreakdownResult {
+  const isCreditCard = params.paymentMethod === "credit_card";
+  const lines: OrderFinancialStepLine[] = [];
+  let stepCounter = 1;
+  const nextStep = () => String(stepCounter++).padStart(2, "0");
+
+  let pixProductsSubtotalCents = 0;
+  let cardTotalDiffCents = 0;
+
+  const itemsList = Array.isArray(params.items) ? params.items : [];
+  const sheetsList = Array.isArray(params.sheets) ? params.sheets : [];
+
+  itemsList.forEach((it, idx) => {
+    const qty = Math.max(1, Number(it.quantity) || 1);
+    const sheet = sheetsList[idx] || null;
+    const cabPricing = resolveCabinetBasePricing(it.cabinet_name, it.color_name);
+    const kitSnapshot = it.kit_items_snapshot || sheet?.kitItemsSnapshot || null;
+
+    const resolvedEq = resolveKitEquipmentSummary({
+      kitItemsSnapshot: kitSnapshot,
+      monitorName: it.monitor_name,
+      printerName: it.printer_name,
+      readerName: it.reader_name,
+    });
+
+    const hasAssembly = Boolean(
+      sheet?.assemblyService?.includes("Montagem Especializada") ||
+        it.monitor_name?.includes("100% Montado")
+    );
+
+    // 01 - Gabinete Base (Preço PIX)
+    const cabPixTotal = cabPricing.pixBaseCents * qty;
+    pixProductsSubtotalCents += cabPixTotal;
+    lines.push({
+      stepNumber: nextStep(),
+      label: `${ String(qty).padStart(2, "0") } - ${it.cabinet_name}${qty > 1 ? ` (${qty}x)` : ""}`,
+      subLabel: `Valor base na tabela PIX • Cor: ${it.color_name}`,
+      amountCents: cabPixTotal,
+    });
+
+    // Se a cor tiver acréscimo (Preto TX ou Bicolor)
+    if (cabPricing.colorAdjustmentCents > 0) {
+      const colTotal = cabPricing.colorAdjustmentCents * qty;
+      pixProductsSubtotalCents += colTotal;
+      lines.push({
+        stepNumber: nextStep(),
+        label: `Acabamento Especial: ${it.color_name}${qty > 1 ? ` (${qty}x)` : ""}`,
+        subLabel: "Adicional de acabamento sobre o Branco TX padrão",
+        amountCents: colTotal,
+        isAddition: true,
+      });
+    }
+
+    // 02 - Kit de Montagem (Completo ou Editado)
+    if (resolvedEq.isKit) {
+      const kitTotal = resolvedEq.kitPriceCents * qty;
+      pixProductsSubtotalCents += kitTotal;
+      const isEditedKit = resolvedEq.removedSubItems.length > 0;
+      const includedBreakdownText = resolvedEq.includedSubItems
+        .map((sub) => `${sub.name} (${sub.priceCents > 0 ? `R$ ${(sub.priceCents / 100).toFixed(0)}` : "Incluso"})`)
+        .join(" + ");
+
+      lines.push({
+        stepNumber: nextStep(),
+        label: `${ String(qty).padStart(2, "0") } - ${
+          isEditedKit
+            ? `Kit Editado (${resolvedEq.selectedCount} de ${resolvedEq.totalCount} itens)`
+            : `Kit de Montagem Completo (${resolvedEq.selectedCount} itens)`
+        }`,
+        subLabel: includedBreakdownText,
+        amountCents: kitTotal,
+        isAddition: true,
+      });
+    } else if (
+      it.reader_name &&
+      !it.reader_name.toLowerCase().includes("não") &&
+      !it.reader_name.toLowerCase().includes("nenhum") &&
+      !it.reader_name.toLowerCase().includes("kit")
+    ) {
+      // Leitor avulso fora do kit
+      const readerTotal = 28000 * qty;
+      pixProductsSubtotalCents += readerTotal;
+      lines.push({
+        stepNumber: nextStep(),
+        label: `${ String(qty).padStart(2, "0") } - Leitor 2D (${it.reader_name})`,
+        subLabel: "Acessório avulso selecionado",
+        amountCents: readerTotal,
+        isAddition: true,
+      });
+    }
+
+    // Montagem de Fábrica (+ R$ 999,00)
+    if (hasAssembly) {
+      const asmTotal = 99900 * qty;
+      pixProductsSubtotalCents += asmTotal;
+      lines.push({
+        stepNumber: nextStep(),
+        label: `${ String(qty).padStart(2, "0") } - Serviço de Montagem Completa de Fábrica`,
+        subLabel: "Totem entregue 100% montado e testado",
+        amountCents: asmTotal,
+        isAddition: true,
+      });
+    }
+
+    // Diferença do Cartão sobre o Gabinete (ex: R$ 1.330 - R$ 1.100 = + R$ 230,00)
+    cardTotalDiffCents += cabPricing.cardAdditionCents * qty;
+  });
+
+  // Valores Adicionais / Serviços Extras inseridos pelo Admin
+  let additionalChargesCents = 0;
+  if (Array.isArray(params.additionalCharges)) {
+    for (const chg of params.additionalCharges) {
+      const chgQty = Math.max(1, Number(chg.quantity) || 1);
+      const chgTotal = (Number(chg.amountCents) || 0) * chgQty;
+      if (chgTotal > 0) {
+        additionalChargesCents += chgTotal;
+        lines.push({
+          stepNumber: nextStep(),
+          label: `${ String(chgQty).padStart(2, "0") } - ${chg.description}`,
+          subLabel: "Valor adicional / serviço extra incluído no pedido",
+          amountCents: chgTotal,
+          isAddition: true,
+        });
+      }
+    }
+  }
+
+  // Desconto de Cupom (se houver)
+  const discountCents = Math.max(0, Number(params.discountCents) || 0);
+  if (discountCents > 0) {
+    lines.push({
+      stepNumber: nextStep(),
+      label: `Desconto Cupom${params.couponCode ? ` (${params.couponCode})` : ""}`,
+      subLabel: "Abatimento promocional aplicado no checkout",
+      amountCents: discountCents,
+      isDiscount: true,
+    });
+  }
+
+  // Frete (SEDEX / PAC / Transportadora)
+  const shippingCents = Math.max(0, Number(params.shippingCents) || 0);
+  const cleanShipName = (params.shippingName || "Frete").trim();
+  lines.push({
+    stepNumber: nextStep(),
+    label: cleanShipName,
+    subLabel: shippingCents > 0 ? "Frete calculado para o CEP de destino" : "Frete Grátis / Retirada",
+    amountCents: shippingCents,
+    isShipping: true,
+    isZeroIncluded: shippingCents === 0,
+  });
+
+  const pixTotalCents = Math.max(
+    0,
+    pixProductsSubtotalCents + additionalChargesCents - discountCents + shippingCents
+  );
+
+  // Se o pedido estiver no Cartão de Crédito (ou se houver diferença de tabela Cartão),
+  // adicionamos a linha explícita explicando os + R$ 230,00 (ou + R$ 210 / + R$ 340) da Tabela Cartão!
+  if (isCreditCard && cardTotalDiffCents > 0) {
+    lines.push({
+      stepNumber: nextStep(),
+      label: "Acréscimo Modalidade Cartão de Crédito (até 10x)",
+      subLabel: `Diferença de tabela do Gabinete no Cartão vs Preço à vista no PIX`,
+      amountCents: cardTotalDiffCents,
+      isAddition: true,
+      isCardDiff: true,
+    });
+  }
+
+  const cardProductsSubtotalCents = pixProductsSubtotalCents + cardTotalDiffCents;
+  const cardTotalCents = Math.max(
+    0,
+    cardProductsSubtotalCents + additionalChargesCents - discountCents + shippingCents
+  );
+
+  const activeTotalCents =
+    typeof params.orderTotalCents === "number" && params.orderTotalCents > 0
+      ? params.orderTotalCents
+      : isCreditCard
+      ? cardTotalCents
+      : pixTotalCents;
+
+  return {
+    lines,
+    pixProductsSubtotalCents,
+    cardProductsSubtotalCents,
+    cardTotalDiffCents,
+    additionalChargesCents,
+    discountCents,
+    shippingCents,
+    pixTotalCents,
+    cardTotalCents,
+    activeTotalCents,
+    isCreditCard,
   };
 }
 
@@ -473,6 +778,7 @@ export function buildOrderDeliveryChecklist(params: {
   includeAssemblyService?: boolean;
 }): DeliveryChecklistItem[] {
   const qty = Math.max(1, Number(params.quantity) || 1);
+  const cabPricing = resolveCabinetBasePricing(params.cabinetName, params.colorName);
   const resolved = resolveKitEquipmentSummary({
     monitor: params.monitor,
     kitItemsSnapshot: params.kitItemsSnapshot,
@@ -486,10 +792,10 @@ export function buildOrderDeliveryChecklist(params: {
       id: "chk-cabinet",
       name: `${params.cabinetName} — Cor: ${params.colorName}`,
       category: "cabinet",
-      priceCents: 0,
+      priceCents: cabPricing.pixCabinetWithColorCents * qty,
       included: true,
       quantity: qty,
-      badgeLabel: "OBRIGATÓRIO • ESTRUTURA FÍSICA",
+      badgeLabel: "OBRIGATÓRIO • ESTRUTURA FÍSICA (BASE PIX)",
       notes: "Gabinete usinado em CNC com fechadura e chaves.",
     },
   ];

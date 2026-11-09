@@ -1,5 +1,234 @@
 [
   {
+    "id": "log_1794188449118_7iw20",
+    "timestamp": "2026-11-09T01:40:49.118Z",
+    "category": "payments",
+    "level": "success",
+    "action": "Pagamento Aprovado — Pagamento Aprovado",
+    "target": "Pedido #TOT-TEST-ONLY",
+    "details": "Valor compensado e confirmado pelo Mercado Pago. (MP ID: 123 • Método: Cartão VISA 10x • Cliente: Cliente).",
+    "actor": "Webhook Mercado Pago",
+    "metadata": {
+      "paymentId": "123",
+      "gatewayStatus": "approved",
+      "statusDetail": null,
+      "statusLabel": "Pagamento Aprovado",
+      "status": "paid",
+      "orderStatus": "paid",
+      "orderId": "order-test",
+      "orderNumber": "TOT-TEST-ONLY",
+      "totalCents": 142345,
+      "method": "credit_card",
+      "installments": 10,
+      "cardLastFour": null
+    }
+  },
+  {
+    "id": "log_1794188449115_oaqcg",
+    "timestamp": "2026-11-09T01:40:49.115Z",
+    "category": "orders",
+    "level": "warn",
+    "action": "Falha na Notificação WhatsApp",
+    "target": "Pagamento Confirmado #TOT-TEST-ONLY",
+    "details": "Enviado para 0/2 contatos (Ronaldo: Unexpected network request blocked in test. | Daniela: Unexpected network request blocked in test.)",
+    "actor": "FooodNext WhatsApp Notifier",
+    "metadata": {
+      "results": [
+        {
+          "recipient": "Ronaldo",
+          "number": "5511975960999",
+          "ok": false,
+          "error": "Unexpected network request blocked in test."
+        },
+        {
+          "recipient": "Daniela",
+          "number": "5511947020103",
+          "ok": false,
+          "error": "Unexpected network request blocked in test."
+        }
+      ]
+    }
+  },
+  {
+    "id": "log_1794188447894_n70sa",
+    "timestamp": "2026-11-09T01:40:47.894Z",
+    "category": "payments",
+    "level": "info",
+    "action": "Status Sincronizado — Pagamento Aprovado",
+    "target": "Pedido #TOT-TEST-ONLY",
+    "details": "Valor compensado e confirmado pelo Mercado Pago. (MP ID: 123 • Método: Cartão VISA 10x • Cliente: Cliente).",
+    "actor": "Webhook Mercado Pago",
+    "metadata": {
+      "paymentId": "123",
+      "gatewayStatus": "approved",
+      "statusDetail": null,
+      "statusLabel": "Pagamento Aprovado",
+      "status": "pending",
+      "orderStatus": "awaiting_payment",
+      "orderId": "order-test",
+      "orderNumber": "TOT-TEST-ONLY",
+      "totalCents": 142345,
+      "method": "credit_card",
+      "installments": 10,
+      "cardLastFour": null
+    }
+  },
+  {
+    "id": "log_1794188447891_8yo1z",
+    "timestamp": "2026-11-09T01:40:47.891Z",
+    "category": "payments",
+    "level": "warn",
+    "action": "Pagamento Estornado — Pagamento Estornado",
+    "target": "Pedido #TOT-TEST-ONLY",
+    "details": "O valor foi devolvido/estornado ao comprador pelo Mercado Pago. (MP ID: 123 • Método: Cartão VISA 10x • Cliente: Cliente).",
+    "actor": "Webhook Mercado Pago",
+    "metadata": {
+      "paymentId": "123",
+      "gatewayStatus": "refunded",
+      "statusDetail": null,
+      "statusLabel": "Pagamento Estornado",
+      "status": "refunded",
+      "orderStatus": "cancelled",
+      "orderId": "order-test",
+      "orderNumber": "TOT-TEST-ONLY",
+      "totalCents": 142345,
+      "method": "credit_card",
+      "installments": 10,
+      "cardLastFour": null
+    }
+  },
+  {
+    "id": "log_1794188447888_1jx9q",
+    "timestamp": "2026-11-09T01:40:47.888Z",
+    "category": "payments",
+    "level": "warn",
+    "action": "Pagamento Divergente Detectado",
+    "target": "Pedido #TOT-TEST-ONLY",
+    "details": "Pagamento MP #123 (R$ 1) divergente do pedido #TOT-TEST-ONLY (R$ 1423.45).",
+    "actor": "Webhook Mercado Pago",
+    "metadata": {
+      "paymentId": "123",
+      "orderId": "order-test",
+      "orderNumber": "TOT-TEST-ONLY",
+      "transactionAmount": 1,
+      "orderTotalCents": 142345,
+      "paymentStatus": "approved"
+    }
+  },
+  {
+    "id": "log_1794188447886_i2zni",
+    "timestamp": "2026-11-09T01:40:47.886Z",
+    "category": "payments",
+    "level": "success",
+    "action": "Pagamento Aprovado — Pagamento Aprovado",
+    "target": "Pedido #TOT-TEST-ONLY",
+    "details": "Valor compensado e confirmado pelo Mercado Pago. (MP ID: 123 • Método: Cartão VISA 10x • Cliente: Cliente).",
+    "actor": "Webhook Mercado Pago",
+    "metadata": {
+      "paymentId": "123",
+      "gatewayStatus": "approved",
+      "statusDetail": null,
+      "statusLabel": "Pagamento Aprovado",
+      "status": "paid",
+      "orderStatus": "paid",
+      "orderId": "order-test",
+      "orderNumber": "TOT-TEST-ONLY",
+      "totalCents": 142345,
+      "method": "credit_card",
+      "installments": 10,
+      "cardLastFour": null
+    }
+  },
+  {
+    "id": "log_1794188447882_dnmpc",
+    "timestamp": "2026-11-09T01:40:47.882Z",
+    "category": "payments",
+    "level": "success",
+    "action": "Pagamento Aprovado — Pagamento Aprovado",
+    "target": "Pedido #TOT-TEST-ONLY",
+    "details": "Valor compensado e confirmado pelo Mercado Pago. (MP ID: 123 • Método: Cartão VISA 10x • Cliente: Cliente).",
+    "actor": "Webhook Mercado Pago",
+    "metadata": {
+      "paymentId": "123",
+      "gatewayStatus": "approved",
+      "statusDetail": null,
+      "statusLabel": "Pagamento Aprovado",
+      "status": "paid",
+      "orderStatus": "paid",
+      "orderId": "order-test",
+      "orderNumber": "TOT-TEST-ONLY",
+      "totalCents": 142345,
+      "method": "credit_card",
+      "installments": 10,
+      "cardLastFour": null
+    }
+  },
+  {
+    "id": "log_1794188447876_dgxn1",
+    "timestamp": "2026-11-09T01:40:47.876Z",
+    "category": "orders",
+    "level": "warn",
+    "action": "Falha na Notificação WhatsApp",
+    "target": "Pagamento Confirmado #TOT-TEST-ONLY",
+    "details": "Enviado para 0/2 contatos (Ronaldo: Unexpected network request blocked in test. | Daniela: Unexpected network request blocked in test.)",
+    "actor": "FooodNext WhatsApp Notifier",
+    "metadata": {
+      "results": [
+        {
+          "recipient": "Ronaldo",
+          "number": "5511975960999",
+          "ok": false,
+          "error": "Unexpected network request blocked in test."
+        },
+        {
+          "recipient": "Daniela",
+          "number": "5511947020103",
+          "ok": false,
+          "error": "Unexpected network request blocked in test."
+        }
+      ]
+    }
+  },
+  {
+    "id": "log_1794188446640_odo1n",
+    "timestamp": "2026-11-09T01:40:46.640Z",
+    "category": "payments",
+    "level": "info",
+    "action": "QR Code Pix Gerado (24h)",
+    "target": "Pedido #TOT-TEST-ONLY",
+    "details": "Cobrança Pix criada no Mercado Pago (ID 124) no valor de R$ 1234.56 com validade de 24h.",
+    "actor": "Checkout Cliente",
+    "metadata": {
+      "orderId": "order-test",
+      "orderNumber": "TOT-TEST-ONLY",
+      "gatewayPaymentId": "124",
+      "amountCents": 123456,
+      "expiresAt": "2026-11-09T02:10:46.639Z",
+      "customerName": "Teste Integração",
+      "customerEmail": "test@example.com"
+    }
+  },
+  {
+    "id": "log_1794188446638_197vs",
+    "timestamp": "2026-11-09T01:40:46.638Z",
+    "category": "payments",
+    "level": "info",
+    "action": "Checkout Cartão Criado (72h)",
+    "target": "Pedido #TOT-TEST-ONLY",
+    "details": "Preferência Checkout Pro criada no Mercado Pago (preference-test) no valor de R$ 1423.45 em até 10x (validade 72h).",
+    "actor": "Checkout Cliente",
+    "metadata": {
+      "orderId": "order-test",
+      "orderNumber": "TOT-TEST-ONLY",
+      "gatewayPreferenceId": "preference-test",
+      "checkoutUrl": "https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=mock",
+      "amountCents": 142345,
+      "expiresAt": "2026-11-12T01:40:46.636Z",
+      "customerName": "Teste Integração",
+      "customerEmail": "test@example.com"
+    }
+  },
+  {
     "id": "log_1794186004749_0ape1",
     "timestamp": "2026-11-09T01:00:04.749Z",
     "category": "payments",

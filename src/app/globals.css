@@ -573,3 +573,19 @@ body {
   color: #34d399 !important;
 }
 
+
+/* ============================================================================
+   CORREÇÃO DEFINITIVA DE GRADIENTES ESCUROS NO TEMA CLARO (v3.3.8)
+   Remove manchas escuras (via-slate-900 / to-slate-900 / from-amber-950 / etc.)
+   ============================================================================ */
+.admin-light [class*="bg-slate-900"],
+.admin-light [class*="bg-slate-950"],
+.admin-light [class*="via-slate-9"],
+.admin-light [class*="to-slate-9"],
+.admin-light [class*="from-slate-9"],
+.admin-light [class*="from-amber-950"],
+.admin-light [class*="from-rose-950"],
+.admin-light [class*="from-indigo-950"],
+.admin-light [class*="from-emerald-950"] {
+  background-image: none !important;
+}

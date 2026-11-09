@@ -27,10 +27,10 @@ export async function GET(req: Request) {
     const status = searchParams.get("status") || undefined;
     const site = (process.env.NEXT_PUBLIC_SITE_URL || "https://totem.xpointsolucoes.com.br").replace(/\/$/, "");
 
-    // 1. Carrega do Appwrite
+    // 1. Carrega todos os pedidos do Appwrite para computar contadores por status
     let appwriteOrders: any[] = [];
     try {
-      appwriteOrders = await listAllOrdersAdmin(status);
+      appwriteOrders = await listAllOrdersAdmin();
     } catch {
       // Silencioso se Appwrite estiver offline
     }
@@ -179,8 +179,6 @@ export async function GET(req: Request) {
     }
 
     localOrders.forEach((o) => {
-      if (status && status !== "all" && o.status !== status) return;
-
       const existing = orderMap.get(o.orderNumber);
       if (!existing) {
         orderMap.set(o.orderNumber, {
@@ -246,13 +244,37 @@ export async function GET(req: Request) {
       }
     });
 
-    const consolidated = Array.from(orderMap.values()).sort(
+    const allConsolidated = Array.from(orderMap.values()).sort(
       (a, b) => new Date(b.$createdAt).getTime() - new Date(a.$createdAt).getTime()
     );
+
+    const statusCounts: Record<string, number> = {
+      awaiting_custom_analysis: 0,
+      custom_approved: 0,
+      awaiting_payment: 0,
+      paid: 0,
+      in_production: 0,
+      ready: 0,
+      shipped: 0,
+      delivered: 0,
+      cancelled: 0,
+    };
+
+    for (const item of allConsolidated) {
+      const st = item.status || "awaiting_payment";
+      statusCounts[st] = (statusCounts[st] || 0) + 1;
+    }
+
+    const consolidated =
+      status && status !== "all"
+        ? allConsolidated.filter((o) => o.status === status)
+        : allConsolidated;
 
     return NextResponse.json({
       ok: true,
       total: consolidated.length,
+      totalAll: allConsolidated.length,
+      statusCounts,
       data: consolidated,
     });
   } catch (error: any) {
