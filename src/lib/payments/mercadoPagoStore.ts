@@ -7,6 +7,8 @@ import { syncOrderStatusToVoucherUsage } from "@/lib/vouchers/voucherStore";
 import { logEcosystemEvent } from "@/lib/logging/ecosystemLogger";
 import { notifyPaymentConfirmedOnWhatsApp } from "@/lib/notifications/whatsappNotifier";
 import { adsLeadsCartsStore } from "@/lib/analytics/adsLeadsCartsStore";
+import { calculateSafeCardChargeCents } from "@/modules/pricing/pricingEngine";
+import { buildOrderFinancialBreakdown } from "@/modules/catalog/kitDefaults";
 import {
   createMercadoPagoPayment,
   mercadoPagoRequest,
@@ -601,18 +603,60 @@ export async function regenerateOrderPayment(params: {
     state: parsedAddress.state || "",
   };
 
-  const additionalCharges: Array<{ description: string; amountCents: number; quantity?: number }> =
+  const additionalCharges: Array<{ id?: string; description: string; amountCents: number; quantity?: number }> =
     Array.isArray(parsedAddress.additionalCharges) ? parsedAddress.additionalCharges : [];
   const extrasSummary =
     additionalCharges.length > 0
       ? ` (+ ${additionalCharges.map((c) => c.description).join(", ")})`
       : "";
 
+  let parsedSheets: any[] = [];
+  try {
+    parsedSheets = order.manufacturing_sheet_json ? JSON.parse(order.manufacturing_sheet_json) : [];
+  } catch {}
+
+  const prevMethod =
+    storedPayment.payment_method === "credit_card" || parsedAddress.paymentMethod === "credit_card"
+      ? "credit_card"
+      : "pix";
+
+  const breakdown = buildOrderFinancialBreakdown({
+    items: Array.isArray((details as any).items) ? (details as any).items : [],
+    sheets: Array.isArray(parsedSheets) ? parsedSheets : [],
+    additionalCharges: additionalCharges.map((c, idx) => ({
+      id: c.id || `extra_${idx}`,
+      description: c.description,
+      amountCents: c.amountCents,
+      quantity: c.quantity || 1,
+    })),
+    discountCents: Number(order.discount_cents ?? parsedAddress.discountCents) || 0,
+    couponCode: order.coupon_code || parsedAddress.couponCode || null,
+    shippingCents: Number(order.shipping_cents) || 0,
+    shippingName: parsedAddress.shippingMethod?.name || "Frete",
+    paymentMethod: method,
+  });
+
+  // Determina com segurança o valor base à vista (PIX) do pedido para proteger 100% contra a taxa de 4,98% do MP no cartão
+  let basePixTotalCents = Number(parsedAddress.basePixTotalCents) || 0;
+  if (basePixTotalCents <= 0) {
+    if (prevMethod === "pix") {
+      basePixTotalCents = Number(order.total_cents) || breakdown.pixTotalCents;
+    } else if (breakdown.pixTotalCents > 0) {
+      basePixTotalCents = breakdown.pixTotalCents;
+    } else {
+      basePixTotalCents = Math.round((Number(order.total_cents) || 0) * 0.95);
+    }
+  }
+
+  const safeCardTotalCents = calculateSafeCardChargeCents(basePixTotalCents);
+  const effectiveAmountCents = method === "credit_card" ? safeCardTotalCents : basePixTotalCents;
+  const effectiveSubtotalCents = Math.max(0, effectiveAmountCents - (Number(order.shipping_cents) || 0));
+
   const attemptKey = `regen-${Date.now()}`;
   const created = await createMercadoPagoPayment({
     orderId: order.$id,
     orderNumber: order.order_number,
-    amountCents: order.total_cents,
+    amountCents: effectiveAmountCents,
     customer,
     deliveryAddress,
     method,
@@ -623,7 +667,7 @@ export async function regenerateOrderPayment(params: {
   await updateMercadoPagoPayment(order.$id, {
     payment_method: method,
     status: "pending",
-    amount_cents: order.total_cents,
+    amount_cents: effectiveAmountCents,
     pix_code: created.pixCode || "",
     expires_at: created.expiresAt,
     gateway_payment_id: created.gatewayPaymentId || "",
@@ -632,19 +676,35 @@ export async function regenerateOrderPayment(params: {
     gateway_status: created.gatewayStatus || "pending",
   });
 
-  if (order.status === "cancelled") {
+  const nextOrderStatus = order.status === "cancelled" ? "awaiting_payment" : order.status;
+  if (
+    order.status === "cancelled" ||
+    order.total_cents !== effectiveAmountCents ||
+    order.subtotal_cents !== effectiveSubtotalCents
+  ) {
     await getServerDatabases().updateDocument(
       APPWRITE_CONFIG.databaseId,
       APPWRITE_CONFIG.collections.orders,
       order.$id,
-      { status: "awaiting_payment" }
+      {
+        status: nextOrderStatus,
+        total_cents: effectiveAmountCents,
+        subtotal_cents: effectiveSubtotalCents,
+      }
     );
-    order.status = "awaiting_payment";
+    order.status = nextOrderStatus;
+    order.total_cents = effectiveAmountCents;
+    order.subtotal_cents = effectiveSubtotalCents;
   }
+
+  const netEstimatedCents =
+    method === "credit_card"
+      ? effectiveAmountCents - Math.round(effectiveAmountCents * 0.0498)
+      : effectiveAmountCents;
 
   const entry: OrderPaymentHistoryEntry = {
     at: new Date().toISOString(),
-    action: method === "credit_card" ? "Novo Link de Cartão Gerado (72h)" : "Novo QR Code Pix Gerado (24h)",
+    action: method === "credit_card" ? "Novo Link de Cartão Gerado (72h • Protegido)" : "Novo QR Code Pix Gerado (24h)",
     gatewayPaymentId: created.gatewayPaymentId,
     gatewayPreferenceId: created.gatewayPreferenceId,
     gatewayStatus: "pending",
@@ -652,21 +712,27 @@ export async function regenerateOrderPayment(params: {
     statusLabel: method === "credit_card" ? "Aguardando Pagamento no Cartão (72h)" : "Aguardando Pagamento Pix (24h)",
     statusDescription:
       method === "credit_card"
-        ? `Novo link Checkout Pro gerado por ${actor} com validade de 72 horas.`
-        : `Novo QR Code Pix gerado por ${actor} com validade de 24 horas.`,
+        ? `Novo link Checkout Pro gerado por ${actor} com proteção de taxa MP (Base PIX: R$ ${(basePixTotalCents / 100).toFixed(2)} → Cobrado no Cartão: R$ ${(effectiveAmountCents / 100).toFixed(2)} • Líquido na conta MP: R$ ${(netEstimatedCents / 100).toFixed(2)}).`
+        : `Novo QR Code Pix gerado por ${actor} com validade de 24 horas (R$ ${(effectiveAmountCents / 100).toFixed(2)}).`,
     severity: "info",
     method,
-    amountCents: order.total_cents,
+    amountCents: effectiveAmountCents,
     actor,
   };
 
-  await appendOrderPaymentAuditEntry(order, entry, { paymentMethod: method });
+  await appendOrderPaymentAuditEntry(order, entry, {
+    paymentMethod: method,
+    basePixTotalCents,
+    safeCardTotalCents,
+  });
 
   return {
     orderId: order.$id,
     orderNumber: order.order_number,
     status: "awaiting_payment",
-    totalCents: order.total_cents,
+    totalCents: effectiveAmountCents,
+    basePixTotalCents,
+    safeCardTotalCents,
     payment: {
       provider: "mercadopago",
       method,

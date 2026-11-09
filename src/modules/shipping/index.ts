@@ -4,3 +4,4 @@ export * from "./shippingEngine";
 export * from "./antiFailureGuard";
 export * from "./receiptGroundTruth";
 export * from "./correiosOnlineService";
+export * from "./correiosPrepostagemService";

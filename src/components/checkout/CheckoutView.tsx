@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useCart } from "@/modules/cart/CartContext";
-import { formatBRL, calculateTotemPrice } from "@/modules/pricing/pricingEngine";
+import { formatBRL, calculateTotemPrice, calculateSafeCardChargeCents } from "@/modules/pricing/pricingEngine";
 import { CustomerInfo, DeliveryAddress, OrderDetails, ManufacturingSpec } from "@/types/order";
 import { ShippingQuote, ShippingOptionId } from "@/types/shipping";
 import { Card, Button, Input, Badge } from "@/components/ui";
@@ -164,6 +164,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
       const nextOrder: OrderDetails = {
         ...orderDetails,
         status: "awaiting_payment",
+        totalCents: typeof data.totalCents === "number" && data.totalCents > 0 ? data.totalCents : orderDetails.totalCents,
         payment: {
           ...orderDetails.payment,
           ...data.payment,
@@ -425,13 +426,11 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     shippingQuotes.find((q) => q.id === selectedShippingId && q.isAvailable) || null;
   const shippingCents = selectedShippingQuote ? selectedShippingQuote.priceCents : 0;
   const pixSubtotalCents = appliedCoupon && finalTotalPriceCents !== undefined ? finalTotalPriceCents : totalPriceCents;
-  const cardSubtotalCents = Math.max(0, items.reduce((acc, item) => acc + calculateTotemPrice({
-    cabinet: item.configuration.model, color: item.configuration.color, monitor: item.configuration.monitor,
-    printer: item.configuration.printer, barcodeReader: item.configuration.barcodeReader,
-    includeAssemblyService: item.configuration.includeAssemblyService,
-  }).cardTotalPriceCents * item.quantity, 0) - couponDiscountCents);
+  const pixTotalWithShippingCents = Math.max(0, pixSubtotalCents + shippingCents);
+  const cardTotalWithShippingCents = calculateSafeCardChargeCents(pixTotalWithShippingCents);
+  const cardSubtotalCents = Math.max(0, cardTotalWithShippingCents - shippingCents);
   const effectiveSubtotalCents = paymentMethod === "credit_card" ? cardSubtotalCents : pixSubtotalCents;
-  const finalTotalCents = effectiveSubtotalCents + shippingCents;
+  const finalTotalCents = paymentMethod === "credit_card" ? cardTotalWithShippingCents : pixTotalWithShippingCents;
 
   // Busca automática de CEP com alta resiliência (3 tentativas entre ViaCEP, BrasilAPI e OpenCEP)
   const lookupCep = async (cleanCep: string) => {

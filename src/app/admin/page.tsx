@@ -1,7 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { formatBRL } from "@/modules/pricing/pricingEngine";
+import {
+  formatBRL,
+  calculateSafeCardChargeCents,
+  simulateMercadoPagoCardBreakdown,
+} from "@/modules/pricing/pricingEngine";
 import { siteConfig } from "@/config/site";
 import {
   resolveKitEquipmentSummary,
@@ -1064,6 +1068,8 @@ export default function AdminPage() {
   };
 
   const [sendingWaOrderId, setSendingWaOrderId] = useState<string | null>(null);
+  const [showQuickMpCalculator, setShowQuickMpCalculator] = useState<boolean>(false);
+  const [quickMpPixInputBRL, setQuickMpPixInputBRL] = useState<string>("1558.00");
 
   const handleSendPaymentToCustomerWhatsAppApi = async (order: OrderRecord) => {
     if (sendingWaOrderId) return;
@@ -1109,18 +1115,65 @@ export default function AdminPage() {
     }
   };
 
+  const computeEditFormBreakdown = (form: EditOrderFormState) => {
+    return buildOrderFinancialBreakdown({
+      items: (form.items || []).map((it) => ({
+        cabinet_name: it.cabinet_name,
+        color_name: it.color_name,
+        quantity: it.quantity || 1,
+        unit_price_cents: it.unit_price_cents,
+        subtotal_cents: it.subtotal_cents,
+        monitor_name: it.monitor_name,
+        printer_name: it.printer_name,
+        reader_name: it.reader_name,
+        kit_items_snapshot: it.is_kit ? it.kit_items : null,
+      })),
+      sheets: (form.items || []).map((it) => ({
+        kitItemsSnapshot: it.is_kit ? it.kit_items : null,
+        assemblyService: it.include_assembly ? "Montagem Especializada (+ R$ 999)" : null,
+      })),
+      additionalCharges: form.additional_charges || [],
+      discountCents: Number(form.discount_cents) || 0,
+      couponCode: form.coupon_code || null,
+      shippingCents: Number(form.shipping_cents) || 0,
+      shippingName: form.shipping_name || "Frete",
+      paymentMethod: form.payment_method,
+    });
+  };
+
+  const resolveEditFormPixAndCardTotals = (form: EditOrderFormState) => {
+    const fin = computeEditFormBreakdown(form);
+    const currentTotal = Math.max(0, Number(form.total_cents) || 0);
+    let basePixTotalCents = fin.pixTotalCents;
+
+    if (form.payment_method === "pix") {
+      basePixTotalCents = currentTotal > 0 ? currentTotal : fin.pixTotalCents;
+    } else {
+      if (currentTotal === fin.cardTotalCents || currentTotal === fin.pixTotalCents) {
+        basePixTotalCents = fin.pixTotalCents;
+      } else if (currentTotal > 0) {
+        basePixTotalCents = Math.round(currentTotal * 0.95);
+      }
+    }
+
+    const safeCardTotalCents = calculateSafeCardChargeCents(basePixTotalCents);
+    const sim = simulateMercadoPagoCardBreakdown(basePixTotalCents);
+
+    return {
+      fin,
+      basePixTotalCents,
+      safeCardTotalCents,
+      sim,
+    };
+  };
+
   const recalculateEditFormTotals = (form: EditOrderFormState): EditOrderFormState => {
-    const itemsSum = (form.items || []).reduce((acc, i) => acc + (Number(i.subtotal_cents) || 0), 0);
-    const extrasSum = (form.additional_charges || []).reduce(
-      (acc, c) => acc + (Number(c.amountCents) || 0) * Math.max(1, Number(c.quantity) || 1),
-      0
-    );
-    const ship = Number(form.shipping_cents) || 0;
-    const disc = Number(form.discount_cents) || 0;
+    const fin = computeEditFormBreakdown(form);
+    const isCard = form.payment_method === "credit_card";
     return {
       ...form,
-      subtotal_cents: itemsSum,
-      total_cents: Math.max(0, itemsSum + extrasSum - disc + ship),
+      subtotal_cents: isCard ? Math.max(0, fin.cardTotalCents - fin.shippingCents) : fin.pixProductsSubtotalCents,
+      total_cents: isCard ? fin.cardTotalCents : fin.pixTotalCents,
     };
   };
 
@@ -1305,6 +1358,8 @@ export default function AdminPage() {
         }))
         .filter((c) => c.description.length > 0 && c.amountCents > 0);
 
+      const { basePixTotalCents, safeCardTotalCents } = resolveEditFormPixAndCardTotals(editOrderForm);
+
       const newDeliveryAddress = {
         ...prevAddr,
         cep: editOrderForm.cep.trim(),
@@ -1315,6 +1370,8 @@ export default function AdminPage() {
         city: editOrderForm.city.trim(),
         state: editOrderForm.state.trim() || "SP",
         paymentMethod: editOrderForm.payment_method,
+        basePixTotalCents,
+        safeCardTotalCents,
         couponCode: editOrderForm.coupon_code.trim() || null,
         discountCents: Number(editOrderForm.discount_cents) || 0,
         customerNotes: editOrderForm.order_notes.trim() || null,
@@ -1474,6 +1531,10 @@ export default function AdminPage() {
         }))
         .filter((c) => c.description.length > 0 && c.amountCents > 0);
 
+      const { basePixTotalCents, safeCardTotalCents } = resolveEditFormPixAndCardTotals(editOrderForm);
+      const effectiveTotalCents = targetMethod === "credit_card" ? safeCardTotalCents : basePixTotalCents;
+      const effectiveSubtotalCents = Math.max(0, effectiveTotalCents - (Number(editOrderForm.shipping_cents) || 0));
+
       const newDeliveryAddress = {
         ...prevAddr,
         cep: editOrderForm.cep.trim(),
@@ -1484,6 +1545,8 @@ export default function AdminPage() {
         city: editOrderForm.city.trim(),
         state: editOrderForm.state.trim() || "SP",
         paymentMethod: targetMethod,
+        basePixTotalCents,
+        safeCardTotalCents,
         couponCode: editOrderForm.coupon_code.trim() || null,
         discountCents: Number(editOrderForm.discount_cents) || 0,
         customerNotes: editOrderForm.order_notes.trim() || null,
@@ -1564,9 +1627,9 @@ export default function AdminPage() {
         customer_document: editOrderForm.customer_document.trim(),
         customer_email: editOrderForm.customer_email.trim(),
         customer_whatsapp: editOrderForm.customer_whatsapp.trim(),
-        subtotal_cents: Number(editOrderForm.subtotal_cents) || 0,
+        subtotal_cents: effectiveSubtotalCents,
         shipping_cents: Number(editOrderForm.shipping_cents) || 0,
-        total_cents: Number(editOrderForm.total_cents) || 0,
+        total_cents: effectiveTotalCents,
         delivery_address_json: JSON.stringify(newDeliveryAddress),
         manufacturing_sheet_json: JSON.stringify(newSheets),
         items: editOrderForm.items.map((it) => ({
@@ -2255,6 +2318,21 @@ export default function AdminPage() {
                   </button>
                 </div>
 
+                {/* Botão Calculadora Rápida de Cartão Mercado Pago (Recebimento 100% PIX) */}
+                <button
+                  type="button"
+                  onClick={() => setShowQuickMpCalculator((prev) => !prev)}
+                  className={`px-3 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 border transition-all shrink-0 cursor-pointer ${
+                    showQuickMpCalculator
+                      ? "bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/20"
+                      : "bg-slate-900 hover:bg-slate-800 text-emerald-400 border-emerald-500/40"
+                  }`}
+                  title="Simular valor seguro a cobrar no Cartão Parcelado do Mercado Pago para receber 100% do valor do PIX à vista"
+                >
+                  <CreditCard className="w-3.5 h-3.5" />
+                  <span>Calculadora Cartão MP (100% PIX)</span>
+                </button>
+
                 {/* Campo de Busca */}
                 <div className="relative min-w-[240px] sm:w-64 lg:w-72">
                   <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -2271,6 +2349,120 @@ export default function AdminPage() {
                 </div>
               </div>
             </div>
+
+            {/* Painel Expansível: Simulador Rápido de Cobrança Segura no Cartão Mercado Pago */}
+            {showQuickMpCalculator && (() => {
+              const rawCents = Math.max(0, Math.round((parseFloat(quickMpPixInputBRL.replace(",", ".")) || 0) * 100));
+              const qSim = simulateMercadoPagoCardBreakdown(rawCents);
+              return (
+                <div className="p-4 rounded-2xl bg-slate-900/95 border-2 border-emerald-500/40 shadow-xl space-y-3 animate-fade-in">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-wide">
+                        Calculadora de Cobrança Segura no Cartão Parcelado (Mercado Pago • Receber 100% do PIX à Vista)
+                      </h3>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/35 text-emerald-300">
+                        Taxa Real MP Vendedor: 4,98% • Divisor Seguro: ÷ 0,95
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowQuickMpCalculator(false)}
+                        className="text-xs font-bold text-slate-400 hover:text-white px-2 py-0.5 rounded-lg bg-slate-800 cursor-pointer"
+                      >
+                        Fechar ✕
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-stretch text-xs">
+                    <div className="p-3 rounded-xl bg-slate-950 border-2 border-emerald-500/50 space-y-1">
+                      <label className="block text-[10px] font-black text-emerald-400 uppercase">
+                        1. Digite o Valor PIX (Sua Meta Líquida)
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-slate-400">R$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={quickMpPixInputBRL}
+                          onChange={(e) => setQuickMpPixInputBRL(e.target.value)}
+                          className="w-full px-2.5 py-1.5 bg-slate-900 border border-emerald-500/40 rounded-lg text-emerald-300 font-mono font-black text-sm focus:outline-none focus:border-emerald-400"
+                        />
+                      </div>
+                      <span className="text-[10px] text-slate-400 block">
+                        Valor que você quer receber limpo à vista
+                      </span>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-blue-950/30 border-2 border-blue-500/50 space-y-1 flex flex-col justify-between">
+                      <div>
+                        <span className="text-[10px] font-black text-blue-300 uppercase block">
+                          2. Cobrar no Link do Cartão (÷ 0,95)
+                        </span>
+                        <span className="text-lg font-black text-white font-mono block mt-0.5">
+                          {formatBRL(qSim.safeCardChargeCents)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-1 pt-1">
+                        <span className="text-[10px] text-blue-300 font-bold">
+                          + {formatBRL(qSim.cardProtectionAdditionCents)} (+5,26%)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard?.writeText((qSim.safeCardChargeCents / 100).toFixed(2).replace(".", ","));
+                            setSaveSuccessMsg(`Valor seguro ${formatBRL(qSim.safeCardChargeCents)} copiado para a área de transferência!`);
+                            setTimeout(() => setSaveSuccessMsg(""), 3000);
+                          }}
+                          className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] cursor-pointer"
+                        >
+                          Copiar Valor
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-slate-950 border border-rose-500/30 space-y-1">
+                      <span className="text-[10px] font-bold text-rose-300 uppercase block">
+                        3. Taxa Vendedor MP (4,98%)
+                      </span>
+                      <span className="text-base font-black text-rose-400 font-mono block mt-0.5">
+                        - {formatBRL(qSim.mpSellerFeeCents)}
+                      </span>
+                      <span className="text-[10px] text-slate-400 block">
+                        Retida pelo MP sobre {formatBRL(qSim.safeCardChargeCents)}
+                      </span>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-emerald-950/30 border-2 border-emerald-500/50 space-y-1">
+                      <span className="text-[10px] font-black text-emerald-300 uppercase block">
+                        4. Você Recebe Líquido à Vista
+                      </span>
+                      <span className="text-lg font-black text-emerald-400 font-mono block mt-0.5">
+                        {formatBRL(qSim.netReceivedCents)} ✅
+                      </span>
+                      <span className="text-[10px] text-emerald-300 font-bold block">
+                        100% do PIX garantido (+{formatBRL(Math.max(0, qSim.safetyBufferCents))} folga)
+                      </span>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-slate-950 border border-indigo-500/30 space-y-1">
+                      <span className="text-[10px] font-bold text-indigo-300 uppercase block">
+                        5. Cliente Parcelando em 10x MP
+                      </span>
+                      <span className="text-base font-black text-indigo-300 font-mono block mt-0.5">
+                        10x de {formatBRL(qSim.buyer10xInstallmentCents)}
+                      </span>
+                      <span className="text-[10px] text-slate-400 block">
+                        Principal cliente (+20,65%): {formatBRL(qSim.buyer10xTotalCents)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Listagem de Pedidos ou Painel ADS (Carrinhos Abandonados & Conversões) */}
             {statusFilter === "ads" ? (
@@ -5116,12 +5308,20 @@ export default function AdminPage() {
                         <label className="block text-slate-400 font-semibold mb-1">Método de Pagamento</label>
                         <select
                           value={editOrderForm.payment_method}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            const nextMethod = e.target.value as "pix" | "credit_card";
+                            const { basePixTotalCents, safeCardTotalCents } = resolveEditFormPixAndCardTotals(editOrderForm);
                             setEditOrderForm({
                               ...editOrderForm,
-                              payment_method: e.target.value as "pix" | "credit_card",
-                            })
-                          }
+                              payment_method: nextMethod,
+                              total_cents: nextMethod === "credit_card" ? safeCardTotalCents : basePixTotalCents,
+                              subtotal_cents: Math.max(
+                                0,
+                                (nextMethod === "credit_card" ? safeCardTotalCents : basePixTotalCents) -
+                                  (Number(editOrderForm.shipping_cents) || 0)
+                              ),
+                            });
+                          }}
                           className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold focus:outline-none focus:border-indigo-500"
                         >
                           <option value="pix">PIX à Vista</option>
@@ -5273,13 +5473,15 @@ export default function AdminPage() {
                 </>
               )}
 
-              {(editModalFocusSection === "payment_proposal" || editModalFocusSection === "all") && (
+              {(editModalFocusSection === "payment_proposal" || editModalFocusSection === "all") && (() => {
+                const { basePixTotalCents, safeCardTotalCents, sim } = resolveEditFormPixAndCardTotals(editOrderForm);
+                return (
                 <>
-                  {/* 3. Método de Entrega & Valores Financeiros */}
-                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                  {/* 3. Método de Entrega & Valores Financeiros + Proteção de Taxa Cartão MP */}
+                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3.5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <h4 className="font-black text-cyan-400 uppercase text-[11px] tracking-wider">
-                        Modalidade de Frete & Totais do Pedido
+                        Modalidade de Frete & Totais do Pedido (PIX vs Cartão Seguro MP)
                       </h4>
                       <button
                         type="button"
@@ -5302,21 +5504,6 @@ export default function AdminPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-slate-400 font-semibold mb-1">Subtotal + Adicionais (R$)</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={(editOrderForm.subtotal_cents / 100).toFixed(2)}
-                          onChange={(e) =>
-                            setEditOrderForm({
-                              ...editOrderForm,
-                              subtotal_cents: Math.round((parseFloat(e.target.value) || 0) * 100),
-                            })
-                          }
-                          className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono"
-                        />
-                      </div>
-                      <div>
                         <label className="block text-slate-400 font-semibold mb-1">Valor do Frete (R$)</label>
                         <input
                           type="number"
@@ -5335,20 +5522,133 @@ export default function AdminPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-amber-300 font-bold mb-1">Total da Cobrança (R$)</label>
+                        <label className="block text-emerald-400 font-bold mb-1">
+                          Valor PIX / Líquido a Receber (R$)
+                        </label>
                         <input
                           type="number"
                           step="0.01"
-                          value={(editOrderForm.total_cents / 100).toFixed(2)}
-                          onChange={(e) =>
+                          value={(basePixTotalCents / 100).toFixed(2)}
+                          onChange={(e) => {
+                            const nextPixCents = Math.max(0, Math.round((parseFloat(e.target.value) || 0) * 100));
+                            const nextCardCents = calculateSafeCardChargeCents(nextPixCents);
+                            const isCard = editOrderForm.payment_method === "credit_card";
+                            const nextTotal = isCard ? nextCardCents : nextPixCents;
                             setEditOrderForm({
                               ...editOrderForm,
-                              total_cents: Math.round((parseFloat(e.target.value) || 0) * 100),
-                            })
-                          }
+                              total_cents: nextTotal,
+                              subtotal_cents: Math.max(0, nextTotal - (Number(editOrderForm.shipping_cents) || 0)),
+                            });
+                          }}
+                          className="w-full px-3 py-2 bg-emerald-950/30 border border-emerald-500/40 rounded-xl text-emerald-300 font-mono font-black"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-amber-300 font-bold mb-1">
+                          Total no Cartão Seguro ÷ 0,95 (R$)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={(safeCardTotalCents / 100).toFixed(2)}
+                          onChange={(e) => {
+                            const nextCardCents = Math.max(0, Math.round((parseFloat(e.target.value) || 0) * 100));
+                            setEditOrderForm({
+                              ...editOrderForm,
+                              payment_method: "credit_card",
+                              total_cents: nextCardCents,
+                              subtotal_cents: Math.max(0, nextCardCents - (Number(editOrderForm.shipping_cents) || 0)),
+                            });
+                          }}
                           className="w-full px-3 py-2 bg-amber-950/40 border border-amber-500/40 rounded-xl text-amber-300 font-mono font-black"
                         />
                       </div>
+                    </div>
+
+                    {/* PAINEL DE PROTEÇÃO DE TAXA DO CARTÃO MERCADO PAGO (4,98% VENDEDOR + 20,65% PARCELADO CLIENTE) */}
+                    <div className="p-3.5 rounded-xl bg-gradient-to-r from-blue-950/50 via-slate-900 to-emerald-950/40 border border-blue-500/40 space-y-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-[11px] font-black text-blue-300 uppercase tracking-wider flex items-center gap-1.5">
+                          <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span>
+                            Auditoria de Cobrança Segura no Cartão Parcelado (Mercado Pago • Recebimento 100% do PIX à Vista)
+                          </span>
+                        </span>
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-black text-[10px]">
+                          Fórmula Ativa: Valor PIX ÷ 0,95 (Cobre 4,98% MP + Folga)
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 text-[11px]">
+                        <div className="p-2.5 rounded-xl bg-slate-950/90 border border-emerald-500/30">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase block">
+                            1. Sua Meta (Valor PIX)
+                          </span>
+                          <span className="text-sm font-black text-emerald-400 font-mono">
+                            {formatBRL(sim.pixTargetCents)}
+                          </span>
+                          <span className="text-[10px] text-slate-400 block mt-0.5">
+                            Valor base à vista desejado
+                          </span>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-slate-950/90 border border-blue-500/40">
+                          <span className="text-[10px] font-bold text-blue-300 uppercase block">
+                            2. Cobrar no Link Cartão
+                          </span>
+                          <span className="text-sm font-black text-white font-mono">
+                            {formatBRL(sim.safeCardChargeCents)}
+                          </span>
+                          <span className="text-[10px] text-blue-300 font-bold block mt-0.5">
+                            + {formatBRL(sim.cardProtectionAdditionCents)} (+5,26% proteção)
+                          </span>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-slate-950/90 border border-rose-500/30">
+                          <span className="text-[10px] font-bold text-rose-300 uppercase block">
+                            3. Taxa Vendedor MP (4,98%)
+                          </span>
+                          <span className="text-sm font-black text-rose-400 font-mono">
+                            - {formatBRL(sim.mpSellerFeeCents)}
+                          </span>
+                          <span className="text-[10px] text-slate-400 block mt-0.5">
+                            Desconto à vista do MP
+                          </span>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-emerald-950/40 border-2 border-emerald-500/50">
+                          <span className="text-[10px] font-black text-emerald-300 uppercase block">
+                            4. Você Recebe Líquido
+                          </span>
+                          <span className="text-sm font-black text-emerald-300 font-mono">
+                            {formatBRL(sim.netReceivedCents)} ✅
+                          </span>
+                          <span className="text-[10px] text-emerald-400 font-bold block mt-0.5">
+                            100% do PIX garantido na hora
+                          </span>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-slate-950/90 border border-indigo-500/30">
+                          <span className="text-[10px] font-bold text-indigo-300 uppercase block">
+                            5. Cliente em 10x no MP
+                          </span>
+                          <span className="text-sm font-black text-indigo-300 font-mono">
+                            10x {formatBRL(sim.buyer10xInstallmentCents)}
+                          </span>
+                          <span className="text-[10px] text-slate-400 block mt-0.5">
+                            Total cliente: {formatBRL(sim.buyer10xTotalCents)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <p className="text-[11px] text-slate-300 leading-relaxed">
+                        💡 <strong>Por que cobrar {formatBRL(sim.safeCardChargeCents)} no Cartão?</strong> Se você cobrasse{" "}
+                        <strong className="text-amber-300">{formatBRL(sim.pixTargetCents)}</strong> direto no link de cartão, o Mercado Pago descontaria{" "}
+                        <strong className="text-rose-400">- {formatBRL(sim.ifChargedWithoutProtectionFeeCents)} (4,98%)</strong> e você receberia apenas{" "}
+                        <strong className="text-rose-300">{formatBRL(sim.ifChargedWithoutProtectionNetCents)}</strong>. Com o cálculo protegido ({" "}
+                        <strong className="text-white">{formatBRL(sim.safeCardChargeCents)}</strong>), você recebe na hora{" "}
+                        <strong className="text-emerald-400">{formatBRL(sim.netReceivedCents)}</strong>!
+                      </p>
                     </div>
                   </div>
 
@@ -5375,7 +5675,17 @@ export default function AdminPage() {
                       }))}
                       paymentMethod={editOrderForm.payment_method}
                       onChangePaymentMethod={(method) => {
-                        setEditOrderForm((prev) => (prev ? { ...prev, payment_method: method } : prev));
+                        setEditOrderForm((prev) => {
+                          if (!prev) return prev;
+                          const { basePixTotalCents: bPix, safeCardTotalCents: sCard } = resolveEditFormPixAndCardTotals(prev);
+                          const nextTotal = method === "credit_card" ? sCard : bPix;
+                          return {
+                            ...prev,
+                            payment_method: method,
+                            total_cents: nextTotal,
+                            subtotal_cents: Math.max(0, nextTotal - (Number(prev.shipping_cents) || 0)),
+                          };
+                        });
                       }}
                       onUpdateItems={(nextVisualItems) => {
                         const mapped: EditableOrderItem[] = nextVisualItems.map((vi) => ({
@@ -5735,13 +6045,23 @@ export default function AdminPage() {
                           <span className="text-amber-300">{editOrderForm.customer_name}</span>
                         </h4>
                       </div>
-                      <div className="text-left sm:text-right bg-slate-950/90 px-4 py-2 rounded-xl border border-amber-500/40 shrink-0">
-                        <span className="text-[10px] font-black uppercase text-amber-300 block">
-                          Novo Valor Total da Cobrança
-                        </span>
-                        <span className="text-lg sm:text-xl font-black text-white font-mono">
-                          {formatBRL(editOrderForm.total_cents)}
-                        </span>
+                      <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        <div className="text-left sm:text-right bg-slate-950/90 px-3.5 py-2 rounded-xl border border-emerald-500/40">
+                          <span className="text-[9px] font-black uppercase text-emerald-400 block">
+                            Valor no PIX (Líquido)
+                          </span>
+                          <span className="text-base sm:text-lg font-black text-emerald-400 font-mono">
+                            {formatBRL(basePixTotalCents)}
+                          </span>
+                        </div>
+                        <div className="text-left sm:text-right bg-slate-950/90 px-3.5 py-2 rounded-xl border border-blue-500/40">
+                          <span className="text-[9px] font-black uppercase text-blue-300 block">
+                            Link Cartão Seguro (÷ 0,95)
+                          </span>
+                          <span className="text-base sm:text-lg font-black text-white font-mono">
+                            {formatBRL(safeCardTotalCents)}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
@@ -5753,7 +6073,9 @@ export default function AdminPage() {
                         className="px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer"
                       >
                         <Zap className="w-4 h-4 shrink-0" />
-                        <span>Salvar + Gerar Novo PIX (24h) + Abrir WhatsApp do Cliente</span>
+                        <span>
+                          Salvar + Gerar PIX ({formatBRL(basePixTotalCents)}) + Abrir WhatsApp
+                        </span>
                       </button>
 
                       <button
@@ -5763,7 +6085,9 @@ export default function AdminPage() {
                         className="px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-600/25 transition-all cursor-pointer"
                       >
                         <CreditCard className="w-4 h-4 shrink-0" />
-                        <span>Salvar + Gerar Novo Link Cartão (72h) + Abrir WhatsApp do Cliente</span>
+                        <span>
+                          Salvar + Gerar Cartão Seguro ({formatBRL(safeCardTotalCents)} → Recebe {formatBRL(sim.netReceivedCents)}) + WhatsApp
+                        </span>
                       </button>
 
                       <button
@@ -5773,7 +6097,9 @@ export default function AdminPage() {
                         className="px-4 py-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 disabled:opacity-50 text-emerald-300 border border-emerald-500/40 font-extrabold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
                       >
                         <Share2 className="w-3.5 h-3.5 shrink-0" />
-                        <span>Salvar + Gerar Novo PIX + Disparar Direto via API WhatsApp</span>
+                        <span>
+                          Salvar + Gerar PIX ({formatBRL(basePixTotalCents)}) + Disparar via API WhatsApp
+                        </span>
                       </button>
 
                       <button
@@ -5783,12 +6109,15 @@ export default function AdminPage() {
                         className="px-4 py-2.5 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 disabled:opacity-50 text-blue-300 border border-blue-500/40 font-extrabold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
                       >
                         <Share2 className="w-3.5 h-3.5 shrink-0" />
-                        <span>Salvar + Gerar Link Cartão + Disparar Direto via API WhatsApp</span>
+                        <span>
+                          Salvar + Gerar Cartão ({formatBRL(safeCardTotalCents)}) + Disparar via API WhatsApp
+                        </span>
                       </button>
                     </div>
                   </div>
                 </>
-              )}
+                );
+              })()}
             </div>
 
             {/* Rodapé Fixo de Ações */}

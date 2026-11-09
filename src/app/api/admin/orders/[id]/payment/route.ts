@@ -73,10 +73,13 @@ export async function POST(
         customerPaymentUrl: `${site}/checkout/retorno?orderId=${encodeURIComponent(orderId)}&token=${checkoutStatusToken(orderId)}`,
         paymentHistory: parsedAddr.paymentHistory || [],
         lastGatewayDiag: parsedAddr.lastGatewayDiag || null,
+        totalCents: regen.totalCents,
+        basePixTotalCents: regen.basePixTotalCents,
+        safeCardTotalCents: regen.safeCardTotalCents,
         message:
           targetMethod === "credit_card"
-            ? "Novo link de Cartão (72h) gerado com sucesso no Mercado Pago!"
-            : "Novo QR Code Pix (24h) gerado com sucesso no Mercado Pago!",
+            ? `Novo link de Cartão (72h) gerado com proteção de taxa MP: R$ ${(regen.totalCents / 100).toFixed(2)} (Líquido garantido: R$ ${((regen.totalCents - Math.round(regen.totalCents * 0.0498)) / 100).toFixed(2)} = 100% do PIX)!`
+            : `Novo QR Code Pix (24h) gerado no valor à vista de R$ ${(regen.totalCents / 100).toFixed(2)}!`,
       });
     }
 

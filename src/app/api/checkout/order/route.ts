@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
-import { calculateTotemPrice } from "@/modules/pricing/pricingEngine";
+import { calculateTotemPrice, calculateSafeCardChargeCents } from "@/modules/pricing/pricingEngine";
 import {
   isItemKit,
   resolveKitEquipmentSummary,
@@ -139,6 +139,7 @@ export async function POST(req: Request) {
     const catalogReaders = liveCatalog.barcodeReaders;
 
     let subtotalCents = 0;
+    let pixItemsSubtotalCents = 0;
     const validatedCartItems: CartItem[] = [];
     const manufacturingSheets: ManufacturingSpec[] = [];
 
@@ -211,6 +212,7 @@ export async function POST(req: Request) {
       const itemSubtotalCents = unitPriceCents * quantity;
 
       subtotalCents += itemSubtotalCents;
+      pixItemsSubtotalCents += pricing.pixTotalPriceCents * quantity;
 
       const cartItem: CartItem = {
         id: rawItem.id || `item_${i + 1}_${Date.now()}`,
@@ -421,7 +423,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Selecione uma opção de entrega válida e recalcule o frete." }, { status: 400 });
     }
 
-    const totalCents = subtotalCents + shippingCents;
+    const basePixSubtotalCents = Math.max(0, pixItemsSubtotalCents - discountCents);
+    const basePixTotalCents = basePixSubtotalCents + shippingCents;
+    const safeCardTotalCents = calculateSafeCardChargeCents(basePixTotalCents);
+
+    const totalCents = paymentMethod === "credit_card" ? safeCardTotalCents : basePixTotalCents;
+    subtotalCents = paymentMethod === "credit_card" ? Math.max(0, safeCardTotalCents - shippingCents) : basePixSubtotalCents;
+
     if (!Number.isSafeInteger(totalCents) || totalCents <= 0) {
       return NextResponse.json({ error: "Valor do pedido inválido." }, { status: 400 });
     }
@@ -482,7 +490,11 @@ export async function POST(req: Request) {
       appwriteResult = await saveOrderWithSnapshot({
         orderNumber,
         customer,
-        deliveryAddress,
+        deliveryAddress: {
+          ...deliveryAddress,
+          basePixTotalCents,
+          safeCardTotalCents,
+        } as any,
         shippingMethod: selectedShippingInfo,
         couponCode: appliedCouponCode,
         discountCents,

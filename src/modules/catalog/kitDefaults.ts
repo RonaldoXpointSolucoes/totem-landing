@@ -476,14 +476,11 @@ export function resolveCabinetBasePricing(
 } {
   const cabNorm = (cabinetName || "").toLowerCase();
   let pixBaseCents = 110000; // Gabinete de Balcão (R$ 1.100,00 no PIX)
-  let cardBaseCents = 133000; // Gabinete de Balcão (R$ 1.330,00 no Cartão)
 
   if (cabNorm.includes("parede")) {
     pixBaseCents = 99000; // R$ 990,00 no PIX
-    cardBaseCents = 120000; // R$ 1.200,00 no Cartão
   } else if (cabNorm.includes("piso")) {
     pixBaseCents = 159000; // R$ 1.590,00 no PIX
-    cardBaseCents = 193000; // R$ 1.930,00 no Cartão
   }
 
   const colNorm = (colorName || "").toLowerCase();
@@ -494,15 +491,18 @@ export function resolveCabinetBasePricing(
     colorAdjustmentCents = 18000; // + R$ 180,00
   }
 
-  const cardAdditionCents = Math.max(0, cardBaseCents - pixBaseCents);
+  const cardBaseCents = Math.ceil(pixBaseCents / 0.95);
+  const pixCabinetWithColorCents = pixBaseCents + colorAdjustmentCents;
+  const cardCabinetWithColorCents = Math.ceil(pixCabinetWithColorCents / 0.95);
+  const cardAdditionCents = Math.max(0, cardCabinetWithColorCents - pixCabinetWithColorCents);
 
   return {
     pixBaseCents,
     cardBaseCents,
     cardAdditionCents,
     colorAdjustmentCents,
-    pixCabinetWithColorCents: pixBaseCents + colorAdjustmentCents,
-    cardCabinetWithColorCents: cardBaseCents + colorAdjustmentCents,
+    pixCabinetWithColorCents,
+    cardCabinetWithColorCents,
   };
 }
 
@@ -530,6 +530,10 @@ export interface OrderFinancialBreakdownResult {
   cardTotalCents: number;
   activeTotalCents: number;
   isCreditCard: boolean;
+  mpSellerFeeCents: number;
+  expectedNetReceivedCents: number;
+  buyer10xTotalCents: number;
+  buyer10xInstallmentCents: number;
 }
 
 /**
@@ -554,6 +558,7 @@ export function buildOrderFinancialBreakdown(params: {
   }> | null;
   additionalCharges?: Array<{
     id: string;
+    type?: "addition" | "discount";
     description: string;
     amountCents: number;
     quantity?: number;
@@ -672,36 +677,54 @@ export function buildOrderFinancialBreakdown(params: {
     cardTotalDiffCents += cabPricing.cardAdditionCents * qty;
   });
 
-  // Valores Adicionais / Serviços Extras inseridos pelo Admin
+  // Acréscimos (+) e Descontos (-) com descrição do motivo inseridos pelo Admin
   let additionalChargesCents = 0;
+  let manualDiscountsCents = 0;
   if (Array.isArray(params.additionalCharges)) {
     for (const chg of params.additionalCharges) {
       const chgQty = Math.max(1, Number(chg.quantity) || 1);
-      const chgTotal = (Number(chg.amountCents) || 0) * chgQty;
-      if (chgTotal > 0) {
-        additionalChargesCents += chgTotal;
+      const rawAmount = Number(chg.amountCents) || 0;
+      const isDisc = chg.type === "discount" || rawAmount < 0;
+      const absTotal = Math.abs(rawAmount) * chgQty;
+      if (absTotal <= 0) continue;
+
+      if (isDisc) {
+        manualDiscountsCents += absTotal;
         lines.push({
           stepNumber: nextStep(),
-          label: `${ String(chgQty).padStart(2, "0") } - ${chg.description}`,
-          subLabel: "Valor adicional / serviço extra incluído no pedido",
-          amountCents: chgTotal,
+          label: `Desconto${chgQty > 1 ? ` (${chgQty}x)` : ""}: ${chg.description || "Desconto Especial"}`,
+          subLabel: "Motivo / justificativa do desconto aplicado na edição do pedido",
+          amountCents: absTotal,
+          isDiscount: true,
+        });
+      } else {
+        additionalChargesCents += absTotal;
+        lines.push({
+          stepNumber: nextStep(),
+          label: `Acréscimo (${String(chgQty).padStart(2, "0")}x): ${chg.description || "Valor Adicional"}`,
+          subLabel: "Motivo / justificativa do acréscimo ou item extra incluído no pedido",
+          amountCents: absTotal,
           isAddition: true,
         });
       }
     }
   }
 
-  // Desconto de Cupom (se houver)
-  const discountCents = Math.max(0, Number(params.discountCents) || 0);
-  if (discountCents > 0) {
+  // Desconto de Cupom ou Desconto Direto (se houver)
+  const couponDiscountCents = Math.max(0, Number(params.discountCents) || 0);
+  if (couponDiscountCents > 0) {
     lines.push({
       stepNumber: nextStep(),
-      label: `Desconto Cupom${params.couponCode ? ` (${params.couponCode})` : ""}`,
-      subLabel: "Abatimento promocional aplicado no checkout",
-      amountCents: discountCents,
+      label: `Desconto${params.couponCode ? ` (${params.couponCode})` : " Aplicado"}`,
+      subLabel: params.couponCode
+        ? `Motivo / Cupom registrado: ${params.couponCode}`
+        : "Abatimento comercial aplicado no pedido",
+      amountCents: couponDiscountCents,
       isDiscount: true,
     });
   }
+
+  const discountCents = couponDiscountCents + manualDiscountsCents;
 
   // Frete (SEDEX / PAC / Transportadora)
   const shippingCents = Math.max(0, Number(params.shippingCents) || 0);
@@ -720,24 +743,37 @@ export function buildOrderFinancialBreakdown(params: {
     pixProductsSubtotalCents + additionalChargesCents - discountCents + shippingCents
   );
 
-  // Se o pedido estiver no Cartão de Crédito (ou se houver diferença de tabela Cartão),
-  // adicionamos a linha explícita explicando os + R$ 230,00 (ou + R$ 210 / + R$ 340) da Tabela Cartão!
+  // Mantém a diferença do catálogo do Gabinete (ex: + R$ 230,00 no Balcão) ou a diferença real do pedido salvo no Cartão
+  const catalogCardDiffCents = cardTotalDiffCents;
+  const safeGrossUpCardTotalCents = Math.ceil(pixTotalCents / 0.95);
+  const catalogCardTotalCents = Math.max(
+    0,
+    pixProductsSubtotalCents + catalogCardDiffCents + additionalChargesCents - discountCents + shippingCents
+  );
+
+  let cardTotalCents = catalogCardTotalCents > 0 ? catalogCardTotalCents : safeGrossUpCardTotalCents;
+  if (isCreditCard && typeof params.orderTotalCents === "number" && params.orderTotalCents > pixTotalCents) {
+    cardTotalCents = params.orderTotalCents;
+  }
+
+  cardTotalDiffCents = Math.max(0, cardTotalCents - pixTotalCents);
+  const cardProductsSubtotalCents = pixProductsSubtotalCents + cardTotalDiffCents;
+
   if (isCreditCard && cardTotalDiffCents > 0) {
+    const isCatalogDiff = cardTotalDiffCents === catalogCardDiffCents;
     lines.push({
       stepNumber: nextStep(),
-      label: "Acréscimo Modalidade Cartão de Crédito (até 10x)",
-      subLabel: `Diferença de tabela do Gabinete no Cartão vs Preço à vista no PIX`,
+      label: isCatalogDiff
+        ? "Acréscimo Modalidade Cartão de Crédito (até 10x)"
+        : "Acréscimo / Proteção Modalidade Cartão de Crédito",
+      subLabel: isCatalogDiff
+        ? "Diferença de tabela do Gabinete no Cartão vs Preço à vista no PIX"
+        : "Diferença da modalidade Cartão sobre o Total na Tabela PIX à vista",
       amountCents: cardTotalDiffCents,
       isAddition: true,
       isCardDiff: true,
     });
   }
-
-  const cardProductsSubtotalCents = pixProductsSubtotalCents + cardTotalDiffCents;
-  const cardTotalCents = Math.max(
-    0,
-    cardProductsSubtotalCents + additionalChargesCents - discountCents + shippingCents
-  );
 
   const activeTotalCents =
     typeof params.orderTotalCents === "number" && params.orderTotalCents > 0
@@ -745,6 +781,11 @@ export function buildOrderFinancialBreakdown(params: {
       : isCreditCard
       ? cardTotalCents
       : pixTotalCents;
+
+  const mpSellerFeeCents = Math.round(cardTotalCents * 0.0498);
+  const expectedNetReceivedCents = Math.max(0, cardTotalCents - mpSellerFeeCents);
+  const buyer10xTotalCents = Math.round(cardTotalCents * 1.2065);
+  const buyer10xInstallmentCents = Math.round(buyer10xTotalCents / 10);
 
   return {
     lines,
@@ -758,6 +799,10 @@ export function buildOrderFinancialBreakdown(params: {
     cardTotalCents,
     activeTotalCents,
     isCreditCard,
+    mpSellerFeeCents,
+    expectedNetReceivedCents,
+    buyer10xTotalCents,
+    buyer10xInstallmentCents,
   };
 }
 
