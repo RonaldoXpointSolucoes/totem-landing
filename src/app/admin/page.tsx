@@ -1075,20 +1075,16 @@ export default function AdminPage() {
     }
   };
 
-  const recalculateEditFormTotals = (
-    items: EditableOrderItem[],
-    additionalCharges: OrderAdditionalCharge[],
-    shippingCents: number,
-    discountCents: number
-  ) => {
-    const itemsSum = items.reduce((acc, i) => acc + (Number(i.subtotal_cents) || 0), 0);
-    const extrasSum = additionalCharges.reduce(
+  const recalculateEditFormTotals = (form: EditOrderFormState): EditOrderFormState => {
+    const itemsSum = (form.items || []).reduce((acc, i) => acc + (Number(i.subtotal_cents) || 0), 0);
+    const extrasSum = (form.additional_charges || []).reduce(
       (acc, c) => acc + (Number(c.amountCents) || 0) * Math.max(1, Number(c.quantity) || 1),
       0
     );
-    const ship = Number(shippingCents) || 0;
-    const disc = Number(discountCents) || 0;
+    const ship = Number(form.shipping_cents) || 0;
+    const disc = Number(form.discount_cents) || 0;
     return {
+      ...form,
       subtotal_cents: itemsSum,
       total_cents: Math.max(0, itemsSum + extrasSum - disc + ship),
     };
@@ -3074,7 +3070,7 @@ export default function AdminPage() {
                                     onClick={() => handleSendPaymentToCustomerWhatsAppApi(order)}
                                     className="px-2 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
                                   >
-                                    <Send className="w-3 h-3" />
+                                    <Share2 className="w-3 h-3" />
                                     <span>
                                       {sendingWaOrderId === order.$id ? "Enviando..." : "Disparar Zap API"}
                                     </span>
@@ -3308,13 +3304,14 @@ export default function AdminPage() {
                                       >
                                         <span className="text-[9px] font-black uppercase tracking-wider text-purple-300 flex items-center gap-1">
                                           <QrCode className="w-3 h-3 shrink-0" />
-                                          <span>{resolvedEq.isKit && !resolvedEq.readerDisplay ? "Itens Extras do Kit" : "Leitor 2D / QR"}</span>
+                                          <span>{resolvedEq.isKit && !resolvedEq.hasReader ? "Itens Extras do Kit" : "Leitor 2D / QR"}</span>
                                         </span>
                                         <p className="font-bold text-slate-100 text-xs leading-snug">
-                                          {resolvedEq.readerDisplay ||
-                                            (resolvedEq.isKit
-                                              ? resolvedEq.kitExtraItems.join(" + ")
-                                              : it.reader_name || "Não incluído")}
+                                          {resolvedEq.hasReader
+                                            ? resolvedEq.readerDisplay
+                                            : resolvedEq.isKit
+                                            ? resolvedEq.accessoriesSummary || "Kit Completo (Coolers + Régua + Cabos)"
+                                            : it.reader_name || "Não incluído"}
                                         </p>
                                       </div>
 
@@ -3883,13 +3880,14 @@ export default function AdminPage() {
                             <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-500/30">
                               <span className="text-[10px] font-black uppercase text-purple-300 flex items-center gap-1 mb-0.5">
                                 <QrCode className="w-3.5 h-3.5" />
-                                <span>{resolvedEq.isKit && !resolvedEq.readerDisplay ? "Itens Extras do Kit" : "Leitor / Scanner 2D"}</span>
+                                <span>{resolvedEq.isKit && !resolvedEq.hasReader ? "Itens Extras do Kit" : "Leitor / Scanner 2D"}</span>
                               </span>
                               <strong className="text-white text-xs sm:text-sm block">
-                                {resolvedEq.readerDisplay ||
-                                  (resolvedEq.isKit
-                                    ? resolvedEq.kitExtraItems.join(" + ")
-                                    : item.reader_name || "Não incluído")}
+                                {resolvedEq.hasReader
+                                  ? resolvedEq.readerDisplay
+                                  : resolvedEq.isKit
+                                  ? resolvedEq.accessoriesSummary || "Kit Completo (Coolers + Régua + Cabos)"
+                                  : item.reader_name || "Não incluído"}
                               </strong>
                             </div>
                           </div>
@@ -4003,34 +4001,34 @@ export default function AdminPage() {
                     })}
 
                     {/* Valores Adicionais no Modal (se houver) */}
-                    {getOrderAdditionalCharges(modalAddr).length > 0 && (
+                    {getOrderAdditionalCharges(selectedOrder).length > 0 && (
                       <div className="p-4 rounded-2xl bg-amber-950/25 border-2 border-amber-500/40 space-y-2 text-xs">
                         <div className="flex items-center justify-between border-b border-amber-500/30 pb-2">
                           <span className="font-black text-amber-300 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
                             <Plus className="w-4 h-4" />
-                            <span>Valores Adicionais / Serviços Extras ({getOrderAdditionalCharges(modalAddr).length})</span>
+                            <span>Valores Adicionais / Serviços Extras ({getOrderAdditionalCharges(selectedOrder).length})</span>
                           </span>
                           <span className="font-black text-amber-300 font-mono text-sm">
                             +{" "}
                             {formatBRL(
-                              getOrderAdditionalCharges(modalAddr).reduce(
-                                (s, c) => s + c.amountCents * Math.max(1, c.quantity),
+                              getOrderAdditionalCharges(selectedOrder).reduce(
+                                (s, c) => s + c.amountCents * Math.max(1, c.quantity || 1),
                                 0
                               )
                             )}
                           </span>
                         </div>
                         <div className="space-y-1.5">
-                          {getOrderAdditionalCharges(modalAddr).map((chg) => (
+                          {getOrderAdditionalCharges(selectedOrder).map((chg) => (
                             <div
                               key={chg.id}
                               className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-950/90 border border-amber-500/30"
                             >
                               <span className="font-bold text-white">
-                                {chg.quantity > 1 ? `${chg.quantity}x ` : ""}{chg.description}
+                                {chg.quantity && chg.quantity > 1 ? `${chg.quantity}x ` : ""}{chg.description}
                               </span>
                               <span className="font-black text-amber-300 font-mono">
-                                + {formatBRL(chg.amountCents * Math.max(1, chg.quantity))}
+                                + {formatBRL(chg.amountCents * Math.max(1, chg.quantity || 1))}
                               </span>
                             </div>
                           ))}
@@ -4289,18 +4287,30 @@ export default function AdminPage() {
 
               <div className="flex flex-wrap items-center gap-2">
                 {/* Seletor rápido de modo no modal */}
-                <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800">
+                <div className="flex flex-wrap items-center bg-slate-950 p-1 rounded-xl border border-slate-800 gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditModalFocusSection("payment_proposal")}
+                    className={`px-3 py-1.5 rounded-lg text-[11px] font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
+                      editModalFocusSection === "payment_proposal"
+                        ? "bg-amber-500 text-slate-950 shadow-md"
+                        : "text-slate-300 hover:text-white"
+                    }`}
+                  >
+                    <CreditCard className="w-3.5 h-3.5" />
+                    <span>Itens, + Valores Adicionais & Nova Cobrança</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => setEditModalFocusSection("execution")}
                     className={`px-3 py-1.5 rounded-lg text-[11px] font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
                       editModalFocusSection === "execution"
-                        ? "bg-amber-500 text-slate-950 shadow-md"
+                        ? "bg-emerald-500 text-slate-950 shadow-md"
                         : "text-slate-300 hover:text-white"
                     }`}
                   >
                     <FileText className="w-3.5 h-3.5" />
-                    <span>Ordem de Execução (Fotos, Vídeos & Texto)</span>
+                    <span>Ordem de Execução (Fotos & Vídeos)</span>
                   </button>
                   <button
                     type="button"
@@ -4312,7 +4322,7 @@ export default function AdminPage() {
                     }`}
                   >
                     <Edit2 className="w-3.5 h-3.5" />
-                    <span>Pedido Completo (Cliente, Itens & Tudo)</span>
+                    <span>Pedido Completo (Tudo)</span>
                   </button>
                 </div>
 
@@ -4334,30 +4344,42 @@ export default function AdminPage() {
               {/* ===================================================================== */}
               {/* BLOCO PRINCIPAL: EDITOR POTENTE DE ORDEM DE EXECUÇÃO (TEXTO, FOTOS E VÍDEOS) */}
               {/* ===================================================================== */}
-              <OrderExecutionEditor
-                orderNumber={editingOrder.order_number}
-                value={editOrderForm.execution_order}
-                onChange={(nextExecutionOrder) =>
-                  setEditOrderForm({
-                    ...editOrderForm,
-                    execution_order: nextExecutionOrder,
-                  })
-                }
-              />
+              {editModalFocusSection !== "payment_proposal" && (
+                <OrderExecutionEditor
+                  orderNumber={editingOrder.order_number}
+                  value={editOrderForm.execution_order}
+                  onChange={(nextExecutionOrder) =>
+                    setEditOrderForm({
+                      ...editOrderForm,
+                      execution_order: nextExecutionOrder,
+                    })
+                  }
+                />
+              )}
 
               {editModalFocusSection === "execution" && (
                 <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 flex flex-wrap items-center justify-between gap-3">
                   <p className="text-slate-400 text-xs">
-                    Deseja também alterar dados do cliente, endereço, valores ou anexar fotos/vídeos a um item específico?
+                    Deseja editar itens, adicionar valores extras com descrição específica ou gerar uma nova condição de pagamento?
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => setEditModalFocusSection("all")}
-                    className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                    <span>Mostrar Campos Comerciais e Itens do Pedido</span>
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditModalFocusSection("payment_proposal")}
+                      className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Editar Itens / + Valores Adicionais & Nova Cobrança</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditModalFocusSection("all")}
+                      className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                      <span>Mostrar Todos os Campos</span>
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -4541,28 +4563,23 @@ export default function AdminPage() {
                       </div>
                     </div>
                   </div>
+                </>
+              )}
 
+              {(editModalFocusSection === "payment_proposal" || editModalFocusSection === "all") && (
+                <>
                   {/* 3. Método de Entrega & Valores Financeiros */}
                   <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <h4 className="font-black text-cyan-400 uppercase text-[11px] tracking-wider">
-                        2. Método de Entrega & Valores Financeiros
+                        Modalidade de Frete & Totais do Pedido
                       </h4>
                       <button
                         type="button"
-                        onClick={() => {
-                          const itemsSum = editOrderForm.items.reduce((acc, i) => acc + (Number(i.subtotal_cents) || 0), 0);
-                          const disc = Number(editOrderForm.discount_cents) || 0;
-                          const ship = Number(editOrderForm.shipping_cents) || 0;
-                          setEditOrderForm({
-                            ...editOrderForm,
-                            subtotal_cents: itemsSum,
-                            total_cents: Math.max(0, itemsSum - disc + ship),
-                          });
-                        }}
+                        onClick={() => setEditOrderForm(recalculateEditFormTotals(editOrderForm))}
                         className="px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 font-bold text-[10px] cursor-pointer"
                       >
-                        Recalcular Total pelos Itens + Frete
+                        🔄 Recalcular Total (Itens + Valores Adicionais + Frete)
                       </button>
                     </div>
 
@@ -4578,7 +4595,7 @@ export default function AdminPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-slate-400 font-semibold mb-1">Subtotal Gabinetes (R$)</label>
+                        <label className="block text-slate-400 font-semibold mb-1">Subtotal + Adicionais (R$)</label>
                         <input
                           type="number"
                           step="0.01"
@@ -4598,17 +4615,20 @@ export default function AdminPage() {
                           type="number"
                           step="0.01"
                           value={(editOrderForm.shipping_cents / 100).toFixed(2)}
-                          onChange={(e) =>
-                            setEditOrderForm({
-                              ...editOrderForm,
-                              shipping_cents: Math.round((parseFloat(e.target.value) || 0) * 100),
-                            })
-                          }
+                          onChange={(e) => {
+                            const nextShip = Math.round((parseFloat(e.target.value) || 0) * 100);
+                            setEditOrderForm(
+                              recalculateEditFormTotals({
+                                ...editOrderForm,
+                                shipping_cents: nextShip,
+                              })
+                            );
+                          }}
                           className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-cyan-300 font-mono font-bold"
                         />
                       </div>
                       <div>
-                        <label className="block text-emerald-400 font-bold mb-1">Total Pago (R$)</label>
+                        <label className="block text-amber-300 font-bold mb-1">Total da Cobrança (R$)</label>
                         <input
                           type="number"
                           step="0.01"
@@ -4619,7 +4639,7 @@ export default function AdminPage() {
                               total_cents: Math.round((parseFloat(e.target.value) || 0) * 100),
                             })
                           }
-                          className="w-full px-3 py-2 bg-emerald-950/40 border border-emerald-500/40 rounded-xl text-emerald-300 font-mono font-black"
+                          className="w-full px-3 py-2 bg-amber-950/40 border border-amber-500/40 rounded-xl text-amber-300 font-mono font-black"
                         />
                       </div>
                     </div>
@@ -4627,33 +4647,31 @@ export default function AdminPage() {
 
                   {/* 4. Itens do Pedido, Equipamentos (Monitor/Impressora), Observações e Anexos por Gabinete */}
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <h4 className="font-black text-emerald-400 uppercase text-[11px] tracking-wider">
-                        3. Itens do Pedido, Monitor, Impressora, Especificações & Fotos/Vídeos por Item ({editOrderForm.items.length})
+                        Itens do Pedido, Monitor, Impressora & Especificações ({editOrderForm.items.length})
                       </h4>
                       <button
                         type="button"
-                        onClick={() =>
-                          setEditOrderForm({
-                            ...editOrderForm,
-                            items: [
-                              ...editOrderForm.items,
-                              {
-                                cabinet_name: "Gabinete de Balcão Compacto",
-                                color_name: "Branco TX",
-                                monitor_name: 'Touch 21.5" Full HD — Mais Vendido',
-                                printer_name: "Elgin i9",
-                                reader_name: "Sem leitor",
-                                unit_price_cents: 120000,
-                                quantity: 1,
-                                subtotal_cents: 120000,
-                                screenCutoutMm: "",
-                                customizationNotes: "",
-                                itemAttachments: [],
-                              },
-                            ],
-                          })
-                        }
+                        onClick={() => {
+                          const nextItems = [
+                            ...editOrderForm.items,
+                            {
+                              cabinet_name: "Gabinete de Balcão Compacto",
+                              color_name: "Branco TX (MaDeFibra BP)",
+                              monitor_name: 'Kit de Montagem — Computador All-in-One Touch 23.8" Core i5',
+                              printer_name: "IMPRESSORA PDV - VT-8360 80mm (Kit)",
+                              reader_name: "Kit Completo (Coolers + Régua + Cabos)",
+                              unit_price_cents: 494200,
+                              quantity: 1,
+                              subtotal_cents: 494200,
+                              screenCutoutMm: "",
+                              customizationNotes: "",
+                              itemAttachments: [],
+                            },
+                          ];
+                          setEditOrderForm(recalculateEditFormTotals({ ...editOrderForm, items: nextItems }));
+                        }}
                         className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-bold text-xs flex items-center gap-1 cursor-pointer"
                       >
                         <Plus className="w-3.5 h-3.5" />
@@ -4667,23 +4685,43 @@ export default function AdminPage() {
                           key={it.$id || idx}
                           className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3"
                         >
-                          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
                             <span className="font-black text-white text-xs">
                               Item #{idx + 1} — {it.cabinet_name}
                             </span>
-                            {editOrderForm.items.length > 1 && (
+                            <div className="flex flex-wrap items-center gap-2">
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const next = editOrderForm.items.filter((_, i) => i !== idx);
+                                  const next = [...editOrderForm.items];
+                                  next[idx] = {
+                                    ...next[idx],
+                                    monitor_name: 'Kit de Montagem — Computador All-in-One Touch 23.8" Core i5',
+                                    printer_name: "IMPRESSORA PDV - VT-8360 80mm (Kit)",
+                                    reader_name: "Kit Completo (Coolers + Régua + Cabos)",
+                                  };
                                   setEditOrderForm({ ...editOrderForm, items: next });
                                 }}
-                                className="text-rose-400 hover:text-rose-300 font-bold text-[11px] flex items-center gap-1 cursor-pointer"
+                                className="px-2.5 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 font-extrabold text-[10px] flex items-center gap-1 cursor-pointer"
+                                title="Preencher Monitor e Impressora com os modelos reais do Kit de Montagem"
                               >
-                                <Trash2 className="w-3 h-3" />
-                                <span>Remover Item</span>
+                                <Zap className="w-3 h-3" />
+                                <span>Aplicar Modelos do Kit (All-in-One Touch 23.8&quot; + VT-8360)</span>
                               </button>
-                            )}
+                              {editOrderForm.items.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = editOrderForm.items.filter((_, i) => i !== idx);
+                                    setEditOrderForm(recalculateEditFormTotals({ ...editOrderForm, items: next }));
+                                  }}
+                                  className="text-rose-400 hover:text-rose-300 font-bold text-[11px] flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                  <span>Remover Item</span>
+                                </button>
+                              )}
+                            </div>
                           </div>
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
@@ -4728,7 +4766,7 @@ export default function AdminPage() {
                                       quantity: q,
                                       subtotal_cents: q * (next[idx].unit_price_cents || 0),
                                     };
-                                    setEditOrderForm({ ...editOrderForm, items: next });
+                                    setEditOrderForm(recalculateEditFormTotals({ ...editOrderForm, items: next }));
                                   }}
                                   className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono"
                                 />
@@ -4747,7 +4785,7 @@ export default function AdminPage() {
                                       subtotal_cents: sub,
                                       unit_price_cents: Math.round(sub / Math.max(1, next[idx].quantity)),
                                     };
-                                    setEditOrderForm({ ...editOrderForm, items: next });
+                                    setEditOrderForm(recalculateEditFormTotals({ ...editOrderForm, items: next }));
                                   }}
                                   className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-indigo-300 font-mono font-bold"
                                 />
@@ -4766,7 +4804,7 @@ export default function AdminPage() {
                                   next[idx] = { ...next[idx], monitor_name: e.target.value };
                                   setEditOrderForm({ ...editOrderForm, items: next });
                                 }}
-                                placeholder='Ex: Touch 21.5" Full HD ou Monitor Sob Medida'
+                                placeholder='Ex: Computador All-in-One Touch 23.8" Core i5'
                                 className="w-full px-3 py-2 bg-cyan-950/30 border border-cyan-500/40 rounded-xl text-white font-bold"
                               />
                             </div>
@@ -4780,12 +4818,12 @@ export default function AdminPage() {
                                   next[idx] = { ...next[idx], printer_name: e.target.value };
                                   setEditOrderForm({ ...editOrderForm, items: next });
                                 }}
-                                placeholder="Ex: Elgin i9, Epson TM-T20X..."
+                                placeholder="Ex: IMPRESSORA PDV - VT-8360 80mm, Elgin i9, Epson TM-T20X..."
                                 className="w-full px-3 py-2 bg-indigo-950/30 border border-indigo-500/40 rounded-xl text-white font-bold"
                               />
                             </div>
                             <div>
-                              <label className="block text-purple-300 font-bold mb-1">Leitor 2D / QR Code</label>
+                              <label className="block text-purple-300 font-bold mb-1">Leitor 2D / Acessórios</label>
                               <input
                                 type="text"
                                 value={it.reader_name}
@@ -4794,7 +4832,7 @@ export default function AdminPage() {
                                   next[idx] = { ...next[idx], reader_name: e.target.value };
                                   setEditOrderForm({ ...editOrderForm, items: next });
                                 }}
-                                placeholder="Ex: Sem leitor ou Leitor 2D Fixo"
+                                placeholder="Ex: Kit Completo (Coolers + Régua + Cabos) ou Leitor 2D"
                                 className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
                               />
                             </div>
@@ -4933,6 +4971,252 @@ export default function AdminPage() {
                           </div>
                         </div>
                       ))}
+                    </div>
+                  </div>
+
+                  {/* ===================================================================== */}
+                  {/* 5. VALORES ADICIONAIS COM DESCRIÇÃO ESPECÍFICA (EX: SERVIÇO, ACESSÓRIO, PARCELAMENTO) */}
+                  {/* ===================================================================== */}
+                  <div className="p-4 sm:p-5 rounded-2xl bg-amber-950/20 border-2 border-amber-500/40 space-y-3.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h4 className="font-black text-amber-300 uppercase text-xs tracking-wider flex items-center gap-1.5">
+                          <Plus className="w-4 h-4" />
+                          <span>
+                            Valores Adicionais / Serviços Extras com Descrição Específica (
+                            {editOrderForm.additional_charges.length})
+                          </span>
+                        </h4>
+                        <p className="text-[11px] text-slate-300 mt-0.5">
+                          Adicione qualquer item extra, serviço de montagem, acessório ou ajuste de condição comercial com descrição personalizada. O total do pedido será atualizado automaticamente.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextCharges: OrderAdditionalCharge[] = [
+                            ...editOrderForm.additional_charges,
+                            {
+                              id: `chg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                              description: "",
+                              amountCents: 0,
+                              quantity: 1,
+                            },
+                          ];
+                          setEditOrderForm(
+                            recalculateEditFormTotals({
+                              ...editOrderForm,
+                              additional_charges: nextCharges,
+                            })
+                          );
+                        }}
+                        className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/20 cursor-pointer"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>+ Adicionar Valor Adicional</span>
+                      </button>
+                    </div>
+
+                    {/* Atalhos Rápidos de Valores Adicionais Frequentes */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <span className="text-[10px] font-bold uppercase text-slate-400 mr-1">Atalhos Rápidos:</span>
+                      {[
+                        { label: "+ Montagem Especializada (R$ 999,00)", desc: "Serviço Especializado de Montagem de Fábrica 100% Pronto", cents: 99900 },
+                        { label: "+ Leitor QR Code 2D (R$ 349,00)", desc: "Leitor de Código de Barras / QR Code 2D Homologado", cents: 34900 },
+                        { label: "+ Suporte Pinpad Universal (R$ 149,00)", desc: "Suporte Universal para Máquina de Cartão / Pinpad", cents: 14900 },
+                        { label: "+ Ajuste / Acréscimo Condição Especial", desc: "Acréscimo de Condição Comercial / Parcelamento", cents: 15000 },
+                      ].map((preset) => (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => {
+                            const nextCharges: OrderAdditionalCharge[] = [
+                              ...editOrderForm.additional_charges,
+                              {
+                                id: `chg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                                description: preset.desc,
+                                amountCents: preset.cents,
+                                quantity: 1,
+                              },
+                            ];
+                            setEditOrderForm(
+                              recalculateEditFormTotals({
+                                ...editOrderForm,
+                                additional_charges: nextCharges,
+                              })
+                            );
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-amber-500/20 text-amber-200 border border-amber-500/30 font-bold text-[10px] transition-colors cursor-pointer"
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {editOrderForm.additional_charges.length === 0 ? (
+                      <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 text-slate-400 text-[11px] italic">
+                        Nenhum valor adicional incluído neste pedido. Clique em &quot;+ Adicionar Valor Adicional&quot; ou em um dos atalhos acima para adicionar.
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {editOrderForm.additional_charges.map((chg, cIdx) => (
+                          <div
+                            key={chg.id || cIdx}
+                            className="p-3 rounded-xl bg-slate-950 border border-amber-500/40 grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end"
+                          >
+                            <div className="sm:col-span-6">
+                              <label className="block text-amber-300 font-bold text-[10px] uppercase mb-1">
+                                Descrição Específica do Valor Adicional #{cIdx + 1}
+                              </label>
+                              <input
+                                type="text"
+                                value={chg.description}
+                                onChange={(e) => {
+                                  const nextCharges = [...editOrderForm.additional_charges];
+                                  nextCharges[cIdx] = { ...nextCharges[cIdx], description: e.target.value };
+                                  setEditOrderForm({
+                                    ...editOrderForm,
+                                    additional_charges: nextCharges,
+                                  });
+                                }}
+                                placeholder="Ex: Serviço de Montagem Completa, Leitor QR Code, Diferença de Monitor..."
+                                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold"
+                              />
+                            </div>
+                            <div className="sm:col-span-2">
+                              <label className="block text-slate-400 font-semibold text-[10px] uppercase mb-1">
+                                Qtd
+                              </label>
+                              <input
+                                type="number"
+                                min={1}
+                                value={chg.quantity}
+                                onChange={(e) => {
+                                  const q = Math.max(1, parseInt(e.target.value, 10) || 1);
+                                  const nextCharges = [...editOrderForm.additional_charges];
+                                  nextCharges[cIdx] = { ...nextCharges[cIdx], quantity: q };
+                                  setEditOrderForm(
+                                    recalculateEditFormTotals({
+                                      ...editOrderForm,
+                                      additional_charges: nextCharges,
+                                    })
+                                  );
+                                }}
+                                className="w-full px-2.5 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-mono"
+                              />
+                            </div>
+                            <div className="sm:col-span-3">
+                              <label className="block text-amber-300 font-bold text-[10px] uppercase mb-1">
+                                Valor Unitário (R$)
+                              </label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={(chg.amountCents / 100).toFixed(2)}
+                                onChange={(e) => {
+                                  const cents = Math.round((parseFloat(e.target.value) || 0) * 100);
+                                  const nextCharges = [...editOrderForm.additional_charges];
+                                  nextCharges[cIdx] = { ...nextCharges[cIdx], amountCents: cents };
+                                  setEditOrderForm(
+                                    recalculateEditFormTotals({
+                                      ...editOrderForm,
+                                      additional_charges: nextCharges,
+                                    })
+                                  );
+                                }}
+                                placeholder="0.00"
+                                className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-xl text-amber-300 font-mono font-black"
+                              />
+                            </div>
+                            <div className="sm:col-span-1 flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nextCharges = editOrderForm.additional_charges.filter((_, i) => i !== cIdx);
+                                  setEditOrderForm(
+                                    recalculateEditFormTotals({
+                                      ...editOrderForm,
+                                      additional_charges: nextCharges,
+                                    })
+                                  );
+                                }}
+                                className="w-full sm:w-9 h-9 rounded-xl bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 flex items-center justify-center cursor-pointer"
+                                title="Remover este valor adicional"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ===================================================================== */}
+                  {/* 6. GERAR NOVA CONDIÇÃO DE PAGAMENTO (MERCADO PAGO) & ENVIAR AO CLIENTE */}
+                  {/* ===================================================================== */}
+                  <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-indigo-950/60 via-slate-950 to-emerald-950/50 border-2 border-indigo-500/50 space-y-4 shadow-xl">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                          <Zap className="w-3.5 h-3.5" />
+                          <span>Geração de Nova Condição de Pagamento & Disparo ao Cliente</span>
+                        </span>
+                        <h4 className="text-sm sm:text-base font-black text-white mt-0.5">
+                          Salvar Alterações + Gerar Nova Cobrança no Mercado Pago + Enviar para{" "}
+                          <span className="text-amber-300">{editOrderForm.customer_name}</span>
+                        </h4>
+                      </div>
+                      <div className="text-left sm:text-right bg-slate-950/90 px-4 py-2 rounded-xl border border-amber-500/40 shrink-0">
+                        <span className="text-[10px] font-black uppercase text-amber-300 block">
+                          Novo Valor Total da Cobrança
+                        </span>
+                        <span className="text-lg sm:text-xl font-black text-white font-mono">
+                          {formatBRL(editOrderForm.total_cents)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <button
+                        type="button"
+                        disabled={isSavingOrderEdit}
+                        onClick={() => handleSaveAndRegenerateOrderPayment("pix", "wa_web")}
+                        className="px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer"
+                      >
+                        <Zap className="w-4 h-4 shrink-0" />
+                        <span>Salvar + Gerar Novo PIX (24h) + Abrir WhatsApp do Cliente</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isSavingOrderEdit}
+                        onClick={() => handleSaveAndRegenerateOrderPayment("credit_card", "wa_web")}
+                        className="px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-600/25 transition-all cursor-pointer"
+                      >
+                        <CreditCard className="w-4 h-4 shrink-0" />
+                        <span>Salvar + Gerar Novo Link Cartão (72h) + Abrir WhatsApp do Cliente</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isSavingOrderEdit}
+                        onClick={() => handleSaveAndRegenerateOrderPayment("pix", "api")}
+                        className="px-4 py-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 disabled:opacity-50 text-emerald-300 border border-emerald-500/40 font-extrabold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+                      >
+                        <Share2 className="w-3.5 h-3.5 shrink-0" />
+                        <span>Salvar + Gerar Novo PIX + Disparar Direto via API WhatsApp</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isSavingOrderEdit}
+                        onClick={() => handleSaveAndRegenerateOrderPayment("credit_card", "api")}
+                        className="px-4 py-2.5 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 disabled:opacity-50 text-blue-300 border border-blue-500/40 font-extrabold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+                      >
+                        <Share2 className="w-3.5 h-3.5 shrink-0" />
+                        <span>Salvar + Gerar Link Cartão + Disparar Direto via API WhatsApp</span>
+                      </button>
                     </div>
                   </div>
                 </>
