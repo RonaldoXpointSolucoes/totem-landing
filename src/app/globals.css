@@ -598,3 +598,17 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Mantém as cores oficiais escuras na barra superior do App PWA */
+.admin-light .admin-pwa-header {
+  background: linear-gradient(90deg, #0f172a 0%, #131c31 50%, #0f172a 100%) !important;
+  color: #f8fafc !important;
+  border-bottom-color: rgba(99, 102, 241, 0.28) !important;
+}
+.admin-light .admin-pwa-header .pwa-keep-white,
+.admin-light .admin-pwa-header span.text-white {
+  color: #ffffff !important;
+}
+.admin-light .admin-pwa-header span.text-slate-300 {
+  color: #cbd5e1 !important;
+}

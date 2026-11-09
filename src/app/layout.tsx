@@ -44,10 +44,20 @@ export const metadata: Metadata = {
   alternates: {
     canonical: siteConfig.url,
   },
+  manifest: "/site.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Totem Pro",
+  },
   icons: {
-    icon: "/icon.svg",
-    shortcut: "/icon.svg",
-    apple: "/icon.svg",
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/icons/icon-192.png",
+    apple: "/icons/icon-192.png",
   },
   openGraph: {
     type: "website",
@@ -99,8 +109,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#090a0f" },
+    { media: "(prefers-color-scheme: light)", color: "#0f172a" },
+    { media: "(prefers-color-scheme: dark)", color: "#0f172a" },
   ],
   width: "device-width",
   initialScale: 1,

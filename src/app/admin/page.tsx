@@ -95,6 +95,13 @@ import {
   Upload,
   Sun,
   Moon,
+  Smartphone,
+  Bell,
+  Volume2,
+  VolumeX,
+  Wifi,
+  WifiOff,
+  Download,
 } from "lucide-react";
 
 interface OrderItem {
@@ -306,14 +313,232 @@ export default function AdminPage() {
   // Tema do Painel (Escuro / Claro)
   const [adminTheme, setAdminTheme] = useState<"dark" | "light">("dark");
 
+  // Estados de Recursos Nativo-PWA (Instalador, Alerta Sonoro, Auto-Sync, WakeLock, Rede)
+  const [showPwaHubModal, setShowPwaHubModal] = useState(false);
+  const [pwaInstallPrompt, setPwaInstallPrompt] = useState<any>(null);
+  const [isPwaStandalone, setIsPwaStandalone] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
+  const [pwaAutoSync, setPwaAutoSync] = useState(true);
+  const [pwaSoundAlerts, setPwaSoundAlerts] = useState(true);
+  const [pwaWakeLockActive, setPwaWakeLockActive] = useState(false);
+  const [pwaNotificationPermission, setPwaNotificationPermission] = useState<string>("default");
+  const [lastSyncTimeStr, setLastSyncTimeStr] = useState<string>("");
+  const wakeLockSentinelRef = React.useRef<any>(null);
+  const knownOrderIdsRef = React.useRef<Set<string>>(new Set());
+
   useEffect(() => {
     try {
       const saved = localStorage.getItem("totem_admin_theme");
       if (saved === "light" || saved === "dark") {
         setAdminTheme(saved);
       }
+      const savedSync = localStorage.getItem("totem_admin_pwa_autosync");
+      if (savedSync !== null) setPwaAutoSync(savedSync === "true");
+      const savedSound = localStorage.getItem("totem_admin_pwa_sound");
+      if (savedSound !== null) setPwaSoundAlerts(savedSound === "true");
     } catch {}
   }, []);
+
+  // Garante que a barra superior do navegador/PWA no celular sempre mantenha a cor do app (#0f172a)
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const targetColor = "#0f172a";
+    const existingMetas = document.querySelectorAll('meta[name="theme-color"]');
+    if (existingMetas.length > 0) {
+      existingMetas.forEach((m) => {
+        m.setAttribute("content", targetColor);
+        m.removeAttribute("media");
+      });
+    } else {
+      const meta = document.createElement("meta");
+      meta.name = "theme-color";
+      meta.content = targetColor;
+      document.head.appendChild(meta);
+    }
+    document.title = "Totem Pro Admin — Gestão & Produção CNC";
+  }, [adminTheme]);
+
+  // Inicialização de Service Worker, Detector Standalone, Online/Offline e Prompt de Instalação PWA
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    setIsOnline(navigator.onLine);
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    const checkStandalone = () => {
+      const standalone =
+        window.matchMedia("(display-mode: standalone)").matches ||
+        window.matchMedia("(display-mode: window-controls-overlay)").matches ||
+        Boolean((window.navigator as any).standalone);
+      setIsPwaStandalone(standalone);
+    };
+    checkStandalone();
+
+    if ("Notification" in window) {
+      setPwaNotificationPermission(Notification.permission);
+    }
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setPwaInstallPrompt(e);
+    };
+    const handleAppInstalled = () => {
+      setPwaInstallPrompt(null);
+      setIsPwaStandalone(true);
+      setSaveSuccessMsg("App Totem Pro Admin instalado com sucesso na tela inicial!");
+      setTimeout(() => setSaveSuccessMsg(""), 4000);
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleAppInstalled);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", handleAppInstalled);
+    };
+  }, []);
+
+  const playOrderChime = () => {
+    try {
+      if (typeof window === "undefined") return;
+      if (navigator.vibrate) {
+        navigator.vibrate([180, 80, 220]);
+      }
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const now = ctx.currentTime;
+
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = "sine";
+      osc1.frequency.setValueAtTime(880, now); // A5
+      osc1.frequency.setValueAtTime(1174.66, now + 0.14); // D6
+      gain1.gain.setValueAtTime(0.001, now);
+      gain1.gain.exponentialRampToValueAtTime(0.24, now + 0.02);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.46);
+    } catch {}
+  };
+
+  const triggerNativeOrderNotification = async (title: string, body: string) => {
+    try {
+      if (typeof window === "undefined" || !("Notification" in window)) return;
+      if (Notification.permission === "granted") {
+        if ("serviceWorker" in navigator) {
+          const reg = await navigator.serviceWorker.getRegistration();
+          if (reg && reg.showNotification) {
+            await reg.showNotification(title, {
+              body,
+              icon: "/icons/icon-192.png",
+              badge: "/icons/icon-192.png",
+              tag: `totem-order-${Date.now()}`,
+              data: { url: "/admin?tab=orders&status=all&view=simplified" },
+            });
+            return;
+          }
+        }
+        new Notification(title, { body, icon: "/icons/icon-192.png" });
+      }
+    } catch {}
+  };
+
+  const handleRequestPwaNotificationPermission = async () => {
+    try {
+      if (typeof window === "undefined" || !("Notification" in window)) {
+        alert("Este navegador não suporta notificações nativas.");
+        return;
+      }
+      const perm = await Notification.requestPermission();
+      setPwaNotificationPermission(perm);
+      if (perm === "granted") {
+        setPwaSoundAlerts(true);
+        localStorage.setItem("totem_admin_pwa_sound", "true");
+        playOrderChime();
+        await triggerNativeOrderNotification(
+          "🔔 Alertas Ativados — Totem Pro Admin",
+          "Você receberá som e notificação nativa a cada novo pedido!"
+        );
+        setSaveSuccessMsg("Notificações nativas e alerta sonoro ativados no celular!");
+        setTimeout(() => setSaveSuccessMsg(""), 4000);
+      }
+    } catch {}
+  };
+
+  const togglePwaWakeLock = async () => {
+    try {
+      if (pwaWakeLockActive) {
+        if (wakeLockSentinelRef.current) {
+          await wakeLockSentinelRef.current.release();
+          wakeLockSentinelRef.current = null;
+        }
+        setPwaWakeLockActive(false);
+        setSaveSuccessMsg("Modo Tela Sempre Acesa desativado.");
+        setTimeout(() => setSaveSuccessMsg(""), 3000);
+        return;
+      }
+      if ("wakeLock" in navigator) {
+        const sentinel = await (navigator as any).wakeLock.request("screen");
+        wakeLockSentinelRef.current = sentinel;
+        setPwaWakeLockActive(true);
+        sentinel.addEventListener("release", () => {
+          setPwaWakeLockActive(false);
+        });
+        if (navigator.vibrate) navigator.vibrate(40);
+        setSaveSuccessMsg("💡 Modo Fábrica Ativo: A tela do celular permanecerá acesa!");
+        setTimeout(() => setSaveSuccessMsg(""), 4000);
+      } else {
+        alert("Seu navegador não suporta o recurso Wake Lock (Tela Sempre Acesa).");
+      }
+    } catch {
+      alert("Não foi possível ativar o bloqueio de tela neste momento.");
+    }
+  };
+
+  const handleInstallPwaApp = async () => {
+    if (pwaInstallPrompt) {
+      try {
+        await pwaInstallPrompt.prompt();
+        const choice = await pwaInstallPrompt.userChoice;
+        if (choice?.outcome === "accepted") {
+          setPwaInstallPrompt(null);
+        }
+      } catch {}
+    } else {
+      setShowPwaHubModal(true);
+    }
+  };
+
+  const handleForceUpdatePwaCache = async () => {
+    try {
+      if ("serviceWorker" in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const r of regs) {
+          await r.update();
+        }
+      }
+      if ("caches" in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+      if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
+      window.location.reload();
+    } catch {
+      window.location.reload();
+    }
+  };
 
   const toggleAdminTheme = () => {
     const next = adminTheme === "dark" ? "light" : "dark";
@@ -721,7 +946,7 @@ export default function AdminPage() {
       .catch(() => setIsAuthenticated(false));
   }, []);
 
-  // Carregar Pedidos
+  // Carregar Pedidos (com Detecção de Novo Pedido Sonoro/Nativo, Badge PWA & Cache Offline)
   const loadOrders = async (status = statusFilter) => {
     setIsLoadingOrders(true);
     try {
@@ -734,8 +959,57 @@ export default function AdminPage() {
       if (json.ok) {
         const fetchedOrders: OrderRecord[] = json.data || [];
         setOrders(fetchedOrders);
+        setLastSyncTimeStr(
+          new Date().toLocaleTimeString("pt-BR", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          })
+        );
+
+        // Detecta chegada de novos pedidos em tempo real para tocar sino + notificação nativa
+        if (knownOrderIdsRef.current.size > 0 && fetchedOrders.length > 0) {
+          const brandNewOrders = fetchedOrders.filter(
+            (o) => o.$id && !knownOrderIdsRef.current.has(o.$id)
+          );
+          if (brandNewOrders.length > 0 && pwaSoundAlerts) {
+            playOrderChime();
+            const newest = brandNewOrders[0];
+            triggerNativeOrderNotification(
+              `🎉 Novo Pedido ${newest.order_number}!`,
+              `${newest.customer_name || "Cliente"} • ${formatBRL(newest.total_cents)}`
+            );
+          }
+        }
+        fetchedOrders.forEach((o) => {
+          if (o.$id) knownOrderIdsRef.current.add(o.$id);
+        });
+
+        // Salva snapshot offline para consulta de emergência sem internet na fábrica
+        try {
+          if (!status || status === "all") {
+            localStorage.setItem(
+              "totem_admin_orders_offline_cache",
+              JSON.stringify(fetchedOrders.slice(0, 25))
+            );
+          }
+        } catch {}
+
         if (json.statusCounts && typeof json.statusCounts === "object") {
           setOrderStatusCounts(json.statusCounts);
+          try {
+            const pendingBadgeCount =
+              Number(json.statusCounts.awaiting_payment || 0) +
+              Number(json.statusCounts.paid || 0) +
+              Number(json.statusCounts.awaiting_custom_analysis || 0);
+            if ("setAppBadge" in navigator) {
+              if (pendingBadgeCount > 0) {
+                (navigator as any).setAppBadge(pendingBadgeCount).catch(() => {});
+              } else {
+                (navigator as any).clearAppBadge?.().catch(() => {});
+              }
+            }
+          } catch {}
         }
         if (typeof json.totalAll === "number") {
           setTotalAllOrdersCount(json.totalAll);
@@ -759,9 +1033,73 @@ export default function AdminPage() {
       }
     } catch (err) {
       console.error("Erro ao carregar pedidos:", err);
+      // Fallback para Cache Local se estiver Offline
+      try {
+        const cached = localStorage.getItem("totem_admin_orders_offline_cache");
+        if (cached && orders.length === 0) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) {
+            setOrders(parsed);
+          }
+        }
+      } catch {}
     } finally {
       setIsLoadingOrders(false);
     }
+  };
+
+  // Auto-Sync Inteligente PWA a cada 45 segundos
+  useEffect(() => {
+    if (!isAuthenticated || !pwaAutoSync) return;
+    const timer = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        loadOrders();
+        if (statusFilter === "ads") {
+          loadAdsLeads(true);
+        }
+      }
+    }, 45000);
+    return () => clearInterval(timer);
+  }, [isAuthenticated, pwaAutoSync, statusFilter, pwaSoundAlerts]);
+
+  // Compartilhamento Nativo do Celular (Web Share API)
+  const handleShareOrderNative = async (order: OrderRecord) => {
+    const addr = getOrderAddress(order);
+    const shipping = getOrderShipping(order);
+    const payMethod = getOrderPaymentMethod(order);
+    const itemsText = (order.items || [])
+      .map((it) => `• ${it.quantity}x ${it.cabinet_name} (${it.color_name})`)
+      .join("\n");
+    const addrLine = addr?.street
+      ? `${addr.street}, nº ${addr.number || "S/N"}${addr.complement ? ` (${addr.complement})` : ""} — ${addr.neighborhood || ""}, ${addr.city}/${addr.state || "SP"} • CEP ${addr.cep || ""}`
+      : "Endereço não informado";
+
+    const shareText = [
+      `📦 *Pedido ${order.order_number} — Totem Pro*`,
+      `👤 Cliente: ${order.customer_name || "—"} (${order.customer_document || "—"})`,
+      `📱 WhatsApp: ${order.customer_whatsapp || "—"}`,
+      `🛠️ Itens:\n${itemsText}`,
+      `🚚 Entrega: ${shipping.name}`,
+      `📍 Endereço: ${addrLine}`,
+      `💰 Total: ${formatBRL(order.total_cents)} (${payMethod === "credit_card" ? "Cartão" : "PIX"})`,
+    ].join("\n");
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: `Pedido ${order.order_number} — ${order.customer_name}`,
+          text: shareText,
+          url: `${window.location.origin}/admin?tab=orders&modalOrder=${order.order_number}`,
+        });
+        return;
+      }
+    } catch {}
+
+    try {
+      await navigator.clipboard.writeText(shareText);
+      setSaveSuccessMsg(`Resumo do pedido ${order.order_number} copiado para compartilhar!`);
+      setTimeout(() => setSaveSuccessMsg(""), 3500);
+    } catch {}
   };
 
   // Carregar Catálogo
@@ -1987,100 +2325,439 @@ export default function AdminPage() {
   // 2. Painel Administrativo Autenticado
   return (
     <div className={`min-h-screen ${adminTheme === "light" ? "admin-light bg-slate-50 text-slate-900" : "bg-slate-950 text-slate-100"} flex flex-col antialiased transition-colors duration-200`}>
-      {/* Topo / Header Administrativo (Linha Única Compacta no Mobile & Desktop) */}
-      <header className="sticky top-0 z-40 bg-slate-900/95 border-b border-slate-800 backdrop-blur-md px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3">
-        <div className="max-w-[1600px] mx-auto flex items-center justify-between gap-2">
+      {/* Topo / Header Administrativo Nativo PWA (Mantém Cores Oficiais do App #0f172a) */}
+      <header className="admin-pwa-header sticky top-0 z-40 bg-gradient-to-r from-[#0f172a] via-[#131c31] to-[#0f172a] border-b border-indigo-500/25 shadow-[0_4px_20px_rgba(0,0,0,0.4)] backdrop-blur-xl">
+        {/* Filete Superior Luminoso da Marca (Fusão com Status Bar do Celular) */}
+        <div className="h-[2px] w-full bg-gradient-to-r from-indigo-500 via-cyan-400 to-emerald-400 opacity-90" />
+
+        <div className="max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3 flex items-center justify-between gap-2">
+          {/* Esquerda: Identidade do App + Status Live / Auto-Sync / Offline */}
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowPwaHubModal(true)}
+              className="relative w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center shadow-md shadow-indigo-500/25 shrink-0 active:scale-95 transition-transform cursor-pointer"
+              title="Abrir Central de Recursos do App PWA"
+            >
               <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-            </div>
+              <span
+                className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#0f172a] ${
+                  isOnline ? "bg-emerald-400" : "bg-amber-400 animate-ping"
+                }`}
+              />
+            </button>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                <span className="font-extrabold text-white text-sm sm:text-base tracking-tight truncate">Totem Pro</span>
-                <span className="hidden sm:inline-flex text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
-                  Painel Admin
+                <span className="pwa-keep-white font-extrabold text-white text-sm sm:text-base tracking-tight truncate">
+                  Totem Pro
                 </span>
-                <div className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[9px] sm:text-[10px] font-mono text-emerald-400 font-semibold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="hidden sm:inline-flex text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/35">
+                  Admin PWA
+                </span>
+                <div className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[9px] sm:text-[10px] font-mono text-emerald-300 font-bold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   <span>v{siteConfig.version}</span>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-slate-400 truncate">
-                <span className="inline-block w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                <span className="truncate">
-                  <span className="sm:hidden">Appwrite Live</span>
-                  <span className="hidden sm:inline">Appwrite Database Live (`totem_db`)</span>
-                </span>
+              <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-slate-300 truncate">
+                {isOnline ? (
+                  <>
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                    <span className="truncate text-slate-300">
+                      <span className="sm:hidden">
+                        {lastSyncTimeStr ? `Sync ${lastSyncTimeStr.slice(0, 5)}` : "Live"}
+                      </span>
+                      <span className="hidden sm:inline">
+                        Appwrite Live {lastSyncTimeStr ? `• Sync ${lastSyncTimeStr}` : ""}
+                      </span>
+                    </span>
+                  </>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-amber-300 font-bold truncate">
+                    <WifiOff className="w-3 h-3 shrink-0" />
+                    <span>Offline (Cache Local)</span>
+                  </span>
+                )}
+                {pwaWakeLockActive && (
+                  <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-400/40 text-[9px] font-extrabold shrink-0">
+                    💡 Tela Acesa
+                  </span>
+                )}
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Direita: Recursos Rápidos do PWA + Ações do Topo */}
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+            {/* Botão Central de Recursos PWA / Instalar App */}
+            <button
+              type="button"
+              onClick={() => setShowPwaHubModal(true)}
+              className="px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-xl bg-gradient-to-r from-indigo-600/30 to-cyan-600/25 hover:from-indigo-600/45 hover:to-cyan-600/40 active:scale-95 text-cyan-200 border border-cyan-400/40 text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm"
+              title="Central de Recursos do App PWA (Instalar Tela Cheia, Alerta Sonoro, Tela Sempre Acesa, Auto-Sync e Cache)"
+            >
+              {pwaInstallPrompt ? (
+                <>
+                  <Download className="w-3.5 h-3.5 text-emerald-300 animate-bounce" />
+                  <span className="text-[11px] sm:text-xs text-white">Instalar</span>
+                </>
+              ) : (
+                <>
+                  <Smartphone className="w-3.5 h-3.5 text-cyan-300" />
+                  <span className="text-[11px] sm:text-xs text-white">PWA</span>
+                </>
+              )}
+            </button>
+
+            {/* Alternador Rápido de Alerta Sonoro de Novo Pedido */}
+            <button
+              type="button"
+              onClick={() => {
+                const next = !pwaSoundAlerts;
+                setPwaSoundAlerts(next);
+                try {
+                  localStorage.setItem("totem_admin_pwa_sound", String(next));
+                } catch {}
+                if (next) {
+                  playOrderChime();
+                  if (pwaNotificationPermission === "default" && "Notification" in window) {
+                    Notification.requestPermission().then((p) => setPwaNotificationPermission(p)).catch(() => {});
+                  }
+                  setSaveSuccessMsg("🔔 Alerta sonoro de novos pedidos ativado!");
+                } else {
+                  setSaveSuccessMsg("🔕 Alerta sonoro de novos pedidos silenciado.");
+                }
+                setTimeout(() => setSaveSuccessMsg(""), 3000);
+              }}
+              className={`p-2 rounded-xl text-xs flex items-center justify-center gap-1 transition-all active:scale-95 border cursor-pointer ${
+                pwaSoundAlerts
+                  ? "bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border-emerald-500/35"
+                  : "bg-slate-800/90 hover:bg-slate-700 text-slate-400 border-slate-700/60"
+              }`}
+              title={pwaSoundAlerts ? "Alerta Sonoro de Novo Pedido Ativo (Toque para silenciar)" : "Alerta Sonoro Silenciado (Toque para ativar)"}
+            >
+              {pwaSoundAlerts ? (
+                <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+              ) : (
+                <VolumeX className="w-3.5 h-3.5 text-slate-400" />
+              )}
+            </button>
+
             {/* Alternador de Tema Claro / Escuro */}
             <button
               onClick={toggleAdminTheme}
               className={`p-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 border cursor-pointer ${
                 adminTheme === "light"
-                  ? "bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 border-amber-300"
-                  : "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700/60"
+                  ? "bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-400/50"
+                  : "bg-slate-800/90 hover:bg-slate-700 text-slate-300 border-slate-700/60"
               }`}
               title={adminTheme === "light" ? "Alternar para Tema Escuro" : "Alternar para Tema Claro"}
             >
               {adminTheme === "light" ? (
                 <>
-                  <Moon className="w-3.5 h-3.5 text-indigo-600" />
-                  <span className="hidden md:inline font-medium">Tema Escuro</span>
+                  <Moon className="w-3.5 h-3.5 text-indigo-300" />
+                  <span className="hidden md:inline font-medium text-white">Escuro</span>
                 </>
               ) : (
                 <>
                   <Sun className="w-3.5 h-3.5 text-amber-400" />
-                  <span className="hidden md:inline font-medium">Tema Claro</span>
+                  <span className="hidden md:inline font-medium text-slate-200">Claro</span>
                 </>
               )}
             </button>
 
             <button
               onClick={() => {
+                if (typeof navigator !== "undefined" && navigator.vibrate) {
+                  navigator.vibrate(25);
+                }
                 loadOrders();
                 loadAdsLeads(true);
                 loadCatalog();
                 loadAnalytics();
               }}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 text-xs flex items-center justify-center gap-1.5 transition-all border border-slate-700/60 cursor-pointer"
+              className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 active:scale-95 text-slate-200 text-xs flex items-center justify-center gap-1.5 transition-all border border-slate-700/60 cursor-pointer"
               title="Sincronizar todos os dados (Pedidos, ADS, Appwrite e Catálogo)"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingOrders || isLoadingAdsLeads || isLoadingCatalog || isLoadingAnalytics ? "animate-spin" : ""}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingOrders || isLoadingAdsLeads || isLoadingCatalog || isLoadingAnalytics ? "animate-spin text-cyan-400" : ""}`} />
               <span className="hidden md:inline">Atualizar</span>
             </button>
+
             <a
               href="/"
               target="_blank"
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 text-xs flex items-center justify-center gap-1.5 transition-all border border-slate-700/60"
+              className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 active:scale-95 text-slate-200 text-xs flex items-center justify-center gap-1.5 transition-all border border-slate-700/60"
               title="Abrir loja pública em nova guia"
             >
               <ExternalLink className="w-3.5 h-3.5" />
               <span className="hidden md:inline">Ver Loja</span>
             </a>
-            {currentUser && (
-              <div className="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-xl bg-slate-800/80 border border-slate-700/60 text-xs">
-                <div className="w-5 h-5 rounded-full bg-indigo-600/30 text-indigo-400 flex items-center justify-center font-bold text-[10px]">
-                  {currentUser.name ? currentUser.name.substring(0, 1).toUpperCase() : "A"}
-                </div>
-                <span className="font-semibold text-slate-200">{currentUser.name || currentUser.email}</span>
-              </div>
-            )}
 
             <button
               onClick={handleLogout}
-              className="px-2.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 text-rose-400 border border-rose-500/30 text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer"
+              className="p-2 sm:px-2.5 sm:py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 active:scale-95 text-rose-300 border border-rose-500/35 text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer"
               title="Encerrar sessão administrativa"
             >
               <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden xs:inline sm:inline">Sair</span>
+              <span className="hidden sm:inline">Sair</span>
             </button>
           </div>
         </div>
       </header>
+
+      {/* Modal / Bottom Sheet: Central de Recursos Úteis do App PWA */}
+      {showPwaHubModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in"
+          onClick={() => setShowPwaHubModal(false)}
+        >
+          <div
+            className="w-full sm:max-w-lg bg-slate-900 border-t sm:border border-indigo-500/30 rounded-t-[28px] sm:rounded-3xl p-4 sm:p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Alça Mobile (Bottom Sheet Handle) */}
+            <div className="sm:hidden w-12 h-1.5 rounded-full bg-slate-700 mx-auto -mt-1 mb-1" />
+
+            <div className="flex items-start justify-between gap-3 border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-indigo-500/25 shrink-0">
+                  <Smartphone className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-black text-white flex items-center gap-2">
+                    <span>Central de Recursos do App PWA</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                      v{siteConfig.version}
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Superpoderes mobile para gestão de pedidos, expedição e chão de fábrica
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPwaHubModal(false)}
+                className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* 1. Status de Tela Cheia (Standalone) & Remoção da Barra Branca de URL */}
+            <div
+              className={`p-3.5 rounded-2xl border space-y-2 ${
+                isPwaStandalone
+                  ? "bg-emerald-950/30 border-emerald-500/40"
+                  : "bg-indigo-950/40 border-indigo-500/45"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-black text-white flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-cyan-400" />
+                  <span>
+                    {isPwaStandalone
+                      ? "✅ Modo App Nativo Tela Cheia Ativo"
+                      : "📲 Como Abrir em Tela Cheia (Sem Barra Superior de URL)"}
+                  </span>
+                </span>
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    isPwaStandalone
+                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                      : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                  }`}
+                >
+                  {isPwaStandalone ? "Standalone" : "Atalho / Navegador"}
+                </span>
+              </div>
+
+              {!isPwaStandalone && (
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Para ocultar a barra de endereço (<code className="text-cyan-300">totem.xpointsolucoes.com.br</code>) e deixar 100% da tela com as cores escuras do app:
+                  {pwaInstallPrompt
+                    ? " toque no botão abaixo para instalar o WebAPK oficial."
+                    : " toque no menu ⋮ do Chrome no canto superior direito e escolha «Instalar aplicativo» (ou remova o atalho antigo da tela inicial e adicione novamente)."}
+                </p>
+              )}
+
+              {pwaInstallPrompt && (
+                <button
+                  type="button"
+                  onClick={handleInstallPwaApp}
+                  className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 active:scale-95 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25 cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Instalar App Totem Admin em Tela Cheia</span>
+                </button>
+              )}
+            </div>
+
+            {/* 2. Grade de Recursos Interativos do PWA */}
+            <div className="space-y-2.5">
+              {/* Recurso A: Alerta Sonoro + Notificação Nativa de Novos Pedidos */}
+              <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between gap-3">
+                <div className="space-y-0.5 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <Bell className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span className="text-xs font-bold text-white">Alerta Sonoro & Notificação de Pedido</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Toca sinal sonoro, vibra e exibe notificação quando chega novo pedido.
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playOrderChime();
+                      triggerNativeOrderNotification(
+                        "🔔 Teste de Alerta — Totem Pro",
+                        "Som e vibração funcionando perfeitamente no seu aparelho!"
+                      );
+                    }}
+                    className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-cyan-300 border border-slate-700 text-[11px] font-bold cursor-pointer"
+                  >
+                    Testar Som
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !pwaSoundAlerts;
+                      setPwaSoundAlerts(next);
+                      try {
+                        localStorage.setItem("totem_admin_pwa_sound", String(next));
+                      } catch {}
+                      if (next && pwaNotificationPermission !== "granted") {
+                        handleRequestPwaNotificationPermission();
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-[11px] font-black border cursor-pointer transition-all ${
+                      pwaSoundAlerts
+                        ? "bg-emerald-600 text-white border-emerald-400"
+                        : "bg-slate-800 text-slate-400 border-slate-700"
+                    }`}
+                  >
+                    {pwaSoundAlerts ? "ATIVO" : "OFF"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Recurso B: Modo Fábrica — Tela Sempre Acesa (Wake Lock) */}
+              <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between gap-3">
+                <div className="space-y-0.5 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <Zap className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span className="text-xs font-bold text-white">Modo Fábrica (Tela Sempre Acesa)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Impede que a tela do celular apague enquanto você confere medidas CNC ou embala.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={togglePwaWakeLock}
+                  className={`px-3 py-1.5 rounded-xl text-[11px] font-black border shrink-0 cursor-pointer transition-all active:scale-95 ${
+                    pwaWakeLockActive
+                      ? "bg-amber-500 text-slate-950 border-amber-300 shadow-md shadow-amber-500/20"
+                      : "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700"
+                  }`}
+                >
+                  {pwaWakeLockActive ? "💡 ACESA" : "ATIVAR"}
+                </button>
+              </div>
+
+              {/* Recurso C: Auto-Sync em Segundo Plano (45s) + Cache Offline */}
+              <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between gap-3">
+                <div className="space-y-0.5 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <RefreshCw className={`w-4 h-4 text-indigo-400 shrink-0 ${pwaAutoSync ? "animate-spin" : ""}`} style={{ animationDuration: "6s" }} />
+                    <span className="text-xs font-bold text-white">Sincronização Automática (45s) + Offline</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Atualiza pedidos sozinho a cada 45s e guarda cópia de emergência sem internet.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !pwaAutoSync;
+                    setPwaAutoSync(next);
+                    try {
+                      localStorage.setItem("totem_admin_pwa_autosync", String(next));
+                    } catch {}
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-[11px] font-black border shrink-0 cursor-pointer transition-all active:scale-95 ${
+                    pwaAutoSync
+                      ? "bg-indigo-600 text-white border-indigo-400"
+                      : "bg-slate-800 text-slate-400 border-slate-700"
+                  }`}
+                >
+                  {pwaAutoSync ? "AUTO 45s" : "MANUAL"}
+                </button>
+              </div>
+            </div>
+
+            {/* 3. Atalhos Rápidos de Operação no Celular */}
+            <div className="space-y-2 pt-1 border-t border-slate-800">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                Atalhos Rápidos de Operação Mobile
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab("orders");
+                    setStatusFilter("awaiting_payment");
+                    loadOrders("awaiting_payment");
+                    setShowPwaHubModal(false);
+                  }}
+                  className="p-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 border border-amber-500/35 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Aguardando Pagto ({orderStatusCounts.awaiting_payment || 0})</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab("orders");
+                    setStatusFilter("paid");
+                    loadOrders("paid");
+                    setShowPwaHubModal(false);
+                  }}
+                  className="p-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 active:scale-95 text-emerald-300 border border-emerald-500/35 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Pagos / Produção ({orderStatusCounts.paid || 0})</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab("orders");
+                    setShowQuickMpCalculator(true);
+                    setShowPwaHubModal(false);
+                  }}
+                  className="p-2.5 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 active:scale-95 text-blue-300 border border-blue-500/35 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <CreditCard className="w-3.5 h-3.5" />
+                  <span>Calculadora Cartão MP</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleForceUpdatePwaCache}
+                  className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Limpar Cache & Atualizar</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Navegação por Abas Principais (Carrossel Deslizante de 1 Linha no Mobile / Wrap no Desktop) */}
       <div className="border-b border-slate-800/80 bg-slate-900/50 backdrop-blur-sm">
@@ -2810,35 +3487,35 @@ export default function AdminPage() {
                             </span>
                           </div>
 
-                          {/* 5. AÇÕES RÁPIDAS (ERGONÔMICAS NO MOBILE & DESKTOP) */}
-                          <div className="shrink-0 flex flex-wrap items-center justify-between sm:justify-end gap-1.5 pt-2 xl:pt-0 border-t xl:border-t-0 border-slate-800/70">
-                            <div className="flex flex-wrap items-center gap-1.5">
+                          {/* 5. AÇÕES RÁPIDAS (1 LINHA ERGONÔMICA NO MOBILE & DESKTOP + COMPARTILHAR NATIVO PWA) */}
+                          <div className="shrink-0 flex items-center justify-between sm:justify-end gap-1 sm:gap-1.5 pt-2 xl:pt-0 border-t xl:border-t-0 border-slate-800/70 overflow-x-auto no-scrollbar">
+                            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
                               <button
                                 type="button"
                                 onClick={() => toggleOrderExpanded(order.$id)}
-                                className="px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-extrabold text-xs inline-flex items-center gap-1 shadow-sm transition-all cursor-pointer"
+                                className="px-2 sm:px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-extrabold text-[11px] sm:text-xs inline-flex items-center gap-1 shadow-sm transition-all cursor-pointer shrink-0"
                                 title="Clique para abrir todos os detalhes, cobrança Mercado Pago e as 3 colunas do pedido"
                               >
                                 <Eye className="w-3.5 h-3.5" />
                                 <span>Detalhes</span>
-                                <ChevronDown className="w-3.5 h-3.5" />
+                                <ChevronDown className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                               </button>
 
                               <button
                                 type="button"
                                 onClick={() => setPrintingProductionOrder(order)}
-                                className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-xs inline-flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 transition-all cursor-pointer"
+                                className="px-2 sm:px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-[11px] sm:text-xs inline-flex items-center gap-1 shadow-sm shadow-emerald-600/20 transition-all cursor-pointer shrink-0"
                                 title="Imprimir Ordem de Produção para a Fábrica (Sem Valores Monetários + Orientações + Checklist à Caneta)"
                               >
                                 <Printer className="w-3.5 h-3.5" />
-                                <span className="sm:hidden">O. Produção</span>
+                                <span className="sm:hidden">Produção</span>
                                 <span className="hidden sm:inline">Ordem de Produção</span>
                               </button>
 
                               <button
                                 type="button"
                                 onClick={() => setCorreiosLabelOrder(order)}
-                                className="px-2.5 py-1.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 active:scale-95 text-amber-300 border border-amber-400/50 font-extrabold text-xs inline-flex items-center gap-1 transition-all cursor-pointer"
+                                className="px-2 sm:px-2.5 py-1.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 active:scale-95 text-amber-300 border border-amber-400/50 font-extrabold text-[11px] sm:text-xs inline-flex items-center gap-1 transition-all cursor-pointer shrink-0"
                                 title="Lançar Pré-Postagem no Contrato Correios (API CWS) e Imprimir Etiqueta Simplificada"
                               >
                                 <Truck className="w-3.5 h-3.5" />
@@ -2849,7 +3526,7 @@ export default function AdminPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleOpenEditOrder(order, "payment_proposal")}
-                                  className="px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 border border-amber-500/35 font-bold text-xs inline-flex items-center gap-1 transition-all cursor-pointer"
+                                  className="px-2 sm:px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 border border-amber-500/35 font-bold text-[11px] sm:text-xs inline-flex items-center gap-1 transition-all cursor-pointer shrink-0"
                                   title="Editar itens, adicionar valores extras e gerar nova condição de pagamento"
                                 >
                                   <Plus className="w-3.5 h-3.5" />
@@ -2858,7 +3535,16 @@ export default function AdminPage() {
                               )}
                             </div>
 
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handleShareOrderNative(order)}
+                                className="p-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 active:scale-95 text-cyan-300 border border-cyan-500/35 transition-all cursor-pointer"
+                                title="Compartilhar resumo do pedido no celular (WhatsApp, E-mail, Impressão)"
+                              >
+                                <Share2 className="w-3.5 h-3.5" />
+                              </button>
+
                               <button
                                 type="button"
                                 onClick={() => handleOpenEditOrder(order, "all")}

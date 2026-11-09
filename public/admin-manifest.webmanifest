@@ -1,0 +1,64 @@
+{
+  "id": "/admin",
+  "name": "Totem Pro Admin — Gestão & Produção CNC",
+  "short_name": "Totem Admin",
+  "description": "Painel Administrativo e Ordem de Produção CNC da Totem Pro (X-Point Soluções).",
+  "start_url": "/admin?tab=orders&status=all&view=simplified",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#090a0f",
+  "theme_color": "#0f172a",
+  "categories": ["business", "productivity", "shopping"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/admin-icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Pedidos & Produção CNC",
+      "short_name": "Pedidos",
+      "description": "Ver fila de pedidos e ordens de produção CNC",
+      "url": "/admin?tab=orders&status=all&view=simplified",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Aguardando Pagamento",
+      "short_name": "Cobranças",
+      "description": "Pedidos pendentes de PIX ou Cartão",
+      "url": "/admin?tab=orders&status=awaiting_payment&view=simplified",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Leads & Carrinhos ADS",
+      "short_name": "ADS Leads",
+      "description": "Carrinhos abandonados e conversões Google Ads",
+      "url": "/admin?tab=orders&status=ads&view=simplified",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Clientes & Compras",
+      "short_name": "Clientes",
+      "description": "Base de clientes e histórico de compras",
+      "url": "/admin?tab=customers",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ]
+}
