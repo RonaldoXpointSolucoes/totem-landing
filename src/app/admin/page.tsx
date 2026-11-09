@@ -1987,36 +1987,39 @@ export default function AdminPage() {
   // 2. Painel Administrativo Autenticado
   return (
     <div className={`min-h-screen ${adminTheme === "light" ? "admin-light bg-slate-50 text-slate-900" : "bg-slate-950 text-slate-100"} flex flex-col antialiased transition-colors duration-200`}>
-      {/* Topo / Header Administrativo */}
-      <header className="sticky top-0 z-40 bg-slate-900/90 border-b border-slate-800 backdrop-blur-md px-4 sm:px-6 lg:px-8 py-3.5">
-        <div className="max-w-[1600px] mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center shadow-md shadow-indigo-500/20">
-              <ShieldCheck className="w-5 h-5 text-white" />
+      {/* Topo / Header Administrativo (Linha Única Compacta no Mobile & Desktop) */}
+      <header className="sticky top-0 z-40 bg-slate-900/95 border-b border-slate-800 backdrop-blur-md px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3">
+        <div className="max-w-[1600px] mx-auto flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0">
+              <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-white text-base tracking-tight">Totem Pro</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                <span className="font-extrabold text-white text-sm sm:text-base tracking-tight truncate">Totem Pro</span>
+                <span className="hidden sm:inline-flex text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
                   Painel Admin
                 </span>
-                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-mono text-emerald-400 font-semibold">
+                <div className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[9px] sm:text-[10px] font-mono text-emerald-400 font-semibold">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   <span>v{siteConfig.version}</span>
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Appwrite Database Live (`totem_db`)</span>
+              <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-slate-400 truncate">
+                <span className="inline-block w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <span className="truncate">
+                  <span className="sm:hidden">Appwrite Live</span>
+                  <span className="hidden sm:inline">Appwrite Database Live (`totem_db`)</span>
+                </span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-end sm:self-auto">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Alternador de Tema Claro / Escuro */}
             <button
               onClick={toggleAdminTheme}
-              className={`p-2 rounded-lg text-xs flex items-center gap-1.5 transition-all border ${
+              className={`p-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 border cursor-pointer ${
                 adminTheme === "light"
                   ? "bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 border-amber-300"
                   : "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700/60"
@@ -2026,12 +2029,12 @@ export default function AdminPage() {
               {adminTheme === "light" ? (
                 <>
                   <Moon className="w-3.5 h-3.5 text-indigo-600" />
-                  <span className="hidden sm:inline font-medium">Tema Escuro</span>
+                  <span className="hidden md:inline font-medium">Tema Escuro</span>
                 </>
               ) : (
                 <>
                   <Sun className="w-3.5 h-3.5 text-amber-400" />
-                  <span className="hidden sm:inline font-medium">Tema Claro</span>
+                  <span className="hidden md:inline font-medium">Tema Claro</span>
                 </>
               )}
             </button>
@@ -2043,22 +2046,23 @@ export default function AdminPage() {
                 loadCatalog();
                 loadAnalytics();
               }}
-              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center gap-1.5 transition-colors border border-slate-700/60 cursor-pointer"
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 text-xs flex items-center justify-center gap-1.5 transition-all border border-slate-700/60 cursor-pointer"
               title="Sincronizar todos os dados (Pedidos, ADS, Appwrite e Catálogo)"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoadingOrders || isLoadingAdsLeads || isLoadingCatalog || isLoadingAnalytics ? "animate-spin" : ""}`} />
-              <span className="hidden sm:inline">Atualizar</span>
+              <span className="hidden md:inline">Atualizar</span>
             </button>
             <a
               href="/"
               target="_blank"
-              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center gap-1.5 transition-colors border border-slate-700/60"
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 text-xs flex items-center justify-center gap-1.5 transition-all border border-slate-700/60"
+              title="Abrir loja pública em nova guia"
             >
               <ExternalLink className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Ver Loja</span>
+              <span className="hidden md:inline">Ver Loja</span>
             </a>
             {currentUser && (
-              <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs">
+              <div className="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-xl bg-slate-800/80 border border-slate-700/60 text-xs">
                 <div className="w-5 h-5 rounded-full bg-indigo-600/30 text-indigo-400 flex items-center justify-center font-bold text-[10px]">
                   {currentUser.name ? currentUser.name.substring(0, 1).toUpperCase() : "A"}
                 </div>
@@ -2068,66 +2072,67 @@ export default function AdminPage() {
 
             <button
               onClick={handleLogout}
-              className="p-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs flex items-center gap-1.5 transition-colors"
+              className="px-2.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 text-rose-400 border border-rose-500/30 text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer"
+              title="Encerrar sessão administrativa"
             >
               <LogOut className="w-3.5 h-3.5" />
-              <span>Sair</span>
+              <span className="hidden xs:inline sm:inline">Sair</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* Navegação por Abas Principais */}
-      <div className="border-b border-slate-800/80 bg-slate-900/40">
-        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center flex-wrap gap-1.5 py-2.5">
+      {/* Navegação por Abas Principais (Carrossel Deslizante de 1 Linha no Mobile / Wrap no Desktop) */}
+      <div className="border-b border-slate-800/80 bg-slate-900/50 backdrop-blur-sm">
+        <div className="max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 flex items-center flex-nowrap lg:flex-wrap gap-1.5 py-2 overflow-x-auto no-scrollbar snap-x">
           <button
             onClick={() => setActiveTab("orders")}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all shrink-0 ${
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 snap-start cursor-pointer ${
               activeTab === "orders"
                 ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25"
-                : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                : "bg-slate-900/70 lg:bg-transparent border border-slate-800/80 lg:border-transparent text-slate-300 lg:text-slate-400 hover:text-white hover:bg-slate-800/60"
             }`}
           >
-            <Package className="w-4 h-4" />
+            <Package className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             <span>Pedidos & Produção CNC</span>
-            <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-black/30 text-white font-bold">
+            <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] bg-black/30 text-white font-extrabold">
               {totalAllOrdersCount || orders.length}
             </span>
           </button>
 
           <button
             onClick={() => setActiveTab("catalog")}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all shrink-0 ${
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 snap-start cursor-pointer ${
               activeTab === "catalog"
                 ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25"
-                : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                : "bg-slate-900/70 lg:bg-transparent border border-slate-800/80 lg:border-transparent text-slate-300 lg:text-slate-400 hover:text-white hover:bg-slate-800/60"
             }`}
           >
-            <Layers className="w-4 h-4" />
+            <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             <span>Catálogo & Precificação</span>
           </button>
 
           <button
             onClick={() => setActiveTab("vouchers")}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all shrink-0 ${
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 snap-start cursor-pointer ${
               activeTab === "vouchers"
                 ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25"
-                : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                : "bg-slate-900/70 lg:bg-transparent border border-slate-800/80 lg:border-transparent text-slate-300 lg:text-slate-400 hover:text-white hover:bg-slate-800/60"
             }`}
           >
-            <Tag className="w-4 h-4 text-emerald-400" />
+            <Tag className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
             <span>Gestão de Vouchers</span>
           </button>
 
           <button
             onClick={() => setActiveTab("customers")}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all shrink-0 ${
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 snap-start cursor-pointer ${
               activeTab === "customers"
                 ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25"
-                : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                : "bg-slate-900/70 lg:bg-transparent border border-slate-800/80 lg:border-transparent text-slate-300 lg:text-slate-400 hover:text-white hover:bg-slate-800/60"
             }`}
           >
-            <Users className="w-4 h-4 text-cyan-400" />
+            <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400" />
             <span>Clientes & Compras</span>
           </button>
 
@@ -2136,71 +2141,71 @@ export default function AdminPage() {
               setActiveTab("analytics");
               loadAnalytics();
             }}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all shrink-0 ${
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 snap-start cursor-pointer ${
               activeTab === "analytics"
                 ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25"
-                : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                : "bg-slate-900/70 lg:bg-transparent border border-slate-800/80 lg:border-transparent text-slate-300 lg:text-slate-400 hover:text-white hover:bg-slate-800/60"
             }`}
           >
-            <BarChart3 className="w-4 h-4 text-cyan-400" />
+            <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400" />
             <span>Analytics & Funil</span>
           </button>
 
           <button
             onClick={() => setActiveTab("marketing")}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all shrink-0 ${
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 snap-start cursor-pointer ${
               activeTab === "marketing"
                 ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25"
-                : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                : "bg-slate-900/70 lg:bg-transparent border border-slate-800/80 lg:border-transparent text-slate-300 lg:text-slate-400 hover:text-white hover:bg-slate-800/60"
             }`}
           >
-            <Share2 className="w-4 h-4 text-cyan-400" />
+            <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400" />
             <span>SEO & Tráfego Pago</span>
           </button>
 
           <button
             onClick={() => setActiveTab("team")}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all shrink-0 ${
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 snap-start cursor-pointer ${
               activeTab === "team"
                 ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25"
-                : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                : "bg-slate-900/70 lg:bg-transparent border border-slate-800/80 lg:border-transparent text-slate-300 lg:text-slate-400 hover:text-white hover:bg-slate-800/60"
             }`}
           >
-            <Users className="w-4 h-4 text-emerald-400" />
+            <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
             <span>Equipe & Vendedores</span>
           </button>
 
           <button
             onClick={() => setActiveTab("logs")}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all shrink-0 ${
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 snap-start cursor-pointer ${
               activeTab === "logs"
                 ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25"
-                : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                : "bg-slate-900/70 lg:bg-transparent border border-slate-800/80 lg:border-transparent text-slate-300 lg:text-slate-400 hover:text-white hover:bg-slate-800/60"
             }`}
           >
-            <FileText className="w-4 h-4" />
+            <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             <span>Auditoria & Logs</span>
-            <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-black/30 text-white font-bold">
+            <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] bg-black/30 text-white font-bold">
               {auditLogs.length}
             </span>
           </button>
 
           <button
             onClick={() => setActiveTab("telemetry")}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all shrink-0 ${
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 snap-start cursor-pointer ${
               activeTab === "telemetry"
                 ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25"
-                : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                : "bg-slate-900/70 lg:bg-transparent border border-slate-800/80 lg:border-transparent text-slate-300 lg:text-slate-400 hover:text-white hover:bg-slate-800/60"
             }`}
           >
-            <ShieldAlert className="w-4 h-4 text-rose-400" />
+            <ShieldAlert className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-400" />
             <span>Erros & Diagnósticos</span>
           </button>
         </div>
       </div>
 
       {/* Conteúdo Principal */}
-      <main className="flex-1 max-w-[1600px] w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6 overflow-x-hidden">
+      <main className="flex-1 max-w-[1600px] w-full mx-auto p-3 sm:p-6 lg:p-8 space-y-4 sm:space-y-6 overflow-x-hidden">
         {/* Notificação de Sucesso */}
         {saveSuccessMsg && (
           <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-emerald-400 text-sm flex items-center gap-3 animate-fade-in shadow-lg shadow-emerald-500/5">
@@ -2213,20 +2218,20 @@ export default function AdminPage() {
         {/* ABA 1: PEDIDOS E PRODUÇÃO CNC */}
         {/* ======================================================== */}
         {activeTab === "orders" && (
-          <div className="space-y-5">
-            {/* Barra de Filtros, Busca e Modo de Visualização */}
-            <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
-              {/* Filtros por Status (Todos com Badge de Contagem) */}
-              <div className="flex items-center flex-wrap gap-1.5">
+          <div className="space-y-3.5 sm:space-y-5">
+            {/* Barra de Filtros, Busca e Modo de Visualização (Mobile-First Ultra-Compacta) */}
+            <div className="flex flex-col lg:flex-row gap-2.5 sm:gap-3 items-stretch lg:items-center justify-between">
+              {/* Filtros por Status (1 Linha Deslizante no Mobile com Prioridade para Status com Pedidos > 0) */}
+              <div className="flex items-center flex-nowrap lg:flex-wrap gap-1.5 overflow-x-auto no-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0 pb-0.5 snap-x">
                 <button
                   onClick={() => {
                     setStatusFilter("all");
                     loadOrders("all");
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-all border inline-flex items-center gap-1.5 cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 snap-start transition-all active:scale-95 border inline-flex items-center gap-1.5 cursor-pointer ${
                     statusFilter === "all"
                       ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
-                      : "bg-slate-900 text-slate-400 hover:bg-slate-800 border-slate-800"
+                      : "bg-slate-900 text-slate-300 hover:bg-slate-800 border-slate-800"
                   }`}
                 >
                   <span>Todos</span>
@@ -2246,7 +2251,7 @@ export default function AdminPage() {
                     loadAdsLeads(true);
                   }}
                   title="Carrinhos Abandonados, Conversões Google Ads e Leads do Checkout (Clique para atualizar)"
-                  className={`px-3 py-1.5 rounded-lg text-xs font-extrabold shrink-0 transition-all border inline-flex items-center gap-1.5 cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-extrabold shrink-0 snap-start transition-all active:scale-95 border inline-flex items-center gap-1.5 cursor-pointer ${
                     statusFilter === "ads"
                       ? "bg-gradient-to-r from-indigo-600 to-cyan-600 text-white border-cyan-400 shadow-lg shadow-indigo-500/25"
                       : "bg-slate-900 text-cyan-400 hover:bg-slate-800 border-cyan-500/40"
@@ -2264,49 +2269,94 @@ export default function AdminPage() {
                     {adsRecords.length || 0}
                   </span>
                 </button>
-                {Object.entries(STATUS_CONFIG).map(([key, config]) => {
-                  const count =
-                    typeof orderStatusCounts[key] === "number"
-                      ? orderStatusCounts[key]
-                      : orders.filter((o) => o.status === key).length;
-                  const isActive = statusFilter === key;
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => {
-                        setStatusFilter(key);
-                        loadOrders(key);
-                      }}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-all border inline-flex items-center gap-1.5 cursor-pointer ${
-                        isActive
-                          ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
-                          : "bg-slate-900 text-slate-400 hover:bg-slate-800 border-slate-800"
-                      }`}
-                    >
-                      <span>{config.label}</span>
-                      <span
-                        className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold leading-none ${
+                {Object.entries(STATUS_CONFIG)
+                  .map(([key, config]) => {
+                    const count =
+                      typeof orderStatusCounts[key] === "number"
+                        ? orderStatusCounts[key]
+                        : orders.filter((o) => o.status === key).length;
+                    return { key, config, count };
+                  })
+                  .sort((a, b) => {
+                    const aHas = a.count > 0 || statusFilter === a.key ? 1 : 0;
+                    const bHas = b.count > 0 || statusFilter === b.key ? 1 : 0;
+                    return bHas - aHas;
+                  })
+                  .map(({ key, config, count }) => {
+                    const isActive = statusFilter === key;
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => {
+                          setStatusFilter(key);
+                          loadOrders(key);
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 snap-start transition-all active:scale-95 border inline-flex items-center gap-1.5 cursor-pointer ${
                           isActive
-                            ? "bg-white/25 text-white"
+                            ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
                             : count > 0
-                            ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/35"
-                            : "bg-slate-800/80 text-slate-400 border border-slate-700/70"
+                            ? "bg-slate-900 text-slate-200 hover:bg-slate-800 border-indigo-500/35"
+                            : "bg-slate-900/70 text-slate-400 hover:bg-slate-800 border-slate-800/80"
                         }`}
                       >
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
+                        <span>{config.label}</span>
+                        <span
+                          className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold leading-none ${
+                            isActive
+                              ? "bg-white/25 text-white"
+                              : count > 0
+                              ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/35"
+                              : "bg-slate-800/80 text-slate-400 border border-slate-700/70"
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
               </div>
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
+                {/* Linha Mobile Compacta: Busca + Botão Calculadora MP lado a lado */}
+                <div className="flex items-center gap-2 order-1 sm:order-2">
+                  {/* Campo de Busca */}
+                  <div className="relative flex-1 sm:w-60 lg:w-72">
+                    <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      id="admin-order-search"
+                      name="orderSearch"
+                      aria-label="Buscar pedido, cliente ou CPF/CNPJ"
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Buscar pedido, cliente, CPF/CNPJ..."
+                      className="w-full pl-8 sm:pl-9 pr-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  {/* Botão Calculadora Rápida de Cartão Mercado Pago (Recebimento 100% PIX) */}
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickMpCalculator((prev) => !prev)}
+                    className={`px-2.5 sm:px-3 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 border transition-all active:scale-95 shrink-0 cursor-pointer ${
+                      showQuickMpCalculator
+                        ? "bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/20"
+                        : "bg-slate-900 hover:bg-slate-800 text-emerald-400 border-emerald-500/40"
+                    }`}
+                    title="Simular valor seguro a cobrar no Cartão Parcelado do Mercado Pago para receber 100% do valor do PIX à vista"
+                  >
+                    <CreditCard className="w-3.5 h-3.5 shrink-0" />
+                    <span className="sm:hidden">Calc. MP</span>
+                    <span className="hidden sm:inline">Calculadora Cartão MP (100% PIX)</span>
+                  </button>
+                </div>
+
                 {/* Alternador de Modo de Visualização: Simplificada vs Detalhada */}
-                <div className="inline-flex items-center p-1 bg-slate-900 border border-slate-800 rounded-xl shrink-0">
+                <div className="inline-flex items-center p-1 bg-slate-900 border border-slate-800 rounded-xl shrink-0 order-2 sm:order-1">
                   <button
                     type="button"
                     onClick={() => toggleOrdersViewMode("simplified")}
-                    className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer ${
                       ordersViewMode === "simplified"
                         ? "bg-indigo-600 text-white shadow-sm"
                         : "text-slate-400 hover:text-white"
@@ -2319,7 +2369,7 @@ export default function AdminPage() {
                   <button
                     type="button"
                     onClick={() => toggleOrdersViewMode("detailed")}
-                    className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer ${
                       ordersViewMode === "detailed"
                         ? "bg-indigo-600 text-white shadow-sm"
                         : "text-slate-400 hover:text-white"
@@ -2329,36 +2379,6 @@ export default function AdminPage() {
                     <Maximize2 className="w-3.5 h-3.5" />
                     <span>Visão Detalhada</span>
                   </button>
-                </div>
-
-                {/* Botão Calculadora Rápida de Cartão Mercado Pago (Recebimento 100% PIX) */}
-                <button
-                  type="button"
-                  onClick={() => setShowQuickMpCalculator((prev) => !prev)}
-                  className={`px-3 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 border transition-all shrink-0 cursor-pointer ${
-                    showQuickMpCalculator
-                      ? "bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/20"
-                      : "bg-slate-900 hover:bg-slate-800 text-emerald-400 border-emerald-500/40"
-                  }`}
-                  title="Simular valor seguro a cobrar no Cartão Parcelado do Mercado Pago para receber 100% do valor do PIX à vista"
-                >
-                  <CreditCard className="w-3.5 h-3.5" />
-                  <span>Calculadora Cartão MP (100% PIX)</span>
-                </button>
-
-                {/* Campo de Busca */}
-                <div className="relative min-w-[240px] sm:w-64 lg:w-72">
-                  <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    id="admin-order-search"
-                    name="orderSearch"
-                    aria-label="Buscar pedido, cliente ou CPF/CNPJ"
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Buscar pedido, cliente, CPF/CNPJ..."
-                    className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                  />
                 </div>
               </div>
             </div>
@@ -2570,7 +2590,7 @@ export default function AdminPage() {
                     <div
                       key={order.$id}
                       className={`bg-slate-900/90 border transition-all shadow-lg overflow-hidden ${
-                        isExpanded ? "rounded-3xl p-4 sm:p-6 space-y-4" : "rounded-2xl px-4 py-3 sm:px-5 sm:py-3.5"
+                        isExpanded ? "rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 space-y-4" : "rounded-2xl p-3 sm:px-5 sm:py-3.5"
                       } ${
                         orderHasAnyDeviation
                           ? "border-amber-400/80 border-l-4 border-l-amber-400 hover:border-amber-400 shadow-amber-500/5"
@@ -2583,55 +2603,93 @@ export default function AdminPage() {
                     >
                       {!isExpanded ? (
                         /* ========================================================================= */
-                        /* MODO: LISTA SIMPLIFICADA EM UMA LINHA (SOMENTE OS ITENS MAIS IMPORTANTES) */
+                        /* MODO: LISTA SIMPLIFICADA (MOBILE CARD COMPACTO / 1 LINHA NO DESKTOP)      */
                         /* ========================================================================= */
                         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-2.5">
-                          {/* 1. CLIENTE, WHATSAPP & CIDADE/UF */}
-                          <div className="xl:w-[21%] flex items-center gap-2.5 min-w-0">
-                            <div
-                              className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-black text-sm border ${
-                                isOrderPaid
-                                  ? "bg-emerald-500/15 border-emerald-500/35 text-emerald-300"
-                                  : isPaymentFailedOrCancelled
-                                  ? "bg-rose-500/15 border-rose-500/35 text-rose-300"
-                                  : "bg-amber-500/15 border-amber-500/35 text-amber-300"
-                              }`}
-                            >
-                              {(order.customer_name || "C").trim().charAt(0).toUpperCase()}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-1.5">
-                                <p
-                                  className="font-extrabold text-white text-sm sm:text-base tracking-tight truncate"
-                                  title={order.customer_name || "Cliente não informado"}
-                                >
-                                  {order.customer_name || "Cliente não informado"}
-                                </p>
-                                {waHref && (
-                                  <a
-                                    href={waHref}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="p-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 transition-all shrink-0"
-                                    title="Falar com o cliente no WhatsApp"
-                                  >
-                                    <MessageCircle className="w-3.5 h-3.5" />
-                                  </a>
-                                )}
+                          {/* 1. CLIENTE, WHATSAPP & CIDADE/UF (+ VALOR TOTAL NO TOPO DIREITO DO MOBILE) */}
+                          <div className="xl:w-[22%] flex items-start xl:items-center justify-between gap-2 min-w-0">
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              <div
+                                className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-black text-sm border ${
+                                  isOrderPaid
+                                    ? "bg-emerald-500/15 border-emerald-500/35 text-emerald-300"
+                                    : isPaymentFailedOrCancelled
+                                    ? "bg-rose-500/15 border-rose-500/35 text-rose-300"
+                                    : "bg-amber-500/15 border-amber-500/35 text-amber-300"
+                                }`}
+                              >
+                                {(order.customer_name || "C").trim().charAt(0).toUpperCase()}
                               </div>
-                              <p className="text-[11px] text-slate-400 font-mono truncate">
-                                <span className="text-slate-300 font-semibold">{order.customer_document || "—"}</span>
-                                {addr?.city ? (
-                                  <span className="font-sans">
-                                    {" "}• {addr.city}/{addr.state || "SP"}
-                                  </span>
-                                ) : null}
-                              </p>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5">
+                                  <p
+                                    className="font-extrabold text-white text-sm sm:text-base tracking-tight truncate"
+                                    title={order.customer_name || "Cliente não informado"}
+                                  >
+                                    {order.customer_name || "Cliente não informado"}
+                                  </p>
+                                  {waHref && (
+                                    <a
+                                      href={waHref}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="p-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 active:scale-95 text-emerald-400 border border-emerald-500/30 transition-all shrink-0"
+                                      title="Falar com o cliente no WhatsApp"
+                                    >
+                                      <MessageCircle className="w-3.5 h-3.5" />
+                                    </a>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-slate-400 font-mono truncate">
+                                  <span className="text-slate-300 font-semibold">{order.customer_document || "—"}</span>
+                                  {addr?.city ? (
+                                    <span className="font-sans">
+                                      {" "}• {addr.city}/{addr.state || "SP"}
+                                    </span>
+                                  ) : null}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Preço & Método no Topo Direito exclusivamente em Telas Menores (< xl) */}
+                            <div className="xl:hidden flex flex-col items-end shrink-0 text-right pl-1">
+                              <span
+                                className={`text-sm font-black font-mono leading-tight ${
+                                  isOrderPaid
+                                    ? "text-emerald-400"
+                                    : isPaymentFailedOrCancelled
+                                    ? "text-rose-400"
+                                    : "text-amber-400"
+                                }`}
+                              >
+                                {formatBRL(order.total_cents)}
+                              </span>
+                              <span
+                                className={`text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1 ${
+                                  isOrderPaid
+                                    ? "text-emerald-400"
+                                    : isPaymentFailedOrCancelled
+                                    ? "text-rose-400"
+                                    : "text-amber-400"
+                                }`}
+                              >
+                                {isOrderPaid ? (
+                                  <>
+                                    <CheckCircle2 className="w-2.5 h-2.5" />
+                                    <span>Pago ({payMethod === "credit_card" ? "Cartão" : "Pix"})</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Clock className="w-2.5 h-2.5" />
+                                    <span>{payMethod === "credit_card" ? "Cartão" : "Pix"}</span>
+                                  </>
+                                )}
+                              </span>
                             </div>
                           </div>
 
                           {/* 2. ITEM PRINCIPAL RESUMIDO (GABINETE + COR + EQUIPAMENTO PRINCIPAL) */}
-                          <div className="xl:w-[24%] flex items-center gap-2.5 xl:border-l xl:border-slate-800/80 xl:pl-3 min-w-0">
+                          <div className="xl:w-[24%] flex items-center gap-2.5 p-2 xl:p-0 rounded-xl xl:rounded-none bg-slate-950/55 xl:bg-transparent border border-slate-800/70 xl:border-0 xl:border-l xl:border-slate-800/80 xl:pl-3 min-w-0">
                             {firstItemThumb && (
                               <div className="w-10 h-10 rounded-lg bg-white border border-slate-700 overflow-hidden flex items-center justify-center p-0.5 shrink-0">
                                 <img src={firstItemThumb} alt="Gabinete" className="w-full h-full object-contain" />
@@ -2644,7 +2702,7 @@ export default function AdminPage() {
                               </p>
                               <div className="flex items-center gap-1 flex-wrap text-[10px]">
                                 {firstItem?.color_name && (
-                                  <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-200 border border-slate-700 font-semibold truncate max-w-[135px]">
+                                  <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-200 border border-slate-700 font-semibold truncate max-w-[145px]">
                                     {firstItem.color_name}
                                   </span>
                                 )}
@@ -2683,7 +2741,7 @@ export default function AdminPage() {
                           </div>
 
                           {/* 3. NÚMERO DO PEDIDO, DATA, FRETE & STATUS */}
-                          <div className="xl:w-[19%] xl:border-l xl:border-slate-800/80 xl:pl-3 min-w-0 space-y-0.5">
+                          <div className="xl:w-[19%] xl:border-l xl:border-slate-800/80 xl:pl-3 min-w-0 flex xl:flex-col items-center xl:items-start justify-between gap-1.5 flex-wrap">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="font-extrabold text-white text-xs sm:text-sm font-mono tracking-tight">
                                 {order.order_number}
@@ -2716,8 +2774,8 @@ export default function AdminPage() {
                             </p>
                           </div>
 
-                          {/* 4. VALOR TOTAL & MÉTODO DE PAGAMENTO */}
-                          <div className="xl:w-[11%] xl:border-l xl:border-slate-800/80 xl:pl-3 shrink-0 flex xl:flex-col items-center xl:items-end justify-between gap-1.5">
+                          {/* 4. VALOR TOTAL & MÉTODO DE PAGAMENTO (VISÍVEL NO DESKTOP XL) */}
+                          <div className="hidden xl:flex xl:w-[11%] xl:border-l xl:border-slate-800/80 xl:pl-3 shrink-0 xl:flex-col items-end justify-between gap-1.5">
                             <span
                               className={`text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1 ${
                                 isOrderPaid
@@ -2752,68 +2810,73 @@ export default function AdminPage() {
                             </span>
                           </div>
 
-                          {/* 5. AÇÕES RÁPIDAS NA MESMA LINHA (INCLUINDO IMPRIMIR ORDEM DE PRODUÇÃO DIRETO NA LISTA SIMPLES) */}
-                          <div className="shrink-0 flex flex-wrap items-center justify-end gap-1.5 pt-2 xl:pt-0 border-t xl:border-t-0 border-slate-800/70">
-                            <button
-                              type="button"
-                              onClick={() => toggleOrderExpanded(order.$id)}
-                              className="px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-extrabold text-xs inline-flex items-center gap-1 shadow-sm transition-all cursor-pointer"
-                              title="Clique para abrir todos os detalhes, cobrança Mercado Pago e as 3 colunas do pedido"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>Detalhes</span>
-                              <ChevronDown className="w-3.5 h-3.5" />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => setPrintingProductionOrder(order)}
-                              className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-xs inline-flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 transition-all cursor-pointer"
-                              title="Imprimir Ordem de Produção para a Fábrica (Sem Valores Monetários + Orientações + Checklist à Caneta)"
-                            >
-                              <Printer className="w-3.5 h-3.5" />
-                              <span>Ordem de Produção</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => setCorreiosLabelOrder(order)}
-                              className="px-2 py-1.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 active:scale-95 text-amber-300 border border-amber-400/50 font-extrabold text-xs inline-flex items-center gap-1 transition-all cursor-pointer"
-                              title="Lançar Pré-Postagem no Contrato Correios (API CWS) e Imprimir Etiqueta Simplificada"
-                            >
-                              <Truck className="w-3.5 h-3.5" />
-                              <span className="hidden 2xl:inline">Etiqueta</span>
-                            </button>
-
-                            {!isOrderPaid && (
+                          {/* 5. AÇÕES RÁPIDAS (ERGONÔMICAS NO MOBILE & DESKTOP) */}
+                          <div className="shrink-0 flex flex-wrap items-center justify-between sm:justify-end gap-1.5 pt-2 xl:pt-0 border-t xl:border-t-0 border-slate-800/70">
+                            <div className="flex flex-wrap items-center gap-1.5">
                               <button
                                 type="button"
-                                onClick={() => handleOpenEditOrder(order, "payment_proposal")}
-                                className="px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 border border-amber-500/35 font-bold text-xs inline-flex items-center gap-1 transition-all cursor-pointer"
-                                title="Editar itens, adicionar valores extras e gerar nova condição de pagamento"
+                                onClick={() => toggleOrderExpanded(order.$id)}
+                                className="px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-extrabold text-xs inline-flex items-center gap-1 shadow-sm transition-all cursor-pointer"
+                                title="Clique para abrir todos os detalhes, cobrança Mercado Pago e as 3 colunas do pedido"
                               >
-                                <Plus className="w-3.5 h-3.5" />
-                                <span>Cobrança</span>
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>Detalhes</span>
+                                <ChevronDown className="w-3.5 h-3.5" />
                               </button>
-                            )}
 
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditOrder(order, "all")}
-                              className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 border border-slate-700 transition-all cursor-pointer"
-                              title="Editar dados deste pedido"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
+                              <button
+                                type="button"
+                                onClick={() => setPrintingProductionOrder(order)}
+                                className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-xs inline-flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 transition-all cursor-pointer"
+                                title="Imprimir Ordem de Produção para a Fábrica (Sem Valores Monetários + Orientações + Checklist à Caneta)"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                                <span className="sm:hidden">O. Produção</span>
+                                <span className="hidden sm:inline">Ordem de Produção</span>
+                              </button>
 
-                            <button
-                              type="button"
-                              onClick={() => setDeletingOrder(order)}
-                              className="p-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 active:scale-95 text-rose-400 border border-rose-500/30 transition-all cursor-pointer"
-                              title="Excluir este pedido permanentemente"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                              <button
+                                type="button"
+                                onClick={() => setCorreiosLabelOrder(order)}
+                                className="px-2.5 py-1.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 active:scale-95 text-amber-300 border border-amber-400/50 font-extrabold text-xs inline-flex items-center gap-1 transition-all cursor-pointer"
+                                title="Lançar Pré-Postagem no Contrato Correios (API CWS) e Imprimir Etiqueta Simplificada"
+                              >
+                                <Truck className="w-3.5 h-3.5" />
+                                <span className="xl:hidden 2xl:inline">Etiqueta</span>
+                              </button>
+
+                              {!isOrderPaid && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditOrder(order, "payment_proposal")}
+                                  className="px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 border border-amber-500/35 font-bold text-xs inline-flex items-center gap-1 transition-all cursor-pointer"
+                                  title="Editar itens, adicionar valores extras e gerar nova condição de pagamento"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                  <span>Cobrança</span>
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditOrder(order, "all")}
+                                className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 border border-slate-700 transition-all cursor-pointer"
+                                title="Editar dados deste pedido"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => setDeletingOrder(order)}
+                                className="p-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 active:scale-95 text-rose-400 border border-rose-500/30 transition-all cursor-pointer"
+                                title="Excluir este pedido permanentemente"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ) : (

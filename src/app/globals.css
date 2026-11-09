@@ -589,3 +589,12 @@ body {
 .admin-light [class*="from-emerald-950"] {
   background-image: none !important;
 }
+
+/* Hide scrollbar for Chrome, Safari and Opera on horizontal mobile strips */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
