@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getOrderWithDetails } from "@/lib/appwrite/server";
 import { translateMercadoPagoStatusDetail, verifyCheckoutStatusToken } from "@/lib/payments/mercadoPago";
 import { refreshMercadoPagoOrder } from "@/lib/payments/mercadoPagoStore";
-import { resolveKitEquipmentSummary } from "@/modules/catalog/kitDefaults";
+import { resolveKitEquipmentSummary, buildOrderDeliveryChecklist } from "@/modules/catalog/kitDefaults";
 
 export const dynamic = "force-dynamic";
 const lastRefresh = new Map<string, number>();
@@ -67,6 +67,14 @@ export async function GET(req: Request) {
         : {};
     } catch {}
 
+    let parsedSheets: any[] = [];
+    try {
+      if (orderDetails.order.manufacturing_sheet_json) {
+        const raw = JSON.parse(orderDetails.order.manufacturing_sheet_json);
+        parsedSheets = Array.isArray(raw) ? raw : raw ? [raw] : [];
+      }
+    } catch {}
+
     return NextResponse.json(
       {
         ok: true,
@@ -88,12 +96,27 @@ export async function GET(req: Request) {
         shippingCents: orderDetails.order.shipping_cents || 0,
         discountCents: Number(orderDetails.order.discount_cents || parsedAddress.discountCents || 0),
         totalCents: orderDetails.order.total_cents,
-        items: (orderDetails.items || []).map((it: any) => {
+        items: (orderDetails.items || []).map((it: any, idx: number) => {
+          const sheet = parsedSheets[idx] || parsedSheets[0] || null;
+          const kitSnapshot = Array.isArray(sheet?.kitItemsSnapshot) ? sheet.kitItemsSnapshot : null;
           const kitEq = resolveKitEquipmentSummary({
+            kitItemsSnapshot: kitSnapshot,
             monitorName: it.monitor_name,
             printerName: it.printer_name,
             readerName: it.reader_name,
           });
+          const deliveryChecklist =
+            Array.isArray(sheet?.deliveryChecklist) && sheet.deliveryChecklist.length > 0
+              ? sheet.deliveryChecklist
+              : buildOrderDeliveryChecklist({
+                  cabinetName: it.cabinet_name,
+                  colorName: it.color_name,
+                  quantity: it.quantity || 1,
+                  kitItemsSnapshot: kitSnapshot,
+                  monitorName: it.monitor_name,
+                  printerName: it.printer_name,
+                  readerName: it.reader_name,
+                });
           return {
             id: it.$id,
             cabinetName: it.cabinet_name,
@@ -104,6 +127,7 @@ export async function GET(req: Request) {
             quantity: it.quantity || 1,
             unitPriceCents: it.unit_price_cents || 0,
             subtotalCents: it.subtotal_cents || 0,
+            deliveryChecklist,
           };
         }),
         additionalCharges: Array.isArray(parsedAddress.additionalCharges)

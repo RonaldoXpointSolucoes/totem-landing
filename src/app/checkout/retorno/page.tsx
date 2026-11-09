@@ -56,6 +56,16 @@ type StatusData = {
     quantity: number;
     unitPriceCents: number;
     subtotalCents: number;
+    deliveryChecklist?: {
+      id: string;
+      name: string;
+      category: string;
+      priceCents: number;
+      included: boolean;
+      quantity: number;
+      badgeLabel: string;
+      notes?: string;
+    }[];
   }[];
   additionalCharges?: {
     id: string;
@@ -245,32 +255,81 @@ function PaymentReturnContent() {
                   <span className="text-[10px] uppercase tracking-wider text-slate-500 font-extrabold block">
                     Itens do Pedido ({status.items.length})
                   </span>
-                  {status.items.map((it, idx) => (
-                    <div
-                      key={it.id || idx}
-                      className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 flex items-start justify-between gap-2"
-                    >
-                      <div className="space-y-0.5 min-w-0">
-                        <p className="font-bold text-slate-900 dark:text-white">
-                          {it.quantity}x {it.cabinetName} ({it.colorName})
-                        </p>
-                        <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                          • Monitor: <strong className="text-slate-800 dark:text-slate-200">{it.monitorName}</strong>
-                        </p>
-                        <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                          • Impressora: <strong className="text-slate-800 dark:text-slate-200">{it.printerName}</strong>
-                        </p>
-                        {it.readerName && (
-                          <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                            • Leitor: <strong className="text-slate-800 dark:text-slate-200">{it.readerName}</strong>
-                          </p>
+                  {status.items.map((it, idx) => {
+                    const includedItems = (it.deliveryChecklist || []).filter((c) => c.included);
+                    const removedItems = (it.deliveryChecklist || []).filter((c) => !c.included);
+                    return (
+                      <div
+                        key={it.id || idx}
+                        className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 space-y-2.5"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="space-y-0.5 min-w-0">
+                            <p className="font-bold text-slate-900 dark:text-white text-sm">
+                              {it.quantity}x {it.cabinetName} ({it.colorName})
+                            </p>
+                            <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                              • Monitor: <strong className="text-slate-800 dark:text-slate-200">{it.monitorName}</strong>
+                            </p>
+                            <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                              • Impressora: <strong className="text-slate-800 dark:text-slate-200">{it.printerName}</strong>
+                            </p>
+                          </div>
+                          <span className="font-extrabold text-slate-900 dark:text-white font-mono shrink-0 text-sm">
+                            {formatBRL(it.subtotalCents)}
+                          </span>
+                        </div>
+
+                        {includedItems.length > 0 && (
+                          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block">
+                              ✓ Itens Inclusos na Entrega deste Pedido ({includedItems.length})
+                            </span>
+                            <div className="grid grid-cols-1 gap-1">
+                              {includedItems.map((chk) => (
+                                <div
+                                  key={chk.id}
+                                  className="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-between gap-2 text-[11px]"
+                                >
+                                  <span className="font-semibold text-emerald-900 dark:text-emerald-200">
+                                    ✓ {chk.name}
+                                  </span>
+                                  {chk.priceCents > 0 && (
+                                    <span className="font-mono font-bold text-emerald-700 dark:text-emerald-300 shrink-0">
+                                      + {formatBRL(chk.priceCents)}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {removedItems.length > 0 && (
+                          <div className="pt-1.5 space-y-1">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-rose-500 block">
+                              ✕ Itens Removidos do Kit pelo Cliente (Não Cobrados)
+                            </span>
+                            <div className="grid grid-cols-1 gap-1">
+                              {removedItems.map((chk) => (
+                                <div
+                                  key={chk.id}
+                                  className="px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-between gap-2 text-[11px] opacity-80"
+                                >
+                                  <span className="text-rose-700 dark:text-rose-300 line-through">
+                                    ✕ {chk.name}
+                                  </span>
+                                  <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 shrink-0">
+                                    Não cobrado (R$ 0,00)
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         )}
                       </div>
-                      <span className="font-extrabold text-slate-900 dark:text-white font-mono shrink-0">
-                        {formatBRL(it.subtotalCents)}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 

@@ -429,18 +429,18 @@ export function resolveKitEquipmentSummary(params: {
     !rawRdr.toLowerCase().includes("coolers") &&
     !rawRdr.toLowerCase().includes("acessórios do kit");
   const readerDisplay = hasValidRawReader
-    ? rawRdr
+    ? rawRdr.slice(0, 128)
     : kitReaderModel
-    ? `${kitReaderModel} (Kit)`
+    ? `${kitReaderModel} (Kit)`.slice(0, 128)
     : accessoriesSummary
-    ? `Enviar do Kit (${accSubs.length} itens): ${accessoriesSummary}`
+    ? `Enviar do Kit (${accSubs.length} itens): ${accessoriesSummary}`.slice(0, 128)
     : "";
 
   return {
     isKit: true,
-    monitorDisplay,
-    kitMonitorModel,
-    printerDisplay,
+    monitorDisplay: monitorDisplay.slice(0, 128),
+    kitMonitorModel: kitMonitorModel.slice(0, 128),
+    printerDisplay: printerDisplay.slice(0, 128),
     readerDisplay,
     hasReader: Boolean(kitReaderModel || hasValidRawReader),
     hasMonitorInKit,

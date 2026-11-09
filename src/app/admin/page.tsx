@@ -3,7 +3,14 @@
 import React, { useState, useEffect } from "react";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
 import { siteConfig } from "@/config/site";
-import { resolveKitEquipmentSummary, buildOrderDeliveryChecklist, DeliveryChecklistItem } from "@/modules/catalog/kitDefaults";
+import {
+  resolveKitEquipmentSummary,
+  buildOrderDeliveryChecklist,
+  DeliveryChecklistItem,
+  DEFAULT_KIT_SUB_ITEMS,
+} from "@/modules/catalog/kitDefaults";
+import { KitSubItem } from "@/types/catalog";
+import { AdminOrderVisualEditor } from "@/components/admin/AdminOrderVisualEditor";
 import { CatalogManager } from "@/components/admin/CatalogManager";
 import { MarketingSettingsManager } from "@/components/admin/MarketingSettingsManager";
 import { TeamManager } from "@/components/admin/TeamManager";
@@ -140,6 +147,10 @@ interface EditableOrderItem {
   screenCutoutMm: string;
   customizationNotes: string;
   itemAttachments: ExecutionAttachment[];
+  is_kit?: boolean;
+  kit_items?: KitSubItem[];
+  include_assembly?: boolean;
+  delivery_checklist?: DeliveryChecklistItem[];
 }
 
 interface EditOrderFormState {
@@ -1117,15 +1128,35 @@ export default function AdminPage() {
 
     const editableItems: EditableOrderItem[] = (order.items || []).map((it, idx) => {
       const sheet = sheets[idx] || null;
+      const kitSnapshot =
+        Array.isArray(sheet?.kitItemsSnapshot) && sheet.kitItemsSnapshot.length > 0
+          ? sheet.kitItemsSnapshot
+          : Array.isArray((it as any).kit_items_snapshot) && (it as any).kit_items_snapshot.length > 0
+          ? (it as any).kit_items_snapshot
+          : null;
       const resolved = resolveKitEquipmentSummary({
+        kitItemsSnapshot: kitSnapshot,
         monitorName: it.monitor_name,
         printerName: it.printer_name,
         readerName: it.reader_name,
       });
+      const initialKitItems =
+        kitSnapshot ||
+        DEFAULT_KIT_SUB_ITEMS.map((sub) => {
+          if (resolved.isKit) {
+            if (sub.category === "monitor" && !resolved.hasMonitorInKit) return { ...sub, selected: false };
+            if (sub.category === "printer" && !resolved.hasPrinterInKit) return { ...sub, selected: false };
+          }
+          return { ...sub };
+        });
+      const includeAssembly =
+        Boolean((sheet as any)?.includeAssemblyService) ||
+        String(sheet?.assemblyService || "").includes("999");
+
       return {
         $id: it.$id,
-        cabinet_name: it.cabinet_name || "Gabinete de Parede Compacto",
-        color_name: it.color_name || "Branco TX",
+        cabinet_name: it.cabinet_name || "Gabinete de Parede",
+        color_name: it.color_name || "Branco TX (MaDeFibra BP)",
         monitor_name: resolved.monitorDisplay || "Nenhum",
         printer_name: resolved.printerDisplay || "Nenhum",
         reader_name: resolved.isKit
@@ -1143,6 +1174,23 @@ export default function AdminPage() {
           sheet?.customNotes ||
           "",
         itemAttachments: Array.isArray(sheet?.itemAttachments) ? sheet.itemAttachments : [],
+        is_kit: resolved.isKit,
+        kit_items: initialKitItems,
+        include_assembly: includeAssembly,
+        delivery_checklist: Array.isArray((it as any).delivery_checklist)
+          ? (it as any).delivery_checklist
+          : Array.isArray((sheet as any)?.deliveryChecklist)
+          ? (sheet as any).deliveryChecklist
+          : buildOrderDeliveryChecklist({
+              cabinetName: it.cabinet_name,
+              colorName: it.color_name,
+              quantity: it.quantity || 1,
+              kitItemsSnapshot: resolved.isKit ? initialKitItems : null,
+              monitorName: it.monitor_name,
+              printerName: it.printer_name,
+              readerName: it.reader_name,
+              includeAssemblyService: includeAssembly,
+            }),
       };
     });
 
@@ -1289,6 +1337,21 @@ export default function AdminPage() {
           customizationNotes: it.customizationNotes.trim(),
           itemAttachments: it.itemAttachments || [],
           isCustomMonitor: isCustomMon,
+          isKit: Boolean(it.is_kit),
+          kitItemsSnapshot: it.is_kit && Array.isArray(it.kit_items) ? it.kit_items : undefined,
+          includeAssemblyService: Boolean(it.include_assembly),
+          deliveryChecklist:
+            it.delivery_checklist ||
+            buildOrderDeliveryChecklist({
+              cabinetName: it.cabinet_name,
+              colorName: it.color_name,
+              quantity: it.quantity || 1,
+              kitItemsSnapshot: it.is_kit ? it.kit_items : null,
+              monitorName: it.monitor_name,
+              printerName: it.printer_name,
+              readerName: it.reader_name,
+              includeAssemblyService: Boolean(it.include_assembly),
+            }),
           screenSpecs: {
             ...(baseSheet.screenSpecs || {}),
             monitorName: it.monitor_name,
@@ -1437,6 +1500,21 @@ export default function AdminPage() {
           colorName: it.color_name,
           customizationNotes: it.customizationNotes.trim(),
           itemAttachments: it.itemAttachments || [],
+          isKit: Boolean(it.is_kit),
+          kitItemsSnapshot: it.is_kit && Array.isArray(it.kit_items) ? it.kit_items : undefined,
+          includeAssemblyService: Boolean(it.include_assembly),
+          deliveryChecklist:
+            it.delivery_checklist ||
+            buildOrderDeliveryChecklist({
+              cabinetName: it.cabinet_name,
+              colorName: it.color_name,
+              quantity: it.quantity || 1,
+              kitItemsSnapshot: it.is_kit ? it.kit_items : null,
+              monitorName: it.monitor_name,
+              printerName: it.printer_name,
+              readerName: it.reader_name,
+              includeAssemblyService: Boolean(it.include_assembly),
+            }),
           screenSpecs: {
             ...(baseSheet.screenSpecs || {}),
             monitorName: it.monitor_name,
@@ -4972,232 +5050,93 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  {/* 4. Itens do Pedido, Equipamentos (Monitor/Impressora), Observações e Anexos por Gabinete */}
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h4 className="font-black text-emerald-400 uppercase text-[11px] tracking-wider">
-                        Itens do Pedido, Monitor, Impressora & Especificações ({editOrderForm.items.length})
-                      </h4>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const nextItems = [
-                            ...editOrderForm.items,
-                            {
-                              cabinet_name: "Gabinete de Balcão Compacto",
-                              color_name: "Branco TX (MaDeFibra BP)",
-                              monitor_name: 'Kit de Montagem — Computador All-in-One Touch 23.8" Core i5',
-                              printer_name: "IMPRESSORA PDV - VT-8360 80mm (Kit)",
-                              reader_name: "Kit Completo (Coolers + Régua + Cabos)",
-                              unit_price_cents: 494200,
-                              quantity: 1,
-                              subtotal_cents: 494200,
-                              screenCutoutMm: "",
-                              customizationNotes: "",
-                              itemAttachments: [],
-                            },
-                          ];
-                          setEditOrderForm(recalculateEditFormTotals({ ...editOrderForm, items: nextItems }));
-                        }}
-                        className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-bold text-xs flex items-center gap-1 cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Adicionar Item ao Pedido</span>
-                      </button>
-                    </div>
+                  {/* 4. Configurador Visual Interativo (Etapas 1 a 6 + Kit de Montagem Igual ao Pedido Original) */}
+                  <div className="space-y-4">
+                    <AdminOrderVisualEditor
+                      items={editOrderForm.items.map((it) => ({
+                        $id: it.$id,
+                        cabinet_name: it.cabinet_name,
+                        color_name: it.color_name,
+                        monitor_name: it.monitor_name,
+                        printer_name: it.printer_name,
+                        reader_name: it.reader_name,
+                        unit_price_cents: it.unit_price_cents,
+                        quantity: it.quantity,
+                        subtotal_cents: it.subtotal_cents,
+                        technical_notes: it.customizationNotes,
+                        screen_cutout: it.screenCutoutMm,
+                        execution_media: it.itemAttachments,
+                        is_kit: it.is_kit,
+                        kit_items: it.kit_items,
+                        include_assembly: it.include_assembly,
+                        delivery_checklist: it.delivery_checklist,
+                      }))}
+                      paymentMethod={editOrderForm.payment_method}
+                      onChangePaymentMethod={(method) => {
+                        setEditOrderForm((prev) => (prev ? { ...prev, payment_method: method } : prev));
+                      }}
+                      onUpdateItems={(nextVisualItems) => {
+                        const mapped: EditableOrderItem[] = nextVisualItems.map((vi) => ({
+                          $id: vi.$id,
+                          cabinet_name: vi.cabinet_name,
+                          color_name: vi.color_name,
+                          monitor_name: vi.monitor_name,
+                          printer_name: vi.printer_name,
+                          reader_name: vi.reader_name,
+                          unit_price_cents: vi.unit_price_cents,
+                          quantity: vi.quantity,
+                          subtotal_cents: vi.subtotal_cents,
+                          screenCutoutMm: vi.screen_cutout,
+                          customizationNotes: vi.technical_notes,
+                          itemAttachments: vi.execution_media || [],
+                          is_kit: vi.is_kit,
+                          kit_items: vi.kit_items,
+                          include_assembly: vi.include_assembly,
+                          delivery_checklist: vi.delivery_checklist,
+                        }));
+                        setEditOrderForm((prev) =>
+                          prev ? recalculateEditFormTotals({ ...prev, items: mapped }) : prev
+                        );
+                      }}
+                      onAddNewItem={() => {
+                        const defaultKit = DEFAULT_KIT_SUB_ITEMS.map((s) => ({ ...s, selected: true }));
+                        const nextItems: EditableOrderItem[] = [
+                          ...editOrderForm.items,
+                          {
+                            cabinet_name: "Gabinete de Balcão",
+                            color_name: "Branco TX (MaDeFibra BP)",
+                            monitor_name: 'Kit de Montagem — Computador All-in-One Touch 23.8" Core i5',
+                            printer_name: "IMPRESSORA PDV - VT-8360 80mm (Inclusa no Kit)",
+                            reader_name: "Kit Completo (Coolers + Régua + Cabos)",
+                            unit_price_cents: editOrderForm.payment_method === "credit_card" ? 494200 : 471200,
+                            quantity: 1,
+                            subtotal_cents: editOrderForm.payment_method === "credit_card" ? 494200 : 471200,
+                            screenCutoutMm: 'Abertura usinada para tela 23.8" (tolerância de precisão CNC +1.5mm)',
+                            customizationNotes: "",
+                            itemAttachments: [],
+                            is_kit: true,
+                            kit_items: defaultKit,
+                            include_assembly: false,
+                          },
+                        ];
+                        setEditOrderForm(recalculateEditFormTotals({ ...editOrderForm, items: nextItems }));
+                      }}
+                      onRemoveItem={(removeIdx) => {
+                        const next = editOrderForm.items.filter((_, i) => i !== removeIdx);
+                        setEditOrderForm(recalculateEditFormTotals({ ...editOrderForm, items: next }));
+                      }}
+                    />
 
                     <div className="space-y-3">
                       {editOrderForm.items.map((it, idx) => (
                         <div
                           key={it.$id || idx}
-                          className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3"
+                          className="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5"
                         >
-                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                          <div className="flex items-center justify-between">
                             <span className="font-black text-white text-xs">
-                              Item #{idx + 1} — {it.cabinet_name}
+                              Anexos Multimídia — Item #{idx + 1} ({it.cabinet_name})
                             </span>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const next = [...editOrderForm.items];
-                                  next[idx] = {
-                                    ...next[idx],
-                                    monitor_name: 'Kit de Montagem — Computador All-in-One Touch 23.8" Core i5',
-                                    printer_name: "IMPRESSORA PDV - VT-8360 80mm (Kit)",
-                                    reader_name: "Kit Completo (Coolers + Régua + Cabos)",
-                                  };
-                                  setEditOrderForm({ ...editOrderForm, items: next });
-                                }}
-                                className="px-2.5 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 font-extrabold text-[10px] flex items-center gap-1 cursor-pointer"
-                                title="Preencher Monitor e Impressora com os modelos reais do Kit de Montagem"
-                              >
-                                <Zap className="w-3 h-3" />
-                                <span>Aplicar Modelos do Kit (All-in-One Touch 23.8&quot; + VT-8360)</span>
-                              </button>
-                              {editOrderForm.items.length > 1 && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const next = editOrderForm.items.filter((_, i) => i !== idx);
-                                    setEditOrderForm(recalculateEditFormTotals({ ...editOrderForm, items: next }));
-                                  }}
-                                  className="text-rose-400 hover:text-rose-300 font-bold text-[11px] flex items-center gap-1 cursor-pointer"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                  <span>Remover Item</span>
-                                </button>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                            <div className="lg:col-span-2">
-                              <label className="block text-slate-400 font-semibold mb-1">Modelo do Gabinete</label>
-                              <input
-                                type="text"
-                                value={it.cabinet_name}
-                                onChange={(e) => {
-                                  const next = [...editOrderForm.items];
-                                  next[idx] = { ...next[idx], cabinet_name: e.target.value };
-                                  setEditOrderForm({ ...editOrderForm, items: next });
-                                }}
-                                className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-slate-400 font-semibold mb-1">Acabamento / Cor</label>
-                              <input
-                                type="text"
-                                value={it.color_name}
-                                onChange={(e) => {
-                                  const next = [...editOrderForm.items];
-                                  next[idx] = { ...next[idx], color_name: e.target.value };
-                                  setEditOrderForm({ ...editOrderForm, items: next });
-                                }}
-                                className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
-                              />
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <label className="block text-slate-400 font-semibold mb-1">Qtd</label>
-                                <input
-                                  type="number"
-                                  min={1}
-                                  value={it.quantity}
-                                  onChange={(e) => {
-                                    const q = Math.max(1, parseInt(e.target.value, 10) || 1);
-                                    const next = [...editOrderForm.items];
-                                    next[idx] = {
-                                      ...next[idx],
-                                      quantity: q,
-                                      subtotal_cents: q * (next[idx].unit_price_cents || 0),
-                                    };
-                                    setEditOrderForm(recalculateEditFormTotals({ ...editOrderForm, items: next }));
-                                  }}
-                                  className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-slate-400 font-semibold mb-1">Subtotal (R$)</label>
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  value={(it.subtotal_cents / 100).toFixed(2)}
-                                  onChange={(e) => {
-                                    const sub = Math.round((parseFloat(e.target.value) || 0) * 100);
-                                    const next = [...editOrderForm.items];
-                                    next[idx] = {
-                                      ...next[idx],
-                                      subtotal_cents: sub,
-                                      unit_price_cents: Math.round(sub / Math.max(1, next[idx].quantity)),
-                                    };
-                                    setEditOrderForm(recalculateEditFormTotals({ ...editOrderForm, items: next }));
-                                  }}
-                                  className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-indigo-300 font-mono font-bold"
-                                />
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                            <div>
-                              <label className="block text-cyan-300 font-bold mb-1">Monitor Escolhido</label>
-                              <input
-                                type="text"
-                                value={it.monitor_name}
-                                onChange={(e) => {
-                                  const next = [...editOrderForm.items];
-                                  next[idx] = { ...next[idx], monitor_name: e.target.value };
-                                  setEditOrderForm({ ...editOrderForm, items: next });
-                                }}
-                                placeholder='Ex: Computador All-in-One Touch 23.8" Core i5'
-                                className="w-full px-3 py-2 bg-cyan-950/30 border border-cyan-500/40 rounded-xl text-white font-bold"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-indigo-300 font-bold mb-1">Impressora Escolhida</label>
-                              <input
-                                type="text"
-                                value={it.printer_name}
-                                onChange={(e) => {
-                                  const next = [...editOrderForm.items];
-                                  next[idx] = { ...next[idx], printer_name: e.target.value };
-                                  setEditOrderForm({ ...editOrderForm, items: next });
-                                }}
-                                placeholder="Ex: IMPRESSORA PDV - VT-8360 80mm, Elgin i9, Epson TM-T20X..."
-                                className="w-full px-3 py-2 bg-indigo-950/30 border border-indigo-500/40 rounded-xl text-white font-bold"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-purple-300 font-bold mb-1">Leitor 2D / Acessórios</label>
-                              <input
-                                type="text"
-                                value={it.reader_name}
-                                onChange={(e) => {
-                                  const next = [...editOrderForm.items];
-                                  next[idx] = { ...next[idx], reader_name: e.target.value };
-                                  setEditOrderForm({ ...editOrderForm, items: next });
-                                }}
-                                placeholder="Ex: Kit Completo (Coolers + Régua + Cabos) ou Leitor 2D"
-                                className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                            <div>
-                              <label className="block text-slate-400 font-semibold mb-1">
-                                Especificação de Corte CNC da Tela / Medidas do Monitor
-                              </label>
-                              <input
-                                type="text"
-                                value={it.screenCutoutMm}
-                                onChange={(e) => {
-                                  const next = [...editOrderForm.items];
-                                  next[idx] = { ...next[idx], screenCutoutMm: e.target.value };
-                                  setEditOrderForm({ ...editOrderForm, items: next });
-                                }}
-                                placeholder="Ex: Monitor Inteiro: 49.6x30cm | Tela: 47.6x27cm..."
-                                className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 font-mono text-[11px]"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-amber-300 font-extrabold mb-1">
-                                ⚠️ Observação Especial / Alerta Fora do Padrão deste Item
-                              </label>
-                              <input
-                                type="text"
-                                value={it.customizationNotes}
-                                onChange={(e) => {
-                                  const next = [...editOrderForm.items];
-                                  next[idx] = { ...next[idx], customizationNotes: e.target.value };
-                                  setEditOrderForm({ ...editOrderForm, items: next });
-                                }}
-                                placeholder="Qualquer observação escrita aqui ficará em destaque amarelo/vermelho no card!"
-                                className="w-full px-3 py-2 bg-amber-950/30 border border-amber-500/50 rounded-xl text-amber-100 placeholder-slate-500 font-bold"
-                              />
-                            </div>
                           </div>
 
                           {/* ANEXOS TÉCNICOS DESTE ITEM (FOTOS E VÍDEOS ESPECÍFICOS DO GABINETE) */}
