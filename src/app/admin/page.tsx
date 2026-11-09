@@ -1041,14 +1041,22 @@ export default function AdminPage() {
   const handleSendPaymentToCustomerWhatsAppApi = async (order: OrderRecord) => {
     if (sendingWaOrderId) return;
     setSendingWaOrderId(order.$id);
+    const messageText = buildCustomerPaymentWhatsAppText(order);
     try {
       const res = await fetch("/api/admin/orders/notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: order.$id, mode: "send_to_customer" }),
+        body: JSON.stringify({
+          mode: "send_to_customer",
+          orderId: order.$id,
+          orderNumber: order.order_number,
+          customerName: order.customer_name,
+          customerWhatsapp: order.customer_whatsapp,
+          message: messageText,
+        }),
       });
       const json = await res.json();
-      if (json.ok && json.whatsapp?.sent) {
+      if (json.ok) {
         setSaveSuccessMsg(`Cobrança e resumo do pedido ${order.order_number} enviados no WhatsApp de ${order.customer_name}!`);
         setTimeout(() => setSaveSuccessMsg(""), 4500);
         addAuditLog("Cobrança WhatsApp Enviada", `Pedido #${order.order_number}`, `Enviado para ${order.customer_whatsapp}`);
@@ -1056,8 +1064,7 @@ export default function AdminPage() {
         // Fallback: abre o wa.me com o texto completo
         const cleanPhone = (order.customer_whatsapp || "").replace(/\D/g, "");
         if (cleanPhone) {
-          const text = json.whatsappText || buildCustomerPaymentWhatsAppText(order, json.customerPaymentUrl);
-          window.open(`https://wa.me/55${cleanPhone}?text=${encodeURIComponent(text)}`, "_blank");
+          window.open(`https://wa.me/55${cleanPhone}?text=${encodeURIComponent(messageText)}`, "_blank");
         } else {
           alert(json.error || "Cliente não possui número de WhatsApp cadastrado.");
         }
@@ -1066,7 +1073,7 @@ export default function AdminPage() {
       const cleanPhone = (order.customer_whatsapp || "").replace(/\D/g, "");
       if (cleanPhone) {
         window.open(
-          `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(buildCustomerPaymentWhatsAppText(order))}`,
+          `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(messageText)}`,
           "_blank"
         );
       }
@@ -1537,23 +1544,33 @@ export default function AdminPage() {
       };
 
       if (sendMode === "api") {
+        const waText = buildCustomerPaymentWhatsAppText(updatedOrderSnapshot, customerPaymentUrl);
         try {
           const notifyRes = await fetch("/api/admin/orders/notify", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ orderId: editingOrder.$id, mode: "send_to_customer" }),
+            body: JSON.stringify({
+              mode: "send_to_customer",
+              orderId: editingOrder.$id,
+              orderNumber: editingOrder.order_number,
+              customerName: payload.customer_name,
+              customerWhatsapp: payload.customer_whatsapp,
+              message: waText,
+            }),
           });
           const notifyJson = await notifyRes.json();
-          if (!notifyJson.ok || !notifyJson.whatsapp?.sent) {
+          if (!notifyJson.ok) {
             const cleanPhone = (payload.customer_whatsapp || "").replace(/\D/g, "");
             if (cleanPhone) {
-              const waText =
-                notifyJson.whatsappText ||
-                buildCustomerPaymentWhatsAppText(updatedOrderSnapshot, customerPaymentUrl);
               window.open(`https://wa.me/55${cleanPhone}?text=${encodeURIComponent(waText)}`, "_blank");
             }
           }
-        } catch {}
+        } catch {
+          const cleanPhone = (payload.customer_whatsapp || "").replace(/\D/g, "");
+          if (cleanPhone) {
+            window.open(`https://wa.me/55${cleanPhone}?text=${encodeURIComponent(waText)}`, "_blank");
+          }
+        }
       } else if (sendMode === "wa_web") {
         const cleanPhone = (payload.customer_whatsapp || "").replace(/\D/g, "");
         if (cleanPhone) {
