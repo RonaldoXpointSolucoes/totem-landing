@@ -230,12 +230,11 @@ export function ProductionOrderPrintModal({
   const ship = order.shipping || {};
 
   const cncProductionChecks = [
-    "1. Chapas cortadas na Router CNC conforme modelo e cor MDF",
-    "2. Recorte VESA da tela e rasgo da impressora conferidos no gabarito",
-    "3. Furação de botão Liga/Desliga, tomada, passa-cabos e 2 coolers",
-    "4. Montagem estrutural, limpeza de bordas MDF e acabamento revisados",
-    "5. Fechadura tubular instalada e testada com par de chaves (2 un.)",
-    "6. Todos os itens do Checklist abaixo conferidos antes de lacrar a caixa",
+    "Chave",
+    "Trava Monitor",
+    "Parafusos",
+    "Manuais",
+    "Folder Propaganda",
   ];
 
   return (
@@ -487,13 +486,13 @@ export function ProductionOrderPrintModal({
                   }}
                 >
                   <div style={{ borderRight: "1px solid #cbd5e1", paddingRight: "8px" }}>
-                    <div style={{ fontSize: "8.5px", fontWeight: 900, color: "#475569", textTransform: "uppercase" }}>
+                    <div style={{ fontSize: "10px", fontWeight: 900, color: "#334155", textTransform: "uppercase", letterSpacing: "0.3px" }}>
                       CLIENTE / DESTINATÁRIO
                     </div>
-                    <div style={{ fontSize: "11px", fontWeight: 900, color: "#0f172a", marginTop: "1px" }}>
+                    <div style={{ fontSize: "16px", fontWeight: 900, color: "#0f172a", marginTop: "2px", lineHeight: 1.15 }}>
                       {order.customer_name}
                     </div>
-                    <div style={{ color: "#1e293b", marginTop: "1px" }}>
+                    <div style={{ fontSize: "10.5px", color: "#1e293b", marginTop: "3px" }}>
                       <strong>CPF/CNPJ:</strong> {order.customer_document || "—"} •{" "}
                       <strong>Tel:</strong> {order.customer_whatsapp || "—"}
                     </div>
@@ -593,24 +592,30 @@ export function ProductionOrderPrintModal({
                           display: "flex",
                           justifyContent: "space-between",
                           alignItems: "center",
-                          borderBottom: "1.5px solid #0f172a",
-                          paddingBottom: "4px",
+                          borderBottom: "2px solid #0f172a",
+                          paddingBottom: "5px",
                           marginBottom: "6px",
-                          fontSize: "10.5px",
-                          fontWeight: 900,
-                          textTransform: "uppercase",
                         }}
                       >
-                        <span>
-                          1. ESPECIFICAÇÃO DE USINAGEM CNC #{idx + 1}: {itemQty}x{" "}
-                          {stripMonetaryValues(it.cabinet_name)} — COR: {stripMonetaryValues(it.color_name)}
+                        <span
+                          style={{
+                            fontSize: "15.5px",
+                            fontWeight: 900,
+                            color: "#0f172a",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.2px",
+                          }}
+                        >
+                          {itemQty}x {stripMonetaryValues(it.cabinet_name)} — COR: {stripMonetaryValues(it.color_name)}
                         </span>
                         <span
                           style={{
                             background: "#e2e8f0",
-                            padding: "1px 6px",
+                            padding: "2px 8px",
                             borderRadius: "4px",
-                            fontSize: "9.5px",
+                            fontSize: "10px",
+                            fontWeight: 900,
+                            textTransform: "uppercase",
                           }}
                         >
                           {hasAssembly
@@ -935,7 +940,7 @@ export function ProductionOrderPrintModal({
               })}
 
               {/* ================================================================= */}
-              {/* 3. CHECKLIST DE USINAGEM CNC & ESTRUTURA (EM 2 COLUNAS COMPACTAS) */}
+              {/* 3. CHECKLIST DE ACESSÓRIOS & IMPRESSOS (5 ITENS LADO A LADO)      */}
               {/* ================================================================= */}
               <div
                 style={{
@@ -959,15 +964,15 @@ export function ProductionOrderPrintModal({
                     textTransform: "uppercase",
                   }}
                 >
-                  <span>3. CHECKLIST DE USINAGEM CNC, ACABAMENTO & MONTAGEM (MARCAR [ ✓ ] À CANETA)</span>
-                  <span style={{ fontSize: "9px", color: "#334155" }}>CONTROLE DE QUALIDADE CNC</span>
+                  <span>3. CHECKLIST COMPLEMENTAR DE ENVIO (MARCAR [ ✓ ] À CANETA)</span>
+                  <span style={{ fontSize: "9px", color: "#334155" }}>CONFERÊNCIA OBRIGATÓRIA</span>
                 </div>
 
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: "4px 8px",
+                    gridTemplateColumns: "repeat(5, 1fr)",
+                    gap: "6px",
                   }}
                 >
                   {cncProductionChecks.map((stepText, sIdx) => (
@@ -977,16 +982,16 @@ export function ProductionOrderPrintModal({
                         display: "flex",
                         alignItems: "center",
                         gap: "6px",
-                        border: "1px solid #cbd5e1",
-                        borderRadius: "4px",
-                        padding: "3.5px 6px",
+                        border: "1.5px solid #475569",
+                        borderRadius: "5px",
+                        padding: "5px 7px",
                         background: "#f8fafc",
                       }}
                     >
                       <span
                         style={{
-                          width: "14px",
-                          height: "14px",
+                          width: "16px",
+                          height: "16px",
                           border: "2px solid #0f172a",
                           borderRadius: "3px",
                           display: "inline-block",
@@ -994,7 +999,7 @@ export function ProductionOrderPrintModal({
                           background: "#ffffff",
                         }}
                       />
-                      <span style={{ fontWeight: 700, fontSize: "9.5px", color: "#0f172a" }}>
+                      <span style={{ fontWeight: 900, fontSize: "10.5px", color: "#0f172a" }}>
                         {stepText}
                       </span>
                     </div>
