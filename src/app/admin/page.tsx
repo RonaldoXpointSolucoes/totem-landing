@@ -2585,9 +2585,9 @@ export default function AdminPage() {
                         /* ========================================================================= */
                         /* MODO: LISTA SIMPLIFICADA EM UMA LINHA (SOMENTE OS ITENS MAIS IMPORTANTES) */
                         /* ========================================================================= */
-                        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+                        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-2.5">
                           {/* 1. CLIENTE, WHATSAPP & CIDADE/UF */}
-                          <div className="xl:w-[25%] flex items-center gap-3 min-w-0">
+                          <div className="xl:w-[21%] flex items-center gap-2.5 min-w-0">
                             <div
                               className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-black text-sm border ${
                                 isOrderPaid
@@ -2631,7 +2631,7 @@ export default function AdminPage() {
                           </div>
 
                           {/* 2. ITEM PRINCIPAL RESUMIDO (GABINETE + COR + EQUIPAMENTO PRINCIPAL) */}
-                          <div className="xl:w-[28%] flex items-center gap-2.5 xl:border-l xl:border-slate-800/80 xl:pl-3.5 min-w-0">
+                          <div className="xl:w-[24%] flex items-center gap-2.5 xl:border-l xl:border-slate-800/80 xl:pl-3 min-w-0">
                             {firstItemThumb && (
                               <div className="w-10 h-10 rounded-lg bg-white border border-slate-700 overflow-hidden flex items-center justify-center p-0.5 shrink-0">
                                 <img src={firstItemThumb} alt="Gabinete" className="w-full h-full object-contain" />
@@ -2644,13 +2644,13 @@ export default function AdminPage() {
                               </p>
                               <div className="flex items-center gap-1 flex-wrap text-[10px]">
                                 {firstItem?.color_name && (
-                                  <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-200 border border-slate-700 font-semibold truncate max-w-[140px]">
+                                  <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-200 border border-slate-700 font-semibold truncate max-w-[135px]">
                                     {firstItem.color_name}
                                   </span>
                                 )}
                                 {resolvedFirstItem?.isKit ? (
                                   <span
-                                    className={`px-1.5 py-0.5 rounded font-bold border truncate max-w-[190px] ${
+                                    className={`px-1.5 py-0.5 rounded font-bold border truncate max-w-[180px] ${
                                       !resolvedFirstItem.hasMonitorInKit || !resolvedFirstItem.hasPrinterInKit
                                         ? "bg-amber-500/15 text-amber-300 border-amber-500/40"
                                         : "bg-cyan-950/60 text-cyan-300 border-cyan-500/35"
@@ -2667,7 +2667,7 @@ export default function AdminPage() {
                                   </span>
                                 ) : resolvedFirstItem?.monitorDisplay ? (
                                   <span
-                                    className="px-1.5 py-0.5 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-500/35 font-semibold truncate max-w-[180px]"
+                                    className="px-1.5 py-0.5 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-500/35 font-semibold truncate max-w-[170px]"
                                     title={resolvedFirstItem.monitorDisplay}
                                   >
                                     {resolvedFirstItem.monitorDisplay}
@@ -2683,7 +2683,7 @@ export default function AdminPage() {
                           </div>
 
                           {/* 3. NÚMERO DO PEDIDO, DATA, FRETE & STATUS */}
-                          <div className="xl:w-[21%] xl:border-l xl:border-slate-800/80 xl:pl-3.5 min-w-0 space-y-0.5">
+                          <div className="xl:w-[19%] xl:border-l xl:border-slate-800/80 xl:pl-3 min-w-0 space-y-0.5">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="font-extrabold text-white text-xs sm:text-sm font-mono tracking-tight">
                                 {order.order_number}
@@ -2717,7 +2717,7 @@ export default function AdminPage() {
                           </div>
 
                           {/* 4. VALOR TOTAL & MÉTODO DE PAGAMENTO */}
-                          <div className="xl:w-[13%] xl:border-l xl:border-slate-800/80 xl:pl-3.5 shrink-0 flex xl:flex-col items-center xl:items-end justify-between gap-2">
+                          <div className="xl:w-[11%] xl:border-l xl:border-slate-800/80 xl:pl-3 shrink-0 flex xl:flex-col items-center xl:items-end justify-between gap-1.5">
                             <span
                               className={`text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1 ${
                                 isOrderPaid
@@ -2752,12 +2752,12 @@ export default function AdminPage() {
                             </span>
                           </div>
 
-                          {/* 5. AÇÕES RÁPIDAS NA MESMA LINHA (SÓ EXPANDE AO CLICAR EM DETALHES) */}
-                          <div className="shrink-0 flex items-center justify-end gap-1.5 pt-2 xl:pt-0 border-t xl:border-t-0 border-slate-800/70">
+                          {/* 5. AÇÕES RÁPIDAS NA MESMA LINHA (INCLUINDO IMPRIMIR ORDEM DE PRODUÇÃO DIRETO NA LISTA SIMPLES) */}
+                          <div className="shrink-0 flex flex-wrap items-center justify-end gap-1.5 pt-2 xl:pt-0 border-t xl:border-t-0 border-slate-800/70">
                             <button
                               type="button"
                               onClick={() => toggleOrderExpanded(order.$id)}
-                              className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-extrabold text-xs inline-flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                              className="px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-extrabold text-xs inline-flex items-center gap-1 shadow-sm transition-all cursor-pointer"
                               title="Clique para abrir todos os detalhes, cobrança Mercado Pago e as 3 colunas do pedido"
                             >
                               <Eye className="w-3.5 h-3.5" />
@@ -2768,21 +2768,21 @@ export default function AdminPage() {
                             <button
                               type="button"
                               onClick={() => setPrintingProductionOrder(order)}
-                              className="px-2.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 active:scale-95 text-emerald-300 border border-emerald-500/40 font-extrabold text-xs inline-flex items-center gap-1 transition-all cursor-pointer"
+                              className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-xs inline-flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 transition-all cursor-pointer"
                               title="Imprimir Ordem de Produção para a Fábrica (Sem Valores Monetários + Orientações + Checklist à Caneta)"
                             >
                               <Printer className="w-3.5 h-3.5" />
-                              <span className="hidden sm:inline">O.S. Produção</span>
+                              <span>Ordem de Produção</span>
                             </button>
 
                             <button
                               type="button"
                               onClick={() => setCorreiosLabelOrder(order)}
-                              className="px-2.5 py-1.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 active:scale-95 text-amber-300 border border-amber-400/50 font-extrabold text-xs inline-flex items-center gap-1 transition-all cursor-pointer"
+                              className="px-2 py-1.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 active:scale-95 text-amber-300 border border-amber-400/50 font-extrabold text-xs inline-flex items-center gap-1 transition-all cursor-pointer"
                               title="Lançar Pré-Postagem no Contrato Correios (API CWS) e Imprimir Etiqueta Simplificada"
                             >
-                              <Printer className="w-3.5 h-3.5" />
-                              <span className="hidden sm:inline">Etiqueta</span>
+                              <Truck className="w-3.5 h-3.5" />
+                              <span className="hidden 2xl:inline">Etiqueta</span>
                             </button>
 
                             {!isOrderPaid && (
@@ -2793,7 +2793,7 @@ export default function AdminPage() {
                                 title="Editar itens, adicionar valores extras e gerar nova condição de pagamento"
                               >
                                 <Plus className="w-3.5 h-3.5" />
-                                <span className="hidden sm:inline">Cobrança</span>
+                                <span>Cobrança</span>
                               </button>
                             )}
 
