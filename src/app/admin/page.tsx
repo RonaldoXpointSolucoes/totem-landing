@@ -17,6 +17,7 @@ import {
 } from "@/modules/catalog/kitDefaults";
 import { KitSubItem } from "@/types/catalog";
 import { AdminOrderVisualEditor } from "@/components/admin/AdminOrderVisualEditor";
+import CorreiosLabelModal from "@/components/admin/CorreiosLabelModal";
 import { CatalogManager } from "@/components/admin/CatalogManager";
 import { MarketingSettingsManager } from "@/components/admin/MarketingSettingsManager";
 import { TeamManager } from "@/components/admin/TeamManager";
@@ -1068,6 +1069,7 @@ export default function AdminPage() {
   };
 
   const [sendingWaOrderId, setSendingWaOrderId] = useState<string | null>(null);
+  const [correiosLabelOrder, setCorreiosLabelOrder] = useState<OrderRecord | null>(null);
   const [showQuickMpCalculator, setShowQuickMpCalculator] = useState<boolean>(false);
   const [quickMpPixInputBRL, setQuickMpPixInputBRL] = useState<string>("1558.00");
 
@@ -2752,6 +2754,16 @@ export default function AdminPage() {
                               <ChevronDown className="w-3.5 h-3.5" />
                             </button>
 
+                            <button
+                              type="button"
+                              onClick={() => setCorreiosLabelOrder(order)}
+                              className="px-2.5 py-1.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 active:scale-95 text-amber-300 border border-amber-400/50 font-extrabold text-xs inline-flex items-center gap-1 transition-all cursor-pointer"
+                              title="Lançar Pré-Postagem no Contrato Correios (API CWS) e Imprimir Etiqueta Simplificada"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                              <span className="hidden sm:inline">Etiqueta</span>
+                            </button>
+
                             {!isOrderPaid && (
                               <button
                                 type="button"
@@ -2914,6 +2926,16 @@ export default function AdminPage() {
                                 >
                                   <Eye className="w-3.5 h-3.5" />
                                   <span>Ver Pedido Completo & Ficha CNC</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => setCorreiosLabelOrder(order)}
+                                  className="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md shadow-amber-400/20 transition-all shrink-0 cursor-pointer"
+                                  title="Lançar Pré-Postagem no sistema dos Correios pela API usando seu Contrato 9912722993 e Imprimir Etiqueta Simplificada"
+                                >
+                                  <Printer className="w-3.5 h-3.5" />
+                                  <span>Etiqueta Correios (API / Imprimir)</span>
                                 </button>
 
                                 {!isOrderPaid && (
@@ -3200,20 +3222,58 @@ export default function AdminPage() {
                             </span>
 
                             {/* Box Método de Envio */}
-                            <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-[10px] uppercase font-bold text-slate-400">Modalidade de Frete:</span>
-                                <span className="text-[11px] font-extrabold text-cyan-300">
-                                  {order.shipping_cents > 0 ? formatBRL(order.shipping_cents) : "Grátis / Isento"}
-                                </span>
+                            <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2">
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[10px] uppercase font-bold text-slate-400">Modalidade de Frete:</span>
+                                  <span className="text-[11px] font-extrabold text-cyan-300">
+                                    {order.shipping_cents > 0 ? formatBRL(order.shipping_cents) : "Grátis / Isento"}
+                                  </span>
+                                </div>
+                                <p className="font-bold text-white text-xs">{shipping.name}</p>
+                                <p className="text-[10px] text-slate-400">
+                                  {shipping.carrier ? `Transportadora: ${shipping.carrier}` : ""}
+                                  {shipping.deliveryDaysMin && shipping.deliveryDaysMax
+                                    ? ` • Prazo: ${shipping.deliveryDaysMin} a ${shipping.deliveryDaysMax} dias úteis`
+                                    : ""}
+                                </p>
                               </div>
-                              <p className="font-bold text-white text-xs">{shipping.name}</p>
-                              <p className="text-[10px] text-slate-400">
-                                {shipping.carrier ? `Transportadora: ${shipping.carrier}` : ""}
-                                {shipping.deliveryDaysMin && shipping.deliveryDaysMax
-                                  ? ` • Prazo: ${shipping.deliveryDaysMin} a ${shipping.deliveryDaysMax} dias úteis`
-                                  : ""}
-                              </p>
+
+                              {(addr as any)?.correiosShipment?.volumes?.length > 0 && (
+                                <div className="pt-1.5 border-t border-slate-800 space-y-1">
+                                  <div className="flex items-center justify-between text-[10px]">
+                                    <span className="font-black uppercase text-amber-300">
+                                      Rastreio Contrato {(addr as any).correiosShipment.contractNumber}:
+                                    </span>
+                                    <span className="text-emerald-400 font-bold">
+                                      {(addr as any).correiosShipment.volumes.length} vol(s)
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {(addr as any).correiosShipment.volumes.map((v: any, vi: number) => (
+                                      <span
+                                        key={vi}
+                                        className="px-2 py-0.5 rounded bg-slate-950 border border-amber-500/40 text-amber-300 font-mono text-[10px] font-bold"
+                                      >
+                                        {v.trackingCode}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => setCorreiosLabelOrder(order)}
+                                className="w-full py-2 px-3 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 active:scale-95 text-amber-300 border border-amber-400/50 font-black text-[11px] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                                <span>
+                                  {(addr as any)?.correiosShipment
+                                    ? "Reimprimir / Atualizar Etiqueta Correios"
+                                    : "Gerar & Imprimir Etiqueta Correios"}
+                                </span>
+                              </button>
                             </div>
 
                             {/* Box Demonstrativo Financeiro em Ordem (01, 02, 03, 04...) */}
@@ -6214,6 +6274,19 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
+      )}
+      {/* ======================================================== */}
+      {/* MODAL: PRÉ-POSTAGEM & IMPRESSÃO DE ETIQUETA CORREIOS API */}
+      {/* ======================================================== */}
+      {correiosLabelOrder && (
+        <CorreiosLabelModal
+          orderId={correiosLabelOrder.$id}
+          orderNumber={correiosLabelOrder.order_number}
+          onClose={() => setCorreiosLabelOrder(null)}
+          onLabelSaved={() => {
+            loadOrders();
+          }}
+        />
       )}
     </div>
   );
