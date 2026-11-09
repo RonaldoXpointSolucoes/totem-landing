@@ -17,6 +17,7 @@ import {
 } from "@/modules/catalog/kitDefaults";
 import { KitSubItem } from "@/types/catalog";
 import { AdminOrderVisualEditor } from "@/components/admin/AdminOrderVisualEditor";
+import { ProductionOrderPrintModal } from "@/components/admin/ProductionOrderPrintModal";
 import CorreiosLabelModal from "@/components/admin/CorreiosLabelModal";
 import { CatalogManager } from "@/components/admin/CatalogManager";
 import { MarketingSettingsManager } from "@/components/admin/MarketingSettingsManager";
@@ -119,6 +120,7 @@ interface ShippingMethodInfo {
 
 interface OrderAdditionalCharge {
   id: string;
+  type?: "addition" | "discount";
   description: string;
   amountCents: number;
   quantity: number;
@@ -1032,21 +1034,25 @@ export default function AdminPage() {
 
     const extrasLines =
       additionalCharges.length > 0
-        ? `\n\n➕ *ITENS / VALORES ADICIONAIS INCLUSOS:*\n` +
+        ? `\n\n🏷️ *DESCONTOS / ACRÉSCIMOS COM MOTIVO:*\n` +
           additionalCharges
-            .map(
-              (ch) =>
-                `   • ${ch.quantity && ch.quantity > 1 ? `${ch.quantity}x ` : ""}${ch.description}: *+ ${formatBRL(
-                  (Number(ch.amountCents) || 0) * (Number(ch.quantity) || 1)
-                )}*`
-            )
+            .map((ch) => {
+              const isDisc = ch.type === "discount" || Number(ch.amountCents) < 0;
+              const absTotal = Math.abs(Number(ch.amountCents) || 0) * Math.max(1, Number(ch.quantity) || 1);
+              return `   • ${ch.quantity && ch.quantity > 1 ? `${ch.quantity}x ` : ""}${ch.description}: *${
+                isDisc ? "-" : "+"
+              } ${formatBRL(absTotal)}*`;
+            })
             .join("\n")
         : "";
 
-    const extraTotalCents = additionalCharges.reduce(
-      (acc, ch) => acc + (Number(ch.amountCents) || 0) * (Number(ch.quantity) || 1),
-      0
-    );
+    const extraAdditionsCents = additionalCharges
+      .filter((ch) => ch.type !== "discount" && Number(ch.amountCents) >= 0)
+      .reduce((acc, ch) => acc + Math.abs(Number(ch.amountCents) || 0) * Math.max(1, Number(ch.quantity) || 1), 0);
+
+    const extraDiscountsCents = additionalCharges
+      .filter((ch) => ch.type === "discount" || Number(ch.amountCents) < 0)
+      .reduce((acc, ch) => acc + Math.abs(Number(ch.amountCents) || 0) * Math.max(1, Number(ch.quantity) || 1), 0);
 
     return [
       `Olá *${order.customer_name || "Cliente"}*! Tudo bem?`,
@@ -1059,7 +1065,8 @@ export default function AdminPage() {
       ``,
       `💰 *RESUMO FINANCEIRO:*`,
       `• Subtotal Gabinetes: ${formatBRL(order.subtotal_cents)}`,
-      ...(extraTotalCents > 0 ? [`• Valores Adicionais: + ${formatBRL(extraTotalCents)}`] : []),
+      ...(extraAdditionsCents > 0 ? [`• Acréscimos / Serviços Extras: + ${formatBRL(extraAdditionsCents)}`] : []),
+      ...(extraDiscountsCents > 0 ? [`• Descontos Concedidos: - ${formatBRL(extraDiscountsCents)}`] : []),
       `• Frete (${shipping.name}): ${order.shipping_cents > 0 ? formatBRL(order.shipping_cents) : "Grátis / Isento"}`,
       `*VALOR TOTAL: ${formatBRL(order.total_cents)}*`,
       ``,
@@ -1070,6 +1077,7 @@ export default function AdminPage() {
 
   const [sendingWaOrderId, setSendingWaOrderId] = useState<string | null>(null);
   const [correiosLabelOrder, setCorreiosLabelOrder] = useState<OrderRecord | null>(null);
+  const [printingProductionOrder, setPrintingProductionOrder] = useState<OrderRecord | null>(null);
   const [showQuickMpCalculator, setShowQuickMpCalculator] = useState<boolean>(false);
   const [quickMpPixInputBRL, setQuickMpPixInputBRL] = useState<string>("1558.00");
 
@@ -1191,8 +1199,9 @@ export default function AdminPage() {
     const existingCharges: OrderAdditionalCharge[] = Array.isArray(addr?.additionalCharges)
       ? addr!.additionalCharges!.map((c, idx) => ({
           id: c.id || `extra_${idx}_${Date.now()}`,
+          type: c.type === "discount" || Number(c.amountCents) < 0 ? "discount" : "addition",
           description: c.description || "",
-          amountCents: Number(c.amountCents) || 0,
+          amountCents: Math.abs(Number(c.amountCents) || 0),
           quantity: Math.max(1, Number(c.quantity) || 1),
         }))
       : [];
@@ -1354,8 +1363,9 @@ export default function AdminPage() {
       const validAdditionalCharges = (editOrderForm.additional_charges || [])
         .map((c) => ({
           id: c.id || `extra_${Date.now()}`,
+          type: (c.type === "discount" ? "discount" : "addition") as "addition" | "discount",
           description: (c.description || "").trim(),
-          amountCents: Math.round(Number(c.amountCents) || 0),
+          amountCents: Math.abs(Math.round(Number(c.amountCents) || 0)),
           quantity: Math.max(1, Number(c.quantity) || 1),
         }))
         .filter((c) => c.description.length > 0 && c.amountCents > 0);
@@ -1527,8 +1537,9 @@ export default function AdminPage() {
       const validAdditionalCharges = (editOrderForm.additional_charges || [])
         .map((c) => ({
           id: c.id || `extra_${Date.now()}`,
+          type: (c.type === "discount" ? "discount" : "addition") as "addition" | "discount",
           description: (c.description || "").trim(),
-          amountCents: Math.round(Number(c.amountCents) || 0),
+          amountCents: Math.abs(Math.round(Number(c.amountCents) || 0)),
           quantity: Math.max(1, Number(c.quantity) || 1),
         }))
         .filter((c) => c.description.length > 0 && c.amountCents > 0);
@@ -2756,6 +2767,16 @@ export default function AdminPage() {
 
                             <button
                               type="button"
+                              onClick={() => setPrintingProductionOrder(order)}
+                              className="px-2.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 active:scale-95 text-emerald-300 border border-emerald-500/40 font-extrabold text-xs inline-flex items-center gap-1 transition-all cursor-pointer"
+                              title="Imprimir Ordem de Produção para a Fábrica (Sem Valores Monetários + Orientações + Checklist à Caneta)"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                              <span className="hidden sm:inline">O.S. Produção</span>
+                            </button>
+
+                            <button
+                              type="button"
                               onClick={() => setCorreiosLabelOrder(order)}
                               className="px-2.5 py-1.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 active:scale-95 text-amber-300 border border-amber-400/50 font-extrabold text-xs inline-flex items-center gap-1 transition-all cursor-pointer"
                               title="Lançar Pré-Postagem no Contrato Correios (API CWS) e Imprimir Etiqueta Simplificada"
@@ -2908,6 +2929,16 @@ export default function AdminPage() {
                                     <span>Recolher Detalhes</span>
                                   </button>
                                 )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => setPrintingProductionOrder(order)}
+                                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black text-xs flex items-center gap-1.5 shadow-md shadow-emerald-600/25 transition-all shrink-0 cursor-pointer"
+                                  title="Imprimir Ordem de Produção sem valor monetário, com opção de escrever orientações e checklist completo para marcar à caneta"
+                                >
+                                  <Printer className="w-3.5 h-3.5" />
+                                  <span>Imprimir Ordem de Produção (S/ Preços)</span>
+                                </button>
 
                                 <button
                                   type="button"
@@ -4126,32 +4157,68 @@ export default function AdminPage() {
                                 );
                               })}
 
-                              {/* Valores Adicionais com Descrição Específica (se houver) */}
+                              {/* Descontos (-) e Acréscimos (+) com Descrição do Motivo (se houver) */}
                               {additionalCharges.length > 0 && (
                                 <div className="p-3 rounded-2xl bg-amber-950/25 border-2 border-amber-500/40 space-y-2 text-[11px]">
                                   <div className="flex items-center justify-between gap-2 border-b border-amber-500/30 pb-1.5">
                                     <span className="font-black text-amber-300 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
-                                      <Plus className="w-3.5 h-3.5" />
-                                      <span>Valores Adicionais / Serviços Extras ({additionalCharges.length})</span>
+                                      <Tag className="w-3.5 h-3.5" />
+                                      <span>
+                                        Descontos (-) & Acréscimos (+) com Motivo ({additionalCharges.length})
+                                      </span>
                                     </span>
-                                    <span className="font-black text-amber-300 font-mono text-xs">
-                                      + {formatBRL(additionalCharges.reduce((s, c) => s + c.amountCents * Math.max(1, c.quantity), 0))}
-                                    </span>
+                                    {(() => {
+                                      const netDelta = additionalCharges.reduce((s, c) => {
+                                        const isDisc = c.type === "discount" || Number(c.amountCents) < 0;
+                                        const absVal = Math.abs(Number(c.amountCents) || 0) * Math.max(1, Number(c.quantity) || 1);
+                                        return s + (isDisc ? -absVal : absVal);
+                                      }, 0);
+                                      return (
+                                        <span
+                                          className={`font-black font-mono text-xs ${
+                                            netDelta < 0 ? "text-emerald-400" : "text-amber-300"
+                                          }`}
+                                        >
+                                          {netDelta < 0 ? `- ${formatBRL(Math.abs(netDelta))}` : `+ ${formatBRL(netDelta)}`}
+                                        </span>
+                                      );
+                                    })()}
                                   </div>
                                   <div className="space-y-1.5">
-                                    {additionalCharges.map((chg) => (
-                                      <div
-                                        key={chg.id}
-                                        className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-950/80 border border-amber-500/30"
-                                      >
-                                        <span className="font-bold text-white">
-                                          {chg.quantity > 1 ? `${chg.quantity}x ` : ""}{chg.description}
-                                        </span>
-                                        <span className="font-black text-amber-300 font-mono shrink-0">
-                                          + {formatBRL(chg.amountCents * Math.max(1, chg.quantity))}
-                                        </span>
-                                      </div>
-                                    ))}
+                                    {additionalCharges.map((chg) => {
+                                      const isDisc = chg.type === "discount" || Number(chg.amountCents) < 0;
+                                      const absTotal = Math.abs(Number(chg.amountCents) || 0) * Math.max(1, Number(chg.quantity) || 1);
+                                      return (
+                                        <div
+                                          key={chg.id}
+                                          className={`flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-950/80 border ${
+                                            isDisc ? "border-emerald-500/40" : "border-amber-500/30"
+                                          }`}
+                                        >
+                                          <div className="flex items-center gap-1.5 min-w-0">
+                                            <span
+                                              className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase shrink-0 ${
+                                                isDisc
+                                                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                                                  : "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                                              }`}
+                                            >
+                                              {isDisc ? "Desconto (-)" : "Acréscimo (+)"}
+                                            </span>
+                                            <span className="font-bold text-white truncate">
+                                              {chg.quantity > 1 ? `${chg.quantity}x ` : ""}{chg.description}
+                                            </span>
+                                          </div>
+                                          <span
+                                            className={`font-black font-mono shrink-0 ${
+                                              isDisc ? "text-emerald-400" : "text-amber-300"
+                                            }`}
+                                          >
+                                            {isDisc ? `- ${formatBRL(absTotal)}` : `+ ${formatBRL(absTotal)}`}
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 </div>
                               )}
@@ -4289,6 +4356,15 @@ export default function AdminPage() {
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Excluir</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPrintingProductionOrder(selectedOrder)}
+                    className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black flex items-center gap-1.5 shadow-md shadow-emerald-600/20 transition-colors cursor-pointer"
+                    title="Imprimir Ordem de Produção sem valor monetário, com opção de escrever orientações e checklist para marcar à caneta"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>Imprimir Ordem de Produção (S/ Valores)</span>
                   </button>
                   <button
                     type="button"
@@ -5257,7 +5333,7 @@ export default function AdminPage() {
                     }`}
                   >
                     <CreditCard className="w-3.5 h-3.5" />
-                    <span>Itens, + Valores Adicionais & Nova Cobrança</span>
+                    <span>Itens, Desconto/Acréscimo & Nova Cobrança</span>
                   </button>
                   <button
                     type="button"
@@ -5284,6 +5360,42 @@ export default function AdminPage() {
                     <span>Pedido Completo (Tudo)</span>
                   </button>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPrintingProductionOrder({
+                      ...editingOrder,
+                      customer_name: editOrderForm.customer_name,
+                      customer_document: editOrderForm.customer_document,
+                      customer_email: editOrderForm.customer_email,
+                      customer_whatsapp: editOrderForm.customer_whatsapp,
+                      delivery_address_json: JSON.stringify({
+                        ...(getOrderAddress(editingOrder) || {}),
+                        cep: editOrderForm.cep,
+                        street: editOrderForm.street,
+                        number: editOrderForm.number,
+                        complement: editOrderForm.complement,
+                        neighborhood: editOrderForm.neighborhood,
+                        city: editOrderForm.city,
+                        state: editOrderForm.state,
+                        customerNotes: editOrderForm.order_notes,
+                        executionOrder: editOrderForm.execution_order,
+                        shippingMethod: {
+                          name: editOrderForm.shipping_name,
+                          carrier: editOrderForm.shipping_carrier,
+                          priceCents: editOrderForm.shipping_cents,
+                        },
+                      }),
+                      items: editOrderForm.items as any,
+                    })
+                  }
+                  className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] flex items-center gap-1.5 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+                  title="Imprimir Ordem de Produção sem valor monetário, com opção de escrever orientações e checklist de todos os detalhes para marcar à caneta"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Imprimir Ordem de Produção (S/ Preços)</span>
+                </button>
 
                 <button
                   type="button"
@@ -5712,6 +5824,400 @@ export default function AdminPage() {
                     </div>
                   </div>
 
+                  {/* ===================================================================== */}
+                  {/* 3.B DESCONTOS (-) E ACRÉSCIMOS (+) COM DESCRIÇÃO DO MOTIVO (TOPO DO MODAL) */}
+                  {/* ===================================================================== */}
+                  <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-950/30 via-slate-950 to-amber-950/25 border-2 border-amber-500/45 space-y-3.5 shadow-lg">
+                    <div className="flex flex-wrap items-center justify-between gap-2.5">
+                      <div>
+                        <h4 className="font-black text-amber-300 uppercase text-xs tracking-wider flex items-center gap-1.5">
+                          <Tag className="w-4 h-4 text-emerald-400" />
+                          <span>
+                            🏷️ Descontos (-) & Acréscimos (+) com Descrição do Motivo (
+                            {editOrderForm.additional_charges.length + (editOrderForm.discount_cents > 0 ? 1 : 0)})
+                          </span>
+                        </h4>
+                        <p className="text-[11px] text-slate-300 mt-0.5">
+                          Adicione ou remova <strong>Desconto (-)</strong> ou <strong>Acréscimo (+)</strong> informando a descrição do motivo. O valor PIX e o Cartão Seguro recalculam na hora.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextCharges: OrderAdditionalCharge[] = [
+                              ...editOrderForm.additional_charges,
+                              {
+                                id: `disc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                                type: "discount",
+                                description: "Desconto comercial autorizado",
+                                amountCents: 10000,
+                                quantity: 1,
+                              },
+                            ];
+                            setEditOrderForm(
+                              recalculateEditFormTotals({
+                                ...editOrderForm,
+                                additional_charges: nextCharges,
+                              })
+                            );
+                          }}
+                          className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center gap-1.5 shadow-md shadow-emerald-600/20 cursor-pointer"
+                        >
+                          <span>➖ + Adicionar Desconto (-) com Motivo</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextCharges: OrderAdditionalCharge[] = [
+                              ...editOrderForm.additional_charges,
+                              {
+                                id: `chg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                                type: "addition",
+                                description: "",
+                                amountCents: 0,
+                                quantity: 1,
+                              },
+                            ];
+                            setEditOrderForm(
+                              recalculateEditFormTotals({
+                                ...editOrderForm,
+                                additional_charges: nextCharges,
+                              })
+                            );
+                          }}
+                          className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/20 cursor-pointer"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>➕ + Adicionar Acréscimo (+) com Motivo</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Atalhos Rápidos de Descontos (-) e Acréscimos (+) */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <span className="text-[10px] font-bold uppercase text-emerald-400 mr-1">Descontos Rápidos (-):</span>
+                      {[
+                        {
+                          label: "- Desconto Negociação WhatsApp (R$ 100,00)",
+                          desc: "Desconto especial negociação WhatsApp",
+                          cents: 10000,
+                        },
+                        {
+                          label: "- Desconto Pagamento Imediato (R$ 150,00)",
+                          desc: "Desconto comercial para fechamento imediato",
+                          cents: 15000,
+                        },
+                        ...(editOrderForm.shipping_cents > 0
+                          ? [
+                              {
+                                label: `- Isenção / Abatimento do Frete (${formatBRL(editOrderForm.shipping_cents)})`,
+                                desc: `Desconto de isenção de frete (${editOrderForm.shipping_name})`,
+                                cents: editOrderForm.shipping_cents,
+                              },
+                            ]
+                          : []),
+                      ].map((preset) => (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => {
+                            const nextCharges: OrderAdditionalCharge[] = [
+                              ...editOrderForm.additional_charges,
+                              {
+                                id: `disc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                                type: "discount",
+                                description: preset.desc,
+                                amountCents: preset.cents,
+                                quantity: 1,
+                              },
+                            ];
+                            setEditOrderForm(
+                              recalculateEditFormTotals({
+                                ...editOrderForm,
+                                additional_charges: nextCharges,
+                              })
+                            );
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-950/60 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 font-bold text-[10px] transition-colors cursor-pointer"
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+
+                      <span className="text-[10px] font-bold uppercase text-amber-300 ml-2 mr-1">Acréscimos Rápidos (+):</span>
+                      {[
+                        {
+                          label: "+ Montagem Especializada (R$ 999,00)",
+                          desc: "Serviço Especializado de Montagem de Fábrica 100% Pronto",
+                          cents: 99900,
+                        },
+                        {
+                          label: "+ Leitor QR Code 2D (R$ 349,00)",
+                          desc: "Leitor de Código de Barras / QR Code 2D Homologado",
+                          cents: 34900,
+                        },
+                        {
+                          label: "+ Suporte Pinpad Universal (R$ 149,00)",
+                          desc: "Suporte Universal para Máquina de Cartão / Pinpad",
+                          cents: 14900,
+                        },
+                      ].map((preset) => (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => {
+                            const nextCharges: OrderAdditionalCharge[] = [
+                              ...editOrderForm.additional_charges,
+                              {
+                                id: `chg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                                type: "addition",
+                                description: preset.desc,
+                                amountCents: preset.cents,
+                                quantity: 1,
+                              },
+                            ];
+                            setEditOrderForm(
+                              recalculateEditFormTotals({
+                                ...editOrderForm,
+                                additional_charges: nextCharges,
+                              })
+                            );
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-amber-500/20 text-amber-200 border border-amber-500/30 font-bold text-[10px] transition-colors cursor-pointer"
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Cupom / Desconto de Checkout (se houver, permite editar ou remover) */}
+                    {(editOrderForm.discount_cents > 0 || editOrderForm.coupon_code) && (
+                      <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/40 grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+                        <div className="sm:col-span-7">
+                          <label className="block text-emerald-300 font-bold text-[10px] uppercase mb-1">
+                            Cupom / Motivo do Desconto de Checkout
+                          </label>
+                          <input
+                            type="text"
+                            value={editOrderForm.coupon_code}
+                            onChange={(e) =>
+                              setEditOrderForm({
+                                ...editOrderForm,
+                                coupon_code: e.target.value,
+                              })
+                            }
+                            placeholder="Ex: CUPOM10 ou Desconto Checkout..."
+                            className="w-full px-3 py-2 bg-slate-900 border border-emerald-500/40 rounded-xl text-white font-bold"
+                          />
+                        </div>
+                        <div className="sm:col-span-4">
+                          <label className="block text-emerald-300 font-bold text-[10px] uppercase mb-1">
+                            Valor do Desconto (-) em R$
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min={0}
+                            value={(editOrderForm.discount_cents / 100).toFixed(2)}
+                            onChange={(e) => {
+                              const nextDisc = Math.max(0, Math.round((parseFloat(e.target.value) || 0) * 100));
+                              setEditOrderForm(
+                                recalculateEditFormTotals({
+                                  ...editOrderForm,
+                                  discount_cents: nextDisc,
+                                })
+                              );
+                            }}
+                            className="w-full px-3 py-2 bg-slate-900 border border-emerald-500/40 rounded-xl text-emerald-400 font-mono font-black"
+                          />
+                        </div>
+                        <div className="sm:col-span-1 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setEditOrderForm(
+                                recalculateEditFormTotals({
+                                  ...editOrderForm,
+                                  discount_cents: 0,
+                                  coupon_code: "",
+                                })
+                              )
+                            }
+                            className="w-full sm:w-9 h-9 rounded-xl bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 flex items-center justify-center cursor-pointer"
+                            title="Remover desconto de cupom"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Lista de Descontos (-) e Acréscimos (+) com Motivo */}
+                    {editOrderForm.additional_charges.length === 0 ? (
+                      <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 text-slate-400 text-[11px] italic">
+                        Nenhum desconto ou acréscimo extra lançado neste pedido. Use os botões acima para adicionar um{" "}
+                        <strong className="text-emerald-400">Desconto (-)</strong> ou{" "}
+                        <strong className="text-amber-300">Acréscimo (+)</strong> com descrição do motivo.
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {editOrderForm.additional_charges.map((chg, cIdx) => {
+                          const isDiscount = chg.type === "discount" || Number(chg.amountCents) < 0;
+                          return (
+                            <div
+                              key={chg.id || cIdx}
+                              className={`p-3 rounded-xl bg-slate-950 border-2 grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end ${
+                                isDiscount ? "border-emerald-500/50" : "border-amber-500/45"
+                              }`}
+                            >
+                              <div className="sm:col-span-3">
+                                <label
+                                  className={`block font-black text-[10px] uppercase mb-1 ${
+                                    isDiscount ? "text-emerald-400" : "text-amber-300"
+                                  }`}
+                                >
+                                  Tipo de Ajuste #{cIdx + 1}
+                                </label>
+                                <select
+                                  value={isDiscount ? "discount" : "addition"}
+                                  onChange={(e) => {
+                                    const nextType = e.target.value as "addition" | "discount";
+                                    const nextCharges = [...editOrderForm.additional_charges];
+                                    nextCharges[cIdx] = {
+                                      ...nextCharges[cIdx],
+                                      type: nextType,
+                                      amountCents: Math.abs(Number(nextCharges[cIdx].amountCents) || 0),
+                                    };
+                                    setEditOrderForm(
+                                      recalculateEditFormTotals({
+                                        ...editOrderForm,
+                                        additional_charges: nextCharges,
+                                      })
+                                    );
+                                  }}
+                                  className={`w-full px-3 py-2 rounded-xl font-black text-xs border cursor-pointer ${
+                                    isDiscount
+                                      ? "bg-emerald-950/50 border-emerald-500/50 text-emerald-300"
+                                      : "bg-amber-950/50 border-amber-500/50 text-amber-300"
+                                  }`}
+                                >
+                                  <option value="discount">➖ Desconto (-)</option>
+                                  <option value="addition">➕ Acréscimo (+)</option>
+                                </select>
+                              </div>
+
+                              <div className="sm:col-span-5">
+                                <label
+                                  className={`block font-bold text-[10px] uppercase mb-1 ${
+                                    isDiscount ? "text-emerald-300" : "text-amber-300"
+                                  }`}
+                                >
+                                  Descrição do Motivo ({isDiscount ? "Por que teve desconto?" : "Por que teve acréscimo?"})
+                                </label>
+                                <input
+                                  type="text"
+                                  value={chg.description}
+                                  onChange={(e) => {
+                                    const nextCharges = [...editOrderForm.additional_charges];
+                                    nextCharges[cIdx] = { ...nextCharges[cIdx], description: e.target.value };
+                                    setEditOrderForm({
+                                      ...editOrderForm,
+                                      additional_charges: nextCharges,
+                                    });
+                                  }}
+                                  placeholder={
+                                    isDiscount
+                                      ? "Ex: Desconto negociação WhatsApp, Abatimento de frete..."
+                                      : "Ex: Serviço de Montagem, Leitor 2D, Diferença de Monitor..."
+                                  }
+                                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold"
+                                />
+                              </div>
+
+                              <div className="sm:col-span-1">
+                                <label className="block text-slate-400 font-semibold text-[10px] uppercase mb-1">
+                                  Qtd
+                                </label>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  value={chg.quantity}
+                                  onChange={(e) => {
+                                    const q = Math.max(1, parseInt(e.target.value, 10) || 1);
+                                    const nextCharges = [...editOrderForm.additional_charges];
+                                    nextCharges[cIdx] = { ...nextCharges[cIdx], quantity: q };
+                                    setEditOrderForm(
+                                      recalculateEditFormTotals({
+                                        ...editOrderForm,
+                                        additional_charges: nextCharges,
+                                      })
+                                    );
+                                  }}
+                                  className="w-full px-2 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-mono text-center"
+                                />
+                              </div>
+
+                              <div className="sm:col-span-2">
+                                <label
+                                  className={`block font-bold text-[10px] uppercase mb-1 ${
+                                    isDiscount ? "text-emerald-400" : "text-amber-300"
+                                  }`}
+                                >
+                                  {isDiscount ? "Desconto (-) R$" : "Acréscimo (+) R$"}
+                                </label>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min={0}
+                                  value={(Math.abs(chg.amountCents) / 100).toFixed(2)}
+                                  onChange={(e) => {
+                                    const cents = Math.abs(Math.round((parseFloat(e.target.value) || 0) * 100));
+                                    const nextCharges = [...editOrderForm.additional_charges];
+                                    nextCharges[cIdx] = { ...nextCharges[cIdx], amountCents: cents };
+                                    setEditOrderForm(
+                                      recalculateEditFormTotals({
+                                        ...editOrderForm,
+                                        additional_charges: nextCharges,
+                                      })
+                                    );
+                                  }}
+                                  placeholder="0.00"
+                                  className={`w-full px-3 py-2 bg-slate-900 rounded-xl font-mono font-black border ${
+                                    isDiscount
+                                      ? "border-emerald-500/50 text-emerald-400"
+                                      : "border-amber-500/50 text-amber-300"
+                                  }`}
+                                />
+                              </div>
+
+                              <div className="sm:col-span-1 flex justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const nextCharges = editOrderForm.additional_charges.filter((_, i) => i !== cIdx);
+                                    setEditOrderForm(
+                                      recalculateEditFormTotals({
+                                        ...editOrderForm,
+                                        additional_charges: nextCharges,
+                                      })
+                                    );
+                                  }}
+                                  className="w-full sm:w-9 h-9 rounded-xl bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 flex items-center justify-center cursor-pointer"
+                                  title="Remover este desconto / acréscimo"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
                   {/* 4. Configurador Visual Interativo (Etapas 1 a 6 + Kit de Montagem Igual ao Pedido Original) */}
                   <div className="space-y-4">
                     <AdminOrderVisualEditor
@@ -5913,184 +6419,6 @@ export default function AdminPage() {
                   </div>
 
                   {/* ===================================================================== */}
-                  {/* 5. VALORES ADICIONAIS COM DESCRIÇÃO ESPECÍFICA (EX: SERVIÇO, ACESSÓRIO, PARCELAMENTO) */}
-                  {/* ===================================================================== */}
-                  <div className="p-4 sm:p-5 rounded-2xl bg-amber-950/20 border-2 border-amber-500/40 space-y-3.5">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <h4 className="font-black text-amber-300 uppercase text-xs tracking-wider flex items-center gap-1.5">
-                          <Plus className="w-4 h-4" />
-                          <span>
-                            Valores Adicionais / Serviços Extras com Descrição Específica (
-                            {editOrderForm.additional_charges.length})
-                          </span>
-                        </h4>
-                        <p className="text-[11px] text-slate-300 mt-0.5">
-                          Adicione qualquer item extra, serviço de montagem, acessório ou ajuste de condição comercial com descrição personalizada. O total do pedido será atualizado automaticamente.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const nextCharges: OrderAdditionalCharge[] = [
-                            ...editOrderForm.additional_charges,
-                            {
-                              id: `chg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                              description: "",
-                              amountCents: 0,
-                              quantity: 1,
-                            },
-                          ];
-                          setEditOrderForm(
-                            recalculateEditFormTotals({
-                              ...editOrderForm,
-                              additional_charges: nextCharges,
-                            })
-                          );
-                        }}
-                        className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/20 cursor-pointer"
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>+ Adicionar Valor Adicional</span>
-                      </button>
-                    </div>
-
-                    {/* Atalhos Rápidos de Valores Adicionais Frequentes */}
-                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                      <span className="text-[10px] font-bold uppercase text-slate-400 mr-1">Atalhos Rápidos:</span>
-                      {[
-                        { label: "+ Montagem Especializada (R$ 999,00)", desc: "Serviço Especializado de Montagem de Fábrica 100% Pronto", cents: 99900 },
-                        { label: "+ Leitor QR Code 2D (R$ 349,00)", desc: "Leitor de Código de Barras / QR Code 2D Homologado", cents: 34900 },
-                        { label: "+ Suporte Pinpad Universal (R$ 149,00)", desc: "Suporte Universal para Máquina de Cartão / Pinpad", cents: 14900 },
-                        { label: "+ Ajuste / Acréscimo Condição Especial", desc: "Acréscimo de Condição Comercial / Parcelamento", cents: 15000 },
-                      ].map((preset) => (
-                        <button
-                          key={preset.label}
-                          type="button"
-                          onClick={() => {
-                            const nextCharges: OrderAdditionalCharge[] = [
-                              ...editOrderForm.additional_charges,
-                              {
-                                id: `chg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                                description: preset.desc,
-                                amountCents: preset.cents,
-                                quantity: 1,
-                              },
-                            ];
-                            setEditOrderForm(
-                              recalculateEditFormTotals({
-                                ...editOrderForm,
-                                additional_charges: nextCharges,
-                              })
-                            );
-                          }}
-                          className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-amber-500/20 text-amber-200 border border-amber-500/30 font-bold text-[10px] transition-colors cursor-pointer"
-                        >
-                          {preset.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    {editOrderForm.additional_charges.length === 0 ? (
-                      <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 text-slate-400 text-[11px] italic">
-                        Nenhum valor adicional incluído neste pedido. Clique em &quot;+ Adicionar Valor Adicional&quot; ou em um dos atalhos acima para adicionar.
-                      </div>
-                    ) : (
-                      <div className="space-y-2.5">
-                        {editOrderForm.additional_charges.map((chg, cIdx) => (
-                          <div
-                            key={chg.id || cIdx}
-                            className="p-3 rounded-xl bg-slate-950 border border-amber-500/40 grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end"
-                          >
-                            <div className="sm:col-span-6">
-                              <label className="block text-amber-300 font-bold text-[10px] uppercase mb-1">
-                                Descrição Específica do Valor Adicional #{cIdx + 1}
-                              </label>
-                              <input
-                                type="text"
-                                value={chg.description}
-                                onChange={(e) => {
-                                  const nextCharges = [...editOrderForm.additional_charges];
-                                  nextCharges[cIdx] = { ...nextCharges[cIdx], description: e.target.value };
-                                  setEditOrderForm({
-                                    ...editOrderForm,
-                                    additional_charges: nextCharges,
-                                  });
-                                }}
-                                placeholder="Ex: Serviço de Montagem Completa, Leitor QR Code, Diferença de Monitor..."
-                                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold"
-                              />
-                            </div>
-                            <div className="sm:col-span-2">
-                              <label className="block text-slate-400 font-semibold text-[10px] uppercase mb-1">
-                                Qtd
-                              </label>
-                              <input
-                                type="number"
-                                min={1}
-                                value={chg.quantity}
-                                onChange={(e) => {
-                                  const q = Math.max(1, parseInt(e.target.value, 10) || 1);
-                                  const nextCharges = [...editOrderForm.additional_charges];
-                                  nextCharges[cIdx] = { ...nextCharges[cIdx], quantity: q };
-                                  setEditOrderForm(
-                                    recalculateEditFormTotals({
-                                      ...editOrderForm,
-                                      additional_charges: nextCharges,
-                                    })
-                                  );
-                                }}
-                                className="w-full px-2.5 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-mono"
-                              />
-                            </div>
-                            <div className="sm:col-span-3">
-                              <label className="block text-amber-300 font-bold text-[10px] uppercase mb-1">
-                                Valor Unitário (R$)
-                              </label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={(chg.amountCents / 100).toFixed(2)}
-                                onChange={(e) => {
-                                  const cents = Math.round((parseFloat(e.target.value) || 0) * 100);
-                                  const nextCharges = [...editOrderForm.additional_charges];
-                                  nextCharges[cIdx] = { ...nextCharges[cIdx], amountCents: cents };
-                                  setEditOrderForm(
-                                    recalculateEditFormTotals({
-                                      ...editOrderForm,
-                                      additional_charges: nextCharges,
-                                    })
-                                  );
-                                }}
-                                placeholder="0.00"
-                                className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-xl text-amber-300 font-mono font-black"
-                              />
-                            </div>
-                            <div className="sm:col-span-1 flex justify-end">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const nextCharges = editOrderForm.additional_charges.filter((_, i) => i !== cIdx);
-                                  setEditOrderForm(
-                                    recalculateEditFormTotals({
-                                      ...editOrderForm,
-                                      additional_charges: nextCharges,
-                                    })
-                                  );
-                                }}
-                                className="w-full sm:w-9 h-9 rounded-xl bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 flex items-center justify-center cursor-pointer"
-                                title="Remover este valor adicional"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* ===================================================================== */}
                   {/* 6. GERAR NOVA CONDIÇÃO DE PAGAMENTO (MERCADO PAGO) & ENVIAR AO CLIENTE */}
                   {/* ===================================================================== */}
                   <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-indigo-950/60 via-slate-950 to-emerald-950/50 border-2 border-indigo-500/50 space-y-4 shadow-xl">
@@ -6181,34 +6509,71 @@ export default function AdminPage() {
             </div>
 
             {/* Rodapé Fixo de Ações */}
-            <div className="px-5 sm:px-7 py-4 border-t border-slate-800 bg-slate-900/95 flex items-center justify-end gap-3 shrink-0">
+            <div className="px-5 sm:px-7 py-4 border-t border-slate-800 bg-slate-900/95 flex flex-wrap items-center justify-between gap-3 shrink-0">
               <button
                 type="button"
-                onClick={() => {
-                  setEditingOrder(null);
-                  setEditOrderForm(null);
-                }}
-                className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-colors cursor-pointer"
+                onClick={() =>
+                  setPrintingProductionOrder({
+                    ...editingOrder,
+                    customer_name: editOrderForm.customer_name,
+                    customer_document: editOrderForm.customer_document,
+                    customer_email: editOrderForm.customer_email,
+                    customer_whatsapp: editOrderForm.customer_whatsapp,
+                    delivery_address_json: JSON.stringify({
+                      ...(getOrderAddress(editingOrder) || {}),
+                      cep: editOrderForm.cep,
+                      street: editOrderForm.street,
+                      number: editOrderForm.number,
+                      complement: editOrderForm.complement,
+                      neighborhood: editOrderForm.neighborhood,
+                      city: editOrderForm.city,
+                      state: editOrderForm.state,
+                      customerNotes: editOrderForm.order_notes,
+                      executionOrder: editOrderForm.execution_order,
+                      shippingMethod: {
+                        name: editOrderForm.shipping_name,
+                        carrier: editOrderForm.shipping_carrier,
+                        priceCents: editOrderForm.shipping_cents,
+                      },
+                    }),
+                    items: editOrderForm.items as any,
+                  })
+                }
+                className="px-4 py-2.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 font-black text-xs flex items-center gap-2 transition-colors cursor-pointer"
               >
-                Cancelar
+                <Printer className="w-4 h-4 text-emerald-400" />
+                <span>🖨️ Imprimir Ordem de Produção (Sem Valor Monetário + Checklist à Caneta)</span>
               </button>
-              <button
-                type="submit"
-                disabled={isSavingOrderEdit}
-                className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer"
-              >
-                {isSavingOrderEdit ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Salvando Ordem de Execução & Pedido...</span>
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" />
-                    <span>Salvar Ordem de Execução & Pedido</span>
-                  </>
-                )}
-              </button>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingOrder(null);
+                    setEditOrderForm(null);
+                  }}
+                  className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingOrderEdit}
+                  className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer"
+                >
+                  {isSavingOrderEdit ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Salvando Ordem de Execução & Pedido...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>Salvar Ordem de Execução & Pedido</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </form>
         </div>
@@ -6275,6 +6640,60 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+      {/* ======================================================== */}
+      {/* MODAL: IMPRESSÃO DE ORDEM DE PRODUÇÃO (SEM PREÇOS + CHECKLIST À CANETA) */}
+      {/* ======================================================== */}
+      {printingProductionOrder && (
+        <ProductionOrderPrintModal
+          order={{
+            ...printingProductionOrder,
+            address: getOrderAddress(printingProductionOrder),
+            shipping: getOrderShipping(printingProductionOrder),
+            sheets: getOrderSheets(printingProductionOrder),
+          }}
+          onClose={() => setPrintingProductionOrder(null)}
+          onSaveOrientations={async (payload) => {
+            const prevAddr = getOrderAddress(printingProductionOrder) || {};
+            const prevExec = createDefaultExecutionOrder(prevAddr.executionOrder || null);
+            const nextExec: OrderExecutionData = {
+              ...prevExec,
+              priority: payload.priority,
+              technicianName: payload.operator,
+              deadlineDate: payload.targetDate,
+              updatedAt: new Date().toISOString(),
+            };
+            const nextAddr = {
+              ...prevAddr,
+              customerNotes: payload.orientations.trim() || null,
+              executionOrder: nextExec,
+            };
+
+            const res = await fetch(`/api/admin/orders/${printingProductionOrder.$id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                delivery_address_json: JSON.stringify(nextAddr),
+              }),
+            });
+            const json = await res.json();
+            if (json.ok) {
+              if (editOrderForm && editingOrder && editingOrder.$id === printingProductionOrder.$id) {
+                setEditOrderForm({
+                  ...editOrderForm,
+                  order_notes: payload.orientations,
+                  execution_order: nextExec,
+                });
+              }
+              await loadOrders();
+              setSaveSuccessMsg(
+                `Orientações da Ordem de Produção ${printingProductionOrder.order_number} salvas com sucesso!`
+              );
+              setTimeout(() => setSaveSuccessMsg(""), 4000);
+            }
+          }}
+        />
+      )}
+
       {/* ======================================================== */}
       {/* MODAL: PRÉ-POSTAGEM & IMPRESSÃO DE ETIQUETA CORREIOS API */}
       {/* ======================================================== */}

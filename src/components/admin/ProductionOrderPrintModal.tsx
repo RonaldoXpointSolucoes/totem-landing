@@ -24,9 +24,9 @@ export interface PrintableOrderItem {
   cabinet_name: string;
   color_name: string;
   quantity: number;
-  monitor_name: string;
-  printer_name: string;
-  reader_name: string;
+  monitor_name?: string;
+  printer_name?: string;
+  reader_name?: string;
   kit_items_snapshot?: any[] | null;
   delivery_checklist?: DeliveryChecklistItem[] | null;
 }
@@ -49,12 +49,15 @@ export interface PrintableOrderData {
     neighborhood?: string;
     city?: string;
     state?: string;
-    customerNotes?: string;
+    customerNotes?: string | null;
     executionOrder?: {
-      priority?: "normal" | "urgent";
+      priority?: "normal" | "high" | "urgent";
       assignedOperator?: string;
+      technicianName?: string;
       targetDispatchDate?: string;
+      deadlineDate?: string;
       plainSummary?: string;
+      technicalSummary?: string;
     } | null;
   } | null;
   shipping?: {
@@ -96,17 +99,24 @@ export function ProductionOrderPrintModal({
   onSaveOrientations,
 }: ProductionOrderPrintModalProps) {
   const exec = order.address?.executionOrder || null;
+  const rawExecSummary = exec?.plainSummary || exec?.technicalSummary || "";
   const initialNotes = [
     order.address?.customerNotes ? stripMonetaryValues(order.address.customerNotes) : "",
-    exec?.plainSummary ? stripMonetaryValues(exec.plainSummary) : "",
+    rawExecSummary && rawExecSummary !== order.address?.customerNotes ? stripMonetaryValues(rawExecSummary) : "",
   ]
     .filter(Boolean)
     .join("\n\n");
 
   const [orientations, setOrientations] = useState<string>(initialNotes);
-  const [operatorName, setOperatorName] = useState<string>(exec?.assignedOperator || "");
-  const [priority, setPriority] = useState<"normal" | "urgent">(exec?.priority || "normal");
-  const [targetDate, setTargetDate] = useState<string>(exec?.targetDispatchDate || "");
+  const [operatorName, setOperatorName] = useState<string>(
+    exec?.assignedOperator || exec?.technicianName || ""
+  );
+  const [priority, setPriority] = useState<"normal" | "urgent">(
+    exec?.priority === "urgent" || exec?.priority === "high" ? "urgent" : "normal"
+  );
+  const [targetDate, setTargetDate] = useState<string>(
+    exec?.targetDispatchDate || exec?.deadlineDate || ""
+  );
   const [blankLinesCount, setBlankLinesCount] = useState<number>(5);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [savedFeedback, setSavedFeedback] = useState<boolean>(false);

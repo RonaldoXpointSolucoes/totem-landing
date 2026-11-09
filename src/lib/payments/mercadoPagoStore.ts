@@ -603,11 +603,18 @@ export async function regenerateOrderPayment(params: {
     state: parsedAddress.state || "",
   };
 
-  const additionalCharges: Array<{ id?: string; description: string; amountCents: number; quantity?: number }> =
-    Array.isArray(parsedAddress.additionalCharges) ? parsedAddress.additionalCharges : [];
+  const additionalCharges: Array<{
+    id?: string;
+    type?: "addition" | "discount";
+    description: string;
+    amountCents: number;
+    quantity?: number;
+  }> = Array.isArray(parsedAddress.additionalCharges) ? parsedAddress.additionalCharges : [];
   const extrasSummary =
     additionalCharges.length > 0
-      ? ` (+ ${additionalCharges.map((c) => c.description).join(", ")})`
+      ? ` (${additionalCharges
+          .map((c) => `${c.type === "discount" || c.amountCents < 0 ? "-" : "+"} ${c.description}`)
+          .join(", ")})`
       : "";
 
   let parsedSheets: any[] = [];
@@ -625,6 +632,7 @@ export async function regenerateOrderPayment(params: {
     sheets: Array.isArray(parsedSheets) ? parsedSheets : [],
     additionalCharges: additionalCharges.map((c, idx) => ({
       id: c.id || `extra_${idx}`,
+      type: c.type === "discount" ? "discount" : "addition",
       description: c.description,
       amountCents: c.amountCents,
       quantity: c.quantity || 1,
