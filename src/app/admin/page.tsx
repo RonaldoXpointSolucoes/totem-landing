@@ -28,6 +28,10 @@ import { SystemLogsManager } from "@/components/admin/SystemLogsManager";
 import { TelemetryErrorsManager } from "@/components/admin/TelemetryErrorsManager";
 import { AnalyticsFunnelManager } from "@/components/admin/AnalyticsFunnelManager";
 import { AdsOrdersLeadsPanel } from "@/components/admin/AdsOrdersLeadsPanel";
+import {
+  CommercialRemarketingPanel,
+  RemarketingDashboardData,
+} from "@/components/admin/CommercialRemarketingPanel";
 import type { AdsLeadCartRecord, AdsLeadStatus } from "@/lib/analytics/adsLeadsCartsStore";
 import {
   useUrlParamState,
@@ -325,6 +329,11 @@ export default function AdminPage() {
   const [lastSyncTimeStr, setLastSyncTimeStr] = useState<string>("");
   const wakeLockSentinelRef = React.useRef<any>(null);
   const knownOrderIdsRef = React.useRef<Set<string>>(new Set());
+
+  // Estados de Remarketing & Recuperação Comercial (Instância Comercial X-Point)
+  const [showRemarketingPanel, setShowRemarketingPanel] = useState(false);
+  const [selectedOrderForRemarketing, setSelectedOrderForRemarketing] = useState<string | null>(null);
+  const [remarketingData, setRemarketingData] = useState<RemarketingDashboardData | null>(null);
 
   useEffect(() => {
     try {
@@ -2986,6 +2995,9 @@ export default function AdminPage() {
                         onClick={() => {
                           setStatusFilter(key);
                           loadOrders(key);
+                          if (key === "awaiting_payment") {
+                            setShowRemarketingPanel(true);
+                          }
                         }}
                         className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 snap-start transition-all active:scale-95 border inline-flex items-center gap-1.5 cursor-pointer ${
                           isActive
@@ -3029,6 +3041,27 @@ export default function AdminPage() {
                       className="w-full pl-8 sm:pl-9 pr-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                     />
                   </div>
+
+                  {/* Botão Central de Remarketing & Recuperação Comercial (Comercial X-Point) */}
+                  <button
+                    type="button"
+                    onClick={() => setShowRemarketingPanel((prev) => !prev)}
+                    className={`px-2.5 sm:px-3 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 border transition-all active:scale-95 shrink-0 cursor-pointer ${
+                      showRemarketingPanel
+                        ? "bg-indigo-600 text-white border-indigo-400 shadow-md shadow-indigo-600/25"
+                        : "bg-slate-900 hover:bg-slate-800 text-indigo-300 border-indigo-500/40"
+                    }`}
+                    title="Central de Remarketing & Recuperação Comercial via WhatsApp (Instância Comercial X-Point • Anti-Loop)"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                    <span className="sm:hidden">Remarketing</span>
+                    <span className="hidden sm:inline">Comercial & Remarketing</span>
+                    {remarketingData?.kpis && (
+                      <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 leading-none">
+                        {remarketingData.kpis.eligibleAssistedCount}
+                      </span>
+                    )}
+                  </button>
 
                   {/* Botão Calculadora Rápida de Cartão Mercado Pago (Recebimento 100% PIX) */}
                   <button
@@ -3193,6 +3226,15 @@ export default function AdminPage() {
               );
             })()}
 
+            {/* Central de Remarketing & Recuperação Comercial (Instância Comercial X-Point) */}
+            <CommercialRemarketingPanel
+              isOpen={showRemarketingPanel}
+              onToggleOpen={() => setShowRemarketingPanel((prev) => !prev)}
+              selectedOrderNumberForModal={selectedOrderForRemarketing}
+              onClearSelectedOrderForModal={() => setSelectedOrderForRemarketing(null)}
+              onDataLoaded={(rmkData) => setRemarketingData(rmkData)}
+            />
+
             {/* Listagem de Pedidos ou Painel ADS (Carrinhos Abandonados & Conversões) */}
             {statusFilter === "ads" ? (
               <AdsOrdersLeadsPanel
@@ -3281,6 +3323,10 @@ export default function AdminPage() {
                   const isPaymentFailedOrCancelled =
                     !isOrderPaid &&
                     (order.status === "cancelled" || order.gateway_diagnosis?.severity === "error");
+
+                  const rmkTarget = remarketingData?.targets?.find(
+                    (t) => t.orderNumber === order.order_number
+                  );
 
                   return (
                     <div
@@ -3542,15 +3588,41 @@ export default function AdminPage() {
                               </button>
 
                               {!isOrderPaid && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenEditOrder(order, "payment_proposal")}
-                                  className="px-2 sm:px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 border border-amber-500/35 font-bold text-[11px] sm:text-xs inline-flex items-center gap-1 transition-all cursor-pointer shrink-0"
-                                  title="Editar itens, adicionar valores extras e gerar nova condição de pagamento"
-                                >
-                                  <Plus className="w-3.5 h-3.5" />
-                                  <span>Cobrança</span>
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedOrderForRemarketing(order.order_number)}
+                                    className={`px-2 sm:px-2.5 py-1.5 rounded-xl font-bold text-[11px] sm:text-xs inline-flex items-center gap-1 transition-all cursor-pointer shrink-0 border ${
+                                      rmkTarget && !rmkTarget.canSendManual
+                                        ? "bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700"
+                                        : "bg-indigo-500/20 hover:bg-indigo-500/30 active:scale-95 text-indigo-300 border-indigo-500/40"
+                                    }`}
+                                    title={
+                                      rmkTarget
+                                        ? `${rmkTarget.primaryStatusBadge.label} — ${rmkTarget.primaryStatusBadge.explanation}`
+                                        : "Recuperar venda via WhatsApp (Instância Comercial X-Point) com travas anti-loop"
+                                    }
+                                  >
+                                    <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+                                    <span>
+                                      {rmkTarget?.alreadyPaidInOtherOrder
+                                        ? `Já Pago (#${rmkTarget.alreadyPaidInOtherOrder.orderNumber.slice(-4)})`
+                                        : rmkTarget?.supersededByNewerOrder
+                                        ? "Duplicado"
+                                        : "Recuperar"}
+                                    </span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditOrder(order, "payment_proposal")}
+                                    className="px-2 sm:px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 border border-amber-500/35 font-bold text-[11px] sm:text-xs inline-flex items-center gap-1 transition-all cursor-pointer shrink-0"
+                                    title="Editar itens, adicionar valores extras e gerar nova condição de pagamento"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    <span>Cobrança</span>
+                                  </button>
+                                </>
                               )}
                             </div>
 
@@ -3785,15 +3857,37 @@ export default function AdminPage() {
                                 </button>
 
                                 {!isOrderPaid && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenEditOrder(order, "payment_proposal")}
-                                    className="col-span-2 sm:col-span-1 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-black text-[11px] sm:text-xs flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/25 transition-all shrink-0 cursor-pointer"
-                                    title="Editar itens, adicionar valores extras com descrição específica e gerar nova condição de pagamento para enviar ao cliente"
-                                  >
-                                    <Plus className="w-3.5 h-3.5 shrink-0" />
-                                    <span>Editar Itens / + Valor Adicional & Nova Cobrança</span>
-                                  </button>
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedOrderForRemarketing(order.order_number)}
+                                      className={`col-span-2 sm:col-span-1 px-3 py-2 rounded-xl font-black text-[11px] sm:text-xs flex items-center justify-center gap-1.5 transition-all shrink-0 cursor-pointer border ${
+                                        rmkTarget && !rmkTarget.canSendManual
+                                          ? "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700"
+                                          : "bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white border-indigo-400 shadow-md shadow-indigo-600/25"
+                                      }`}
+                                      title="Abrir Central de Recuperação Comercial & Auditoria Anti-Loop (Instância Comercial X-Point)"
+                                    >
+                                      <MessageCircle className="w-3.5 h-3.5 shrink-0 text-emerald-300" />
+                                      <span>
+                                        {rmkTarget?.alreadyPaidInOtherOrder
+                                          ? `🛡️ Já Pago no #${rmkTarget.alreadyPaidInOtherOrder.orderNumber}`
+                                          : rmkTarget?.supersededByNewerOrder
+                                          ? `🛡️ Duplicado (#${rmkTarget.supersededByNewerOrder.orderNumber})`
+                                          : "Recuperar Venda (Comercial X-Point)"}
+                                      </span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEditOrder(order, "payment_proposal")}
+                                      className="col-span-2 sm:col-span-1 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-black text-[11px] sm:text-xs flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/25 transition-all shrink-0 cursor-pointer"
+                                      title="Editar itens, adicionar valores extras com descrição específica e gerar nova condição de pagamento para enviar ao cliente"
+                                    >
+                                      <Plus className="w-3.5 h-3.5 shrink-0" />
+                                      <span>Editar Itens / + Valor Adicional & Nova Cobrança</span>
+                                    </button>
+                                  </>
                                 )}
                               </div>
 

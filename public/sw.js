@@ -1,4 +1,4 @@
-const CACHE_NAME = "totem-pro-pwa-v3.4.9";
+const CACHE_NAME = "totem-pro-pwa-v3.5.0";
 const STATIC_ASSETS = [
   "/admin-manifest.webmanifest",
   "/site.webmanifest",
