@@ -6,6 +6,7 @@ import {
   initClientTelemetry,
   recordClientBreadcrumb,
 } from "@/lib/telemetry/clientTelemetry";
+import { captureAndPersistAdsAttribution } from "@/lib/analytics/tracker";
 
 /**
  * Monitor interno de rotas e parâmetros
@@ -16,6 +17,7 @@ const RouteWatcherInner: React.FC = () => {
 
   useEffect(() => {
     if (!pathname) return;
+    captureAndPersistAdsAttribution();
     const query = searchParams?.toString() ? `?${searchParams.toString()}` : "";
     const fullRoute = `${pathname}${query}`;
     recordClientBreadcrumb("navigation", `Rota ativa: ${fullRoute}`);

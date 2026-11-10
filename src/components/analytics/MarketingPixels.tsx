@@ -3,7 +3,11 @@
 import React, { useState, useEffect } from "react";
 import Script from "next/script";
 import { pixelConfig } from "@/config/pixels";
-import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
+import {
+  trackEvent,
+  ANALYTICS_EVENTS,
+  captureAndPersistAdsAttribution,
+} from "@/lib/analytics/tracker";
 
 declare global {
   interface Window {
@@ -38,9 +42,22 @@ export const MarketingPixels: React.FC = () => {
       };
     }
 
+    // Captura imediatamente gclid / gbraid / wbraid / utm_* na aterrissagem antes de qualquer navegação SPA
+    const attr = captureAndPersistAdsAttribution();
+
     const ua = navigator.userAgent || "";
     const isAutomatedAudit = /Chrome-Lighthouse|PageSpeed|GTmetrix|HeadlessChrome/i.test(ua);
     if (isAutomatedAudit) {
+      return;
+    }
+
+    // Se o usuário acabou de clicar em um anúncio do Google Ads (gclid/gad_source na URL),
+    // carrega o gtag/Conversion Linker imediatamente para gravar o cookie _gcl_aw sem atraso
+    const hasAdsParamsInUrl = /[?&](gclid|gbraid|wbraid|gad_source|gad_campaignid)=/i.test(
+      window.location.search
+    );
+    if (hasAdsParamsInUrl || attr.isGoogleAdsOrigin) {
+      setShouldLoadScripts(true);
       return;
     }
 

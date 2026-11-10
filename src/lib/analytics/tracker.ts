@@ -40,53 +40,369 @@ function formatE164Phone(phoneRaw?: string): string | undefined {
 }
 
 /**
- * Extrai e estrutura dados do comprador para o Google Ads Enhanced Conversions
- * Faz fallback automático para os dados já salvos na sessão/checkout do cliente
+ * Lê um cookie específico do navegador (ex: _gcl_aw do Conversion Linker do Google Ads)
+ */
+function readBrowserCookie(name: string): string {
+  if (typeof document === "undefined" || !document.cookie) return "";
+  try {
+    const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+    return match ? decodeURIComponent(match[1]) : "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Extrai o GCLID real de dentro do cookie _gcl_aw / _gcl_gb do Google Conversion Linker
+ * Formato oficial do Google: GCL.<timestamp>.<gclid_token>
+ */
+function extractGclidFromGoogleCookie(): string {
+  const rawAw = readBrowserCookie("_gcl_aw") || readBrowserCookie("_gcl_gb") || readBrowserCookie("_gcl_dc");
+  if (!rawAw) return readBrowserCookie("totem_gclid") || "";
+  const parts = rawAw.split(".");
+  if (parts.length >= 3 && parts[2]) {
+    return parts.slice(2).join(".");
+  }
+  return readBrowserCookie("totem_gclid") || "";
+}
+
+/**
+ * Grava cookie first-party de 90 dias (janela oficial de atribuição do Google Ads)
+ */
+function writeFirstPartyCookie(name: string, value: string, maxAgeDays = 90): void {
+  if (typeof document === "undefined" || !value) return;
+  try {
+    const maxAgeSec = maxAgeDays * 24 * 60 * 60;
+    document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAgeSec}; SameSite=Lax`;
+  } catch {
+    // ignora restrições de cookie
+  }
+}
+
+/**
+ * Captura e persiste imediatamente (antes de qualquer transição SPA do Next.js)
+ * os parâmetros de clique do Google Ads (gclid, gbraid, wbraid, gad_source, utm_*),
+ * preservando First-Touch e Last-Touch por 90 dias em localStorage e Cookie first-party.
+ */
+export function captureAndPersistAdsAttribution(): Record<string, unknown> {
+  if (typeof window === "undefined") return {};
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const storedAttrRaw = window.localStorage.getItem("totem_ads_attribution_v1");
+    const storedAttr = storedAttrRaw ? JSON.parse(storedAttrRaw) : {};
+
+    const urlGclid = urlParams.get("gclid") || "";
+    const urlGbraid = urlParams.get("gbraid") || "";
+    const urlWbraid = urlParams.get("wbraid") || "";
+    const urlGadSource = urlParams.get("gad_source") || "";
+    const urlGadCampaignId = urlParams.get("gad_campaignid") || "";
+    const cookieGclid = extractGclidFromGoogleCookie();
+
+    const gclid = urlGclid || storedAttr.gclid || cookieGclid || "";
+    const gbraid = urlGbraid || storedAttr.gbraid || "";
+    const wbraid = urlWbraid || storedAttr.wbraid || "";
+    const gadSource = urlGadSource || storedAttr.gadSource || "";
+    const gadCampaignId = urlGadCampaignId || storedAttr.gadCampaignId || "";
+
+    const isGoogleAdsHitNow = Boolean(
+      urlGclid || urlGadSource === "1" || urlGadCampaignId || urlGbraid || urlWbraid
+    );
+    const isGoogleAdsHistorical = Boolean(
+      isGoogleAdsHitNow ||
+        gclid ||
+        gadSource === "1" ||
+        gadCampaignId ||
+        gbraid ||
+        wbraid ||
+        storedAttr.isGoogleAdsOrigin === true
+    );
+
+    const utmSource =
+      urlParams.get("utm_source") ||
+      storedAttr.utmSource ||
+      (isGoogleAdsHistorical ? "google" : "");
+    const utmMedium =
+      urlParams.get("utm_medium") ||
+      storedAttr.utmMedium ||
+      (isGoogleAdsHistorical ? "cpc" : "");
+    const utmCampaign =
+      urlParams.get("utm_campaign") ||
+      storedAttr.utmCampaign ||
+      gadCampaignId ||
+      (isGoogleAdsHistorical ? "24395671655" : "");
+    const utmTerm = urlParams.get("utm_term") || storedAttr.utmTerm || "";
+    const utmContent = urlParams.get("utm_content") || storedAttr.utmContent || "";
+    const adGroupId = urlParams.get("adgroupid") || urlParams.get("gad_adgroupid") || storedAttr.adGroupId || "";
+
+    const nowIso = new Date().toISOString();
+    const landingUrl =
+      (isGoogleAdsHitNow && window.location.search ? window.location.href : "") ||
+      storedAttr.landingUrl ||
+      window.location.href;
+    const referrer = storedAttr.referrer || document.referrer || "";
+
+    const campaignAttribution = {
+      gclid: gclid || gbraid || wbraid || "",
+      gadSource,
+      gadCampaignId,
+      gbraid,
+      wbraid,
+      utmSource,
+      utmMedium,
+      utmCampaign,
+      utmTerm,
+      utmContent,
+      adGroupId,
+      landingUrl,
+      referrer,
+      isGoogleAdsOrigin: isGoogleAdsHistorical,
+      firstTouchAt: storedAttr.firstTouchAt || nowIso,
+      firstTouchSource:
+        storedAttr.firstTouchSource || (isGoogleAdsHistorical ? "google_ads" : "organic_or_direct"),
+      lastTouchAt: nowIso,
+    };
+
+    if (isGoogleAdsHitNow || isGoogleAdsHistorical || utmSource || !storedAttrRaw) {
+      window.localStorage.setItem(
+        "totem_ads_attribution_v1",
+        JSON.stringify(campaignAttribution)
+      );
+    }
+
+    if (campaignAttribution.gclid) {
+      writeFirstPartyCookie("totem_gclid", String(campaignAttribution.gclid), 90);
+    }
+    if (isGoogleAdsHistorical) {
+      writeFirstPartyCookie("totem_ads_source", "google_ads", 90);
+    }
+
+    return campaignAttribution;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Extrai e estrutura dados completos do comprador para o Google Ads Enhanced Conversions (Conversões Otimizadas)
+ * Inclui e-mail normalizado, telefone E.164, nome, sobrenome, rua, cidade, estado (UF), CEP e país (BR).
  */
 function extractUserData(data: Record<string, unknown>) {
-  let cachedDraft: Record<string, string> = {};
+  let cachedDraft: Record<string, any> = {};
+  let savedProfile: Record<string, any> = {};
+  let sessionCep = "";
   if (typeof window !== "undefined") {
     try {
       const rawDraft = window.localStorage.getItem("totem_checkout_draft_v2");
-      if (rawDraft) {
-        cachedDraft = JSON.parse(rawDraft) || {};
-      }
-    } catch {
-      // ignora erro de leitura
-    }
+      if (rawDraft) cachedDraft = JSON.parse(rawDraft) || {};
+    } catch {}
+    try {
+      const rawProf = window.localStorage.getItem("totem_saved_buyer_profile");
+      if (rawProf) savedProfile = JSON.parse(rawProf) || {};
+    } catch {}
+    try {
+      sessionCep = window.sessionStorage.getItem("totem_shipping_cep") || "";
+    } catch {}
   }
 
+  const customerObj = (data.customer as Record<string, any>) || {};
+  const addrObj = (data.address as Record<string, any>) || customerObj.address || cachedDraft.address || {};
+
   const email =
-    ((data.email as string) || cachedDraft.email || "")?.trim().toLowerCase() || undefined;
+    (
+      (data.email as string) ||
+      ( data.customerEmail as string) ||
+      customerObj.email ||
+      cachedDraft.email ||
+      savedProfile.email ||
+      ""
+    )
+      ?.trim()
+      .toLowerCase() || undefined;
+
   const rawPhone =
-    ((data.whatsapp || data.phone || data.telephone || cachedDraft.whatsapp) as
-      | string
-      | undefined) || undefined;
+    ((data.whatsapp ||
+      data.customerWhatsapp ||
+      data.phone ||
+      data.telephone ||
+      customerObj.whatsapp ||
+      customerObj.phone ||
+      cachedDraft.whatsapp ||
+      savedProfile.whatsapp) as string | undefined) || undefined;
   const phone_number = formatE164Phone(rawPhone);
 
-  const fullName = ((data.name as string) || cachedDraft.name || "")?.trim() || "";
+  const fullName =
+    (
+      (data.name as string) ||
+      (data.customerName as string) ||
+      customerObj.name ||
+      cachedDraft.name ||
+      savedProfile.name ||
+      ""
+    )?.trim() || "";
   let first_name: string | undefined;
   let last_name: string | undefined;
-  if (fullName) {
+  if (fullName && !fullName.startsWith("Visitante")) {
     const parts = fullName.split(/\s+/);
     first_name = parts[0];
     last_name = parts.slice(1).join(" ") || undefined;
   }
 
   const postal_code =
-    ((data.cep as string) || cachedDraft.cep || "")?.replace(/\D/g, "") || undefined;
+    (
+      (data.cep as string) ||
+      addrObj.cep ||
+      customerObj.cep ||
+      cachedDraft.cep ||
+      savedProfile.cep ||
+      sessionCep ||
+      ""
+    )?.replace(/\D/g, "") || undefined;
 
-  if (!email && !phone_number && !first_name) return null;
+  const city =
+    ((data.city as string) || addrObj.city || customerObj.city || cachedDraft.city || savedProfile.city || "")?.trim() ||
+    undefined;
+  const region =
+    ((data.state as string) || addrObj.state || customerObj.state || cachedDraft.state || savedProfile.state || "")
+      ?.trim()
+      .toUpperCase() || undefined;
+  const streetRaw =
+    ((data.street as string) || addrObj.street || customerObj.street || cachedDraft.street || savedProfile.street || "")?.trim() ||
+    "";
+  const numberRaw =
+    ((data.number as string) || addrObj.number || customerObj.number || cachedDraft.number || "")?.trim() || "";
+  const street = streetRaw ? (numberRaw ? `${streetRaw}, ${numberRaw}` : streetRaw) : undefined;
+
+  if (!email && !phone_number && !first_name && !postal_code) return null;
 
   return {
-    email,
-    phone_number,
+    ...(email ? { email } : {}),
+    ...(phone_number ? { phone_number } : {}),
     address: {
-      first_name,
-      last_name,
-      postal_code,
+      ...(first_name ? { first_name } : {}),
+      ...(last_name ? { last_name } : {}),
+      ...(street ? { street } : {}),
+      ...(city ? { city } : {}),
+      ...(region ? { region } : {}),
+      ...(postal_code ? { postal_code } : {}),
       country: "BR",
     },
+  };
+}
+
+/**
+ * Constrói array rico de itens de e-commerce no padrão GA4 / Google Ads Merchant
+ * com fallback automático para os itens reais salvos no carrinho (localStorage)
+ */
+function buildEnhancedEcommerceItems(
+  data: Record<string, unknown>,
+  fallbackValue?: number
+): Record<string, unknown>[] {
+  if (Array.isArray(data.items) && data.items.length > 0) {
+    return data.items.map((it: any, idx: number) => ({
+      item_id: String(it.item_id || it.cabinetModelId || it.modelId || it.id || `totem_${idx + 1}`),
+      item_name: String(it.item_name || it.cabinetName || it.modelName || "Gabinete Totem de Autoatendimento"),
+      item_brand: "Totem Pro X-Point",
+      item_category: "Totem de Autoatendimento",
+      item_category2: String(it.colorName || "MaDeFibra BP 15mm CNC"),
+      item_variant: String(it.purchaseMode || (it.isKitSelected ? "complete_kit" : "cabinet_only")),
+      price:
+        typeof it.price === "number"
+          ? it.price
+          : typeof it.unitPriceCents === "number"
+          ? it.unitPriceCents / 100
+          : fallbackValue || 1590,
+      quantity: Math.max(1, Number(it.quantity || 1)),
+    }));
+  }
+
+  if (typeof window !== "undefined") {
+    try {
+      const rawCart = window.localStorage.getItem("totem_pro_cart_items_v1");
+      if (rawCart) {
+        const parsed = JSON.parse(rawCart);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((it: any, idx: number) => {
+            const cfg = it?.configuration || {};
+            const model = cfg.model || {};
+            const color = cfg.color || {};
+            const monitor = cfg.monitor || null;
+            const qty = Math.max(1, Number(it?.quantity || 1));
+            const unitCents = Number(
+              it?.unitPriceCents || cfg?.calculatedPriceCents || model?.pixPriceCents || 159000
+            );
+            const isKit = Boolean(
+              it?.isKitSelected ||
+                monitor?.isKit ||
+                String(monitor?.displayName || monitor?.model || "").toLowerCase().includes("kit")
+            );
+            return {
+              item_id: String(it?.cabinetModelId || model?.id || `totem_${idx + 1}`),
+              item_name: String(it?.cabinetName || model?.name || "Gabinete Totem de Autoatendimento"),
+              item_brand: "Totem Pro X-Point",
+              item_category: "Totem de Autoatendimento",
+              item_category2: String(color?.name || it?.colorName || "MaDeFibra BP 15mm CNC"),
+              item_variant: isKit ? "complete_kit" : "cabinet_only",
+              price: unitCents / 100,
+              quantity: qty,
+            };
+          });
+        }
+      }
+    } catch {}
+  }
+
+  return [
+    {
+      item_id: String(data.modelId || data.itemId || "totem_pro_cabinet"),
+      item_name: String(data.modelName || data.cabinetName || "Gabinete Totem de Autoatendimento"),
+      item_brand: "Totem Pro X-Point",
+      item_category: "Totem de Autoatendimento",
+      item_variant: data.isKitSelected ? "complete_kit" : "cabinet_only",
+      price: fallbackValue || 1590,
+      quantity: Math.max(1, Number(data.quantity || 1)),
+    },
+  ];
+}
+
+/**
+ * Extrai sinais avançados de negócio e atribuição para alimentar o Smart Bidding do Google Ads
+ */
+function buildGoogleAdsCustomSignals(
+  data: Record<string, unknown>,
+  items: Record<string, unknown>[],
+  userData: ReturnType<typeof extractUserData>
+): Record<string, unknown> {
+  const attr = captureAndPersistAdsAttribution();
+  const firstItem = (items[0] || {}) as Record<string, any>;
+  let docDigits = String(data.document || data.customerDocument || "").replace(/\D/g, "");
+  if (!docDigits && typeof window !== "undefined") {
+    try {
+      const rawDraft = window.localStorage.getItem("totem_checkout_draft_v2");
+      if (rawDraft) {
+        const parsed = JSON.parse(rawDraft);
+        docDigits = String(parsed?.document || "").replace(/\D/g, "");
+      }
+    } catch {}
+  }
+
+  const customerType =
+    docDigits.length === 14 ? "b2b_cnpj" : docDigits.length === 11 ? "b2c_cpf" : " commercial_visitor";
+
+  return {
+    ...(attr.gclid ? { gclid: attr.gclid } : {}),
+    ...(attr.wbraid ? { wbraid: attr.wbraid } : {}),
+    ...(attr.gbraid ? { gbraid: attr.gbraid } : {}),
+    traffic_origin: attr.isGoogleAdsOrigin ? "google_ads" : "organic_or_direct",
+    utm_campaign: attr.utmCampaign || undefined,
+    utm_term: attr.utmTerm || undefined,
+    cabinet_model: firstItem.item_name || data.modelName || undefined,
+    purchase_mode: firstItem.item_variant || (data.isKitSelected ? "complete_kit" : "cabinet_only"),
+    payment_method: data.paymentMethod || data.method || "pix",
+    customer_type: customerType.trim(),
+    shipping_state: userData?.address?.region || data.state || undefined,
+    shipping_city: userData?.address?.city || data.city || undefined,
+    shipping_cep: userData?.address?.postal_code || data.cep || undefined,
+    new_customer: true,
   };
 }
 
@@ -220,27 +536,35 @@ function dispatchToAdPlatforms(
       break;
 
     case ANALYTICS_EVENTS.ADD_TO_CART: {
-      const cartItems = [
-        {
-          item_id: String(data.modelId || data.itemId || "totem"),
-          item_name: String(data.modelName || "Gabinete Totem"),
-          item_category: "Gabinete Totem",
-          price: valueNumber,
-          quantity: (data.quantity as number) || 1,
-        },
-      ];
+      const cartItems = buildEnhancedEcommerceItems(data, valueNumber);
+      const computedVal =
+        valueNumber ||
+        cartItems.reduce((acc, it) => acc + Number(it.price || 1590) * Number(it.quantity || 1), 0) ||
+        1590;
+      const customSignals = buildGoogleAdsCustomSignals(data, cartItems, userData);
+
       pushToGtmDataLayer("add_to_cart", {
-        ecommerce: { currency, value: valueNumber, items: cartItems },
+        ecommerce: { currency, value: computedVal, items: cartItems },
+        ...(userData ? { user_data: userData } : {}),
+        ...customSignals,
       });
       if (typeof window.gtag === "function") {
-        window.gtag("event", "add_to_cart", { currency, value: valueNumber, items: cartItems });
+        window.gtag("event", "add_to_cart", {
+          currency,
+          value: computedVal,
+          items: cartItems,
+          ...customSignals,
+        });
 
         const atcLabel = pixelConfig.googleAdsAddToCartLabel || "xAc_CPHtqakdEJ2cmMID";
         if (pixelConfig.googleAdsId && atcLabel) {
           window.gtag("event", "conversion", {
             send_to: `${pixelConfig.googleAdsId}/${atcLabel}`,
-            value: valueNumber || 1.0,
+            value: computedVal,
             currency,
+            items: cartItems,
+            ...(userData ? { user_data: userData } : {}),
+            ...customSignals,
           });
         }
       }
@@ -264,104 +588,169 @@ function dispatchToAdPlatforms(
       }
       break;
 
-    case ANALYTICS_EVENTS.BEGIN_CHECKOUT:
+    case ANALYTICS_EVENTS.BEGIN_CHECKOUT: {
+      const checkoutItems = buildEnhancedEcommerceItems(data, valueNumber);
+      const computedVal =
+        valueNumber ||
+        checkoutItems.reduce((acc, it) => acc + Number(it.price || 1590) * Number(it.quantity || 1), 0) ||
+        1590;
+      const customSignals = buildGoogleAdsCustomSignals(data, checkoutItems, userData);
+
       pushToGtmDataLayer("begin_checkout", {
         ecommerce: {
           currency,
-          value: valueNumber,
-          items_count: data.totalItems || data.numItems,
+          value: computedVal,
+          items_count: data.totalItems || data.numItems || checkoutItems.length,
+          items: checkoutItems,
         },
+        ...(userData ? { user_data: userData } : {}),
+        ...customSignals,
       });
       if (typeof window.gtag === "function") {
         window.gtag("event", "begin_checkout", {
           currency,
-          value: valueNumber,
-          items_count: data.totalItems || data.numItems,
+          value: computedVal,
+          items_count: data.totalItems || data.numItems || checkoutItems.length,
+          items: checkoutItems,
+          ...customSignals,
         });
 
         const bcLabel = pixelConfig.googleAdsBeginCheckoutLabel || "JjgUCKfrqakdEJ2cmMID";
         if (pixelConfig.googleAdsId && bcLabel) {
           window.gtag("event", "conversion", {
             send_to: `${pixelConfig.googleAdsId}/${bcLabel}`,
-            value: valueNumber || 1.0,
+            value: computedVal,
             currency,
+            items: checkoutItems,
+            ...(userData ? { user_data: userData } : {}),
+            ...customSignals,
           });
         }
       }
       break;
+    }
 
-    case ANALYTICS_EVENTS.LEAD_SUBMITTED:
+    case ANALYTICS_EVENTS.LEAD_SUBMITTED: {
+      const leadItems = buildEnhancedEcommerceItems(data, valueNumber);
+      const computedVal =
+        valueNumber ||
+        leadItems.reduce((acc, it) => acc + Number(it.price || 1590) * Number(it.quantity || 1), 0) ||
+        1590;
+      const customSignals = buildGoogleAdsCustomSignals(data, leadItems, userData);
+
       pushToGtmDataLayer("generate_lead", {
         currency,
-        value: valueNumber,
-        lead_type: "checkout_registration",
+        value: computedVal,
+        lead_type: data.quotePdfRequested ? "formal_pdf_quote" : "checkout_registration",
+        ecommerce: {
+          currency,
+          value: computedVal,
+          items: leadItems,
+        },
         user_data: userData,
+        ...customSignals,
       });
       if (typeof window.gtag === "function") {
         window.gtag("event", "generate_lead", {
           currency,
-          value: valueNumber,
-          lead_type: "checkout_registration",
+          value: computedVal,
+          lead_type: data.quotePdfRequested ? "formal_pdf_quote" : "checkout_registration",
+          items: leadItems,
+          ...customSignals,
         });
 
-        // Google Ads Conversion Oficial para Lead
+        // Google Ads Conversion Oficial para Lead com Enhanced Conversions + Valor Real do Carrinho
         const leadLabel = pixelConfig.googleAdsLeadLabel || "VumdCIjzqakdEJ2cmMID";
         if (pixelConfig.googleAdsId && leadLabel) {
           window.gtag("event", "conversion", {
             send_to: `${pixelConfig.googleAdsId}/${leadLabel}`,
-            value: valueNumber || 1.0,
+            value: computedVal,
             currency,
+            items: leadItems,
+            ...(userData ? { user_data: userData } : {}),
+            ...customSignals,
           });
         }
       }
       break;
+    }
 
-    case ANALYTICS_EVENTS.PIX_GENERATED:
+    case ANALYTICS_EVENTS.PIX_GENERATED: {
+      const pixItems = buildEnhancedEcommerceItems(data, valueNumber);
+      const computedVal =
+        valueNumber ||
+        pixItems.reduce((acc, it) => acc + Number(it.price || 1590) * Number(it.quantity || 1), 0) ||
+        1590;
+      const customSignals = buildGoogleAdsCustomSignals(data, pixItems, userData);
+
       pushToGtmDataLayer("add_payment_info", {
         ecommerce: {
           payment_type: "PIX",
           currency,
-          value: valueNumber,
+          value: computedVal,
           order_id: data.orderId || data.orderNumber,
+          items: pixItems,
         },
         user_data: userData,
+        ...customSignals,
       });
       if (typeof window.gtag === "function") {
         window.gtag("event", "add_payment_info", {
           payment_type: "PIX",
           currency,
-          value: valueNumber,
+          value: computedVal,
+          items: pixItems,
+          ...customSignals,
         });
       }
       break;
+    }
 
     case ANALYTICS_EVENTS.PURCHASE: {
-      const orderId = String(data.orderId || data.transactionId || data.orderNumber || Date.now());
+      const orderId = String(data.orderNumber || data.orderId || data.transactionId || Date.now());
+      const purchaseItems = buildEnhancedEcommerceItems(data, valueNumber);
+      const computedVal =
+        valueNumber ||
+        purchaseItems.reduce((acc, it) => acc + Number(it.price || 1590) * Number(it.quantity || 1), 0) ||
+        1590;
+      const shippingVal =
+        typeof data.shippingCents === "number" ? data.shippingCents / 100 : undefined;
+      const customSignals = buildGoogleAdsCustomSignals(data, purchaseItems, userData);
+
       pushToGtmDataLayer("purchase", {
         ecommerce: {
           transaction_id: orderId,
-          value: valueNumber,
+          value: computedVal,
+          ...(shippingVal !== undefined ? { shipping: shippingVal } : {}),
           currency,
-          items_count: data.itemCount,
+          items_count: data.itemCount || purchaseItems.length,
+          items: purchaseItems,
         },
         user_data: userData,
+        ...customSignals,
       });
       if (typeof window.gtag === "function") {
         window.gtag("event", "purchase", {
           transaction_id: orderId,
-          value: valueNumber,
+          value: computedVal,
+          ...(shippingVal !== undefined ? { shipping: shippingVal } : {}),
           currency,
-          items_count: data.itemCount,
+          items_count: data.itemCount || purchaseItems.length,
+          items: purchaseItems,
+          ...customSignals,
         });
 
-        // Google Ads Conversion Oficial para Venda
+        // Google Ads Conversion Oficial para Venda com Enhanced Conversions Completas
         const purchaseLabel = pixelConfig.googleAdsPurchaseLabel || "IR8ZCPThqakdEJ2cmMID";
         if (pixelConfig.googleAdsId && purchaseLabel) {
           window.gtag("event", "conversion", {
             send_to: `${pixelConfig.googleAdsId}/${purchaseLabel}`,
-            value: valueNumber,
+            value: computedVal,
             currency,
             transaction_id: orderId,
+            items: purchaseItems,
+            ...(userData ? { user_data: userData } : {}),
+            ...customSignals,
           });
         }
       }
@@ -373,6 +762,12 @@ function dispatchToAdPlatforms(
       const waNumber = String(data.number || "5511991649959");
       const waUrl = String(data.url || "");
       const waButtonId = String(data.buttonId || "btn-floating-whatsapp");
+      const waItems = buildEnhancedEcommerceItems(data, valueNumber);
+      const waEstimatedVal =
+        valueNumber ||
+        waItems.reduce((acc, it) => acc + Number(it.price || 1590) * Number(it.quantity || 1), 0) ||
+        1590;
+      const customSignals = buildGoogleAdsCustomSignals(data, waItems, userData);
 
       // 1. Disparo no dataLayer para o GTM (GTM-W4N3KKL7) acionar a Tag de Conversão do WhatsApp
       pushToGtmDataLayer("contact_whatsapp", {
@@ -382,9 +777,11 @@ function dispatchToAdPlatforms(
         phone_number: waNumber,
         whatsapp_url: waUrl,
         page_path: window.location.pathname,
-        value: 1.0,
+        value: waEstimatedVal,
         currency: "BRL",
+        items: waItems,
         ...(userData ? { user_data: userData } : {}),
+        ...customSignals,
       });
 
       if (typeof window.gtag === "function") {
@@ -396,14 +793,17 @@ function dispatchToAdPlatforms(
           phone_number: waNumber,
           page_path: window.location.pathname,
           transport_type: "beacon",
+          ...customSignals,
         });
 
         window.gtag("event", "generate_lead", {
           currency: "BRL",
-          value: 1.0,
+          value: waEstimatedVal,
           lead_source: "whatsapp",
           source: waSource,
+          items: waItems,
           transport_type: "beacon",
+          ...customSignals,
         });
 
         // 3. Google Ads Conversion Oficial para WhatsApp ([Totem Pro] WhatsApp Consultor Engenharia)
@@ -411,8 +811,11 @@ function dispatchToAdPlatforms(
         if (pixelConfig.googleAdsId && waLabel) {
           window.gtag("event", "conversion", {
             send_to: `${pixelConfig.googleAdsId}/${waLabel}`,
-            value: 1.0,
+            value: waEstimatedVal,
             currency: "BRL",
+            items: waItems,
+            ...(userData ? { user_data: userData } : {}),
+            ...customSignals,
             transport_type: "beacon",
           });
         }
@@ -707,57 +1110,7 @@ function collectBrowserSnapshots() {
   } catch {}
 
   try {
-    const urlParams = new URLSearchParams(window.location.search);
-    const storedAttrRaw = window.localStorage.getItem("totem_ads_attribution_v1");
-    const storedAttr = storedAttrRaw ? JSON.parse(storedAttrRaw) : {};
-    const gclid = urlParams.get("gclid") || storedAttr.gclid || "";
-    const gadSource = urlParams.get("gad_source") || storedAttr.gadSource || "";
-    const gadCampaignId = urlParams.get("gad_campaignid") || storedAttr.gadCampaignId || "";
-    const gbraid = urlParams.get("gbraid") || storedAttr.gbraid || "";
-    const wbraid = urlParams.get("wbraid") || storedAttr.wbraid || "";
-    const isGoogleAdsParam = Boolean(
-      gclid || gadSource === "1" || gadCampaignId || gbraid || wbraid
-    );
-    const utmSource =
-      urlParams.get("utm_source") ||
-      storedAttr.utmSource ||
-      (isGoogleAdsParam ? "google" : "");
-    const utmMedium =
-      urlParams.get("utm_medium") ||
-      storedAttr.utmMedium ||
-      (isGoogleAdsParam ? "cpc" : "");
-    const utmCampaign =
-      urlParams.get("utm_campaign") ||
-      storedAttr.utmCampaign ||
-      gadCampaignId ||
-      (isGoogleAdsParam ? "24395671655" : "");
-    const utmTerm = urlParams.get("utm_term") || storedAttr.utmTerm || "";
-    const landingUrl =
-      (isGoogleAdsParam && window.location.search ? window.location.href : "") ||
-      storedAttr.landingUrl ||
-      window.location.href;
-    const referrer = storedAttr.referrer || document.referrer || "";
-
-    campaignAttribution = {
-      gclid: gclid || gbraid || wbraid || "",
-      gadSource,
-      gadCampaignId,
-      gbraid,
-      wbraid,
-      utmSource,
-      utmMedium,
-      utmCampaign,
-      utmTerm,
-      landingUrl,
-      referrer,
-    };
-
-    if (isGoogleAdsParam || utmSource || !storedAttrRaw) {
-      window.localStorage.setItem(
-        "totem_ads_attribution_v1",
-        JSON.stringify(campaignAttribution)
-      );
-    }
+    campaignAttribution = captureAndPersistAdsAttribution();
   } catch {}
 
   let cartTelemetry: Record<string, unknown> = {};

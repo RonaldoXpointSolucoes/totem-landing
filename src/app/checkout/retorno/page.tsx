@@ -112,6 +112,30 @@ function PaymentReturnContent() {
               orderNumber: data.orderNumber,
               totalCents: data.totalCents,
               totalPriceCents: data.totalCents,
+              shippingCents: data.shippingCents,
+              paymentMethod: data.method,
+              customerName: data.customerName,
+              customerEmail: data.customerEmail,
+              customerWhatsapp: data.customerWhatsapp,
+              customerDocument: data.customerDocument,
+              address: data.customerAddress,
+              cep: data.customerAddress?.cep,
+              city: data.customerAddress?.city,
+              state: data.customerAddress?.state,
+              street: data.customerAddress?.street,
+              number: data.customerAddress?.number,
+              items: Array.isArray(data.items)
+                ? data.items.map((it: any) => ({
+                    item_id: it.id,
+                    cabinetName: it.cabinetName,
+                    colorName: it.colorName,
+                    unitPriceCents: it.unitPriceCents,
+                    quantity: it.quantity || 1,
+                    isKitSelected: Boolean(
+                      it.monitorName && !String(it.monitorName).includes("Sem ")
+                    ),
+                  }))
+                : undefined,
               source: "mercadopago_verified",
             });
             sessionStorage.setItem(`purchase_confirmed_${orderId}`, "1");

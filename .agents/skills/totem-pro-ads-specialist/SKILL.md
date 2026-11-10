@@ -116,19 +116,26 @@ Sempre que o usuário pedir uma análise da campanha ou explicação dos resulta
   ```
 
 ### 4.2. Diretrizes de Formatação e Didática da Mensagem no WhatsApp
-A mensagem enviada ao WhatsApp do Ronaldo **NÃO** deve ser uma cópia poluída de tabelas enormes em Markdown (que quebram na tela do celular). Ela deve ser **enxuta, visualmente impecável, didática e 100% orientada à tomada de decisão**, contendo exatamente estes **5 blocos curtos**:
+A mensagem enviada ao WhatsApp do Ronaldo **NÃO** deve ser uma cópia poluída de tabelas enormes em Markdown (que quebram na tela do celular). Ela deve ser **enxuta, visualmente impecável, didática e 100% orientada à tomada de decisão**, contendo obrigatoriamente uma separação cristalina para **facilitar entender na hora se as vendas vieram do Tráfego Pago (Google Ads) ou de Orgânico/Direto**:
 
-1. **📌 Cabeçalho & Resumo do Período**:
-   - Data/Período analisado, **Investimento (`R$`)**, **Cliques**, **CTR (%)**, **CPC Médio (`R$`)** e se o gasto respeitou a meta diária (`~R$ 35–R$ 50/dia`).
-2. **🎯 Placar das 5 Conversões (Separadas por Tipo e Custo)**:
-   - 🛒 *Carrinhos Adicionados*: Qtd, Valor (`R$`), CPA e Cidades/Dispositivos.
-   - 💬 *WhatsApp Engenharia*: Qtd (Ads + Appwrite), CPA e Cidades/Dispositivos.
-   - 💳 *Início de Checkout*: Qtd, Valor (`R$`) e CPA.
-   - 📋 *Lead Cadastro Checkout*: Qtd e CPA.
-   - 🏆 *Compra Aprovada (Venda)*: Qtd e Receita (`R$`).
-3. **🔍 O Que Aconteceu na Prática (Leitura Didática)**:
-   - Explicação simples e direta de 2 a 3 tópicos: qual grupo puxou o orçamento, o que os clientes realmente buscaram (termos quentes vs. termos ruins) e o comportamento no site (ex.: por que pararam no carrinho ou clicaram no WhatsApp).
-4. **🛠️ Ações Executadas / Recomendadas**:
-   - O que já foi otimizado (termos negativados, ajustes de CPC por grupo) ou o que precisa de aprovação.
-5. **🚀 Veredito de Decisão (Orçamento)**:
+1. **📌 Bloco 1 — Placar Rápido: As Vendas Vieram do Tráfego Pago?**:
+   - Logo no topo, responda de forma direta e visual:
+     - **Total de Vendas Pagas (`R$`):** `X vendas (R$ X.XXX,XX)`
+     - **🟢 Vindas do Tráfego Pago (Google Ads):** `X vendas (R$ X.XXX,XX — XX% do total)`
+     - **🔵 Vindas do Orgânico / Indicação Pura:** `X vendas (R$ X.XXX,XX)`
+   - Para cada venda paga (ou pedido em aberto), exiba uma etiqueta visual clara + a **Prova de Rastreio**:
+     - `🟢 ORIGEM: TRÁFEGO PAGO (Google Ads — Clique Direto c/ GCLID)`: Comprou na mesma sessão em que clicou no anúncio.
+     - `🟢 ORIGEM: TRÁFEGO PAGO (Google Ads — Multi-Sessão / Retorno)`: Clicou no anúncio no 1º acesso (ex.: pesquisou no Google, entrou no configurador, chamou no WhatsApp ou gerou PDF) e voltou dias depois (ou outro sócio no mesmo CEP/empresa) para pagar o PIX/Cartão. Mostre sempre a linha do tempo (`1º Acesso ➔ Retorno ➔ Pagamento`).
+     - `🔵 ORIGEM: ORGÂNICO / DIRETO PURO`: Cliente sem histórico de clique em anúncio (indicação, cliente antigo, etc.).
+2. **💰 Bloco 2 — Balanço Financeiro & ROAS Real do Tráfego Pago**:
+   - Data/Período analisado, **Investimento no Google Ads (`R$`)**, **Faturamento Pago vindo do Ads (`R$`)**, **ROAS Real (`X,XXx`)**, **Custo por Venda Paga (`CAC/CPA Real`)**, **Cliques**, **CTR (%)** e **CPC Médio (`R$`)**.
+3. **🎯 Bloco 3 — Placar das 5 Conversões (Separadas por Tipo, Custo e Origem)**:
+   - 🛒 *1. Adicionar ao Carrinho*: Qtd, Valor (`R$`), CPA e Cidades/Dispositivos.
+   - 💬 *2. WhatsApp Engenharia*: Qtd (Ads + Appwrite), CPA e Cidades/Dispositivos.
+   - 💳 *3. Início de Checkout*: Qtd, Valor (`R$`) e CPA.
+   - 📋 *4. Lead Cadastro / Orçamento PDF*: Qtd, status de quem já comprou e quem falta fechar.
+   - 🏆 *5. Compra Aprovada (Venda)*: Qtd, Receita (`R$`) e confirmação de origem (`Google Ads` vs `Orgânico`).
+4. **🛠️ Bloco 4 — Ações Práticas & Oportunidades Comerciais Imediatas**:
+   - Mensagens/links prontos de pós-venda (upsell) ou abordagem de orçamentos em aberto + otimizações técnicas aplicadas.
+5. **🚀 Bloco 5 — Veredito de Decisão (Orçamento)**:
    - Recomendação direta (**🟢 Aumentar**, **🟡 Manter/Realocar** ou **🔴 Diminuir**) com o motivo em 1 frase clara.

@@ -111,15 +111,32 @@ export async function PATCH(
       });
     }
 
-    // Sincroniza status do voucher associado a este pedido (libera comissão se pago)
+    // Sincroniza status do voucher e conversão de venda em ads_leads_carts (se pago)
     if (body.status) {
       try {
         const orderNumber = (updated as any)?.order_number || body.order_number || id;
         const { syncOrderStatusToVoucherUsage } = await import("@/lib/vouchers/voucherStore");
         await syncOrderStatusToVoucherUsage(orderNumber, body.status);
         await syncOrderStatusToVoucherUsage(id, body.status);
+
+        if (["paid", "in_production", "ready", "shipped", "delivered"].includes(body.status)) {
+          const { adsLeadsCartsStore } = await import("@/lib/analytics/adsLeadsCartsStore");
+          let parsedAddrForSync: any = {};
+          try {
+            const rawAddr = (updated as any)?.delivery_address_json || body.delivery_address_json;
+            if (rawAddr) parsedAddrForSync = typeof rawAddr === "string" ? JSON.parse(rawAddr) : rawAddr;
+          } catch {}
+          await adsLeadsCartsStore.syncOrderPaymentApproved({
+            orderNumber,
+            customerDocument: (updated as any)?.customer_document || body.customer_document,
+            customerEmail: (updated as any)?.customer_email || body.customer_email,
+            customerWhatsapp: (updated as any)?.customer_whatsapp || body.customer_whatsapp,
+            customerCep: parsedAddrForSync?.cep,
+            totalCents: Number((updated as any)?.total_cents || body.total_cents || 0),
+          });
+        }
       } catch (syncErr) {
-        console.warn("Aviso ao sincronizar status de voucher:", syncErr);
+        console.warn("Aviso ao sincronizar status de voucher/ads:", syncErr);
       }
     }
 

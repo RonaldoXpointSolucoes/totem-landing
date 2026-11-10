@@ -2003,27 +2003,67 @@ class AdsLeadsCartsStore {
       return null;
     }
 
-    // Atribuição de campanha
+    // Atribuição de campanha (com herança inteligente Multi-Sessão / First-Touch por WhatsApp, E-mail, CPF/CNPJ ou CEP)
     const attrMeta = meta.campaignAttribution || {};
     const landingCandidate = String(
       attrMeta.landingUrl || event.url || existing?.attribution.landingUrl || ""
     );
+
+    let earlierAdsAttribution: AdsLeadCartRecord["attribution"] | null = null;
+    const cleanWaForMatch = customerWhatsapp.replace(/\D/g, "");
+    const cleanDocForMatch = customerDocument.replace(/\D/g, "");
+    const cleanEmailForMatch = customerEmail.trim().toLowerCase();
+    const cleanCepForMatch = cepVal.replace(/\D/g, "");
+
+    if (cleanWaForMatch.length >= 10 || cleanDocForMatch.length >= 11 || cleanEmailForMatch.length >= 5 || cleanCepForMatch.length === 8) {
+      for (const candidate of this.recordsMap.values()) {
+        if (candidate.id === docId) continue;
+        const candWa = String(candidate.customer?.whatsapp || "").replace(/\D/g, "");
+        const candDoc = String(candidate.customer?.document || "").replace(/\D/g, "");
+        const candEmail = String(candidate.customer?.email || "").trim().toLowerCase();
+        const candCep = String(candidate.customer?.cep || "").replace(/\D/g, "");
+        const isSameCustomerOrLocation =
+          (cleanDocForMatch.length >= 11 && candDoc === cleanDocForMatch) ||
+          (cleanWaForMatch.length >= 10 && candWa === cleanWaForMatch) ||
+          (cleanEmailForMatch.length >= 5 && candEmail === cleanEmailForMatch) ||
+          (cleanCepForMatch.length === 8 && candCep === cleanCepForMatch);
+
+        if (isSameCustomerOrLocation && candidate.attribution?.source === "google_ads") {
+          earlierAdsAttribution = candidate.attribution;
+          if (candidate.attribution.gclid || candidate.attribution.keyword) {
+            break;
+          }
+        }
+      }
+    }
+
     const gclid = String(
       attrMeta.gclid ||
         attrMeta.gbraid ||
         attrMeta.wbraid ||
         meta.gclid ||
         existing?.attribution.gclid ||
+        earlierAdsAttribution?.gclid ||
         ""
     );
     const utmSource = String(
-      attrMeta.utmSource || meta.utmSource || existing?.attribution.utmSource || ""
+      attrMeta.utmSource ||
+        meta.utmSource ||
+        existing?.attribution.utmSource ||
+        earlierAdsAttribution?.utmSource ||
+        ""
     );
     const utmTerm = String(
-      attrMeta.utmTerm || meta.utmTerm || existing?.attribution.utmTerm || ""
+      attrMeta.utmTerm ||
+        meta.utmTerm ||
+        existing?.attribution.utmTerm ||
+        earlierAdsAttribution?.utmTerm ||
+        earlierAdsAttribution?.keyword ||
+        ""
     );
     const isGoogleAds = Boolean(
       gclid ||
+        attrMeta.isGoogleAdsOrigin === true ||
         attrMeta.gadSource === "1" ||
         attrMeta.gadCampaignId ||
         landingCandidate.includes("gad_source=") ||
@@ -2032,7 +2072,8 @@ class AdsLeadsCartsStore {
         landingCandidate.includes("gbraid=") ||
         utmSource.toLowerCase().includes("google") ||
         meta.adGroupId ||
-        existing?.attribution.source === "google_ads"
+        existing?.attribution.source === "google_ads" ||
+        earlierAdsAttribution?.source === "google_ads"
     );
 
     // Determina estágio do funil e tipo de registro
@@ -2495,6 +2536,7 @@ class AdsLeadsCartsStore {
     customerDocument?: string;
     customerEmail?: string;
     customerWhatsapp?: string;
+    customerCep?: string;
     totalCents?: number;
   }): Promise<void> {
     try {
@@ -2502,43 +2544,89 @@ class AdsLeadsCartsStore {
       const docClean = String(params.customerDocument || "").replace(/\D/g, "");
       const waClean = String(params.customerWhatsapp || "").replace(/\D/g, "");
       const emailClean = String(params.customerEmail || "").trim().toLowerCase();
+      const cepClean = String(params.customerCep || "").replace(/\D/g, "");
+
+      const matchedRecords: AdsLeadCartRecord[] = [];
+      let inheritedAdsAttr: AdsLeadCartRecord["attribution"] | null = null;
 
       for (const rec of this.recordsMap.values()) {
         const recDoc = String(rec.customer?.document || "").replace(/\D/g, "");
         const recWa = String(rec.customer?.whatsapp || "").replace(/\D/g, "");
         const recEmail = String(rec.customer?.email || "").trim().toLowerCase();
+        const recCep = String(rec.customer?.cep || "").replace(/\D/g, "");
+
         const matches =
           (params.orderNumber && rec.linkedOrderNumber === params.orderNumber) ||
           (docClean.length >= 11 && recDoc === docClean) ||
           (waClean.length >= 10 && recWa === waClean) ||
-          (emailClean.length >= 5 && recEmail === emailClean);
+          (emailClean.length >= 5 && recEmail === emailClean) ||
+          (cepClean.length === 8 && recCep === cepClean);
 
         if (matches) {
+          matchedRecords.push(rec);
+          if (rec.attribution?.source === "google_ads" && !inheritedAdsAttr) {
+            inheritedAdsAttr = rec.attribution;
+          }
+        }
+      }
+
+      if (matchedRecords.length === 0) return;
+
+      // Ordena para priorizar o registro já vinculado ao orderNumber exato ou o mais avançado no funil
+      matchedRecords.sort((a, b) => {
+        const aExact = params.orderNumber && a.linkedOrderNumber === params.orderNumber ? 1 : 0;
+        const bExact = params.orderNumber && b.linkedOrderNumber === params.orderNumber ? 1 : 0;
+        if (aExact !== bExact) return bExact - aExact;
+        return b.updatedAt.localeCompare(a.updatedAt);
+      });
+
+      for (let i = 0; i < matchedRecords.length; i++) {
+        const rec = matchedRecords[i];
+        const isPrimary = i === 0 || (params.orderNumber && rec.linkedOrderNumber === params.orderNumber);
+
+        rec.status = "converted_order";
+        rec.linkedOrderNumber = rec.linkedOrderNumber || params.orderNumber;
+
+        if (isPrimary) {
           rec.funnelStage = "purchase";
           rec.recordType = "purchase_conversion";
-          rec.status = "converted_order";
-          rec.linkedOrderNumber = params.orderNumber || rec.linkedOrderNumber;
           if (rec.attribution) {
+            if (inheritedAdsAttr) {
+              rec.attribution.source = "google_ads";
+              rec.attribution.campaignId = rec.attribution.campaignId || inheritedAdsAttr.campaignId || "24395671655";
+              rec.attribution.campaignName =
+                rec.attribution.campaignName && rec.attribution.campaignName !== "Tráfego Direto / Orgânico"
+                  ? rec.attribution.campaignName
+                  : inheritedAdsAttr.campaignName || "[SEARCH] Totem Pro — Gabinete & Monte Seu Totem (-50%)";
+              rec.attribution.adGroupId = rec.attribution.adGroupId || inheritedAdsAttr.adGroupId;
+              rec.attribution.adGroupName = rec.attribution.adGroupName || inheritedAdsAttr.adGroupName;
+              rec.attribution.keyword = rec.attribution.keyword || inheritedAdsAttr.keyword;
+              rec.attribution.gclid = rec.attribution.gclid || inheritedAdsAttr.gclid;
+            }
             rec.attribution.conversionActionId = "7871295732";
             rec.attribution.conversionActionName = "[Totem Pro] Compra Aprovada (Purchase)";
             if (params.totalCents) {
               rec.attribution.conversionValueCents = params.totalCents;
             }
           }
-          if (!rec.telemetry.stepsJourney.includes("Compra Confirmada / Pedido Pago")) {
-            rec.telemetry.stepsJourney = [
-              ...rec.telemetry.stepsJourney,
-              "Compra Confirmada / Pedido Pago",
-            ];
+          if (params.totalCents) {
+            rec.cart.totalCents = params.totalCents;
+            rec.cart.pixTotalCents = params.totalCents;
           }
-          rec.updatedAt = new Date().toISOString();
-          enrichAndDiagnoseRecord(rec);
-          this.recordsMap.set(rec.id, rec);
-          this.saveLocalCache();
-          await this.persistToAppwrite(rec);
-          break;
         }
+
+        if (!rec.telemetry.stepsJourney.includes("Compra Confirmada / Pedido Pago")) {
+          rec.telemetry.stepsJourney = [
+            ...rec.telemetry.stepsJourney,
+            "Compra Confirmada / Pedido Pago",
+          ];
+        }
+        rec.updatedAt = new Date().toISOString();
+        enrichAndDiagnoseRecord(rec);
+        this.recordsMap.set(rec.id, rec);
+        await this.persistToAppwrite(rec);
       }
+      this.saveLocalCache();
     } catch (err) {
       console.warn("[AdsLeadsCartsStore] Aviso ao sincronizar pagamento aprovado:", err);
     }
