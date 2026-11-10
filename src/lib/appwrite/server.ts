@@ -158,7 +158,7 @@ export async function getOrderWithDetails(orderId: string) {
 
   try {
     let orderDoc;
-    if (orderId.startsWith("TOT-")) {
+    if (orderId.startsWith("TOT-") || orderId.startsWith("CUST-")) {
       const searchRes = await db.listDocuments(dbId, cols.orders, [
         Query.equal("order_number", orderId),
         Query.limit(1),

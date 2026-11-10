@@ -105,6 +105,7 @@ export async function appendOrderPaymentAuditEntry(
         orderDoc.$id,
         { delivery_address_json: updatedJson }
       );
+      orderDoc.delivery_address_json = updatedJson;
     }
   } catch (err) {
     console.warn("Aviso ao salvar histórico de auditoria no pedido:", err);
@@ -300,6 +301,8 @@ export async function reconcileMercadoPagoPayment(
     ? "awaiting_payment"
     : order.status;
 
+  const transitionedToPaid = nextStatus !== order.status && nextStatus === "paid";
+
   if (nextStatus !== order.status) {
     await getServerDatabases().updateDocument(
       APPWRITE_CONFIG.databaseId,
@@ -308,25 +311,6 @@ export async function reconcileMercadoPagoPayment(
       { status: nextStatus }
     );
     order.status = nextStatus;
-
-    if (nextStatus === "paid") {
-      adsLeadsCartsStore
-        .syncOrderPaymentApproved({
-          orderNumber: order.order_number || order.$id,
-          customerDocument: order.customer_document,
-          customerEmail: order.customer_email,
-          customerWhatsapp: order.customer_whatsapp,
-          totalCents: order.total_cents || 0,
-        })
-        .catch(() => {});
-      await notifyPaymentConfirmedOnWhatsApp({
-        orderNumber: order.order_number || order.$id,
-        customerName: order.customer_name || "Cliente",
-        customerWhatsapp: order.customer_whatsapp || "",
-        totalCents: order.total_cents || 0,
-        method,
-      });
-    }
   }
 
   const auditEntry: OrderPaymentHistoryEntry = {
@@ -355,6 +339,27 @@ export async function reconcileMercadoPagoPayment(
   };
 
   await appendOrderPaymentAuditEntry(order, auditEntry);
+
+  if (transitionedToPaid) {
+    adsLeadsCartsStore
+      .syncOrderPaymentApproved({
+        orderNumber: order.order_number || order.$id,
+        customerDocument: order.customer_document,
+        customerEmail: order.customer_email,
+        customerWhatsapp: order.customer_whatsapp,
+        totalCents: order.total_cents || 0,
+      })
+      .catch(() => {});
+    await notifyPaymentConfirmedOnWhatsApp({
+      orderId: order.$id,
+      orderNumber: order.order_number || order.$id,
+      customerName: order.customer_name || "Cliente",
+      customerWhatsapp: order.customer_whatsapp || "",
+      totalCents: order.total_cents || 0,
+      method,
+      installments: payment.installments || 1,
+    });
+  }
 
   const local = findOrderByNumber(order.$id);
   if (local) {

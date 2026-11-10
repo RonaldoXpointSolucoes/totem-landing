@@ -152,6 +152,8 @@ interface ParsedDeliveryAddress {
   customerNotes?: string | null;
   executionOrder?: OrderExecutionData | null;
   additionalCharges?: OrderAdditionalCharge[];
+  customerPaidConfirmationSentAt?: string | null;
+  customerPaidConfirmationInstance?: string | null;
 }
 
 interface EditableOrderItem {
@@ -334,6 +336,40 @@ export default function AdminPage() {
   const [showRemarketingPanel, setShowRemarketingPanel] = useState(false);
   const [selectedOrderForRemarketing, setSelectedOrderForRemarketing] = useState<string | null>(null);
   const [remarketingData, setRemarketingData] = useState<RemarketingDashboardData | null>(null);
+  const [sendingPaidConfirmOrderId, setSendingPaidConfirmOrderId] = useState<string | null>(null);
+
+  const handleSendPaidConfirmationToCustomer = async (order: any, forceResend = false) => {
+    if (sendingPaidConfirmOrderId) return;
+    setSendingPaidConfirmOrderId(order.$id);
+    try {
+      const res = await fetch("/api/admin/orders/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "send_paid_confirmation",
+          orderId: order.$id,
+          orderNumber: order.order_number,
+          forceResend,
+        }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setSaveSuccessMsg(
+          json.skippedDuplicate
+            ? `A confirmação de pagamento do pedido #${order.order_number} já havia sido enviada anteriormente via Comercial X-Point.`
+            : `Confirmação completa do pedido #${order.order_number} enviada com sucesso para o WhatsApp do cliente (${json.phoneE164 || order.customer_whatsapp}) via Comercial X-Point!`
+        );
+        setTimeout(() => setSaveSuccessMsg(""), 5000);
+        loadOrders(statusFilter === "ads" ? "all" : statusFilter);
+      } else {
+        alert(json.error || "Não foi possível enviar a confirmação para o cliente.");
+      }
+    } catch (err: any) {
+      alert(err?.message || "Erro de conexão ao disparar confirmação.");
+    } finally {
+      setSendingPaidConfirmOrderId(null);
+    }
+  };
 
   useEffect(() => {
     try {
@@ -3587,6 +3623,40 @@ export default function AdminPage() {
                                 <span className="xl:hidden 2xl:inline">Etiqueta</span>
                               </button>
 
+                              {isOrderPaid && (
+                                <button
+                                  type="button"
+                                  disabled={sendingPaidConfirmOrderId === order.$id}
+                                  onClick={() =>
+                                    handleSendPaidConfirmationToCustomer(
+                                      order,
+                                      Boolean(addr?.customerPaidConfirmationSentAt)
+                                    )
+                                  }
+                                  className={`px-2 sm:px-2.5 py-1.5 rounded-xl font-bold text-[11px] sm:text-xs inline-flex items-center gap-1 transition-all cursor-pointer shrink-0 border ${
+                                    addr?.customerPaidConfirmationSentAt
+                                      ? "bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border-emerald-500/35"
+                                      : "bg-cyan-500/20 hover:bg-cyan-500/30 active:scale-95 text-cyan-300 border-cyan-500/40"
+                                  }`}
+                                  title={
+                                    addr?.customerPaidConfirmationSentAt
+                                      ? `Confirmação de pedido pago já enviada via Comercial X-Point em ${new Date(
+                                          addr.customerPaidConfirmationSentAt
+                                        ).toLocaleString("pt-BR")}. Clique se desejar reenviar.`
+                                      : "Enviar mensagem completa de confirmação de pedido recebido + conferência de itens e endereço via Comercial X-Point"
+                                  }
+                                >
+                                  <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+                                  <span>
+                                    {sendingPaidConfirmOrderId === order.$id
+                                      ? "Enviando..."
+                                      : addr?.customerPaidConfirmationSentAt
+                                      ? "Confirmado WhatsApp ✓"
+                                      : "Confirmar Pedido (Cliente)"}
+                                  </span>
+                                </button>
+                              )}
+
                               {!isOrderPaid && (
                                 <>
                                   <button
@@ -3855,6 +3925,40 @@ export default function AdminPage() {
                                   <span className="truncate sm:hidden">Fotos & O.S.</span>
                                   <span className="hidden sm:inline">Ordem de Execução (Fotos & Vídeos)</span>
                                 </button>
+
+                                {isOrderPaid && (
+                                  <button
+                                    type="button"
+                                    disabled={sendingPaidConfirmOrderId === order.$id}
+                                    onClick={() =>
+                                      handleSendPaidConfirmationToCustomer(
+                                        order,
+                                        Boolean(addr?.customerPaidConfirmationSentAt)
+                                      )
+                                    }
+                                    className={`col-span-2 sm:col-span-1 px-3 py-2 rounded-xl font-black text-[11px] sm:text-xs flex items-center justify-center gap-1.5 transition-all shrink-0 cursor-pointer border ${
+                                      addr?.customerPaidConfirmationSentAt
+                                        ? "bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border-emerald-500/40"
+                                        : "bg-cyan-600 hover:bg-cyan-500 active:scale-95 text-white border-cyan-400 shadow-md shadow-cyan-600/25"
+                                    }`}
+                                    title={
+                                      addr?.customerPaidConfirmationSentAt
+                                        ? `Confirmação já enviada via Comercial X-Point em ${new Date(
+                                            addr.customerPaidConfirmationSentAt
+                                          ).toLocaleString("pt-BR")}. Clique se desejar reenviar.`
+                                        : "Disparar confirmação de pedido pago e conferência de dados para o WhatsApp do cliente via Comercial X-Point"
+                                    }
+                                  >
+                                    <MessageCircle className="w-3.5 h-3.5 shrink-0" />
+                                    <span>
+                                      {sendingPaidConfirmOrderId === order.$id
+                                        ? "Enviando Confirmação..."
+                                        : addr?.customerPaidConfirmationSentAt
+                                        ? "Confirmação WhatsApp Enviada ✓ (Reenviar)"
+                                        : "Enviar Confirmação do Pedido (Comercial X-Point)"}
+                                    </span>
+                                  </button>
+                                )}
 
                                 {!isOrderPaid && (
                                   <>

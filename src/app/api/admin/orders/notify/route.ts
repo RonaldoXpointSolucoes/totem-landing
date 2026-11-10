@@ -4,6 +4,7 @@ import { getAuthSession, LEGACY_ADMIN_COOKIE, LEGACY_SECRET } from "@/lib/auth/s
 import {
   broadcastAdminWhatsAppNotification,
   DEFAULT_ORDER_NOTIFICATION_RECIPIENTS,
+  sendCustomerOrderConfirmedWhatsApp,
   sendDirectWhatsAppToCustomer,
 } from "@/lib/notifications/whatsappNotifier";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
@@ -39,6 +40,29 @@ export async function POST(req: Request) {
         ok: result.sentCount > 0,
         sentCount: result.sentCount,
         results: result.results,
+      });
+    }
+
+    if (body.mode === "send_paid_confirmation") {
+      const orderIdOrNumber = String(body.orderId || body.orderNumber || "").trim();
+      if (!orderIdOrNumber) {
+        return NextResponse.json(
+          { ok: false, error: "Identificador do pedido é obrigatório." },
+          { status: 400 }
+        );
+      }
+      const res = await sendCustomerOrderConfirmedWhatsApp({
+        orderIdOrNumber,
+        forceResend: Boolean(body.forceResend),
+        actor: "Gestor Comercial (Painel Admin)",
+      });
+      return NextResponse.json({
+        ok: res.ok,
+        skippedDuplicate: res.skippedDuplicate,
+        error: res.error,
+        instanceUsed: res.instanceUsed,
+        phoneE164: res.phoneE164,
+        orderNumber: res.orderNumber,
       });
     }
 

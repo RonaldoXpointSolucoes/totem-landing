@@ -134,6 +134,16 @@ export async function PATCH(
             customerCep: parsedAddrForSync?.cep,
             totalCents: Number((updated as any)?.total_cents || body.total_cents || 0),
           });
+
+          if (body.status === "paid") {
+            const { sendCustomerOrderConfirmedWhatsApp } = await import(
+              "@/lib/notifications/whatsappNotifier"
+            );
+            await sendCustomerOrderConfirmedWhatsApp({
+              orderIdOrNumber: id,
+              actor: "Admin (Confirmação de Pagamento no Painel)",
+            });
+          }
         }
       } catch (syncErr) {
         console.warn("Aviso ao sincronizar status de voucher/ads:", syncErr);

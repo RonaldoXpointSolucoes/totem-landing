@@ -121,6 +121,7 @@ export async function POST(req: Request) {
     console.log(`[Webhook Pix] Pedido ${orderDoc.order_number} compensado com sucesso!`);
 
     await notifyPaymentConfirmedOnWhatsApp({
+      orderId: orderDoc.$id,
       orderNumber: orderDoc.order_number || orderDoc.$id,
       customerName: orderDoc.customer_name || "Cliente",
       customerWhatsapp: orderDoc.customer_whatsapp || "",
