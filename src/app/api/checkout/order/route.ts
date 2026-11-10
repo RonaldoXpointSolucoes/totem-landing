@@ -42,6 +42,8 @@ interface RequestBody {
     colorName?: string;
     monitorId?: string | null;
     monitorName?: string | null;
+    cutoutMonitorId?: string | null;
+    cutoutMonitorName?: string | null;
     kitItems?: Array<{ id?: string; selected?: boolean }>;
     customMonitor?: Partial<MonitorOption>;
     printerId?: string | null;
@@ -174,10 +176,31 @@ export async function POST(req: Request) {
               }
             : null)
         : null;
-      const monitor: MonitorOption | null =
+      const resolvedCutoutMonitor: MonitorOption | null = rawItem.cutoutMonitorId
+        ? (catalogMonitors.find((m: any) => m.id === rawItem.cutoutMonitorId) as MonitorOption | undefined) ||
+          (String(rawItem.cutoutMonitorId).startsWith("custom-mon-") || rawItem.customMonitor
+            ? {
+                id: String(rawItem.cutoutMonitorId),
+                brand: String(rawItem.customMonitor?.brand || "Sob Medida"),
+                model: String(rawItem.customMonitor?.model || "Custom"),
+                displayName: String(rawItem.customMonitor?.displayName || rawItem.cutoutMonitorName || "Monitor Sob Medida"),
+                sizeInches: Number(rawItem.customMonitor?.sizeInches) || 21.5,
+                vesaPattern: rawItem.customMonitor?.vesaPattern || "100x100",
+                active: true,
+                isCustom: true,
+                priceAdjustmentCents: 0,
+                customDimensions: rawItem.customMonitor?.customDimensions,
+              }
+            : null)
+        : null;
+      const mergedKitMonitor: MonitorOption | null =
         rawMonitor && isItemKit(rawMonitor)
           ? mergeServerCatalogKitItems(rawMonitor, rawItem.kitItems)
           : rawMonitor;
+      const monitor: MonitorOption | null =
+        mergedKitMonitor && isItemKit(mergedKitMonitor) && resolvedCutoutMonitor
+          ? { ...mergedKitMonitor, cutoutMonitor: resolvedCutoutMonitor }
+          : mergedKitMonitor;
       const printer = rawItem.printerId
         ? catalogPrinters.find((p: any) => p.id === rawItem.printerId) || null
         : null;
@@ -235,20 +258,23 @@ export async function POST(req: Request) {
       validatedCartItems.push(cartItem);
 
       // 3. Montar Ficha Técnica de Fabricação para a Router CNC
-      const customDims = monitor?.customDimensions;
+      const customDims = monitor?.cutoutMonitor?.customDimensions || monitor?.customDimensions;
       const kitEq = resolveKitEquipmentSummary({
         monitor,
         printerName: printer?.displayName,
         readerName: barcodeReader?.displayName,
+        cutoutMonitorName: monitor?.cutoutMonitor?.displayName || rawItem.cutoutMonitorName,
       });
+      const effectiveCutoutMon =
+        !kitEq.hasMonitorInKit && monitor?.cutoutMonitor ? monitor.cutoutMonitor : monitor;
 
       const screenSpecs = monitor
         ? {
             monitorName: kitEq.isKit ? kitEq.monitorDisplay : monitor.displayName,
             screenCutoutMm: customDims
               ? `Monitor Inteiro: ${customDims.outerWidthCm}x${customDims.outerHeightCm}cm | Tela Visível (Corte): ${customDims.screenWidthCm}x${customDims.screenHeightCm}cm | Barras (Cima:${customDims.bezelTopCm}cm, Baixo:${customDims.bezelBottomCm}cm, Esq:${customDims.bezelLeftCm}cm, Dir:${customDims.bezelRightCm}cm)`
-              : `Abertura usinada para tela ${monitor.sizeInches || 23.8}" (tolerância de precisão CNC +1.5mm)`,
-            vesaPattern: `Padrão VESA ${monitor.vesaPattern || "100x100"} mm com insertos roscados M4${customDims?.productUrl ? ` | Link: ${customDims.productUrl}` : ""}`,
+              : `Abertura usinada para tela ${effectiveCutoutMon?.sizeInches || 23.8}" (tolerância de precisão CNC +1.5mm)`,
+            vesaPattern: `Padrão VESA ${effectiveCutoutMon?.vesaPattern || "100x100"} mm com insertos roscados M4${customDims?.productUrl ? ` | Link: ${customDims.productUrl}` : ""}`,
           }
         : {
             monitorName: "Não especificado (Painel cego / Pré-disposição)",
@@ -289,6 +315,7 @@ export async function POST(req: Request) {
         monitor,
         printerName: printer?.displayName,
         readerName: barcodeReader?.displayName,
+        cutoutMonitorName: monitor?.cutoutMonitor?.displayName || rawItem.cutoutMonitorName,
         includeAssemblyService,
       });
 

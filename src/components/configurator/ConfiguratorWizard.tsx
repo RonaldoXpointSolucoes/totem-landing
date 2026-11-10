@@ -10,7 +10,14 @@ import {
 } from "@/modules/catalog/catalogData";
 import { calculateTotemPrice, formatBRL } from "@/modules/pricing/pricingEngine";
 import { CabinetModel, ColorOption, MonitorOption, PrinterOption, BarcodeReaderOption } from "@/types/catalog";
-import { isItemKit, getEffectiveKitItems, calculateKitTotalCents, mergeServerCatalogKitItems } from "@/modules/catalog/kitDefaults";
+import {
+  isItemKit,
+  getEffectiveKitItems,
+  calculateKitTotalCents,
+  mergeServerCatalogKitItems,
+  doesKitIncludeMonitor,
+  doesKitIncludePrinter,
+} from "@/modules/catalog/kitDefaults";
 import { TotemConfiguration } from "@/types/order";
 import { useCart } from "@/modules/cart/CartContext";
 import { StepModel } from "./StepModel";
@@ -99,7 +106,11 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
             );
             if (!match) return prev;
             if (isItemKit(prev)) {
-              return mergeServerCatalogKitItems(match, prev.kitItems);
+              const merged = mergeServerCatalogKitItems(match, prev.kitItems);
+              return {
+                ...merged,
+                cutoutMonitor: prev.cutoutMonitor || null,
+              };
             }
             return match;
           });
@@ -209,6 +220,8 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     if (initialStep && initialStep >= 1 && initialStep <= 6) return initialStep;
     return 1;
   });
+  // Sub-passo obrigatório quando o cliente escolhe o Kit sem Monitor (para informar qual monitor vai usar no gabinete)
+  const [isKitCutoutMonitorStep, setIsKitCutoutMonitorStep] = useState<boolean>(false);
   const totalSteps = 6;
 
   // Identificação Reativa de Seleção do Kit de Montagem
@@ -217,6 +230,29 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     if (!isKitSelected) return [];
     return selectedMonitor?.kitItems || getEffectiveKitItems(selectedMonitor);
   }, [isKitSelected, selectedMonitor]);
+
+  const hasMonitorInKit = useMemo(() => {
+    if (!isKitSelected) return false;
+    return doesKitIncludeMonitor(activeKitItems);
+  }, [isKitSelected, activeKitItems]);
+
+  const hasPrinterInKit = useMemo(() => {
+    if (!isKitSelected) return false;
+    return doesKitIncludePrinter(activeKitItems);
+  }, [isKitSelected, activeKitItems]);
+
+  // Se escolheu o Kit de Montagem mas DESABILITOU o Monitor do Kit, precisa obrigatoriamente informar qual monitor vai usar
+  const requiresCutoutMonitorForKit = isKitSelected && !hasMonitorInKit;
+  const selectedCutoutMonitor = isKitSelected ? selectedMonitor?.cutoutMonitor || null : null;
+
+  // Se escolheu o Kit de Montagem mas DESABILITOU a Impressora do Kit, precisa obrigatoriamente informar qual impressora vai usar no Passo 4
+  const requiresCutoutPrinterForKit = isKitSelected && !hasPrinterInKit;
+
+  useEffect(() => {
+    if (step !== 3 || !requiresCutoutMonitorForKit) {
+      setIsKitCutoutMonitorStep(false);
+    }
+  }, [step, requiresCutoutMonitorForKit]);
 
   const kitAdjustmentCents = useMemo(() => {
     if (!isKitSelected) return 0;
@@ -302,25 +338,67 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
 
   const isNextDisabled =
     (step === 3 && !selectedMonitor) ||
-    (step === 4 && !isKitSelected && !selectedPrinter) ||
+    (step === 3 && isKitCutoutMonitorStep && requiresCutoutMonitorForKit && !selectedCutoutMonitor) ||
+    (step === 4 && (!isKitSelected || requiresCutoutPrinterForKit) && !selectedPrinter) ||
     (step === 5 && !isKitSelected && useReader && !selectedReader);
 
-  // Navegação para Frente: Pula etapas 4 e 5 se o Kit foi selecionado
+  // Quando o cliente confirma a personalização do Kit no modal:
+  // - Se desabilitou o monitor do Kit, abre imediatamente o novo passo obrigatório "Seu Monitor"
+  // - Se manteve o monitor do Kit mas desabilitou a impressora do Kit, avança imediatamente para o passo "Sua Impressora"
+  const handleKitConfirmed = (updatedKit: MonitorOption) => {
+    const items = getEffectiveKitItems(updatedKit);
+    const monInKit = doesKitIncludeMonitor(items);
+    const prtInKit = doesKitIncludePrinter(items);
+    if (!monInKit) {
+      setStep(3);
+      setIsKitCutoutMonitorStep(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else if (!prtInKit) {
+      setIsKitCutoutMonitorStep(false);
+      setStep(4);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      setIsKitCutoutMonitorStep(false);
+    }
+  };
+
+  // Navegação para Frente: respeita a obrigatoriedade de informar Monitor e/ou Impressora quando desabilitados no Kit
   const handleNext = () => {
     if (step === 3 && !selectedMonitor) {
       return;
     }
-    if (step === 4 && !isKitSelected && !selectedPrinter) {
+    if (step === 3 && isKitSelected) {
+      if (requiresCutoutMonitorForKit && (!isKitCutoutMonitorStep || !selectedCutoutMonitor)) {
+        if (!isKitCutoutMonitorStep) {
+          setIsKitCutoutMonitorStep(true);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+        return;
+      }
+      setIsKitCutoutMonitorStep(false);
+      if (requiresCutoutPrinterForKit) {
+        setStep(4);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      setStep(6);
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
+    }
+    if (step === 4) {
+      if ((!isKitSelected || requiresCutoutPrinterForKit) && !selectedPrinter) {
+        return;
+      }
+      if (isKitSelected) {
+        setStep(6);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
     }
     if (step === 5 && !isKitSelected && useReader && !selectedReader) {
       return;
     }
-    if (step === 3 && isKitSelected) {
-      // Se selecionou o Kit de Montagem, pula Impressora (4) e Leitor (5) indo direto para Revisão (6)
-      setStep(6);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } else if (step < totalSteps) {
+    if (step < totalSteps) {
       setStep((prev) => prev + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
@@ -328,13 +406,34 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     }
   };
 
-  // Navegação para Trás: Pula de volta da Revisão (6) para o Monitor (3) se o Kit estiver selecionado
+  // Navegação para Trás: retorna inteligentemente para Impressora ou Seu Monitor caso tenham sido exigidos no Kit
   const handleBack = () => {
-    if (step === 6 && isKitSelected) {
-      // Retorno inteligente: da Revisão volta direto para a etapa do Kit
-      setStep(3);
+    if (step === 3 && isKitCutoutMonitorStep) {
+      setIsKitCutoutMonitorStep(false);
       window.scrollTo({ top: 0, behavior: "smooth" });
-    } else if (step > 1) {
+      return;
+    }
+    if (step === 4 && isKitSelected) {
+      setStep(3);
+      if (requiresCutoutMonitorForKit) {
+        setIsKitCutoutMonitorStep(true);
+      }
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    if (step === 6 && isKitSelected) {
+      if (requiresCutoutPrinterForKit) {
+        setStep(4);
+      } else if (requiresCutoutMonitorForKit) {
+        setStep(3);
+        setIsKitCutoutMonitorStep(true);
+      } else {
+        setStep(3);
+      }
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    if (step > 1) {
       setStep((prev) => prev - 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else if (onBackToHome) {
@@ -508,19 +607,52 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
   };
 
   // Passos lógicos estruturados como Cardápio Digital Interativo
+  const effectiveCurrentStepId = step === 3 && isKitCutoutMonitorStep ? 3.5 : step;
+
   const CONFIG_STEPS = [
-    { id: 1, label: "Formato", subtitle: "Gabinete", icon: Box },
-    { id: 2, label: "Acabamento", subtitle: "MDF BP", icon: Palette },
-    { id: 3, label: "Monitor", subtitle: isKitSelected ? "Kit Montagem" : "Touch", icon: Tv },
-    { id: 4, label: "Impressora", subtitle: isKitSelected ? "No Kit" : "Térmica", icon: Printer, isSkipped: isKitSelected },
-    { id: 5, label: "Leitor", subtitle: isKitSelected ? "No Kit" : "Código 2D", icon: QrCode, isSkipped: isKitSelected },
-    { id: 6, label: "Revisão", subtitle: "Ficha CNC", icon: CheckCircle2 },
+    { id: 1, displayNum: "1", label: "Formato", subtitle: "Gabinete", icon: Box },
+    { id: 2, displayNum: "2", label: "Acabamento", subtitle: "MDF BP", icon: Palette },
+    {
+      id: 3,
+      displayNum: "3",
+      label: isKitSelected ? "Kit" : "Monitor",
+      subtitle: isKitSelected ? "Kit Montagem" : "Touch",
+      icon: isKitSelected ? Boxes : Tv,
+    },
+    ...(requiresCutoutMonitorForKit
+      ? [
+          {
+            id: 3.5,
+            displayNum: "3B",
+            label: "Seu Monitor",
+            subtitle: selectedCutoutMonitor ? selectedCutoutMonitor.displayName : "Qual Monitor?",
+            icon: Tv,
+            isCutoutStep: true,
+          },
+        ]
+      : []),
+    {
+      id: 4,
+      displayNum: "4",
+      label: requiresCutoutPrinterForKit ? "Sua Impressora" : "Impressora",
+      subtitle: isKitSelected
+        ? hasPrinterInKit
+          ? "No Kit"
+          : selectedPrinter
+          ? selectedPrinter.displayName
+          : "Qual Impressora?"
+        : "Térmica",
+      icon: Printer,
+      isSkipped: isKitSelected && hasPrinterInKit,
+    },
+    { id: 5, displayNum: "5", label: "Leitor", subtitle: isKitSelected ? "No Kit" : "Código 2D", icon: QrCode, isSkipped: isKitSelected },
+    { id: 6, displayNum: "6", label: "Revisão", subtitle: "Ficha CNC", icon: CheckCircle2 },
   ];
 
   return (
     <div className="flex-1 flex flex-col justify-start pb-44 sm:pb-40">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 w-full flex-1 flex flex-col pt-2 sm:pt-3">
-        {/* Topo: Identificação Enxuta + Cardápio Digital dos 6 Passos */}
+        {/* Topo: Identificação Enxuta + Cardápio Digital dos Passos */}
         <div className="space-y-2 mb-2 sm:mb-3 shrink-0">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -559,34 +691,54 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
             </div>
           </div>
 
-          {/* Barra de Categorias / Passos (Estilo Cardápio Digital - Visão Global de 6 Passos) */}
+          {/* Barra de Categorias / Passos (Estilo Cardápio Digital) */}
           <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar p-1 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-black/10 dark:border-slate-800 backdrop-blur-md shadow-sm">
             {CONFIG_STEPS.map((s) => {
               const Icon = s.icon;
-              const isActive = s.id === step;
-              const isCompleted = s.id < step;
-              const isSkippedByKit = isKitSelected && (s.id === 4 || s.id === 5);
+              const isActive = s.id === effectiveCurrentStepId;
+              const isCompleted = s.id < effectiveCurrentStepId;
+              const isSkippedByKit = Boolean((s as any).isSkipped);
 
               return (
                 <button
                   key={s.id}
                   onClick={() => {
                     if (isSkippedByKit) {
-                      setStep(3); // Redireciona para o kit
-                      return;
-                    }
-                    if (s.id > 3 && !selectedMonitor) {
+                      setIsKitCutoutMonitorStep(false);
                       setStep(3);
                       return;
                     }
-                    if (s.id > 4 && !isKitSelected && !selectedPrinter) {
+                    if (s.id === 3.5) {
+                      setStep(3);
+                      setIsKitCutoutMonitorStep(true);
+                      return;
+                    }
+                    if (s.id === 3) {
+                      setIsKitCutoutMonitorStep(false);
+                      setStep(3);
+                      return;
+                    }
+                    if (s.id > 3 && !selectedMonitor) {
+                      setIsKitCutoutMonitorStep(false);
+                      setStep(3);
+                      return;
+                    }
+                    if (s.id > 3.5 && requiresCutoutMonitorForKit && !selectedCutoutMonitor) {
+                      setStep(3);
+                      setIsKitCutoutMonitorStep(true);
+                      return;
+                    }
+                    if (s.id > 4 && (!isKitSelected || requiresCutoutPrinterForKit) && !selectedPrinter) {
+                      setIsKitCutoutMonitorStep(false);
                       setStep(4);
                       return;
                     }
                     if (s.id > 5 && !isKitSelected && (!readerConfigured || (useReader && !selectedReader))) {
+                      setIsKitCutoutMonitorStep(false);
                       setStep(5);
                       return;
                     }
+                    setIsKitCutoutMonitorStep(false);
                     setStep(s.id);
                   }}
                   className={`flex items-center gap-2 py-1.5 px-2.5 sm:px-3 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
@@ -601,7 +753,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                   title={
                     isSkippedByKit
                       ? `${s.label} já incluso no Kit de Montagem`
-                      : `Passo ${s.id}: ${s.label}`
+                      : `Passo ${s.displayNum}: ${s.label}`
                   }
                 >
                   <div
@@ -615,7 +767,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                         : "bg-black/5 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-black/10 dark:border-slate-700"
                     }`}
                   >
-                    {isCompleted ? <Check className="w-2.5 h-2.5 stroke-[3]" /> : isSkippedByKit ? "✓" : s.id}
+                    {isCompleted ? <Check className="w-2.5 h-2.5 stroke-[3]" /> : isSkippedByKit ? "✓" : s.displayNum}
                   </div>
                   <Icon className="w-3.5 h-3.5 shrink-0 opacity-90" />
                   <span className="truncate">{s.label}</span>
@@ -638,7 +790,11 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
               <div className="flex items-center justify-between shrink-0">
                 <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   {step === 3
-                    ? (isKitSelected ? "Kit de Montagem Completo" : "Visualização do Monitor")
+                    ? isKitCutoutMonitorStep
+                      ? "Seu Monitor (Furação CNC)"
+                      : isKitSelected
+                      ? "Kit de Montagem Completo"
+                      : "Visualização do Monitor"
                     : step === 4
                     ? "Visualização da Impressora"
                     : step === 5
@@ -655,7 +811,11 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                 <TotemViewer3DWrapper
                   selectedModel={selectedModel}
                   selectedColor={selectedColor}
-                  selectedMonitor={selectedMonitor}
+                  selectedMonitor={
+                    step === 3 && isKitCutoutMonitorStep && selectedCutoutMonitor
+                      ? selectedCutoutMonitor
+                      : selectedMonitor
+                  }
                   selectedPrinter={selectedPrinter}
                   selectedReader={selectedReader}
                   useReader={useReader}
@@ -692,14 +852,32 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                   </div>
                 </div>
                 {selectedMonitor ? (
-                  <div className="flex justify-between items-center gap-2">
-                    <span className="shrink-0 font-medium">Monitor:</span>
-                    <span className="font-semibold text-[#1d1d1f] dark:text-white text-right leading-tight">
-                      {isKitSelected
-                        ? `Kit de Montagem (${activeKitItems.filter((i) => i.selected).length} itens)`
-                        : selectedMonitor.displayName}
-                    </span>
-                  </div>
+                  <>
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="shrink-0 font-medium">{isKitSelected ? "Kit:" : "Monitor:"}</span>
+                      <span className="font-semibold text-[#1d1d1f] dark:text-white text-right leading-tight">
+                        {isKitSelected
+                          ? `Kit de Montagem (${activeKitItems.filter((i) => i.selected).length} itens)`
+                          : selectedMonitor.displayName}
+                      </span>
+                    </div>
+                    {requiresCutoutMonitorForKit && (
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="shrink-0 font-medium">Seu Monitor:</span>
+                        <span
+                          className={`font-semibold text-right leading-tight ${
+                            selectedCutoutMonitor
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : "text-amber-600 dark:text-amber-400"
+                          }`}
+                        >
+                          {selectedCutoutMonitor
+                            ? `${selectedCutoutMonitor.displayName} (Furação)`
+                            : "Pendente (Obrigatório)"}
+                        </span>
+                      </div>
+                    )}
+                  </>
                 ) : step === 3 ? (
                   <div className="flex justify-between items-center gap-2">
                     <span className="shrink-0 font-medium">Monitor:</span>
@@ -712,10 +890,22 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
 
                 {(isKitSelected || selectedPrinter) && (
                   <div className="flex justify-between items-center gap-2">
-                    <span className="shrink-0 font-medium">Impressora:</span>
-                    <span className="font-semibold text-[#1d1d1f] dark:text-white text-right leading-tight">
+                    <span className="shrink-0 font-medium">
+                      {requiresCutoutPrinterForKit ? "Sua Impressora:" : "Impressora:"}
+                    </span>
+                    <span
+                      className={`font-semibold text-right leading-tight ${
+                        requiresCutoutPrinterForKit && !selectedPrinter
+                          ? "text-amber-600 dark:text-amber-400"
+                          : "text-[#1d1d1f] dark:text-white"
+                      }`}
+                    >
                       {isKitSelected
-                        ? (activeKitItems.find((i) => i.category === "printer")?.selected ? "Inclusa no Kit" : "Removida do Kit")
+                        ? hasPrinterInKit
+                          ? "Inclusa no Kit"
+                          : selectedPrinter
+                          ? `${selectedPrinter.displayName} (Recorte)`
+                          : "Pendente (Obrigatório)"
                         : selectedPrinter?.displayName}
                     </span>
                   </div>
@@ -726,8 +916,12 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                     <span className="shrink-0 font-medium">Leitor 2D:</span>
                     <span className="font-semibold text-[#1d1d1f] dark:text-white text-right leading-tight">
                       {isKitSelected
-                        ? (activeKitItems.find((i) => i.category === "reader")?.selected ? "Incluso no Kit" : "Removido do Kit")
-                        : (useReader && selectedReader ? selectedReader.displayName : "Sem leitor (Gabinete liso)")}
+                        ? activeKitItems.find((i) => i.category === "reader")?.selected
+                          ? "Incluso no Kit"
+                          : "Removido do Kit"
+                        : useReader && selectedReader
+                        ? selectedReader.displayName
+                        : "Sem leitor (Gabinete liso)"}
                     </span>
                   </div>
                 )}
@@ -794,6 +988,12 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                 cabinetName={selectedModel.name}
                 cabinetBasePixCents={selectedModel.pixPriceCents || selectedModel.basePriceCents}
                 cabinetBaseCardCents={selectedModel.basePriceCents}
+                isKitCutoutMonitorMode={isKitCutoutMonitorStep && requiresCutoutMonitorForKit}
+                onKitConfirmed={handleKitConfirmed}
+                onEnterKitCutoutMonitorStep={() => {
+                  setIsKitCutoutMonitorStep(true);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
               />
             )}
 
@@ -803,6 +1003,8 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                 selectedPrinter={selectedPrinter}
                 onSelectPrinter={handleSelectPrinter}
                 onRequestCustomization={() => setIsCustomModalOpen(true)}
+                isKitWithoutPrinter={requiresCutoutPrinterForKit}
+                cabinetName={selectedModel.name}
               />
             )}
 
@@ -830,14 +1032,26 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                 onToggleAssemblyService={setIncludeAssemblyService}
                 customizationNotes={customizationNotes}
                 onChangeNotes={setCustomizationNotes}
-                onEditStep={(stepNum) => setStep(stepNum)}
+                onEditStep={(stepNum) => {
+                  setIsKitCutoutMonitorStep(false);
+                  setStep(stepNum);
+                }}
+                onEditCutoutMonitor={() => {
+                  setStep(3);
+                  setIsKitCutoutMonitorStep(true);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
                 onRemoveKit={() => {
                   const fallbackMon =
+                    selectedCutoutMonitor ||
                     catalog.monitors.find((m) => !isItemKit(m) && (m.priceAdjustmentCents || 0) === 0) ||
                     catalog.monitors.find((m) => !isItemKit(m)) ||
                     null;
-                  setSelectedMonitor(fallbackMon);
+                  setSelectedMonitor(
+                    fallbackMon ? { ...fallbackMon, isKit: false, cutoutMonitor: null } : null
+                  );
                   setIncludeAssemblyService(false);
+                  setIsKitCutoutMonitorStep(false);
                   setStep(3);
                 }}
                 onAddToCart={handleAddToCart}
@@ -860,10 +1074,18 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
         nextButtonLabel={
           step === 3 && !selectedMonitor
             ? "Selecione o Monitor"
+            : step === 3 && isKitSelected && requiresCutoutMonitorForKit && !isKitCutoutMonitorStep && !selectedCutoutMonitor
+            ? "Informar Meu Monitor"
+            : step === 3 && isKitSelected && isKitCutoutMonitorStep && !selectedCutoutMonitor
+            ? "Selecione seu Monitor"
+            : step === 3 && isKitSelected && requiresCutoutPrinterForKit
+            ? "Informar Minha Impressora"
             : step === 3 && isKitSelected
             ? "Avançar para Revisão"
-            : step === 4 && !isKitSelected && !selectedPrinter
+            : step === 4 && (!isKitSelected || requiresCutoutPrinterForKit) && !selectedPrinter
             ? "Selecione a Impressora"
+            : step === 4 && isKitSelected
+            ? "Avançar para Revisão"
             : step === 5 && !isKitSelected && useReader && !selectedReader
             ? "Selecione o Leitor"
             : undefined
@@ -887,7 +1109,14 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
           <div className="p-3.5 rounded-2xl bg-[#f8f9fa] dark:bg-slate-950 border border-black/10 dark:border-slate-800 space-y-1">
             <p className="font-bold text-[#1d1d1f] dark:text-white">{selectedModel.name} ({selectedColor.name})</p>
             <p className="text-slate-500 dark:text-slate-400">
-              Monitor: {selectedMonitor?.displayName || "Sob Medida"} • Impressora: {selectedPrinter?.displayName}
+              Monitor: {selectedMonitor?.displayName || "Sob Medida"}
+              {isKitSelected && !hasMonitorInKit && selectedCutoutMonitor
+                ? ` • Tela do Cliente: ${selectedCutoutMonitor.displayName}`
+                : ""}{" "}
+              • Impressora:{" "}
+              {isKitSelected && hasPrinterInKit
+                ? "Inclusa no Kit"
+                : selectedPrinter?.displayName || "Padrão"}
             </p>
             {isKitSelected && includeAssemblyService && (
               <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 font-bold pt-0.5">

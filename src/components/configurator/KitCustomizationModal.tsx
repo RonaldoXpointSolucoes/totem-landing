@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { KitSubItem } from "@/types/catalog";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
+import { doesKitIncludeMonitor, doesKitIncludePrinter } from "@/modules/catalog/kitDefaults";
 import { Modal, Button, Badge } from "@/components/ui";
 import {
   Boxes,
@@ -75,6 +76,8 @@ export const KitCustomizationModal: React.FC<KitCustomizationModalProps> = ({
     .reduce((acc, i) => acc + (i.priceCents || 0), 0);
 
   const selectedCount = items.filter((i) => i.selected).length;
+  const hasMonitorSelected = doesKitIncludeMonitor(items);
+  const hasPrinterSelected = doesKitIncludePrinter(items);
 
   const handleConfirm = () => {
     if (selectedCount === 0 && onRemoveKit) {
@@ -359,26 +362,54 @@ export const KitCustomizationModal: React.FC<KitCustomizationModalProps> = ({
             </div>
           </div>
         ) : (
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-black/10 dark:border-slate-800 space-y-1.5 text-xs">
-            <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-              <span>1. Estrutura Física ({cabinetName}):</span>
-              <strong className="text-slate-900 dark:text-white">{formatBRL(cabinetBasePixCents)} (no PIX)</strong>
-            </div>
-            <div className="flex items-center justify-between text-[#0071e3] dark:text-cyan-400">
-              <span>2. + Peças do Kit marcadas acima ({selectedCount} {selectedCount === 1 ? "item" : "itens"}):</span>
-              <strong>+ {formatBRL(currentTotalCents)}</strong>
-            </div>
-            <div className="pt-1.5 border-t border-black/10 dark:border-slate-800 flex items-center justify-between">
-              <span className="font-extrabold text-[#1d1d1f] dark:text-white">
-                Valor Final (Gabinete + Peças Selecionadas):
-              </span>
-              <div className="text-right">
-                <span className="text-base sm:text-lg font-black text-emerald-600 dark:text-emerald-400">
-                  {formatBRL(totalPixWithCabinet)} no PIX
+          <div className="space-y-2">
+            {(!hasMonitorSelected || !hasPrinterSelected) && (
+              <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 flex items-start gap-2.5 text-xs text-amber-900 dark:text-amber-200">
+                <Info className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                <div>
+                  <strong>
+                    Próximo passo obrigatório (Furação CNC + R$ 0,00):
+                  </strong>
+                  <p className="text-[11px] mt-0.5 text-amber-800 dark:text-amber-300 leading-snug">
+                    {!hasMonitorSelected && !hasPrinterSelected ? (
+                      <>
+                        Como você desmarcou o <strong>Monitor</strong> e a <strong>Impressora</strong> do Kit, ao confirmar você informará qual é o <strong>seu Monitor</strong> e a <strong>sua Impressora</strong> para fazermos os recortes exatos no gabinete.
+                      </>
+                    ) : !hasMonitorSelected ? (
+                      <>
+                        Como você desmarcou o <strong>Monitor</strong> do Kit, ao confirmar você informará qual é o <strong>seu Monitor</strong> para fazermos a furação exata no gabinete.
+                      </>
+                    ) : (
+                      <>
+                        Como você desmarcou a <strong>Impressora</strong> do Kit, ao confirmar você informará qual é a <strong>sua Impressora</strong> para fazermos o berço e recorte exato no gabinete.
+                      </>
+                    )}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-black/10 dark:border-slate-800 space-y-1.5 text-xs">
+              <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                <span>1. Estrutura Física ({cabinetName}):</span>
+                <strong className="text-slate-900 dark:text-white">{formatBRL(cabinetBasePixCents)} (no PIX)</strong>
+              </div>
+              <div className="flex items-center justify-between text-[#0071e3] dark:text-cyan-400">
+                <span>2. + Peças do Kit marcadas acima ({selectedCount} {selectedCount === 1 ? "item" : "itens"}):</span>
+                <strong>+ {formatBRL(currentTotalCents)}</strong>
+              </div>
+              <div className="pt-1.5 border-t border-black/10 dark:border-slate-800 flex items-center justify-between">
+                <span className="font-extrabold text-[#1d1d1f] dark:text-white">
+                  Valor Final (Gabinete + Peças Selecionadas):
                 </span>
-                <span className="block text-[10px] text-slate-500">
-                  ou {formatBRL(totalCardWithCabinet)} em até 10x no cartão
-                </span>
+                <div className="text-right">
+                  <span className="text-base sm:text-lg font-black text-emerald-600 dark:text-emerald-400">
+                    {formatBRL(totalPixWithCabinet)} no PIX
+                  </span>
+                  <span className="block text-[10px] text-slate-500">
+                    ou {formatBRL(totalCardWithCabinet)} em até 10x no cartão
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -416,6 +447,12 @@ export const KitCustomizationModal: React.FC<KitCustomizationModalProps> = ({
             <PackageCheck className="w-4 h-4 mr-1.5 shrink-0" />
             {selectedCount === 0
               ? `Seguir Apenas com o Gabinete (${formatBRL(cabinetBasePixCents)})`
+              : !hasMonitorSelected && !hasPrinterSelected
+              ? `Confirmar Kit (+ ${formatBRL(currentTotalCents)}) e Informar Monitor/Impressora`
+              : !hasMonitorSelected
+              ? `Confirmar Kit (+ ${formatBRL(currentTotalCents)}) e Informar Meu Monitor`
+              : !hasPrinterSelected
+              ? `Confirmar Kit (+ ${formatBRL(currentTotalCents)}) e Informar Minha Impressora`
               : `Sim! Quero Gabinete + Kit (+ ${formatBRL(currentTotalCents)})`}
           </Button>
         </div>

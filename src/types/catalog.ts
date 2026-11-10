@@ -97,6 +97,12 @@ export interface MonitorOption extends EquipmentOption {
   vesaPattern?: string;
   isCustom?: boolean;
   customDimensions?: CustomMonitorDimensions;
+  /**
+   * Quando o item selecionado é o Kit de Montagem (`isKit: true`), mas o cliente
+   * desabilitou o monitor do Kit, este campo armazena qual monitor o cliente
+   * vai utilizar no gabinete para a furação CNC (+ R$ 0,00).
+   */
+  cutoutMonitor?: MonitorOption | null;
 }
 
 export interface PrinterOption extends EquipmentOption {

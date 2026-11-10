@@ -21,6 +21,7 @@ interface StepReviewProps {
   customizationNotes?: string;
   onChangeNotes?: (notes: string) => void;
   onEditStep: (stepNumber: number) => void;
+  onEditCutoutMonitor?: () => void;
   onRemoveKit?: () => void;
   onAddToCart: () => void;
 }
@@ -38,6 +39,7 @@ export const StepReview: React.FC<StepReviewProps> = ({
   customizationNotes = "",
   onChangeNotes,
   onEditStep,
+  onEditCutoutMonitor,
   onRemoveKit,
   onAddToCart,
 }) => {
@@ -59,6 +61,7 @@ export const StepReview: React.FC<StepReviewProps> = ({
   const monitorSubItem = kitItems.find((i) => i.category === "monitor");
   const printerSubItem = kitItems.find((i) => i.category === "printer");
   const readerSubItem = kitItems.find((i) => i.category === "reader");
+  const customTargetMonitor = isKit ? monitor?.cutoutMonitor : monitor;
 
   return (
     <div className="space-y-3 sm:space-y-4 pb-8">
@@ -166,20 +169,20 @@ export const StepReview: React.FC<StepReviewProps> = ({
         </div>
 
         {/* DETALHAMENTO DO MONITOR SOB MEDIDA (QUANDO CONFIGURADO) */}
-        {monitor?.isCustom && monitor?.customDimensions && (
+        {customTargetMonitor?.isCustom && customTargetMonitor?.customDimensions && (
           <div className="p-3 sm:p-4 rounded-xl bg-gradient-to-r from-indigo-50/80 to-blue-50/70 dark:from-indigo-950/40 dark:to-slate-900 border border-indigo-200 dark:border-indigo-800/80 space-y-2.5">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div>
                 <h4 className="text-xs sm:text-sm font-black text-[#1d1d1f] dark:text-white">
-                  Gabarito CNC — Monitor Sob Medida ({monitor.displayName})
+                  Gabarito CNC — Monitor Sob Medida ({customTargetMonitor.displayName})
                 </h4>
                 <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                  {monitor.sizeInches}&quot; • VESA {monitor.vesaPattern}
-                  {monitor.customDimensions.productUrl ? ` • Link informado` : ""}
+                  {customTargetMonitor.sizeInches}&quot; • VESA {customTargetMonitor.vesaPattern}
+                  {customTargetMonitor.customDimensions.productUrl ? ` • Link informado` : ""}
                 </p>
               </div>
               <button
-                onClick={() => onEditStep(3)}
+                onClick={() => (isKit && onEditCutoutMonitor ? onEditCutoutMonitor() : onEditStep(3))}
                 className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-slate-700 border border-black/10 dark:border-slate-700 text-indigo-600 dark:text-indigo-300 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-xs"
               >
                 <Edit3 className="w-3 h-3" />
@@ -193,11 +196,11 @@ export const StepReview: React.FC<StepReviewProps> = ({
                   1. Monitor Inteiro (Carcaça)
                 </span>
                 <strong className="text-slate-900 dark:text-white font-mono">
-                  {monitor.customDimensions.outerWidthCm} × {monitor.customDimensions.outerHeightCm} cm
+                  {customTargetMonitor.customDimensions.outerWidthCm} × {customTargetMonitor.customDimensions.outerHeightCm} cm
                 </strong>
-                {monitor.customDimensions.depthCm ? (
+                {customTargetMonitor.customDimensions.depthCm ? (
                   <span className="text-[10px] text-slate-500 block">
-                    Espessura: {monitor.customDimensions.depthCm} cm
+                    Espessura: {customTargetMonitor.customDimensions.depthCm} cm
                   </span>
                 ) : null}
               </div>
@@ -207,7 +210,7 @@ export const StepReview: React.FC<StepReviewProps> = ({
                   2. Medida da Tela (Área de Corte)
                 </span>
                 <strong className="text-slate-900 dark:text-white font-mono">
-                  {monitor.customDimensions.screenWidthCm} × {monitor.customDimensions.screenHeightCm} cm
+                  {customTargetMonitor.customDimensions.screenWidthCm} × {customTargetMonitor.customDimensions.screenHeightCm} cm
                 </strong>
                 <span className="text-[10px] text-slate-500 block">
                   Janela visual na porta frontal
@@ -219,10 +222,10 @@ export const StepReview: React.FC<StepReviewProps> = ({
                   3. Altura das 4 Barras (Moldura)
                 </span>
                 <strong className="text-slate-900 dark:text-white font-mono block">
-                  Cima: {monitor.customDimensions.bezelTopCm}cm • Baixo: {monitor.customDimensions.bezelBottomCm}cm
+                  Cima: {customTargetMonitor.customDimensions.bezelTopCm}cm • Baixo: {customTargetMonitor.customDimensions.bezelBottomCm}cm
                 </strong>
                 <span className="text-[10px] text-slate-500 font-mono block">
-                  Esq: {monitor.customDimensions.bezelLeftCm}cm • Dir: {monitor.customDimensions.bezelRightCm}cm
+                  Esq: {customTargetMonitor.customDimensions.bezelLeftCm}cm • Dir: {customTargetMonitor.customDimensions.bezelRightCm}cm
                 </span>
               </div>
             </div>
@@ -312,6 +315,57 @@ export const StepReview: React.FC<StepReviewProps> = ({
                 </div>
               ))}
             </div>
+
+            {/* Equipamentos do Cliente (Furação/Recorte CNC quando Monitor ou Impressora do Kit foram desmarcados) */}
+            {(!monitorSubItem?.selected || !printerSubItem?.selected) && (
+              <div className="p-3 rounded-xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 space-y-2 text-xs">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="font-black text-amber-900 dark:text-amber-200 uppercase text-[10px] tracking-wider">
+                    🔧 Seus Equipamentos para Furação / Recorte CNC no Gabinete (+ R$ 0,00)
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {!monitorSubItem?.selected && (
+                    <div className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="text-[10px] text-slate-500 block font-semibold">
+                          Seu Monitor (Furação no Gabinete):
+                        </span>
+                        <strong className="text-[#1d1d1f] dark:text-white text-[11px] truncate block">
+                          {monitor?.cutoutMonitor?.displayName || "Pendente — informe seu monitor"}
+                        </strong>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => (onEditCutoutMonitor ? onEditCutoutMonitor() : onEditStep(3))}
+                        className="px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-900/60 hover:bg-amber-200 text-amber-800 dark:text-amber-200 text-[10px] font-bold shrink-0 cursor-pointer"
+                      >
+                        Alterar Monitor
+                      </button>
+                    </div>
+                  )}
+                  {!printerSubItem?.selected && (
+                    <div className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="text-[10px] text-slate-500 block font-semibold">
+                          Sua Impressora (Recorte no Gabinete):
+                        </span>
+                        <strong className="text-[#1d1d1f] dark:text-white text-[11px] truncate block">
+                          {printer?.displayName || "Pendente — informe sua impressora"}
+                        </strong>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onEditStep(4)}
+                        className="px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-900/60 hover:bg-amber-200 text-amber-800 dark:text-amber-200 text-[10px] font-bold shrink-0 cursor-pointer"
+                      >
+                        Alterar Impressora
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -465,7 +519,11 @@ export const StepReview: React.FC<StepReviewProps> = ({
           {/* Monitor / Kit */}
           <div className="py-1.5 flex items-center justify-between gap-2 border-b border-black/5 dark:border-slate-800/60">
             <span className="text-slate-500 font-medium">
-              {isKit ? "Monitor do Kit:" : "Monitor Touch:"}
+              {isKit
+                ? monitorSubItem?.selected
+                  ? "Monitor do Kit:"
+                  : "Seu Monitor (Furação):"
+                : "Monitor Touch:"}
             </span>
             <div className="flex items-center gap-1.5 min-w-0">
               <strong
@@ -474,6 +532,8 @@ export const StepReview: React.FC<StepReviewProps> = ({
                   isKit
                     ? monitorSubItem?.selected
                       ? monitorSubItem.name
+                      : monitor?.cutoutMonitor
+                      ? `${monitor.cutoutMonitor.displayName} (Apenas Furação CNC — Monitor do Kit desmarcado)`
                       : "Não incluso no Kit (Desmarcado)"
                     : monitor?.displayName || "—"
                 }
@@ -481,6 +541,8 @@ export const StepReview: React.FC<StepReviewProps> = ({
                 {isKit
                   ? monitorSubItem?.selected
                     ? monitorSubItem.name
+                    : monitor?.cutoutMonitor
+                    ? `${monitor.cutoutMonitor.displayName} (Só Furação)`
                     : "Não incluso no Kit"
                   : monitor?.displayName || "—"}
               </strong>
@@ -490,9 +552,17 @@ export const StepReview: React.FC<StepReviewProps> = ({
                 </span>
               )}
               <button
-                onClick={() => onEditStep(3)}
+                onClick={() =>
+                  isKit && !monitorSubItem?.selected && onEditCutoutMonitor
+                    ? onEditCutoutMonitor()
+                    : onEditStep(3)
+                }
                 className="p-1 rounded-lg hover:bg-black/5 text-[#0071e3] transition-colors"
-                title="Alterar Monitor ou Kit"
+                title={
+                  isKit && !monitorSubItem?.selected
+                    ? "Alterar Seu Monitor para Furação CNC"
+                    : "Alterar Monitor ou Kit"
+                }
               >
                 <Edit3 className="w-3.5 h-3.5" />
               </button>
@@ -501,14 +571,32 @@ export const StepReview: React.FC<StepReviewProps> = ({
 
           {/* Impressora */}
           <div className="py-1.5 flex items-center justify-between gap-2 border-b border-black/5 dark:border-slate-800/60">
-            <span className="text-slate-500 font-medium">Impressora Térmica:</span>
+            <span className="text-slate-500 font-medium">
+              {isKit
+                ? printerSubItem?.selected
+                  ? "Impressora do Kit:"
+                  : "Sua Impressora (Recorte):"
+                : "Impressora Térmica:"}
+            </span>
             <div className="flex items-center gap-1.5 min-w-0">
               <strong
                 className="text-[#1d1d1f] dark:text-white truncate max-w-[190px]"
-                title={isKit ? (printerSubItem?.selected ? printerSubItem.name : "Não inclusa no Kit") : printer?.displayName || "—"}
+                title={
+                  isKit
+                    ? printerSubItem?.selected
+                      ? printerSubItem.name
+                      : printer
+                      ? `${printer.displayName} (Apenas Suporte/Recorte CNC — Impressora do Kit desmarcada)`
+                      : "Não inclusa no Kit"
+                    : printer?.displayName || "—"
+                }
               >
                 {isKit
-                  ? (printerSubItem?.selected ? printerSubItem.name : "Não inclusa no Kit")
+                  ? printerSubItem?.selected
+                    ? printerSubItem.name
+                    : printer
+                    ? `${printer.displayName} (Só Recorte)`
+                    : "Não inclusa no Kit"
                   : printer?.displayName || "—"}
               </strong>
               {!isKit && (printer?.priceAdjustmentCents || 0) > 0 && (
@@ -517,9 +605,13 @@ export const StepReview: React.FC<StepReviewProps> = ({
                 </span>
               )}
               <button
-                onClick={() => onEditStep(isKit ? 3 : 4)}
+                onClick={() => onEditStep(isKit && printerSubItem?.selected ? 3 : 4)}
                 className="p-1 rounded-lg hover:bg-black/5 text-[#0071e3] transition-colors"
-                title={isKit ? "Personalizar no Kit" : "Alterar Impressora"}
+                title={
+                  isKit && printerSubItem?.selected
+                    ? "Personalizar no Kit"
+                    : "Alterar Sua Impressora para Recorte CNC"
+                }
               >
                 <Edit3 className="w-3.5 h-3.5" />
               </button>

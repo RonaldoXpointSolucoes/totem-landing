@@ -22,6 +22,8 @@ import {
   isItemKit,
   getEffectiveKitItems,
   calculateKitTotalCents,
+  doesKitIncludeMonitor,
+  doesKitIncludePrinter,
 } from "@/modules/catalog/kitDefaults";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
 import { KitCustomizationModal } from "./KitCustomizationModal";
@@ -35,6 +37,13 @@ interface StepMonitorProps {
   cabinetName?: string;
   cabinetBasePixCents?: number;
   cabinetBaseCardCents?: number;
+  /**
+   * Quando true, exibe o passo dedicado para o cliente que escolheu o Kit SEM monitor
+   * informar obrigatoriamente qual é o monitor que ele vai utilizar no gabinete (+ R$ 0,00).
+   */
+  isKitCutoutMonitorMode?: boolean;
+  onKitConfirmed?: (updatedKit: MonitorOption) => void;
+  onEnterKitCutoutMonitorStep?: () => void;
 }
 
 export const StepMonitor: React.FC<StepMonitorProps> = ({
@@ -45,6 +54,9 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
   cabinetName = "Gabinete Totem Pro",
   cabinetBasePixCents = 110000,
   cabinetBaseCardCents = 133000,
+  isKitCutoutMonitorMode = false,
+  onKitConfirmed,
+  onEnterKitCutoutMonitorStep,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -78,9 +90,16 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
     [filteredMonitors]
   );
 
+  const isSelectedKit = isItemKit(selectedMonitor);
+  const currentKitItems = isSelectedKit ? getEffectiveKitItems(selectedMonitor) : [];
+  const hasMonitorInSelectedKit = isSelectedKit ? doesKitIncludeMonitor(currentKitItems) : false;
+  const hasPrinterInSelectedKit = isSelectedKit ? doesKitIncludePrinter(currentKitItems) : false;
+  const activeCutoutMonitor = isSelectedKit ? selectedMonitor?.cutoutMonitor || null : null;
+
   // Abrir modal interativo de medidas do monitor (Outro Monitor / Sob Medida)
   const handleOpenEditor = (targetMon?: MonitorOption) => {
-    setEditorTargetMonitor(targetMon || selectedMonitor || null);
+    const fallbackTarget = isSelectedKit ? activeCutoutMonitor : selectedMonitor;
+    setEditorTargetMonitor(targetMon || fallbackTarget || null);
     setIsEditorOpen(true);
   };
 
@@ -100,10 +119,11 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
   // Remover o Kit e selecionar apenas o gabinete (primeiro monitor homologado com furação R$ 0)
   const handleRemoveKit = () => {
     const fallbackStandard =
+      activeCutoutMonitor ||
       sortedMonitors.find((m) => !isItemKit(m) && (m.priceAdjustmentCents || 0) === 0) ||
       sortedMonitors.find((m) => !isItemKit(m));
     if (fallbackStandard) {
-      onSelectMonitor(fallbackStandard);
+      onSelectMonitor({ ...fallbackStandard, isKit: false, cutoutMonitor: null });
     }
     setIsKitModalOpen(false);
   };
@@ -118,46 +138,133 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
       return;
     }
     const totalCents = calculateKitTotalCents(updatedItems);
+    const monIncluded = doesKitIncludeMonitor(updatedItems);
     const updated: MonitorOption = {
       ...base,
       isKit: true,
       kitItems: updatedItems,
       priceAdjustmentCents: totalCents,
+      cutoutMonitor: monIncluded ? null : selectedMonitor?.cutoutMonitor || null,
       notes: JSON.stringify({ kitItems: updatedItems }),
     };
     onSelectMonitor(updated);
     setIsKitModalOpen(false);
+    onKitConfirmed?.(updated);
   };
 
-  // Ao clicar num monitor padrão, seleciona direto (+ R$ 0).
-  // Ao clicar no Kit de Montagem, abre SEMPRE o modal didático de confirmação
-  // para que o cliente veja todas as peças adicionais e confirme se realmente quer Gabinete + Kit!
+  // Selecionar o monitor para furação CNC quando o cliente escolheu o Kit sem monitor
+  const handleSelectCutoutMonitorForKit = (mon: MonitorOption) => {
+    if (!selectedMonitor || !isItemKit(selectedMonitor)) {
+      onSelectMonitor(mon);
+      return;
+    }
+    const updatedKitWithCutout: MonitorOption = {
+      ...selectedMonitor,
+      isKit: true,
+      cutoutMonitor: {
+        ...mon,
+        isKit: false,
+        priceAdjustmentCents: 0,
+      },
+    };
+    onSelectMonitor(updatedKitWithCutout);
+  };
+
+  // Ao clicar num monitor padrão:
+  // - Se estiver no modo de informar o monitor para o Kit sem tela (ou se o Kit sem tela estiver ativo),
+  //   vincula esse monitor como `cutoutMonitor` do Kit (+ R$ 0,00 de furação).
+  // - Caso contrário, seleciona o monitor padrão na Opção 1 (Só Gabinete).
   const handleSelect = (mon: MonitorOption) => {
     if (isItemKit(mon)) {
       handleOpenKitModal(mon);
+    } else if (isKitCutoutMonitorMode || (isSelectedKit && !hasMonitorInSelectedKit)) {
+      handleSelectCutoutMonitorForKit(mon);
     } else {
       onSelectMonitor(mon);
     }
   };
 
-  const isSelectedKit = isItemKit(selectedMonitor);
+  const effectiveHighlightedMonitor = isSelectedKit
+    ? activeCutoutMonitor
+    : selectedMonitor;
 
   return (
     <div className="space-y-4">
       {/* Cabeçalho Didático */}
-      <div className="text-center sm:text-left space-y-1">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg sm:text-2xl font-black text-[#1d1d1f] dark:text-white tracking-tight">
-            Qual monitor será instalado no seu {cabinetName}?
-          </h2>
-          <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-500/20">
-            Furação no Gabinete Grátis (+ R$ 0,00)
-          </span>
+      {isKitCutoutMonitorMode ? (
+        <div className="space-y-3">
+          <div className="text-center sm:text-left space-y-1">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-black uppercase tracking-wider shadow-xs">
+                  <Tv className="w-3 h-3" />
+                  Passo Obrigatório • Kit Sem Monitor
+                </span>
+                <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-500/20">
+                  Furação no Gabinete Grátis (+ R$ 0,00)
+                </span>
+              </div>
+            </div>
+            <h2 className="text-lg sm:text-2xl font-black text-[#1d1d1f] dark:text-white tracking-tight pt-1">
+              Qual é o monitor que você vai usar no seu {cabinetName}?
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+              Como você desabilitou o monitor dentro do <strong>Kit de Montagem</strong>, informe abaixo qual será o <u>seu monitor</u> para fazermos o recorte e a furação CNC exata no gabinete (<strong className="text-emerald-600 dark:text-emerald-400">+ R$ 0,00</strong>):
+            </p>
+          </div>
+
+          {/* Barra Resumo do Kit Parcial Ativo */}
+          {isSelectedKit && (
+            <div className="p-3 rounded-xl bg-blue-50/90 dark:bg-indigo-950/50 border border-[#0071e3]/40 dark:border-indigo-500/40 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 rounded-lg bg-[#0071e3] text-white flex items-center justify-center shrink-0">
+                  <Boxes className="w-3.5 h-3.5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-black text-[#1d1d1f] dark:text-white truncate">
+                    Kit Parcial Ativo ({currentKitItems.filter((i) => i.selected).length} de {currentKitItems.length} itens • + {formatBRL(calculateKitTotalCents(currentKitItems))})
+                  </p>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-300 truncate">
+                    {activeCutoutMonitor ? (
+                      <span className="text-emerald-700 dark:text-emerald-400 font-bold">
+                        ✓ Seu monitor p/ furação CNC: {activeCutoutMonitor.displayName} (+ R$ 0,00)
+                      </span>
+                    ) : (
+                      <span className="text-amber-700 dark:text-amber-300 font-bold">
+                        ⚠️ Selecione abaixo qual monitor você vai usar para liberar o próximo passo
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleOpenKitModal()}
+                  className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 hover:bg-blue-50 border border-blue-200 dark:border-indigo-700 text-[#0071e3] dark:text-cyan-300 text-[11px] font-bold flex items-center gap-1 cursor-pointer shadow-2xs"
+                >
+                  <SlidersHorizontal className="w-3 h-3" />
+                  <span>Editar Peças do Kit</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-          Escolha na <strong>Opção 1</strong> se você quer comprar <u>somente o gabinete</u> (furação gratuita <strong className="text-emerald-600 dark:text-emerald-400">+ R$ 0,00</strong>) ou na <strong>Opção 2</strong> se deseja comprar o <u>Gabinete + Kit Completo de Equipamentos</u>.
-        </p>
-      </div>
+      ) : (
+        <div className="text-center sm:text-left space-y-1">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg sm:text-2xl font-black text-[#1d1d1f] dark:text-white tracking-tight">
+              Qual monitor será instalado no seu {cabinetName}?
+            </h2>
+            <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-500/20">
+              Furação no Gabinete Grátis (+ R$ 0,00)
+            </span>
+          </div>
+          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+            Escolha na <strong>Opção 1</strong> se você quer comprar <u>somente o gabinete</u> (furação gratuita <strong className="text-emerald-600 dark:text-emerald-400">+ R$ 0,00</strong>) ou na <strong>Opção 2</strong> se deseja comprar o <u>Gabinete + Kit Completo de Equipamentos</u>.
+          </p>
+        </div>
+      )}
 
       {/* Busca Rápida & Botão de Personalizar Medidas */}
       <div className="flex gap-2">
@@ -193,30 +300,61 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
         </div>
       )}
 
+      {isSelectedKit && !hasMonitorInSelectedKit && !activeCutoutMonitor && (
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-800 dark:text-amber-200 text-xs animate-in fade-in duration-200">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+            <span className="font-bold">
+              Você desmarcou o Monitor do Kit! Selecione abaixo qual é o monitor que você vai usar no gabinete (+ R$ 0,00).
+            </span>
+          </div>
+          {!isKitCutoutMonitorMode && onEnterKitCutoutMonitorStep && (
+            <button
+              type="button"
+              onClick={onEnterKitCutoutMonitorStep}
+              className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold cursor-pointer shrink-0 shadow-2xs"
+            >
+              Escolher Meu Monitor Agora →
+            </button>
+          )}
+        </div>
+      )}
+
       {/* =====================================================================
-          OPÇÃO 1: SOMENTE O GABINETE (FURAÇÃO CNC GRÁTIS + R$ 0,00)
+          OPÇÃO 1: LISTA DE MONITORES PADRÃO (SÓ GABINETE OU FURAÇÃO DO KIT SEM MONITOR)
          ===================================================================== */}
       <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50/80 dark:bg-slate-900/40 border border-black/10 dark:border-slate-800 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-black/10 dark:border-slate-800">
           <div className="space-y-0.5">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-[10px] font-black uppercase tracking-wide">
-                <Package className="w-3 h-3" />
-                Opção 1: Quero APENAS o Gabinete (Sem Eletrônicos)
+                {isKitCutoutMonitorMode || (isSelectedKit && !hasMonitorInSelectedKit) ? (
+                  <>
+                    <Tv className="w-3 h-3" />
+                    Selecione o Monitor que você vai usar com o Gabinete + Kit
+                  </>
+                ) : (
+                  <>
+                    <Package className="w-3 h-3" />
+                    Opção 1: Quero APENAS o Gabinete (Sem Eletrônicos)
+                  </>
+                )}
               </span>
               <span className="text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400">
                 + R$ 0,00 (Apenas furação sob medida)
               </span>
             </div>
             <p className="text-[11px] text-slate-600 dark:text-slate-400">
-              Você já tem ou vai comprar a tela por fora? Selecione o modelo abaixo apenas para fazermos o recorte exato no gabinete:
+              {isKitCutoutMonitorMode || (isSelectedKit && !hasMonitorInSelectedKit)
+                ? "Escolha na lista abaixo (ou clique em 'Outro Monitor Sob Medida') qual modelo de monitor você vai instalar no gabinete:"
+                : "Você já tem ou vai comprar a tela por fora? Selecione o modelo abaixo apenas para fazermos o recorte exato no gabinete:"}
             </p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           {standardMonitors.map((mon) => {
-            const isSelected = selectedMonitor?.id === mon.id;
+            const isSelected = effectiveHighlightedMonitor?.id === mon.id;
             return (
               <Card
                 key={mon.id}
@@ -254,7 +392,7 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
                           {mon.sizeInches}&quot;
                         </span>
                       )}
-                      {(mon.priceAdjustmentCents || 0) > 0 && (
+                      {!isSelectedKit && (mon.priceAdjustmentCents || 0) > 0 && (
                         <span className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 px-1.5 py-0.2 rounded border border-emerald-500/30">
                           + {formatBRL(mon.priceAdjustmentCents || 0)}
                         </span>
@@ -264,7 +402,9 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
                       {mon.displayName}
                     </h3>
                     <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold truncate">
-                      {(mon.priceAdjustmentCents || 0) > 0
+                      {isSelectedKit && !hasMonitorInSelectedKit
+                        ? "Furação CNC p/ seu Monitor (+ R$ 0,00)"
+                        : (mon.priceAdjustmentCents || 0) > 0
                         ? `Equipamento incluso (+ ${formatBRL(mon.priceAdjustmentCents || 0)})`
                         : "Só Gabinete • Furação grátis (+ R$ 0,00)"}
                     </p>
@@ -306,19 +446,23 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
             )) && (
             <Card
               interactive
-              selected={selectedMonitor?.isCustom}
+              selected={effectiveHighlightedMonitor?.isCustom}
               onClick={() =>
-                handleOpenEditor(selectedMonitor?.isCustom ? selectedMonitor : undefined)
+                handleOpenEditor(
+                  effectiveHighlightedMonitor?.isCustom
+                    ? effectiveHighlightedMonitor
+                    : undefined
+                )
               }
               className={`p-3 sm:p-3.5 rounded-xl flex items-center justify-between gap-2.5 border-dashed transition-all ${
-                selectedMonitor?.isCustom
+                effectiveHighlightedMonitor?.isCustom
                   ? "border-[#0071e3] bg-blue-50/80 dark:bg-indigo-600/20 ring-2 ring-[#0071e3]/25"
                   : "border-indigo-300 dark:border-indigo-500/40 bg-indigo-50/30 dark:bg-slate-950 hover:border-indigo-500"
               }`}
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-10 h-10 rounded-xl border border-indigo-400/40 bg-indigo-100 dark:bg-indigo-600/30 text-indigo-600 dark:text-indigo-300 flex items-center justify-center shrink-0">
-                  {selectedMonitor?.isCustom ? (
+                  {effectiveHighlightedMonitor?.isCustom ? (
                     <Ruler className="w-4 h-4" />
                   ) : (
                     <Plus className="w-4 h-4" />
@@ -327,39 +471,42 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
-                      {selectedMonitor?.isCustom ? selectedMonitor.brand : "Outro Monitor"}
+                      {effectiveHighlightedMonitor?.isCustom
+                        ? effectiveHighlightedMonitor.brand
+                        : "Outro Monitor"}
                     </span>
                     <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-1.5 py-0.2 rounded">
-                      Só Gabinete (+ R$ 0,00)
+                      Furação Grátis (+ R$ 0,00)
                     </span>
                   </div>
                   <h3 className="text-xs font-bold text-[#1d1d1f] dark:text-white truncate">
-                    {selectedMonitor?.isCustom
-                      ? selectedMonitor.displayName
+                    {effectiveHighlightedMonitor?.isCustom
+                      ? effectiveHighlightedMonitor.displayName
                       : "Meu monitor não está na lista (Sob Medida)"}
                   </h3>
                   <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
-                    {selectedMonitor?.isCustom && selectedMonitor.customDimensions
-                      ? `Monitor: ${selectedMonitor.customDimensions.outerWidthCm}×${selectedMonitor.customDimensions.outerHeightCm}cm • Tela: ${selectedMonitor.customDimensions.screenWidthCm}×${selectedMonitor.customDimensions.screenHeightCm}cm`
+                    {effectiveHighlightedMonitor?.isCustom &&
+                    effectiveHighlightedMonitor.customDimensions
+                      ? `Monitor: ${effectiveHighlightedMonitor.customDimensions.outerWidthCm}×${effectiveHighlightedMonitor.customDimensions.outerHeightCm}cm • Tela: ${effectiveHighlightedMonitor.customDimensions.screenWidthCm}×${effectiveHighlightedMonitor.customDimensions.screenHeightCm}cm`
                       : "Informe as medidas para fazermos a furação exata (+ R$ 0,00)"}
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-1.5 shrink-0">
-                {selectedMonitor?.isCustom && (
+                {effectiveHighlightedMonitor?.isCustom && (
                   <span className="hidden sm:inline-flex px-2 py-1 rounded-lg bg-white/80 dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 text-[10px] font-bold text-indigo-600 dark:text-indigo-300">
                     Editar Medidas
                   </span>
                 )}
                 <div
                   className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
-                    selectedMonitor?.isCustom
+                    effectiveHighlightedMonitor?.isCustom
                       ? "border-[#0071e3] bg-[#0071e3] text-white shadow-sm"
                       : "border-indigo-400/40 bg-white dark:bg-slate-900 text-indigo-500"
                   }`}
                 >
-                  {selectedMonitor?.isCustom ? (
+                  {effectiveHighlightedMonitor?.isCustom ? (
                     <Check className="w-3.5 h-3.5 stroke-[3]" />
                   ) : (
                     <Edit3 className="w-3 h-3" />
@@ -373,8 +520,9 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
 
       {/* =====================================================================
           OPÇÃO 2 (OPCIONAL): GABINETE + KIT DE MONTAGEM COMPLETO
+          (Oculto quando estamos no sub-passo exclusivo de escolher o Monitor para o Kit sem tela)
          ===================================================================== */}
-      {kitMonitors.length > 0 && (
+      {!isKitCutoutMonitorMode && kitMonitors.length > 0 && (
         <div
           className={`p-3.5 sm:p-4 rounded-2xl border-2 transition-all space-y-3 ${
             isSelectedKit
@@ -407,6 +555,8 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
                 : getEffectiveKitItems(mon);
             const kitTotalCents = calculateKitTotalCents(kitItems);
             const activeSubItems = kitItems.filter((i) => i.selected);
+            const monInKit = doesKitIncludeMonitor(kitItems);
+            const prtInKit = doesKitIncludePrinter(kitItems);
 
             return (
               <div
@@ -523,12 +673,14 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
                             handleRemoveKit();
                           } else {
                             const nextTotal = calculateKitTotalCents(nextItems);
+                            const nextHasMon = doesKitIncludeMonitor(nextItems);
                             onSelectMonitor({
                               ...mon,
                               ...(selectedMonitor || {}),
                               isKit: true,
                               kitItems: nextItems,
                               priceAdjustmentCents: nextTotal,
+                              cutoutMonitor: nextHasMon ? null : selectedMonitor?.cutoutMonitor || null,
                               notes: JSON.stringify({ kitItems: nextItems }),
                             });
                           }
@@ -557,6 +709,40 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
                     </div>
                   ))}
                 </div>
+
+                {isSelected && (!monInKit || !prtInKit) && (
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 flex flex-wrap items-center justify-between gap-2 text-[11px] text-amber-900 dark:text-amber-200"
+                  >
+                    <div className="space-y-0.5">
+                      {!monInKit && (
+                        <p className="font-bold">
+                          {activeCutoutMonitor
+                            ? `✓ Seu Monitor p/ furação no gabinete: ${activeCutoutMonitor.displayName} (+ R$ 0,00)`
+                            : "⚠️ Monitor do Kit desabilitado: informe qual monitor você vai usar no gabinete."}
+                        </p>
+                      )}
+                      {!prtInKit && (
+                        <p className="font-bold">
+                          🖨️ Impressora do Kit desabilitada: no próximo passo você informará qual impressora vai usar no gabinete.
+                        </p>
+                      )}
+                    </div>
+                    {!monInKit && onEnterKitCutoutMonitorStep && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEnterKitCutoutMonitorStep();
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold cursor-pointer shrink-0 shadow-2xs"
+                      >
+                        {activeCutoutMonitor ? "Alterar Meu Monitor" : "Informar Meu Monitor →"}
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 {isSelected && (
                   <div className="p-2.5 rounded-lg bg-emerald-50/90 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 flex items-start gap-2 text-[11px] text-emerald-900 dark:text-emerald-200">
@@ -596,7 +782,11 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
         onClose={() => setIsEditorOpen(false)}
         initialMonitor={editorTargetMonitor}
         onSave={(customMon) => {
-          onSelectMonitor(customMon);
+          if (isKitCutoutMonitorMode || (isSelectedKit && !hasMonitorInSelectedKit)) {
+            handleSelectCutoutMonitorForKit(customMon);
+          } else {
+            onSelectMonitor(customMon);
+          }
           setIsEditorOpen(false);
         }}
       />

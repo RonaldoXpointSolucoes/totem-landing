@@ -150,6 +150,8 @@ export interface ResolvedKitEquipment {
   hasReader: boolean;
   hasMonitorInKit: boolean;
   hasPrinterInKit: boolean;
+  cutoutMonitorName?: string;
+  cutoutPrinterName?: string;
   accessoriesSummary: string;
   kitExtraItems: string[];
   selectedItemsSummary: string;
@@ -159,6 +161,30 @@ export interface ResolvedKitEquipment {
   selectedCount: number;
   totalCount: number;
   kitPriceCents: number;
+}
+
+/**
+ * Verifica se a lista de subitens do Kit contém o Monitor marcado como selecionado (`selected !== false`).
+ */
+export function doesKitIncludeMonitor(kitItems?: KitSubItem[] | null): boolean {
+  if (!Array.isArray(kitItems) || kitItems.length === 0) return true;
+  const monSub = kitItems.find(
+    (sub) => sub.category === "monitor" || sub.id === "kit-monitor-touch"
+  );
+  if (!monSub) return false;
+  return monSub.selected !== false;
+}
+
+/**
+ * Verifica se a lista de subitens do Kit contém a Impressora marcada como selecionada (`selected !== false`).
+ */
+export function doesKitIncludePrinter(kitItems?: KitSubItem[] | null): boolean {
+  if (!Array.isArray(kitItems) || kitItems.length === 0) return true;
+  const prtSub = kitItems.find(
+    (sub) => sub.category === "printer" || sub.id === "KIT-IMP-001"
+  );
+  if (!prtSub) return false;
+  return prtSub.selected !== false;
 }
 
 /**
@@ -290,6 +316,7 @@ export function resolveKitEquipmentSummary(params: {
   monitor?: MonitorOption | null;
   kitItemsSnapshot?: KitSubItem[] | null;
   monitorName?: string | null;
+  cutoutMonitorName?: string | null;
   printerName?: string | null;
   readerName?: string | null;
 }): ResolvedKitEquipment {
@@ -322,6 +349,7 @@ export function resolveKitEquipmentSummary(params: {
     rawMon.toLowerCase().includes("kit parcial") ||
     rawMon.toLowerCase().includes("kit personalizado") ||
     rawMon.toLowerCase().includes("sem monitor no kit") ||
+    rawMon.toLowerCase().includes("s/ monitor no kit") ||
     rawMon.toLowerCase() === "kit" ||
     rawPrt.toLowerCase().includes("(kit)") ||
     rawPrt.toLowerCase().includes("no kit");
@@ -364,6 +392,8 @@ export function resolveKitEquipmentSummary(params: {
   const rawPrtLower = rawPrt.toLowerCase();
   const textIndicatesNoMonitor =
     rawMonLower.includes("sem monitor") ||
+    rawMonLower.includes("s/ monitor") ||
+    rawMonLower.includes("sem tela") ||
     rawMonLower.includes("não incluso") ||
     rawMonLower.includes("nao incluso") ||
     rawMonLower.includes("removido") ||
@@ -373,7 +403,8 @@ export function resolveKitEquipmentSummary(params: {
     rawPrtLower.includes("nao inclusa") ||
     rawPrtLower.includes("removida") ||
     rawPrtLower.includes("desmarcada") ||
-    rawPrtLower.includes("sem impressora");
+    rawPrtLower.includes("sem impressora") ||
+    rawPrtLower.includes("s/ impressora");
 
   const kitItems: KitSubItem[] = hasExplicitKitObject
     ? effectiveSourceItems
@@ -401,12 +432,43 @@ export function resolveKitEquipmentSummary(params: {
   const hasMonitorInKit = Boolean(monSub);
   const hasPrinterInKit = Boolean(prtSub);
 
+  // Extrai o monitor que o cliente informou para furação CNC quando o monitor do Kit foi desabilitado
+  let cutoutMonitorName = String(
+    params.cutoutMonitorName || params.monitor?.cutoutMonitor?.displayName || ""
+  ).trim();
+  if (!cutoutMonitorName && !hasMonitorInKit && rawMon) {
+    const matchFuracao = rawMon.match(/Fura[çc][ãa]o(?:\s+CNC)?\s+p\/\s*([^•)]+)/i);
+    if (matchFuracao && matchFuracao[1]) {
+      cutoutMonitorName = matchFuracao[1].trim();
+    }
+  }
+
+  // Extrai a impressora que o cliente informou para recorte/suporte CNC quando a impressora do Kit foi desabilitada
+  let cutoutPrinterName = "";
+  if (!hasPrinterInKit && rawPrt && !isEmptyLabel(rawPrt)) {
+    const matchSuporte = rawPrt.match(/(?:Suporte|Recorte|Fura[çc][ãa]o)(?:\s+CNC)?\s+p\/\s*(.+)$/i);
+    if (matchSuporte && matchSuporte[1]) {
+      cutoutPrinterName = matchSuporte[1].trim();
+    } else if (
+      !rawPrtLower.includes("não inclusa") &&
+      !rawPrtLower.includes("nao inclusa") &&
+      !rawPrtLower.includes("removida") &&
+      !rawPrtLower.includes("inclusa no kit")
+    ) {
+      cutoutPrinterName = rawPrt;
+    }
+  }
+
   const kitMonitorModel = hasMonitorInKit
     ? monSub?.name || 'Computador All-in-One Touch 23.8" Core i5'
+    : cutoutMonitorName
+    ? `NÃO INCLUSO NO KIT • Furação CNC p/ Monitor do Cliente: ${cutoutMonitorName}`
     : "NÃO INCLUSO (Removido do Kit pelo Cliente)";
 
   const kitPrinterModel = hasPrinterInKit
     ? prtSub?.name || "IMPRESSORA PDV - VT-8360 80mm"
+    : cutoutPrinterName
+    ? `NÃO INCLUSA NO KIT • Suporte CNC p/ Impressora do Cliente: ${cutoutPrinterName}`
     : "NÃO INCLUSA (Removida do Kit pelo Cliente)";
 
   const kitReaderModel = rdrSub?.name || "";
@@ -415,7 +477,9 @@ export function resolveKitEquipmentSummary(params: {
   if (hasMonitorInKit) {
     monitorDisplay = `Kit de Montagem — ${kitMonitorModel}`;
   } else if (accSubs.length > 0 || hasPrinterInKit) {
-    monitorDisplay = `Kit Parcial (${selectedSubItems.length}/${kitItems.length} itens) — SEM MONITOR TOUCH (Removido pelo Cliente)`;
+    monitorDisplay = cutoutMonitorName
+      ? `Kit Parcial (${selectedSubItems.length}/${kitItems.length} itens) — S/ Monitor no Kit • Furação p/ ${cutoutMonitorName}`
+      : `Kit Parcial (${selectedSubItems.length}/${kitItems.length} itens) — SEM MONITOR TOUCH (Removido pelo Cliente)`;
   } else {
     monitorDisplay = "Kit de Montagem (Sem itens selecionados)";
   }
@@ -424,6 +488,8 @@ export function resolveKitEquipmentSummary(params: {
     ? kitPrinterModel.toLowerCase().includes("kit")
       ? kitPrinterModel
       : `${kitPrinterModel} (Inclusa no Kit)`
+    : cutoutPrinterName
+    ? `Sem Impressora no Kit • Suporte CNC p/ ${cutoutPrinterName}`
     : "NÃO INCLUSA (Removida do Kit pelo Cliente)";
 
   const hasValidRawReader =
@@ -447,6 +513,8 @@ export function resolveKitEquipmentSummary(params: {
     hasReader: Boolean(kitReaderModel || hasValidRawReader),
     hasMonitorInKit,
     hasPrinterInKit,
+    cutoutMonitorName: cutoutMonitorName || undefined,
+    cutoutPrinterName: cutoutPrinterName || undefined,
     accessoriesSummary,
     kitExtraItems: accSubs.map((a) => a.name),
     selectedItemsSummary,
@@ -818,6 +886,7 @@ export function buildOrderDeliveryChecklist(params: {
   monitor?: MonitorOption | null;
   kitItemsSnapshot?: KitSubItem[] | null;
   monitorName?: string | null;
+  cutoutMonitorName?: string | null;
   printerName?: string | null;
   readerName?: string | null;
   includeAssemblyService?: boolean;
@@ -828,6 +897,7 @@ export function buildOrderDeliveryChecklist(params: {
     monitor: params.monitor,
     kitItemsSnapshot: params.kitItemsSnapshot,
     monitorName: params.monitorName,
+    cutoutMonitorName: params.cutoutMonitorName,
     printerName: params.printerName,
     readerName: params.readerName,
   });
@@ -899,6 +969,34 @@ export function buildOrderDeliveryChecklist(params: {
         quantity: 0,
         badgeLabel: "NÃO ENTREGAR — REMOVIDO PELO CLIENTE",
         notes: "O cliente desmarcou este item do Kit. Não cobrar e não enviar.",
+      });
+    }
+
+    // Se o cliente desmarcou o Monitor do Kit e informou o Monitor dele para a furação CNC:
+    if (!resolved.hasMonitorInKit && resolved.cutoutMonitorName) {
+      checklist.push({
+        id: "chk-kit-cutout-mon",
+        name: `Monitor do Cliente (${resolved.cutoutMonitorName}): APENAS FURAÇÃO CNC NO GABINETE`,
+        category: "cnc_cutout",
+        priceCents: 0,
+        included: false,
+        quantity: 0,
+        badgeLabel: "USINAR FURAÇÃO (TELA DO CLIENTE)",
+        notes: "Cliente desmarcou o monitor do Kit e informou este modelo para o recorte CNC no gabinete.",
+      });
+    }
+
+    // Se o cliente desmarcou a Impressora do Kit e informou a Impressora dele para o suporte/recorte CNC:
+    if (!resolved.hasPrinterInKit && resolved.cutoutPrinterName) {
+      checklist.push({
+        id: "chk-kit-cutout-prt",
+        name: `Impressora do Cliente (${resolved.cutoutPrinterName}): APENAS RECORTE CNC NO GABINETE`,
+        category: "cnc_cutout",
+        priceCents: 0,
+        included: false,
+        quantity: 0,
+        badgeLabel: "USINAR RECORTE (IMPRESSORA DO CLIENTE)",
+        notes: "Cliente desmarcou a impressora do Kit e informou este modelo para o suporte/saída de papel no gabinete.",
       });
     }
   } else {

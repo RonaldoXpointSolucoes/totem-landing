@@ -705,6 +705,8 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
             colorName: i.configuration.color.name,
             monitorId: i.configuration.monitor?.id || undefined,
             monitorName: i.configuration.monitor?.displayName || undefined,
+            cutoutMonitorId: i.configuration.monitor?.cutoutMonitor?.id || undefined,
+            cutoutMonitorName: i.configuration.monitor?.cutoutMonitor?.displayName || undefined,
             kitItems: i.configuration.monitor?.kitItems || undefined,
             printerId: i.configuration.printer?.id || undefined,
             printerName: i.configuration.printer?.displayName || undefined,
@@ -895,8 +897,14 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           colorName: i.configuration.color.name,
           monitorId: i.configuration.monitor?.id || null,
           monitorName: i.configuration.monitor?.displayName || null,
+          cutoutMonitorId: i.configuration.monitor?.cutoutMonitor?.id || null,
+          cutoutMonitorName: i.configuration.monitor?.cutoutMonitor?.displayName || null,
           kitItems: i.configuration.monitor?.kitItems || undefined,
-          customMonitor: i.configuration.monitor?.isCustom ? i.configuration.monitor : undefined,
+          customMonitor: i.configuration.monitor?.isCustom
+            ? i.configuration.monitor
+            : i.configuration.monitor?.cutoutMonitor?.isCustom
+            ? i.configuration.monitor.cutoutMonitor
+            : undefined,
           printerId: i.configuration.printer?.id || null,
           printerName: i.configuration.printer?.displayName || null,
           readerId: i.configuration.barcodeReader?.id || null,
@@ -2224,6 +2232,11 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                             {Array.isArray(item.configuration.monitor?.kitItems)
                               ? ` (${item.configuration.monitor.kitItems.filter((k) => k.selected).length} itens)`
                               : ""}
+                          </p>
+                        )}
+                        {item.configuration.monitor?.cutoutMonitor && (
+                          <p className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 truncate">
+                            🖥️ Furação p/ Monitor: {item.configuration.monitor.cutoutMonitor.displayName}
                           </p>
                         )}
                         {item.configuration.includeAssemblyService && (

@@ -4,13 +4,15 @@ import React from "react";
 import { PrinterOption } from "@/types/catalog";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
 import { Card } from "@/components/ui";
-import { Check, Printer, HelpCircle } from "lucide-react";
+import { Check, Printer, HelpCircle, Boxes } from "lucide-react";
 
 interface StepPrinterProps {
   printers: PrinterOption[];
   selectedPrinter: PrinterOption | null;
   onSelectPrinter: (printer: PrinterOption) => void;
   onRequestCustomization: () => void;
+  isKitWithoutPrinter?: boolean;
+  cabinetName?: string;
 }
 
 export const StepPrinter: React.FC<StepPrinterProps> = ({
@@ -18,24 +20,57 @@ export const StepPrinter: React.FC<StepPrinterProps> = ({
   selectedPrinter,
   onSelectPrinter,
   onRequestCustomization,
+  isKitWithoutPrinter = false,
+  cabinetName = "Gabinete Totem Pro",
 }) => {
   return (
     <div className="space-y-3 sm:space-y-4">
       <div className="text-center sm:text-left space-y-1">
+        {isKitWithoutPrinter && (
+          <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap pb-1">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-black uppercase tracking-wider shadow-xs">
+              <Printer className="w-3 h-3" />
+              Passo Obrigatório • Kit Sem Impressora
+            </span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-indigo-950/60 text-[#0071e3] dark:text-cyan-300 border border-blue-200 dark:border-indigo-800 text-[10px] font-bold">
+              <Boxes className="w-3 h-3" />
+              Kit Parcial Ativo
+            </span>
+          </div>
+        )}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg sm:text-2xl font-black text-[#1d1d1f] dark:text-white tracking-tight">
-            Qual impressora será utilizada?
+            {isKitWithoutPrinter
+              ? `Qual é a impressora que você vai usar no seu ${cabinetName}?`
+              : "Qual impressora será utilizada?"}
           </h2>
           <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-500/20">
-            {selectedPrinter && (selectedPrinter.priceAdjustmentCents || 0) > 0
+            {!isKitWithoutPrinter && selectedPrinter && (selectedPrinter.priceAdjustmentCents || 0) > 0
               ? `Item Cobrado (+ ${formatBRL(selectedPrinter.priceAdjustmentCents || 0)})`
-              : "Berço CNC Homologado (+ R$ 0)"}
+              : "Berço CNC Homologado (+ R$ 0,00)"}
           </span>
         </div>
         <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-          Usinamos o rasgo de saída de papel e o suporte interno na medida da sua impressora.
+          {isKitWithoutPrinter ? (
+            <>
+              Como você desabilitou a impressora dentro do <strong>Kit de Montagem</strong>, informe abaixo qual será a <u>sua impressora térmica</u> para fazermos o berço e o recorte de saída de papel exato no gabinete (<strong className="text-emerald-600 dark:text-emerald-400">+ R$ 0,00</strong>):
+            </>
+          ) : (
+            "Usinamos o rasgo de saída de papel e o suporte interno na medida da sua impressora."
+          )}
         </p>
       </div>
+
+      {!selectedPrinter && (
+        <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-800 dark:text-amber-200 text-xs animate-in fade-in duration-200">
+          <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+          <span className="font-bold">
+            {isKitWithoutPrinter
+              ? "Seleção obrigatória: escolha abaixo qual é a impressora que você vai usar com o gabinete (+ R$ 0,00)."
+              : "Selecione abaixo o modelo da sua impressora térmica para avançar."}
+          </span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {printers.map((printer) => {
