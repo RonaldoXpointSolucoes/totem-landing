@@ -1,4 +1,4 @@
-const CACHE_NAME = "totem-pro-pwa-v3.4.8";
+const CACHE_NAME = "totem-pro-pwa-v3.4.9";
 const STATIC_ASSETS = [
   "/admin-manifest.webmanifest",
   "/site.webmanifest",
@@ -38,8 +38,8 @@ self.addEventListener("fetch", (event) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
 
-  // Never cache API endpoints
-  if (url.pathname.startsWith("/api/")) {
+  // Never intercept cross-origin requests (GTM, Google Ads, Fonts, Mercado Pago, etc.) or API endpoints
+  if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) {
     return;
   }
 
@@ -59,7 +59,10 @@ self.addEventListener("fetch", (event) => {
         }
         return res;
       })
-      .catch(() => caches.match(req))
+      .catch(async () => {
+        const cached = await caches.match(req);
+        return cached || Response.error();
+      })
   );
 });
 

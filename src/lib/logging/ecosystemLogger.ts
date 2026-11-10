@@ -79,8 +79,6 @@ export function logEcosystemEvent(params: {
   actor?: string;
   metadata?: Record<string, any>;
 }): LogEvent {
-  const logs = getAllEcosystemLogs();
-
   const newLog: LogEvent = {
     id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
     timestamp: new Date().toISOString(),
@@ -93,8 +91,17 @@ export function logEcosystemEvent(params: {
     metadata: params.metadata || {},
   };
 
-  logs.unshift(newLog);
-  persistLogs(logs);
+  // Evita poluir o arquivo de produção com logs sintéticos disparados por testes unitários (Vitest)
+  const isTestEnv =
+    process.env.NODE_ENV === "test" ||
+    Boolean(process.env.VITEST) ||
+    String(params.target || "").includes("TOT-TEST-ONLY");
+
+  if (!isTestEnv) {
+    const logs = getAllEcosystemLogs();
+    logs.unshift(newLog);
+    persistLogs(logs);
+  }
 
   return newLog;
 }

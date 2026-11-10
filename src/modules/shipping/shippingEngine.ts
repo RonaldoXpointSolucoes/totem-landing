@@ -32,7 +32,13 @@ function resolveCabinetModel(modelIdRaw: string) {
   if (idLower.includes("wall") || idLower.includes("parede")) {
     return CABINET_MODELS.find((m) => m.id === "cabinet-wall");
   }
-  if (idLower.includes("countertop") || idLower.includes("balcao") || idLower.includes("balcão")) {
+  if (
+    idLower.includes("countertop") ||
+    idLower.includes("counter") ||
+    idLower.includes("balcao") ||
+    idLower.includes("balcão") ||
+    idLower.includes("mesa")
+  ) {
     return CABINET_MODELS.find((m) => m.id === "cabinet-countertop");
   }
   if (idLower.includes("floor") || idLower.includes("piso") || idLower.includes("chao") || idLower.includes("chão")) {

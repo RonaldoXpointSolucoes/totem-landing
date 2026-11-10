@@ -73,7 +73,7 @@ export async function GET(req: Request) {
               const modelId = nameLower.includes("parede")
                 ? "cabinet-wall"
                 : nameLower.includes("balc") || nameLower.includes("mesa")
-                ? "cabinet-counter"
+                ? "cabinet-countertop"
                 : "cabinet-floor";
               return { modelId, quantity: it.quantity || 1 };
             }),

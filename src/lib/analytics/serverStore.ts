@@ -320,7 +320,7 @@ class AnalyticsServerStore {
                     modelId: modelName.toLowerCase().includes("parede")
                       ? "cabinet-wall"
                       : modelName.toLowerCase().includes("balc")
-                      ? "cabinet-counter"
+                      ? "cabinet-countertop"
                       : "cabinet-floor",
                     modelName,
                     colorName,

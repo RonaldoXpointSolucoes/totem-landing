@@ -42,7 +42,11 @@ export async function GET(req: Request) {
 
     const mergedMap = new Map<string, LogEvent>();
     for (const l of baseResult.logs) {
-      if (!l.id.startsWith("log_seed_")) {
+      if (
+        !l.id.startsWith("log_seed_") &&
+        !String(l.target || "").includes("TOT-TEST-ONLY") &&
+        !String(l.details || "").includes("Unexpected network request blocked in test")
+      ) {
         mergedMap.set(l.id, l);
       }
     }
