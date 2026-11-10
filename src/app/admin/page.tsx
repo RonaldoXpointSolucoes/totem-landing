@@ -650,6 +650,25 @@ export default function AdminPage() {
     });
   };
 
+  // Seção ativa na Visão Detalhada Mobile por pedido ("all" | "address" | "payment" | "items")
+  const [mobileDetailSectionByOrder, setMobileDetailSectionByOrder] = useState<
+    Record<string, "all" | "address" | "payment" | "items">
+  >({});
+
+  const getMobileDetailSection = (orderId: string): "all" | "address" | "payment" | "items" => {
+    return mobileDetailSectionByOrder[orderId] || "all";
+  };
+
+  const setMobileDetailSection = (
+    orderId: string,
+    section: "all" | "address" | "payment" | "items"
+  ) => {
+    setMobileDetailSectionByOrder((prev) => ({
+      ...prev,
+      [orderId]: section,
+    }));
+  };
+
   // Analytics de Funil
   const [funnelData, setFunnelData] = useState<any>(null);
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
@@ -3570,108 +3589,151 @@ export default function AdminPage() {
                         /* MODO: VISÃO DETALHADA COMPLETA (AO CLICAR EM DETALHES)  */
                         /* ======================================================== */
                         <>
-                          {/* Topo do Card: Cliente em Destaque à Esquerda | Dados do Pedido à Direita */}
-                          <div className="flex flex-col gap-3.5 pb-4 border-b border-slate-800/80">
-                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                              {/* ESQUERDA: Cliente com Fonte Maior */}
-                              <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-11 h-11 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 flex items-center justify-center shrink-0 font-black text-base">
-                                  {(order.customer_name || "C").trim().charAt(0).toUpperCase()}
-                                </div>
-                                <div className="min-w-0 space-y-0.5">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <h3 className="font-black text-white text-lg sm:text-2xl tracking-tight leading-tight">
-                                      {order.customer_name || "Cliente não informado"}
-                                    </h3>
-                                    {waHref && (
-                                      <a
-                                        href={waHref}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="px-2.5 py-1 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold inline-flex items-center gap-1 transition-colors"
-                                      >
-                                        <MessageCircle className="w-3.5 h-3.5" />
-                                        <span>WhatsApp</span>
-                                      </a>
-                                    )}
+                          {/* Topo do Card: Cliente em Destaque + Valor Total + Botão Recolher Rápido + Ações Simétricas Mobile */}
+                          <div className="flex flex-col gap-3 pb-3.5 border-b border-slate-800/80">
+                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-3">
+                              {/* ESQUERDA: Avatar + Nome do Cliente + WhatsApp + Botão Recolher (no Mobile) */}
+                              <div className="flex items-start sm:items-center justify-between gap-2 min-w-0">
+                                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                                  <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 flex items-center justify-center shrink-0 font-black text-sm sm:text-base shadow-inner">
+                                    {(order.customer_name || "C").trim().charAt(0).toUpperCase()}
                                   </div>
-                                  <p className="text-xs sm:text-sm text-slate-300 font-mono flex items-center flex-wrap gap-1.5">
-                                    <span className="font-semibold text-slate-200">{order.customer_document || "—"}</span>
-                                    {addr?.city && (
-                                      <span className="text-slate-400 font-sans font-medium">
-                                        • {addr.city}/{addr.state || "SP"}
-                                      </span>
-                                    )}
-                                  </p>
-                                </div>
-                              </div>
-
-                              {/* DIREITA: Número do Pedido, Status, Data, Pagamento e Método de Entrega */}
-                              <div className="flex flex-col lg:items-end gap-1.5">
-                                <div className="flex flex-wrap items-center lg:justify-end gap-2">
-                                  <span className="font-extrabold text-white text-base sm:text-lg font-mono tracking-tight">
-                                    {order.order_number}
-                                  </span>
-                                  <span
-                                    className={`px-2.5 py-1 rounded-full text-[11px] font-bold border flex items-center gap-1.5 ${statusInfo.color}`}
-                                  >
-                                    <StatusIcon className="w-3.5 h-3.5" />
-                                    <span>{statusInfo.label}</span>
-                                  </span>
-
-                                  {!isOrderPaid && (
-                                    <span
-                                      className={`px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider border flex items-center gap-1 ${
-                                        isPaymentFailedOrCancelled
-                                          ? "bg-rose-500/20 text-rose-300 border-rose-500/50"
-                                          : "bg-amber-500/20 text-amber-300 border-amber-500/50"
-                                      }`}
-                                    >
-                                      <AlertCircle className="w-3.5 h-3.5" />
-                                      <span>{isPaymentFailedOrCancelled ? "NÃO PAGO / FALHA" : "AGUARDANDO PAGAMENTO"}</span>
-                                    </span>
-                                  )}
-
-                                  {hasExecOrder && (
-                                    <span className="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-400/50 flex items-center gap-1.5">
-                                      <ClipboardCheck className="w-3.5 h-3.5 text-indigo-300" />
-                                      <span>
-                                        O.S. Técnica ({addr?.executionOrder?.attachments?.length || 0} mídia/s)
-                                      </span>
-                                    </span>
-                                  )}
-
-                                  {orderHasAnyDeviation && (
-                                    <span className="px-2.5 py-1 rounded-full text-[11px] font-black bg-amber-500/20 text-amber-300 border-2 border-amber-400 flex items-center gap-1.5 animate-pulse">
-                                      <AlertTriangle className="w-3.5 h-3.5 text-amber-300" />
-                                      <span>ATENÇÃO: FORA DO PADRÃO / OBSERVAÇÃO</span>
-                                    </span>
-                                  )}
+                                  <div className="min-w-0 flex-1 space-y-0.5">
+                                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                                      <h3 className="font-black text-white text-base sm:text-2xl tracking-tight leading-tight">
+                                        {order.customer_name || "Cliente não informado"}
+                                      </h3>
+                                      {waHref && (
+                                        <a
+                                          href={waHref}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-[10px] sm:text-[11px] font-bold inline-flex items-center gap-1 transition-colors shrink-0"
+                                        >
+                                          <MessageCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                          <span>WhatsApp</span>
+                                        </a>
+                                      )}
+                                    </div>
+                                    <p className="text-[11px] sm:text-sm text-slate-300 font-mono flex items-center flex-wrap gap-1.5">
+                                      <span className="font-semibold text-slate-200">{order.customer_document || "—"}</span>
+                                      {addr?.city && (
+                                        <span className="text-slate-400 font-sans font-medium">
+                                          • {addr.city}/{addr.state || "SP"}
+                                        </span>
+                                      )}
+                                    </p>
+                                  </div>
                                 </div>
 
-                                <div className="flex flex-wrap items-center lg:justify-end gap-2 text-xs text-slate-400 font-mono">
-                                  <span>{new Date(order.$createdAt).toLocaleString("pt-BR")}</span>
-                                  <span>•</span>
-                                  <span className="text-slate-200 font-bold font-sans">
-                                    {payMethod === "credit_card" ? "Cartão de Crédito" : "Pix à Vista"}
-                                  </span>
-                                  <span>•</span>
-                                  <span className="text-cyan-400 font-sans font-semibold">
-                                    {shipping.name}{" "}
-                                    {order.shipping_cents > 0 ? `(${formatBRL(order.shipping_cents)})` : "(Isento)"}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Barra de Botões de Ação da Visão Detalhada */}
-                            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/50">
-                              <div className="flex flex-wrap items-center gap-2">
+                                {/* Botão Recolher Rápido no Topo Direito (Mobile) */}
                                 {ordersViewMode === "simplified" && (
                                   <button
                                     type="button"
                                     onClick={() => toggleOrderExpanded(order.$id)}
-                                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white border border-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+                                    className="sm:hidden px-2.5 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 active:scale-95 text-slate-200 border border-slate-700 font-bold text-[10px] flex items-center gap-1 transition-all cursor-pointer shrink-0"
+                                    title="Recolher para lista simplificada"
+                                  >
+                                    <ChevronUp className="w-3.5 h-3.5 text-indigo-400" />
+                                    <span>Recolher</span>
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* DIREITA: Resumo Executivo Compacto (Nº Pedido, Status, Valor Total, Data e Frete) */}
+                              <div className="flex flex-col lg:items-end gap-1.5 p-2.5 sm:p-0 rounded-xl sm:rounded-none bg-slate-950/75 sm:bg-transparent border border-slate-800/80 sm:border-0">
+                                <div className="flex items-center justify-between lg:justify-end gap-2 w-full">
+                                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 min-w-0">
+                                    <span className="font-extrabold text-white text-xs sm:text-lg font-mono tracking-tight">
+                                      {order.order_number}
+                                    </span>
+                                    <span
+                                      className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-[11px] font-bold border flex items-center gap-1 ${statusInfo.color}`}
+                                    >
+                                      <StatusIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+                                      <span>{statusInfo.label}</span>
+                                    </span>
+                                  </div>
+
+                                  {/* Valor Total Sempre Visível no Topo da Visão Detalhada */}
+                                  <div className="text-right shrink-0">
+                                    <p
+                                      className={`font-black font-mono text-sm sm:text-lg leading-none ${
+                                        isOrderPaid
+                                          ? "text-emerald-400"
+                                          : isPaymentFailedOrCancelled
+                                          ? "text-rose-400"
+                                          : "text-amber-300"
+                                      }`}
+                                    >
+                                      {formatBRL(order.total_cents)}
+                                    </p>
+                                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                                      {payMethod === "credit_card" ? "Cartão até 10x" : "Pix à Vista"}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-wrap items-center justify-between lg:justify-end gap-x-2 gap-y-1 text-[11px] sm:text-xs text-slate-400 font-mono w-full">
+                                  <span>
+                                    {new Date(order.$createdAt).toLocaleString("pt-BR", {
+                                      day: "2-digit",
+                                      month: "2-digit",
+                                      year: "numeric",
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </span>
+                                  <span className="hidden sm:inline">•</span>
+                                  <span className="text-cyan-400 font-sans font-semibold truncate max-w-[230px] sm:max-w-none">
+                                    {shipping.name}{" "}
+                                    {order.shipping_cents > 0 ? `(${formatBRL(order.shipping_cents)})` : "(Isento)"}
+                                  </span>
+                                </div>
+
+                                {(orderHasAnyDeviation || hasExecOrder || !isOrderPaid) && (
+                                  <div className="flex flex-wrap items-center lg:justify-end gap-1.5 pt-0.5 w-full">
+                                    {!isOrderPaid && (
+                                      <span
+                                        className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border flex items-center gap-1 ${
+                                          isPaymentFailedOrCancelled
+                                            ? "bg-rose-500/20 text-rose-300 border-rose-500/50"
+                                            : "bg-amber-500/20 text-amber-300 border-amber-500/50"
+                                        }`}
+                                      >
+                                        <AlertCircle className="w-3 h-3 shrink-0" />
+                                        <span>{isPaymentFailedOrCancelled ? "NÃO PAGO / FALHA" : "AGUARDANDO PAGTO"}</span>
+                                      </span>
+                                    )}
+
+                                    {hasExecOrder && (
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-400/50 flex items-center gap-1">
+                                        <ClipboardCheck className="w-3 h-3 text-indigo-300 shrink-0" />
+                                        <span>
+                                          O.S. Técnica ({addr?.executionOrder?.attachments?.length || 0} mídia/s)
+                                        </span>
+                                      </span>
+                                    )}
+
+                                    {orderHasAnyDeviation && (
+                                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-400 flex items-center gap-1 animate-pulse">
+                                        <AlertTriangle className="w-3 h-3 text-amber-300 shrink-0" />
+                                        <span>ATENÇÃO: FORA DO PADRÃO / OBSERVAÇÃO</span>
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Barra de Botões de Ação da Visão Detalhada (Grid 2x2 Simétrico no Mobile + Flex no Desktop) */}
+                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2 pt-2 border-t border-slate-800/60">
+                              <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full lg:w-auto">
+                                {ordersViewMode === "simplified" && (
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleOrderExpanded(order.$id)}
+                                    className="hidden sm:inline-flex px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white border border-slate-700 font-bold text-xs items-center gap-1.5 transition-all cursor-pointer shrink-0"
                                     title="Recolher para lista simplificada em uma linha"
                                   >
                                     <ChevronUp className="w-3.5 h-3.5" />
@@ -3682,56 +3744,61 @@ export default function AdminPage() {
                                 <button
                                   type="button"
                                   onClick={() => setPrintingProductionOrder(order)}
-                                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black text-xs flex items-center gap-1.5 shadow-md shadow-emerald-600/25 transition-all shrink-0 cursor-pointer"
+                                  className="px-2.5 py-2 sm:px-3.5 sm:py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black text-[11px] sm:text-xs flex items-center justify-center sm:justify-start gap-1.5 shadow-md shadow-emerald-600/25 transition-all shrink-0 cursor-pointer"
                                   title="Imprimir Ordem de Produção sem valor monetário, com opção de escrever orientações e checklist completo para marcar à caneta"
                                 >
-                                  <Printer className="w-3.5 h-3.5" />
-                                  <span>Imprimir Ordem de Produção (S/ Preços)</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenEditOrder(order, "execution")}
-                                  className="px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 active:scale-95 text-emerald-300 border border-emerald-500/40 font-extrabold text-xs flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
-                                  title="Abrir Editor Rico da Ordem de Execução para anexar fotos, vídeos e dados técnicos"
-                                >
-                                  <Camera className="w-3.5 h-3.5" />
-                                  <span>Ordem de Execução (Fotos & Vídeos)</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => setSelectedOrder(order)}
-                                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-600/25 transition-all shrink-0 cursor-pointer"
-                                >
-                                  <Eye className="w-3.5 h-3.5" />
-                                  <span>Ver Pedido Completo & Ficha CNC</span>
+                                  <Printer className="w-3.5 h-3.5 shrink-0" />
+                                  <span className="truncate sm:hidden">Ordem Produção</span>
+                                  <span className="hidden sm:inline">Imprimir Ordem de Produção (S/ Preços)</span>
                                 </button>
 
                                 <button
                                   type="button"
                                   onClick={() => setCorreiosLabelOrder(order)}
-                                  className="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md shadow-amber-400/20 transition-all shrink-0 cursor-pointer"
+                                  className="px-2.5 py-2 sm:px-3.5 sm:py-2 rounded-xl bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 font-black text-[11px] sm:text-xs flex items-center justify-center sm:justify-start gap-1.5 shadow-md shadow-amber-400/20 transition-all shrink-0 cursor-pointer"
                                   title="Lançar Pré-Postagem no sistema dos Correios pela API usando seu Contrato 9912722993 e Imprimir Etiqueta Simplificada"
                                 >
-                                  <Printer className="w-3.5 h-3.5" />
-                                  <span>Etiqueta Correios (API / Imprimir)</span>
+                                  <Truck className="w-3.5 h-3.5 shrink-0" />
+                                  <span className="truncate sm:hidden">Etiqueta Correios</span>
+                                  <span className="hidden sm:inline">Etiqueta Correios (API / Imprimir)</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedOrder(order)}
+                                  className="px-2.5 py-2 sm:px-4 sm:py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold text-[11px] sm:text-xs flex items-center justify-center sm:justify-start gap-1.5 shadow-md shadow-indigo-600/25 transition-all shrink-0 cursor-pointer"
+                                >
+                                  <Eye className="w-3.5 h-3.5 shrink-0" />
+                                  <span className="truncate sm:hidden">Ficha CNC / Pedido</span>
+                                  <span className="hidden sm:inline">Ver Pedido Completo & Ficha CNC</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditOrder(order, "execution")}
+                                  className="px-2.5 py-2 sm:px-3 sm:py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 active:scale-95 text-emerald-300 border border-emerald-500/40 font-extrabold text-[11px] sm:text-xs flex items-center justify-center sm:justify-start gap-1.5 transition-all shrink-0 cursor-pointer"
+                                  title="Abrir Editor Rico da Ordem de Execução para anexar fotos, vídeos e dados técnicos"
+                                >
+                                  <Camera className="w-3.5 h-3.5 shrink-0" />
+                                  <span className="truncate sm:hidden">Fotos & O.S.</span>
+                                  <span className="hidden sm:inline">Ordem de Execução (Fotos & Vídeos)</span>
                                 </button>
 
                                 {!isOrderPaid && (
                                   <button
                                     type="button"
                                     onClick={() => handleOpenEditOrder(order, "payment_proposal")}
-                                    className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/25 transition-all shrink-0 cursor-pointer"
+                                    className="col-span-2 sm:col-span-1 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-black text-[11px] sm:text-xs flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/25 transition-all shrink-0 cursor-pointer"
                                     title="Editar itens, adicionar valores extras com descrição específica e gerar nova condição de pagamento para enviar ao cliente"
                                   >
-                                    <Plus className="w-3.5 h-3.5" />
+                                    <Plus className="w-3.5 h-3.5 shrink-0" />
                                     <span>Editar Itens / + Valor Adicional & Nova Cobrança</span>
                                   </button>
                                 )}
                               </div>
 
-                              <div className="flex flex-wrap items-center gap-2">
+                              {/* Barra de Gestão em 1 Única Linha no Mobile (Status + Compartilhar + Editar + Excluir) */}
+                              <div className="flex items-center gap-1.5 sm:gap-2 w-full lg:w-auto">
                                 {/* Seletor rápido de Status */}
                                 <select
                                   id={`order-status-detailed-${order.$id}`}
@@ -3739,7 +3806,7 @@ export default function AdminPage() {
                                   aria-label={`Mudar status do pedido ${order.order_number}`}
                                   value={order.status}
                                   onChange={(e) => handleUpdateOrderStatus(order.$id, e.target.value)}
-                                  className="bg-slate-950 border border-slate-800 text-xs rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                                  className="flex-1 min-w-0 sm:flex-initial bg-slate-950 border border-slate-800 text-[11px] sm:text-xs rounded-xl px-2.5 py-2 text-slate-200 font-semibold focus:outline-none focus:border-indigo-500 cursor-pointer"
                                 >
                                   {Object.entries(STATUS_CONFIG).map(([k, cfg]) => (
                                     <option key={k} value={k}>
@@ -3748,26 +3815,37 @@ export default function AdminPage() {
                                   ))}
                                 </select>
 
+                                {/* Botão Compartilhar Resumo Nativo PWA */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleShareOrderNative(order)}
+                                  className="px-2.5 py-2 rounded-xl bg-indigo-500/15 hover:bg-indigo-500/25 active:scale-95 text-indigo-300 border border-indigo-500/30 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shrink-0 cursor-pointer"
+                                  title="Compartilhar resumo do pedido via WhatsApp / Apps nativos"
+                                >
+                                  <Share2 className="w-3.5 h-3.5" />
+                                  <span className="hidden xl:inline">Compartilhar</span>
+                                </button>
+
                                 {/* Botão Editar Pedido */}
                                 <button
                                   type="button"
                                   onClick={() => handleOpenEditOrder(order, "all")}
-                                  className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 border border-amber-500/30 font-bold text-xs flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+                                  className="px-2.5 py-2 sm:px-3 sm:py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 border border-amber-500/30 font-bold text-[11px] sm:text-xs flex items-center justify-center gap-1.5 transition-all shrink-0 cursor-pointer"
                                   title="Editar dados, itens, equipamentos ou observações deste pedido"
                                 >
                                   <Edit2 className="w-3.5 h-3.5" />
-                                  <span>Editar Pedido</span>
+                                  <span>Editar</span>
                                 </button>
 
                                 {/* Botão Excluir Pedido */}
                                 <button
                                   type="button"
                                   onClick={() => setDeletingOrder(order)}
-                                  className="px-3 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 active:scale-95 text-rose-400 border border-rose-500/30 font-bold text-xs flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+                                  className="px-2.5 py-2 sm:px-3 sm:py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 active:scale-95 text-rose-400 border border-rose-500/30 font-bold text-[11px] sm:text-xs flex items-center justify-center gap-1.5 transition-all shrink-0 cursor-pointer"
                                   title="Excluir este pedido permanentemente"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
-                                  <span>Excluir</span>
+                                  <span className="hidden sm:inline">Excluir</span>
                                 </button>
                               </div>
                             </div>
@@ -3821,14 +3899,14 @@ export default function AdminPage() {
                                 </p>
                               </div>
 
-                              <div className="flex items-center gap-1.5 flex-wrap shrink-0">
+                              <div className="grid grid-cols-2 sm:flex sm:items-center gap-1.5 sm:flex-wrap shrink-0">
                                 <button
                                   type="button"
                                   onClick={() => handleOpenEditOrder(order, "payment_proposal")}
-                                  className="px-3 py-1.5 rounded-xl bg-amber-500/25 hover:bg-amber-500/35 active:scale-95 text-amber-200 border border-amber-400/60 font-extrabold text-[11px] flex items-center gap-1.5 cursor-pointer shadow-sm"
+                                  className="col-span-2 sm:col-span-1 px-3 py-2 sm:py-1.5 rounded-xl bg-amber-500/25 hover:bg-amber-500/35 active:scale-95 text-amber-200 border border-amber-400/60 font-extrabold text-[11px] flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
                                   title="Editar itens do pedido, adicionar valores extras com descrição específica e gerar nova condição de pagamento"
                                 >
-                                  <Plus className="w-3.5 h-3.5" />
+                                  <Plus className="w-3.5 h-3.5 shrink-0" />
                                   <span>Editar Itens / + Valor Adicional</span>
                                 </button>
 
@@ -3836,10 +3914,10 @@ export default function AdminPage() {
                                   type="button"
                                   disabled={Boolean(paymentActionOrderId)}
                                   onClick={() => handleOrderPaymentAction(order, "regenerate_pix")}
-                                  className="px-2.5 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold text-[11px] flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                  className="px-2.5 py-2 sm:py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold text-[11px] flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
                                   title="Gerar novo QR Code Pix válido por 24h no Mercado Pago"
                                 >
-                                  <Zap className="w-3 h-3" />
+                                  <Zap className="w-3 h-3 shrink-0" />
                                   <span>
                                     {paymentActionOrderId === `${order.$id}:regenerate_pix`
                                       ? "Gerando..."
@@ -3851,14 +3929,14 @@ export default function AdminPage() {
                                   type="button"
                                   disabled={Boolean(paymentActionOrderId)}
                                   onClick={() => handleOrderPaymentAction(order, "regenerate_card")}
-                                  className="px-2.5 py-1.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 font-bold text-[11px] flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                  className="px-2.5 py-2 sm:py-1.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 font-bold text-[11px] flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
                                   title="Gerar novo Link Checkout Pro de Cartão válido por 72h"
                                 >
-                                  <CreditCard className="w-3 h-3" />
+                                  <CreditCard className="w-3 h-3 shrink-0" />
                                   <span>
                                     {paymentActionOrderId === `${order.$id}:regenerate_card`
                                       ? "Gerando..."
-                                      : "Novo Link Cartão (72h)"}
+                                      : "Novo Cartão (72h)"}
                                   </span>
                                 </button>
 
@@ -3867,11 +3945,11 @@ export default function AdminPage() {
                                     href={waHref}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[11px] flex items-center gap-1 cursor-pointer shadow-sm"
+                                    className="px-2.5 py-2 sm:py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[11px] flex items-center justify-center gap-1 cursor-pointer shadow-sm"
                                     title="Abrir WhatsApp do cliente com o resumo completo dos itens, valores adicionais e link de pagamento"
                                   >
-                                    <MessageCircle className="w-3.5 h-3.5" />
-                                    <span>Enviar ao Cliente (WhatsApp)</span>
+                                    <MessageCircle className="w-3.5 h-3.5 shrink-0" />
+                                    <span className="truncate">Enviar WhatsApp</span>
                                   </a>
                                 )}
 
@@ -3879,11 +3957,11 @@ export default function AdminPage() {
                                   type="button"
                                   disabled={sendingWaOrderId === order.$id}
                                   onClick={() => handleSendPaymentToCustomerWhatsAppApi(order)}
-                                  className="px-2.5 py-1.5 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 text-teal-200 border border-teal-500/40 font-bold text-[11px] flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                  className="px-2.5 py-2 sm:py-1.5 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 text-teal-200 border border-teal-500/40 font-bold text-[11px] flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
                                   title="Disparar cobrança automaticamente pelo WhatsApp da Loja (API FoodNext)"
                                 >
-                                  <Share2 className="w-3 h-3" />
-                                  <span>
+                                  <Share2 className="w-3 h-3 shrink-0" />
+                                  <span className="truncate">
                                     {sendingWaOrderId === order.$id ? "Enviando..." : "Disparar Zap API"}
                                   </span>
                                 </button>
@@ -3891,11 +3969,11 @@ export default function AdminPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleCopyCustomerPaymentLink(order)}
-                                  className="px-2.5 py-1.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 border border-indigo-500/40 font-bold text-[11px] flex items-center gap-1 cursor-pointer"
+                                  className="px-2.5 py-2 sm:py-1.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 border border-indigo-500/40 font-bold text-[11px] flex items-center justify-center gap-1 cursor-pointer"
                                   title="Copiar link da página de pagamento (Pix + Cartão) para enviar ao cliente"
                                 >
-                                  <Copy className="w-3 h-3" />
-                                  <span>
+                                  <Copy className="w-3 h-3 shrink-0" />
+                                  <span className="truncate">
                                     {copiedPaymentLinkOrderId === order.$id ? "Link Copiado!" : "Copiar Link Pagto"}
                                   </span>
                                 </button>
@@ -3904,11 +3982,11 @@ export default function AdminPage() {
                                   type="button"
                                   disabled={Boolean(paymentActionOrderId)}
                                   onClick={() => handleOrderPaymentAction(order, "sync")}
-                                  className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-[11px] flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                  className="px-2.5 py-2 sm:py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-[11px] flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
                                   title="Consultar status ao vivo na API do Mercado Pago"
                                 >
                                   <RefreshCw
-                                    className={`w-3 h-3 ${
+                                    className={`w-3 h-3 shrink-0 ${
                                       paymentActionOrderId === `${order.$id}:sync` ? "animate-spin" : ""
                                     }`}
                                   />
@@ -3918,10 +3996,48 @@ export default function AdminPage() {
                             </div>
                           )}
 
+                          {/* Navegação Rápida de Seções no Mobile (Pular direto para Itens/CNC, Endereço ou Pagto sem rolar) */}
+                          <div className="lg:hidden grid grid-cols-4 gap-1 p-1 rounded-xl bg-slate-950/90 border border-slate-800/90">
+                            {(
+                              [
+                                { id: "all", label: "Tudo", icon: Layers },
+                                { id: "items", label: `3. Itens (${order.items?.length || 0})`, icon: Package },
+                                { id: "address", label: "1. Cliente", icon: MapPin },
+                                { id: "payment", label: "2. Pagto", icon: Truck },
+                              ] as const
+                            ).map((sec) => {
+                              const activeSec = getMobileDetailSection(order.$id);
+                              const isSecActive = activeSec === sec.id;
+                              const SecIcon = sec.icon;
+                              return (
+                                <button
+                                  key={sec.id}
+                                  type="button"
+                                  onClick={() => setMobileDetailSection(order.$id, sec.id)}
+                                  className={`py-1.5 px-1.5 rounded-lg text-[10px] font-extrabold flex items-center justify-center gap-1 transition-all cursor-pointer truncate ${
+                                    isSecActive
+                                      ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/30"
+                                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
+                                  }`}
+                                >
+                                  <SecIcon className="w-3 h-3 shrink-0" />
+                                  <span className="truncate">{sec.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+
                       {/* Painel de Conferência em 3 Colunas: (1) Cliente & Endereço [3 cols], (2) Entrega & Pagamento [3 cols], (3) Detalhes na Escolha & Alertas [6 cols] */}
                       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 text-xs">
                         {/* 1-) CLIENTE & ENDEREÇO DE ENTREGA */}
-                        <div className="lg:col-span-3 bg-slate-950/80 border border-slate-800/80 rounded-2xl p-3.5 space-y-2.5 flex flex-col justify-between">
+                        <div
+                          className={`lg:col-span-3 bg-slate-950/80 border border-slate-800/80 rounded-2xl p-3.5 space-y-2.5 flex-col justify-between ${
+                            getMobileDetailSection(order.$id) === "all" ||
+                            getMobileDetailSection(order.$id) === "address"
+                              ? "flex"
+                              : "hidden lg:flex"
+                          }`}
+                        >
                           <div className="space-y-2">
                             <div className="flex items-center justify-between gap-2">
                               <span className="text-[10px] font-black uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
@@ -3994,7 +4110,14 @@ export default function AdminPage() {
                         </div>
 
                         {/* 2-) MÉTODO DE ENTREGA & CONFERÊNCIA DE PAGAMENTO */}
-                        <div className="lg:col-span-3 bg-slate-950/80 border border-slate-800/80 rounded-2xl p-3.5 space-y-2.5 flex flex-col justify-between">
+                        <div
+                          className={`lg:col-span-3 bg-slate-950/80 border border-slate-800/80 rounded-2xl p-3.5 space-y-2.5 flex-col justify-between ${
+                            getMobileDetailSection(order.$id) === "all" ||
+                            getMobileDetailSection(order.$id) === "payment"
+                              ? "flex"
+                              : "hidden lg:flex"
+                          }`}
+                        >
                           <div className="space-y-2">
                             <span className="text-[10px] font-black uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
                               <Truck className="w-3.5 h-3.5 shrink-0" />
@@ -4304,31 +4427,40 @@ export default function AdminPage() {
                         </div>
 
                         {/* 3-) DETALHES NA ESCOLHA (FOTO DO GABINETE, EQUIPAMENTOS EM DESTAQUE & ALERTAS FORA DO PADRÃO) */}
-                        <div className="lg:col-span-6 bg-slate-950/90 border border-slate-800/90 rounded-2xl p-3.5 sm:p-4 space-y-3 flex flex-col justify-between">
+                        <div
+                          className={`lg:col-span-6 bg-slate-950/90 border border-slate-800/90 rounded-2xl p-3 sm:p-4 space-y-3 flex-col justify-between ${
+                            getMobileDetailSection(order.$id) === "all" ||
+                            getMobileDetailSection(order.$id) === "items"
+                              ? "flex"
+                              : "hidden lg:flex"
+                          }`}
+                        >
                           <div className="space-y-3">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                               <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-                                <Package className="w-3.5 h-3.5" />
+                                <Package className="w-3.5 h-3.5 shrink-0" />
                                 <span>
-                                  3. Detalhes na Escolha, Equipamentos & Alertas de Produção ({order.items?.length || 0} item/ns)
+                                  3. Detalhes na Escolha, Equipamentos & Alertas ({order.items?.length || 0} item/ns)
                                 </span>
                               </span>
-                              <div className="flex flex-wrap items-center gap-1.5">
+                              <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-1.5 w-full sm:w-auto">
                                 <button
                                   type="button"
                                   onClick={() => handleOpenEditOrder(order, "execution")}
-                                  className="text-[10px] font-extrabold px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 transition-colors cursor-pointer"
+                                  className="text-[10px] font-extrabold px-2.5 py-1.5 sm:py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 flex items-center justify-center gap-1 transition-colors cursor-pointer truncate"
                                 >
-                                  <Camera className="w-3 h-3" />
-                                  <span>+ Anexar Fotos / Vídeos / Ordem de Execução</span>
+                                  <Camera className="w-3 h-3 shrink-0" />
+                                  <span className="truncate sm:hidden">+ Fotos / O.S.</span>
+                                  <span className="hidden sm:inline">+ Anexar Fotos / Vídeos / Ordem de Execução</span>
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => handleOpenEditOrder(order, "payment_proposal")}
-                                  className="text-[10px] font-extrabold px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 flex items-center gap-1 transition-colors cursor-pointer"
+                                  className="text-[10px] font-extrabold px-2.5 py-1.5 sm:py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 flex items-center justify-center gap-1 transition-colors cursor-pointer truncate"
                                 >
-                                  <Plus className="w-3 h-3" />
-                                  <span>+ Valor Adicional / Editar Itens</span>
+                                  <Plus className="w-3 h-3 shrink-0" />
+                                  <span className="truncate sm:hidden">+ Adicional / Itens</span>
+                                  <span className="hidden sm:inline">+ Valor Adicional / Editar Itens</span>
                                 </button>
                               </div>
                             </div>
