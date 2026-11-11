@@ -443,10 +443,26 @@ export async function deleteCatalogItemAdmin(collection: string, docId: string) 
   return res;
 }
 
+let cachedOrdersAll: any[] | null = null;
+let cachedOrdersTimestamp = 0;
+const ORDERS_CACHE_TTL_MS = 2500;
+
+export function invalidateOrdersAdminCache() {
+  cachedOrdersAll = null;
+  cachedOrdersTimestamp = 0;
+}
+
 /**
  * Lista todos os pedidos para o painel administrativo com seus itens e pagamentos.
+ * Otimizado com busca em lote (3 queries totais em vez de 1 + 2*N) para resposta instantânea.
  */
 export async function listAllOrdersAdmin(statusFilter?: string) {
+  const isAllQuery = !statusFilter || statusFilter === "all";
+  const now = Date.now();
+  if (isAllQuery && cachedOrdersAll && now - cachedOrdersTimestamp < ORDERS_CACHE_TTL_MS) {
+    return cachedOrdersAll;
+  }
+
   const db = getServerDatabases();
   const dbId = APPWRITE_CONFIG.databaseId;
   const cols = APPWRITE_CONFIG.collections;
@@ -457,29 +473,60 @@ export async function listAllOrdersAdmin(statusFilter?: string) {
   }
 
   const ordersRes = await db.listDocuments(dbId, cols.orders, queries);
+  const orderDocs = ordersRes.documents || [];
+  if (orderDocs.length === 0) {
+    if (isAllQuery) {
+      cachedOrdersAll = [];
+      cachedOrdersTimestamp = now;
+    }
+    return [];
+  }
 
-  // Carrega itens e pagamentos vinculados
-  const enrichedOrders = await Promise.all(
-    ordersRes.documents.map(async (orderDoc: any) => {
-      const [itemsRes, paymentsRes] = await Promise.all([
-        db.listDocuments(dbId, cols.orderItems, [
-          Query.equal("order_id", orderDoc.$id),
-          Query.limit(50),
-        ]),
-        db.listDocuments(dbId, cols.payments, [
-          Query.equal("order_id", orderDoc.$id),
-          Query.orderDesc("$createdAt"),
-          Query.limit(1),
-        ]),
-      ]);
+  const orderIds = orderDocs.map((d: any) => d.$id).filter(Boolean);
 
-      return {
-        ...orderDoc,
-        items: itemsRes.documents,
-        payment: paymentsRes.documents[0] || null,
-      };
-    })
-  );
+  // Busca todos os itens e pagamentos vinculados em apenas 2 consultas em lote (elimina N+1)
+  const [allItemsRes, allPaymentsRes] = await Promise.all([
+    db
+      .listDocuments(dbId, cols.orderItems, [
+        Query.equal("order_id", orderIds),
+        Query.limit(300),
+      ])
+      .catch(() => ({ documents: [] as any[] })),
+    db
+      .listDocuments(dbId, cols.payments, [
+        Query.equal("order_id", orderIds),
+        Query.orderDesc("$createdAt"),
+        Query.limit(200),
+      ])
+      .catch(() => ({ documents: [] as any[] })),
+  ]);
+
+  const itemsByOrderId = new Map<string, any[]>();
+  for (const itemDoc of allItemsRes.documents) {
+    const oid = itemDoc.order_id;
+    if (!oid) continue;
+    const list = itemsByOrderId.get(oid) || [];
+    list.push(itemDoc);
+    itemsByOrderId.set(oid, list);
+  }
+
+  const latestPaymentByOrderId = new Map<string, any>();
+  for (const payDoc of allPaymentsRes.documents) {
+    const oid = payDoc.order_id;
+    if (!oid || latestPaymentByOrderId.has(oid)) continue;
+    latestPaymentByOrderId.set(oid, payDoc);
+  }
+
+  const enrichedOrders = orderDocs.map((orderDoc: any) => ({
+    ...orderDoc,
+    items: itemsByOrderId.get(orderDoc.$id) || [],
+    payment: latestPaymentByOrderId.get(orderDoc.$id) || null,
+  }));
+
+  if (isAllQuery) {
+    cachedOrdersAll = enrichedOrders;
+    cachedOrdersTimestamp = Date.now();
+  }
 
   return enrichedOrders;
 }
@@ -510,6 +557,7 @@ export async function updateOrderStatusAdmin(orderId: string, newStatus: string)
     }
   }
 
+  invalidateOrdersAdminCache();
   return updatedOrder;
 }
 
@@ -620,6 +668,7 @@ export async function updateOrderAdmin(orderId: string, payload: AdminOrderUpdat
     }
   } catch {}
 
+  invalidateOrdersAdminCache();
   return updatedOrder;
 }
 
@@ -659,6 +708,7 @@ export async function deleteOrderAdmin(orderId: string) {
 
   // 3. Excluir o documento principal do pedido
   await db.deleteDocument(dbId, cols.orders, orderId);
+  invalidateOrdersAdminCache();
   return { deleted: true, orderId };
 }
 

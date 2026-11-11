@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   ExternalLink,
   ArrowLeft,
+  Truck,
 } from "lucide-react";
 
 type StatusData = {
@@ -512,10 +513,26 @@ function PaymentReturnContent() {
           )}
 
           {status?.isPaid && (
-            <div className="space-y-3 pt-2">
+            <div className="space-y-4 pt-2">
               <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">
                 Recebemos a confirmação do Mercado Pago! Sua ordem de produção já foi liberada para a nossa fábrica CNC.
               </p>
+
+              {/* Aviso de Prazo de Produção e Envio (Até 5 dias) */}
+              <div className="p-4 rounded-2xl bg-amber-500/10 dark:bg-amber-950/35 border border-amber-500/35 text-left flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                  <Truck className="w-5 h-5" />
+                </div>
+                <div className="space-y-1 text-xs">
+                  <p className="font-black text-amber-900 dark:text-amber-200 uppercase tracking-wide">
+                    ⏱️ Prazo de Produção e Envio: até 5 dias
+                  </p>
+                  <p className="text-amber-800 dark:text-amber-300/90 leading-relaxed">
+                    O prazo para fabricação sob medida na Router CNC, conferência técnica e envio (postagem) do seu pedido é de <strong>até 5 dias</strong>. Assim que for despachado, nossa equipe enviará os detalhes e o rastreio no seu WhatsApp.
+                  </p>
+                </div>
+              </div>
+
               <Link
                 href="/minha-conta"
                 className="block rounded-xl bg-emerald-600 hover:bg-emerald-500 px-5 py-3.5 font-bold text-sm text-white shadow-lg shadow-emerald-600/25 transition"

@@ -344,6 +344,20 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                       </div>
                     </div>
 
+                    {(order.status === "paid" || order.status === "in_production" || order.status === "ready") && (
+                      <div className="p-3.5 rounded-2xl bg-amber-500/10 dark:bg-amber-950/30 border border-amber-500/30 flex items-start gap-3 text-xs">
+                        <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                        <div className="space-y-0.5">
+                          <p className="font-extrabold text-amber-900 dark:text-amber-200">
+                            ⏱️ Prazo de Produção e Envio: até 5 dias
+                          </p>
+                          <p className="text-amber-800 dark:text-amber-300/90 text-[11px] leading-relaxed">
+                            Seu pedido está em preparação técnica na fábrica CNC. O prazo de produção e postagem é de <strong>até 5 dias</strong> e você receberá o rastreamento diretamente no seu WhatsApp.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     {isPendingPix && order.payment?.method === "credit_card" && order.payment.checkoutUrl && (
                       <a href={order.payment.checkoutUrl} className="block rounded-xl bg-blue-600 p-3 text-center font-semibold text-white">Continuar pagamento no Mercado Pago</a>
                     )}

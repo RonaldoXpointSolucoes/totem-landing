@@ -1044,6 +1044,22 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
             fábrica com as medidas milimétricas e cortes técnicos para início imediato na Router CNC.
           </p>
 
+          {/* Aviso de Prazo de Produção e Envio (Até 5 dias) */}
+          <div className="max-w-xl mx-auto p-4 rounded-2xl bg-amber-500/10 dark:bg-amber-950/35 border border-amber-500/35 text-left flex items-start gap-3.5 shadow-xs">
+            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div className="space-y-1 text-xs sm:text-sm">
+              <p className="font-black text-amber-900 dark:text-amber-200 uppercase tracking-wide text-xs sm:text-sm">
+                ⏱️ Aviso Importante: Prazo de Produção e Envio de até 5 dias
+              </p>
+              <p className="text-amber-800 dark:text-amber-300/90 text-xs leading-relaxed">
+                Seu gabinete passa por usinagem computadorizada CNC sob medida, acabamento, montagem de
+                fechaduras e inspeção de qualidade. O <strong>prazo de produção e envio (postagem) é de até 5 dias</strong>, e nossa equipe enviará o código de rastreio diretamente no seu WhatsApp.
+              </p>
+            </div>
+          </div>
+
           <div className="pt-2 flex flex-wrap justify-center items-center gap-4 text-xs font-mono text-slate-600 dark:text-slate-400">
             <span className="p-2 rounded-lg bg-slate-100 dark:bg-slate-950/80 border border-black/10 dark:border-slate-800">
               Protocolo: <strong className="text-emerald-600 dark:text-emerald-400">{orderDetails.orderNumber}</strong>

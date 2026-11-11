@@ -606,6 +606,7 @@ export function buildCustomerOrderConfirmedWhatsAppMessage(params: {
     `🎉 *PEDIDO CONFIRMADO COM SUCESSO — TOTEM PRO* ✅\n\n` +
     `${greeting}\n\n` +
     `Confirmamos o recebimento do pagamento do seu pedido *#${params.orderNumber}*! Muito obrigado pela sua compra e pela confiança na *X-Point Soluções Tecnológicas*. 🤝\n\n` +
+    `⏱️ *Prazo de Produção e Envio:* Informamos que o prazo para fabricação sob medida na CNC, inspeção de qualidade e envio do seu pedido é de *até 5 dias*.\n\n` +
     `👨‍💼 *Próximo Passo:* Seu pedido já deu entrada em nossa programação e, *em seguida, um dos nossos atendentes retornará por aqui com todos os detalhes do envio e acompanhamento da sua entrega*.\n\n` +
     `Enquanto iniciamos a preparação técnica, pedimos que *confira atentamente o resumo completo abaixo* para confirmar que todas as informações e especificações do que você precisa estão corretas:\n\n` +
     `━━━━━━━━━━━━━━━━━━━━\n` +
