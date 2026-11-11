@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useCart } from "@/modules/cart/CartContext";
 import { formatBRL, calculateTotemPrice, calculateSafeCardChargeCents } from "@/modules/pricing/pricingEngine";
+import { resolveKitEquipmentSummary } from "@/modules/catalog/kitDefaults";
 import { CustomerInfo, DeliveryAddress, OrderDetails, ManufacturingSpec } from "@/types/order";
 import { ShippingQuote, ShippingOptionId } from "@/types/shipping";
 import { Card, Button, Input, Badge } from "@/components/ui";
@@ -2199,7 +2200,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
             </h2>
 
             {/* Lista dos Totens do Pedido */}
-            <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+            <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
               {items.map((item, idx) => {
                 const itemPricing = calculateTotemPrice({
                   cabinet: item.configuration.model,
@@ -2209,50 +2210,70 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   barcodeReader: item.configuration.barcodeReader,
                   includeAssemblyService: item.configuration.includeAssemblyService,
                 });
+                const kitEq = resolveKitEquipmentSummary({
+                  monitor: item.configuration.monitor,
+                  printerName: item.configuration.printer?.displayName,
+                  readerName: item.configuration.barcodeReader?.displayName,
+                });
                 const itemPixSubtotal = itemPricing.pixTotalPriceCents * item.quantity;
                 const itemCardSubtotal = itemPricing.cardTotalPriceCents * item.quantity;
+                const monitorSummaryText = kitEq.isKit
+                  ? kitEq.hasMonitorInKit
+                    ? kitEq.includedSubItems.find((s) => s.category === "monitor")?.name || kitEq.kitMonitorModel
+                    : `${item.configuration.monitor?.cutoutMonitor?.displayName || kitEq.cutoutMonitorName || "Monitor do Cliente"} (Furação no Gabinete)`
+                  : item.configuration.monitor?.displayName || "Padrão";
+                const printerSummaryText = kitEq.isKit
+                  ? kitEq.hasPrinterInKit
+                    ? kitEq.includedSubItems.find((s) => s.category === "printer")?.name || "Impressora do Kit"
+                    : `${item.configuration.printer?.displayName || kitEq.cutoutPrinterName || "Impressora do Cliente"} (Suporte no Gabinete)`
+                  : item.configuration.printer?.displayName || "Padrão";
 
                 return (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-black/10 dark:border-slate-800/80 text-xs"
+                    className="flex flex-col gap-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-black/10 dark:border-slate-800/80 text-xs"
                   >
-                    <div className="flex items-center gap-2.5 truncate">
-                      <span className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-bold flex items-center justify-center shrink-0">
-                        {idx + 1}
-                      </span>
-                      <div className="truncate">
-                        <p className="font-bold text-slate-900 dark:text-slate-200 truncate">{item.configuration.model.name}</p>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                          {item.configuration.color.name} • Qtd: {item.quantity}
-                        </p>
-                        {itemPricing.equipmentAdjustmentCents > 0 && (
-                          <p className="text-[10px] font-bold text-[#0071e3] dark:text-cyan-400 truncate">
-                            📦 + Kit/Periféricos: +{formatBRL(itemPricing.equipmentAdjustmentCents)}
-                            {Array.isArray(item.configuration.monitor?.kitItems)
-                              ? ` (${item.configuration.monitor.kitItems.filter((k) => k.selected).length} itens)`
-                              : ""}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2.5 min-w-0">
+                        <span className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                          {idx + 1}
+                        </span>
+                        <div className="min-w-0 space-y-0.5">
+                          <p className="font-bold text-slate-900 dark:text-slate-200 leading-tight">
+                            {item.configuration.model.name}
                           </p>
-                        )}
-                        {item.configuration.monitor?.cutoutMonitor && (
-                          <p className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 truncate">
-                            🖥️ Furação p/ Monitor: {item.configuration.monitor.cutoutMonitor.displayName}
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                            Cor: <strong className="text-slate-700 dark:text-slate-300">{item.configuration.color.name}</strong> • Qtd: {item.quantity}
                           </p>
-                        )}
-                        {item.configuration.includeAssemblyService && (
-                          <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400">
-                            🛠️ 100% Montado de Fábrica (+ R$ 999)
-                          </p>
-                        )}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="font-black text-emerald-600 dark:text-emerald-400 text-xs sm:text-sm">
+                          {formatBRL(itemPixSubtotal)} <span className="text-[9px] uppercase font-extrabold">no PIX</span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                          {formatBRL(itemCardSubtotal)} no cartão (10x)
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right shrink-0">
-                      <div className="font-black text-emerald-600 dark:text-emerald-400 text-xs sm:text-sm">
-                        {formatBRL(itemPixSubtotal)} <span className="text-[9px] uppercase font-extrabold">no PIX</span>
-                      </div>
-                      <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                        {formatBRL(itemCardSubtotal)} no cartão · até 10x com condições no Mercado Pago
-                      </div>
+
+                    <div className="pl-7 space-y-1 text-[11px] text-slate-600 dark:text-slate-400 border-t border-black/5 dark:border-slate-800/60 pt-1.5">
+                      <p className="leading-snug">
+                        🖥️ <strong className="text-slate-800 dark:text-slate-200">Monitor:</strong> {monitorSummaryText}
+                      </p>
+                      <p className="leading-snug">
+                        🖨️ <strong className="text-slate-800 dark:text-slate-200">Impressora:</strong> {printerSummaryText}
+                      </p>
+                      {itemPricing.equipmentAdjustmentCents > 0 && (
+                        <p className="text-[10px] font-bold text-[#0071e3] dark:text-cyan-400">
+                          📦 + Kit de Montagem ({kitEq.selectedCount}/{kitEq.totalCount} itens): +{formatBRL(itemPricing.equipmentAdjustmentCents)}
+                        </p>
+                      )}
+                      {item.configuration.includeAssemblyService && (
+                        <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                          🛠️ 100% Montado de Fábrica (+ R$ 999)
+                        </p>
+                      )}
                     </div>
                   </div>
                 );

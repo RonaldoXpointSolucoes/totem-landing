@@ -26,6 +26,11 @@ import {
   Wrench,
   FileText,
   MessageCircle,
+  Monitor as MonitorIcon,
+  Printer as PrinterIcon,
+  QrCode,
+  Ruler,
+  Sparkles,
 } from "lucide-react";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 import { siteConfig } from "@/config/site";
@@ -883,31 +888,113 @@ export const CartView: React.FC<CartViewProps> = ({
             const itemPixSubtotalCents = itemPixUnitCents * quantity;
             const itemCardSubtotalCents = itemPricing.cardTotalPriceCents * quantity;
 
+            const kitEq = resolveKitEquipmentSummary({
+              monitor,
+              printerName: printer?.displayName,
+              readerName: barcodeReader?.displayName,
+            });
+            const effectiveCutoutMon =
+              kitEq.isKit && !kitEq.hasMonitorInKit
+                ? monitor?.cutoutMonitor || null
+                : !kitEq.isKit
+                ? monitor
+                : null;
+            const customMonDims = effectiveCutoutMon?.customDimensions || monitor?.customDimensions;
+            const resolvedMonitorTitle = kitEq.isKit
+              ? kitEq.hasMonitorInKit
+                ? kitEq.includedSubItems.find((s) => s.category === "monitor")?.name ||
+                  kitEq.kitMonitorModel
+                : effectiveCutoutMon?.displayName ||
+                  kitEq.cutoutMonitorName ||
+                  "Monitor do Cliente (Clique em Editar para informar)"
+              : monitor?.displayName || "Padrão Homologado";
+
+            const resolvedPrinterTitle = kitEq.isKit
+              ? kitEq.hasPrinterInKit
+                ? kitEq.includedSubItems.find((s) => s.category === "printer")?.name ||
+                  "IMPRESSORA PDV - VT-8360 80mm"
+                : printer?.displayName ||
+                  kitEq.cutoutPrinterName ||
+                  "Impressora do Cliente (Clique em Editar para informar)"
+              : printer?.displayName || "Padrão Homologado";
+
+            const resolvedReaderTitle = kitEq.isKit
+              ? kitEq.includedSubItems.find((s) => s.category === "reader")?.name ||
+                barcodeReader?.displayName ||
+                ""
+              : barcodeReader?.displayName || "";
+
             return (
               <Card
                 key={id}
-                className="p-5 border-black/10 dark:border-slate-800 bg-white dark:bg-slate-900/70 backdrop-blur-xl flex flex-col sm:flex-row gap-5 shadow-sm dark:shadow-xl"
+                className="p-4 sm:p-6 border-black/10 dark:border-slate-800 bg-white/95 dark:bg-slate-900/80 backdrop-blur-xl flex flex-col gap-4 shadow-[0_8px_30px_rgb(0,0,0,0.06)] dark:shadow-xl rounded-2xl transition-all"
               >
-                {/* Imagem do Gabinete */}
-                <div className="relative aspect-[3/4] w-24 sm:w-28 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-black/10 dark:border-slate-800 p-2 flex items-center justify-center shrink-0 mx-auto sm:mx-0">
-                  <img
-                    src={model.mainImage}
-                    alt={model.name}
-                    className="h-full w-auto object-contain drop-shadow-[0_8px_16px_rgba(0,0,0,0.15)] dark:drop-shadow-[0_8px_16px_rgba(0,0,0,0.5)]"
-                  />
-                  <span className="absolute -top-2 -left-2 w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-300 text-xs font-bold flex items-center justify-center border border-black/10 dark:border-slate-700">
-                    {index + 1}
-                  </span>
-                </div>
+                {/* Topo do Card: Miniatura + Título + Modalidade + Preço */}
+                <div className="flex flex-col sm:flex-row gap-4 sm:items-start">
+                  {/* Imagem do Gabinete */}
+                  <div className="relative aspect-[3/4] w-24 sm:w-28 rounded-2xl bg-slate-50 dark:bg-slate-950/80 border border-black/10 dark:border-slate-800 p-2.5 flex items-center justify-center shrink-0 mx-auto sm:mx-0 shadow-inner">
+                    <img
+                      src={model.mainImage}
+                      alt={model.name}
+                      className="h-full w-auto object-contain drop-shadow-[0_8px_16px_rgba(0,0,0,0.15)] dark:drop-shadow-[0_8px_16px_rgba(0,0,0,0.5)]"
+                    />
+                    <span className="absolute -top-2 -left-2 w-6 h-6 rounded-full bg-[#0071e3] text-white text-xs font-black flex items-center justify-center shadow-sm">
+                      {index + 1}
+                    </span>
+                  </div>
 
-                {/* Detalhes Técnicos do Item */}
-                <div className="flex-1 flex flex-col justify-between space-y-3">
-                  <div>
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1.5 sm:gap-2 mb-1">
-                      <h3 className="text-base sm:text-lg font-bold text-[#1d1d1f] dark:text-white">{model.name}</h3>
-                      <div className="sm:text-right space-y-0.5">
+                  {/* Cabeçalho e Resumo Financeiro Unitário */}
+                  <div className="flex-1 min-w-0 space-y-2.5">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <h3 className="text-lg sm:text-xl font-black text-[#1d1d1f] dark:text-white tracking-tight">
+                            {model.name}
+                          </h3>
+                          {kitEq.isKit ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-500/10 dark:bg-indigo-500/20 text-[#0071e3] dark:text-indigo-300 border border-indigo-500/25 text-[10px] font-extrabold uppercase tracking-wider">
+                              <Package className="w-3 h-3 shrink-0" />
+                              {kitEq.selectedCount === kitEq.totalCount
+                                ? `Gabinete + Kit Completo (${kitEq.selectedCount}/${kitEq.totalCount} itens)`
+                                : `Gabinete + Kit Personalizado (${kitEq.selectedCount}/${kitEq.totalCount} itens)`}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 text-[10px] font-extrabold uppercase tracking-wider">
+                              Só Gabinete CNC • Furação Grátis
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Pílulas de Composição do Valor */}
+                        <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-600 dark:text-slate-400">
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800/80 font-medium">
+                            <span
+                              className="w-2.5 h-2.5 rounded-full border border-black/20 dark:border-slate-500 shrink-0"
+                              style={{ background: color.hexReference }}
+                            />
+                            <span>
+                              Cor: <strong className="text-slate-900 dark:text-white">{color.name}</strong>
+                            </span>
+                          </span>
+                          <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800/80 font-medium">
+                            Gabinete no PIX:{" "}
+                            <strong className="text-slate-900 dark:text-white">
+                              {formatBRL(itemPricing.pixBasePriceCents + itemPricing.colorAdjustmentCents)}
+                            </strong>
+                          </span>
+                          {itemPricing.equipmentAdjustmentCents > 0 && (
+                            <span className="px-2 py-0.5 rounded-lg bg-blue-500/10 text-[#0071e3] dark:text-cyan-300 font-bold">
+                              + Kit ({kitEq.selectedCount} itens):{" "}
+                              {formatBRL(itemPricing.equipmentAdjustmentCents)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Bloco de Preço Total do Item */}
+                      <div className="sm:text-right space-y-0.5 shrink-0 bg-emerald-50/60 dark:bg-emerald-950/20 sm:bg-transparent p-2.5 sm:p-0 rounded-xl border border-emerald-500/20 sm:border-0">
                         <div className="flex items-baseline sm:justify-end gap-1.5 flex-wrap">
-                          <span className="text-lg sm:text-xl font-black text-emerald-600 dark:text-emerald-400">
+                          <span className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
                             {formatBRL(itemPixSubtotalCents)}
                           </span>
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[10px] font-extrabold border border-emerald-500/30 whitespace-nowrap">
@@ -928,124 +1015,278 @@ export const CartView: React.FC<CartViewProps> = ({
                       </div>
                     </div>
 
-                    {/* Especificação dos Componentes */}
-                    {(() => {
-                      const kitEq = resolveKitEquipmentSummary({
-                        monitor,
-                        printerName: printer?.displayName,
-                        readerName: barcodeReader?.displayName,
-                      });
-                      return (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-400 mt-2">
-                          <div className="flex items-center gap-1.5">
-                            <span
-                              className="w-2.5 h-2.5 rounded-full border border-black/20 dark:border-slate-600 shrink-0"
-                              style={{ background: color.hexReference }}
-                            />
-                            <span className="truncate">
-                              Cor: <strong className="text-slate-900 dark:text-slate-200">{color.name}</strong>
+                    {/* GRID DETALHADO DE EQUIPAMENTOS E FURAÇÃO DO GABINETE (SEM CORTAR OS NOMES!) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                      {/* 1. MONITOR / TELA */}
+                      <div
+                        className={cn(
+                          "p-3 rounded-xl border space-y-1",
+                          kitEq.isKit && !kitEq.hasMonitorInKit
+                            ? "bg-amber-500/5 dark:bg-amber-950/20 border-amber-500/30"
+                            : "bg-slate-50/90 dark:bg-slate-950/60 border-black/10 dark:border-slate-800"
+                        )}
+                      >
+                        <div className="flex items-center justify-between gap-1.5">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                            <MonitorIcon className="w-3.5 h-3.5 text-[#0071e3] dark:text-cyan-400 shrink-0" />
+                            {kitEq.isKit && kitEq.hasMonitorInKit
+                              ? "Monitor Incluso no Kit"
+                              : kitEq.isKit && !kitEq.hasMonitorInKit
+                              ? "Seu Monitor (Furação no Gabinete)"
+                              : "Monitor (Furação no Gabinete)"}
+                          </span>
+                          <span
+                            className={cn(
+                              "text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase",
+                              kitEq.isKit && kitEq.hasMonitorInKit
+                                ? "bg-blue-500/15 text-[#0071e3] dark:text-cyan-300"
+                                : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                            )}
+                          >
+                            {kitEq.isKit && kitEq.hasMonitorInKit
+                              ? "Vai no Kit"
+                              : "Furação Grátis (+ R$ 0)"}
+                          </span>
+                        </div>
+                        <p className="text-xs sm:text-sm font-extrabold text-[#1d1d1f] dark:text-white leading-snug break-words">
+                          {resolvedMonitorTitle}
+                        </p>
+                        {kitEq.isKit && !kitEq.hasMonitorInKit && (
+                          <p className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">
+                            Monitor removido do Kit • Gabinete será usinado na medida exata para esta tela.
+                          </p>
+                        )}
+                        {customMonDims && (
+                          <div className="pt-1 flex flex-wrap items-center gap-1.5 text-[10px] font-mono text-indigo-700 dark:text-indigo-300">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20">
+                              <Ruler className="w-3 h-3 shrink-0" />
+                              Visor: {customMonDims.screenWidthCm}×{customMonDims.screenHeightCm}cm • Ext:{" "}
+                              {customMonDims.outerWidthCm}×{customMonDims.outerHeightCm}cm
                             </span>
                           </div>
-                          <div className="truncate" title={kitEq.monitorDisplay}>
-                            Tela: <strong className="text-slate-900 dark:text-slate-200">{kitEq.monitorDisplay}</strong>
-                          </div>
-                          <div className="truncate" title={kitEq.printerDisplay}>
-                            Impressora: <strong className="text-slate-900 dark:text-slate-200">{kitEq.printerDisplay}</strong>
-                          </div>
-                          {kitEq.hasReader && (
-                            <div className="truncate" title={kitEq.readerDisplay}>
-                              Leitor: <strong className="text-slate-900 dark:text-slate-200">{kitEq.readerDisplay}</strong>
-                            </div>
-                          )}
-                          {configuration.includeAssemblyService && (
-                            <div className="col-span-full flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400 pt-1">
-                              <Wrench className="w-3.5 h-3.5 shrink-0" />
-                              <span>Totem 100% Montado de Fábrica (+ R$ 999,00)</span>
-                            </div>
-                          )}
+                        )}
+                      </div>
+
+                      {/* 2. IMPRESSORA TÉRMICA */}
+                      <div
+                        className={cn(
+                          "p-3 rounded-xl border space-y-1",
+                          kitEq.isKit && !kitEq.hasPrinterInKit
+                            ? "bg-amber-500/5 dark:bg-amber-950/20 border-amber-500/30"
+                            : "bg-slate-50/90 dark:bg-slate-950/60 border-black/10 dark:border-slate-800"
+                        )}
+                      >
+                        <div className="flex items-center justify-between gap-1.5">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                            <PrinterIcon className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                            {kitEq.isKit && kitEq.hasPrinterInKit
+                              ? "Impressora Inclusa no Kit"
+                              : kitEq.isKit && !kitEq.hasPrinterInKit
+                              ? "Sua Impressora (Suporte no Gabinete)"
+                              : "Impressora (Suporte no Gabinete)"}
+                          </span>
+                          <span
+                            className={cn(
+                              "text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase",
+                              kitEq.isKit && kitEq.hasPrinterInKit
+                                ? "bg-blue-500/15 text-[#0071e3] dark:text-cyan-300"
+                                : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                            )}
+                          >
+                            {kitEq.isKit && kitEq.hasPrinterInKit
+                              ? "Vai no Kit"
+                              : "Suporte Grátis (+ R$ 0)"}
+                          </span>
                         </div>
-                      );
-                    })()}
+                        <p className="text-xs sm:text-sm font-extrabold text-[#1d1d1f] dark:text-white leading-snug break-words">
+                          {resolvedPrinterTitle}
+                        </p>
+                        {kitEq.isKit && !kitEq.hasPrinterInKit ? (
+                          <p className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">
+                            Impressora removida do Kit • Gabinete será usinado com suporte/boca para este modelo.
+                          </p>
+                        ) : (
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            {kitEq.isKit && kitEq.hasPrinterInKit
+                              ? "Impressora térmica 80mm enviada junto com o Kit"
+                              : "Berço interno e rasgo frontal de saída de papel 80mm"}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* 3. LEITOR DE CÓDIGO DE BARRAS / QR CODE (Quando ativo) */}
+                      {resolvedReaderTitle && (
+                        <div className="p-3 rounded-xl bg-slate-50/90 dark:bg-slate-950/60 border border-black/10 dark:border-slate-800 space-y-1 sm:col-span-2">
+                          <div className="flex items-center justify-between gap-1.5">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                              <QrCode className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                              {kitEq.isKit &&
+                              kitEq.includedSubItems.some((s) => s.category === "reader")
+                                ? "Leitor QR / Código de Barras (Incluso no Kit)"
+                                : "Leitor QR / Código de Barras (Janela no Gabinete)"}
+                            </span>
+                            <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+                              {kitEq.isKit &&
+                              kitEq.includedSubItems.some((s) => s.category === "reader")
+                                ? "Vai no Kit"
+                                : "Janela Usinada"}
+                            </span>
+                          </div>
+                          <p className="text-xs sm:text-sm font-bold text-[#1d1d1f] dark:text-white">
+                            {resolvedReaderTitle}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* DETALHAMENTO COMPLETO DOS SUB-ITENS DO KIT DE MONTAGEM (QUANDO KIT ESTÁ SELECIONADO) */}
+                    {kitEq.isKit && (
+                      <div className="p-3.5 rounded-2xl bg-indigo-500/[0.04] dark:bg-indigo-950/25 border border-indigo-500/20 dark:border-indigo-500/30 space-y-2.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-xs font-extrabold text-[#1d1d1f] dark:text-indigo-200 flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-[#0071e3] dark:text-indigo-400 shrink-0" />
+                            Itens Inclusos no Seu Kit ({kitEq.selectedCount} de {kitEq.totalCount}{" "}
+                            selecionados)
+                          </span>
+                          <span className="text-xs font-black text-[#0071e3] dark:text-indigo-300">
+                            + {formatBRL(kitEq.kitPriceCents)}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap gap-1.5">
+                          {kitEq.includedSubItems.map((sub) => (
+                            <span
+                              key={sub.id}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-emerald-500/30 text-[11px] font-semibold text-slate-800 dark:text-slate-200 shadow-2xs"
+                            >
+                              <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400 stroke-[3] shrink-0" />
+                              <span>{sub.name}</span>
+                              {sub.priceCents > 0 && (
+                                <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
+                                  ({formatBRL(sub.priceCents)})
+                                </span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+
+                        {kitEq.removedSubItems.length > 0 && (
+                          <div className="pt-1.5 border-t border-indigo-500/15 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                            <span className="font-bold text-amber-700 dark:text-amber-300">
+                              Desmarcados do Kit:
+                            </span>
+                            {kitEq.removedSubItems.map((rem) => (
+                              <span
+                                key={rem.id}
+                                className="px-2 py-0.5 rounded bg-slate-200/70 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 line-through"
+                              >
+                                {rem.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Serviço de Montagem de Fábrica */}
+                    {configuration.includeAssemblyService && (
+                      <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-2 text-xs font-bold text-amber-700 dark:text-amber-300">
+                        <Wrench className="w-4 h-4 shrink-0" />
+                        <span>
+                          Serviço de Montagem Completa de Fábrica Contratado (+ R$ 999,00) — Totem entregue 100% montado e testado
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Observações de Engenharia (se houver) */}
+                    {configuration.customizationNotes && (
+                      <div className="p-2.5 rounded-xl bg-slate-100/80 dark:bg-slate-950/70 border border-black/10 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-400">
+                        <strong className="text-slate-800 dark:text-slate-200">
+                          Observações p/ Engenharia:
+                        </strong>{" "}
+                        {configuration.customizationNotes}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Barra Inferior do Card: Quantidade e Ações */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-black/10 dark:border-slate-800/80">
+                  {/* Seletor de Quantidade (+/-) */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-slate-500 mr-1">Qtd:</span>
+                    <div className="flex items-center border border-black/15 dark:border-slate-700/80 rounded-xl bg-slate-50 dark:bg-slate-950">
+                      <button
+                        onClick={() => updateQuantity(id, quantity - 1)}
+                        className="p-2 text-slate-600 dark:text-slate-400 hover:text-black dark:hover:text-white active:scale-95 transition-all cursor-pointer"
+                        aria-label="Diminuir quantidade"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="w-9 text-center text-xs font-black text-slate-900 dark:text-white select-none">
+                        {quantity}
+                      </span>
+                      <button
+                        onClick={() => updateQuantity(id, quantity + 1)}
+                        className="p-2 text-slate-600 dark:text-slate-400 hover:text-black dark:hover:text-white active:scale-95 transition-all cursor-pointer"
+                        aria-label="Aumentar quantidade"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      ({formatBRL(itemPixUnitCents)} un. no PIX)
+                    </span>
                   </div>
 
-                  {/* Barra Inferior do Card: Quantidade e Ações */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-black/10 dark:border-slate-800/80">
-                    {/* Seletor de Quantidade (+/-) */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500 mr-1">Qtd:</span>
-                      <div className="flex items-center border border-black/15 dark:border-slate-700/80 rounded-lg bg-slate-50 dark:bg-slate-950">
-                        <button
-                          onClick={() => updateQuantity(id, quantity - 1)}
-                          className="p-1.5 text-slate-600 dark:text-slate-400 hover:text-black dark:hover:text-white transition-colors"
-                          aria-label="Diminuir quantidade"
-                        >
-                          <Minus className="w-3.5 h-3.5" />
-                        </button>
-                        <span className="w-8 text-center text-xs font-bold text-slate-900 dark:text-white select-none">
-                          {quantity}
-                        </span>
-                        <button
-                          onClick={() => updateQuantity(id, quantity + 1)}
-                          className="p-1.5 text-slate-600 dark:text-slate-400 hover:text-black dark:hover:text-white transition-colors"
-                          aria-label="Aumentar quantidade"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                      <span className="text-[11px] text-slate-500">
-                        ({formatBRL(itemPixUnitCents)} un. no PIX)
-                      </span>
-                    </div>
+                  {/* Ações: Duplicar, Editar, Excluir */}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        duplicateItem(id);
+                        trackEvent(ANALYTICS_EVENTS.DUPLICATE_ITEM, {
+                          itemId: id,
+                          modelId: model.id,
+                          modelName: model.name,
+                        });
+                      }}
+                      title="Duplicar configuração para compra em lote"
+                      className="h-9 px-3 text-xs font-bold active:scale-95 transition-transform"
+                    >
+                      <Copy className="w-3.5 h-3.5 mr-1.5 text-cyan-600 dark:text-cyan-400" />
+                      Duplicar
+                    </Button>
 
-                    {/* Ações: Duplicar, Editar, Excluir */}
-                    <div className="flex items-center gap-1.5">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => {
-                          duplicateItem(id);
-                          trackEvent(ANALYTICS_EVENTS.DUPLICATE_ITEM, {
-                            itemId: id,
-                            modelId: model.id,
-                            modelName: model.name,
-                          });
-                        }}
-                        title="Duplicar configuração para compra em lote"
-                        className="h-8 px-2.5 text-xs font-semibold"
-                      >
-                        <Copy className="w-3.5 h-3.5 mr-1 text-cyan-600 dark:text-cyan-400" />
-                        Duplicar
-                      </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onEditItem(id)}
+                      title="Editar configurações deste totem"
+                      className="h-9 px-3 text-xs font-bold active:scale-95 transition-transform"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 mr-1.5 text-[#0071e3] dark:text-indigo-400" />
+                      Editar
+                    </Button>
 
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onEditItem(id)}
-                        title="Editar configurações deste totem"
-                        className="h-8 px-2.5 text-xs font-semibold"
-                      >
-                        <Edit3 className="w-3.5 h-3.5 mr-1 text-[#0071e3] dark:text-indigo-400" />
-                        Editar
-                      </Button>
-
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          removeItem(id);
-                          trackEvent(ANALYTICS_EVENTS.REMOVE_FROM_CART, {
-                            itemId: id,
-                            modelId: model.id,
-                            modelName: model.name,
-                            totalPriceCents: itemPixSubtotalCents,
-                          });
-                        }}
-                        title="Remover do carrinho"
-                        className="h-8 px-2 text-xs text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:text-rose-300 dark:hover:bg-rose-950/30"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        removeItem(id);
+                        trackEvent(ANALYTICS_EVENTS.REMOVE_FROM_CART, {
+                          itemId: id,
+                          modelId: model.id,
+                          modelName: model.name,
+                          totalPriceCents: itemPixSubtotalCents,
+                        });
+                      }}
+                      title="Remover do carrinho"
+                      className="h-9 px-2.5 text-xs text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:text-rose-300 dark:hover:bg-rose-950/30 active:scale-95 transition-transform"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
                 </div>
               </Card>

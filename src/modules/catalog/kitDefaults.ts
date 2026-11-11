@@ -437,8 +437,11 @@ export function resolveKitEquipmentSummary(params: {
     params.cutoutMonitorName || params.monitor?.cutoutMonitor?.displayName || ""
   ).trim();
   if (!cutoutMonitorName && !hasMonitorInKit && rawMon) {
+    const matchPrefixMon = rawMon.match(/^(.+?)\s*\(Fura[çc][ãa]o no Gabinete/i);
     const matchFuracao = rawMon.match(/Fura[çc][ãa]o(?:\s+CNC)?\s+p\/\s*([^•)]+)/i);
-    if (matchFuracao && matchFuracao[1]) {
+    if (matchPrefixMon && matchPrefixMon[1]) {
+      cutoutMonitorName = matchPrefixMon[1].trim();
+    } else if (matchFuracao && matchFuracao[1]) {
       cutoutMonitorName = matchFuracao[1].trim();
     }
   }
@@ -446,8 +449,11 @@ export function resolveKitEquipmentSummary(params: {
   // Extrai a impressora que o cliente informou para recorte/suporte CNC quando a impressora do Kit foi desabilitada
   let cutoutPrinterName = "";
   if (!hasPrinterInKit && rawPrt && !isEmptyLabel(rawPrt)) {
+    const matchPrefixPrt = rawPrt.match(/^(.+?)\s*\((?:Suporte|Fura[çc][ãa]o)/i);
     const matchSuporte = rawPrt.match(/(?:Suporte|Recorte|Fura[çc][ãa]o)(?:\s+CNC)?\s+p\/\s*(.+)$/i);
-    if (matchSuporte && matchSuporte[1]) {
+    if (matchPrefixPrt && matchPrefixPrt[1]) {
+      cutoutPrinterName = matchPrefixPrt[1].trim();
+    } else if (matchSuporte && matchSuporte[1]) {
       cutoutPrinterName = matchSuporte[1].trim();
     } else if (
       !rawPrtLower.includes("não inclusa") &&
@@ -462,13 +468,13 @@ export function resolveKitEquipmentSummary(params: {
   const kitMonitorModel = hasMonitorInKit
     ? monSub?.name || 'Computador All-in-One Touch 23.8" Core i5'
     : cutoutMonitorName
-    ? `NÃO INCLUSO NO KIT • Furação CNC p/ Monitor do Cliente: ${cutoutMonitorName}`
+    ? `${cutoutMonitorName} (Furação CNC p/ Monitor do Cliente • S/ Monitor no Kit)`
     : "NÃO INCLUSO (Removido do Kit pelo Cliente)";
 
   const kitPrinterModel = hasPrinterInKit
     ? prtSub?.name || "IMPRESSORA PDV - VT-8360 80mm"
     : cutoutPrinterName
-    ? `NÃO INCLUSA NO KIT • Suporte CNC p/ Impressora do Cliente: ${cutoutPrinterName}`
+    ? `${cutoutPrinterName} (Suporte CNC p/ Impressora do Cliente • S/ Impressora no Kit)`
     : "NÃO INCLUSA (Removida do Kit pelo Cliente)";
 
   const kitReaderModel = rdrSub?.name || "";
@@ -478,7 +484,7 @@ export function resolveKitEquipmentSummary(params: {
     monitorDisplay = `Kit de Montagem — ${kitMonitorModel}`;
   } else if (accSubs.length > 0 || hasPrinterInKit) {
     monitorDisplay = cutoutMonitorName
-      ? `Kit Parcial (${selectedSubItems.length}/${kitItems.length} itens) — S/ Monitor no Kit • Furação p/ ${cutoutMonitorName}`
+      ? `${cutoutMonitorName} (Furação no Gabinete • Kit Parcial ${selectedSubItems.length}/${kitItems.length} itens)`
       : `Kit Parcial (${selectedSubItems.length}/${kitItems.length} itens) — SEM MONITOR TOUCH (Removido pelo Cliente)`;
   } else {
     monitorDisplay = "Kit de Montagem (Sem itens selecionados)";
@@ -489,7 +495,7 @@ export function resolveKitEquipmentSummary(params: {
       ? kitPrinterModel
       : `${kitPrinterModel} (Inclusa no Kit)`
     : cutoutPrinterName
-    ? `Sem Impressora no Kit • Suporte CNC p/ ${cutoutPrinterName}`
+    ? `${cutoutPrinterName} (Suporte no Gabinete • S/ Impressora no Kit)`
     : "NÃO INCLUSA (Removida do Kit pelo Cliente)";
 
   const hasValidRawReader =
