@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   MessageSquare,
   ShieldCheck,
@@ -238,9 +238,19 @@ export function CommercialRemarketingPanel({
   const [cfgEndHour, setCfgEndHour] = useState(20);
   const [savingConfig, setSavingConfig] = useState(false);
 
+  const onDataLoadedRef = useRef(onDataLoaded);
+  useEffect(() => {
+    onDataLoadedRef.current = onDataLoaded;
+  }, [onDataLoaded]);
+
+  const hasLoadedOnceRef = useRef(false);
+  const lastRmkSignatureRef = useRef("");
+
   const fetchRemarketingData = useCallback(
-    async (withAutoSweep = false) => {
-      setLoading(true);
+    async (withAutoSweep = false, silent = false) => {
+      if (!silent && !hasLoadedOnceRef.current) {
+        setLoading(true);
+      }
       try {
         const res = await fetch(
           `/api/admin/remarketing${withAutoSweep ? "?autoSweep=true" : ""}`,
@@ -248,12 +258,32 @@ export function CommercialRemarketingPanel({
         );
         const json = await res.json();
         if (json.ok) {
-          setData(json);
-          setCfgMinIdle(json.config.minIdleMinutesBeforeAuto);
-          setCfgCooldownHours(json.config.phoneCooldownHours);
-          setCfgStartHour(json.config.businessHoursStart);
-          setCfgEndHour(json.config.businessHoursEnd);
-          onDataLoaded?.(json);
+          hasLoadedOnceRef.current = true;
+          const nextSig = JSON.stringify({
+            kpis: json.kpis,
+            cfg: json.config,
+            inst: json.commercialInstanceStatus?.state,
+            targets: (json.targets || []).map((t: any) => ({
+              id: t.targetId,
+              st: t.stage,
+              dnd: t.doNotDisturb,
+              auto: t.autoSentCount,
+              man: t.manualSentCount,
+              canM: t.canSendManual,
+              notes: t.commercialNotes,
+            })),
+            histLen: (json.history || []).length,
+          });
+
+          if (!silent || nextSig !== lastRmkSignatureRef.current) {
+            lastRmkSignatureRef.current = nextSig;
+            setData(json);
+            setCfgMinIdle(json.config.minIdleMinutesBeforeAuto);
+            setCfgCooldownHours(json.config.phoneCooldownHours);
+            setCfgStartHour(json.config.businessHoursStart);
+            setCfgEndHour(json.config.businessHoursEnd);
+            onDataLoadedRef.current?.(json);
+          }
         }
       } catch (err) {
         console.warn("Erro ao carregar remarketing:", err);
@@ -261,16 +291,23 @@ export function CommercialRemarketingPanel({
         setLoading(false);
       }
     },
-    [onDataLoaded]
+    []
   );
 
-  // Carrega ao montar e executa varredura segura a cada 3 minutos enquanto o Admin estiver aberto
+  // Carrega de forma escalonada (após os pedidos principais) e executa varredura silenciosa a cada 3 minutos
   useEffect(() => {
-    fetchRemarketingData(true);
+    const initTimer = setTimeout(() => {
+      fetchRemarketingData(true, true);
+    }, 1200);
     const interval = setInterval(() => {
-      fetchRemarketingData(true);
+      if (typeof document === "undefined" || document.visibilityState === "visible") {
+        fetchRemarketingData(true, true);
+      }
     }, 180_000);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(initTimer);
+      clearInterval(interval);
+    };
   }, [fetchRemarketingData]);
 
   // Se o usuário clicou em "Recuperar Venda" num card de pedido específico da lista principal

@@ -980,8 +980,73 @@ export default function AdminPage() {
     ]);
   };
 
-  // Checar Auth ao carregar (sessão Google ou legacy password)
+  const ordersRef = React.useRef<OrderRecord[]>([]);
   useEffect(() => {
+    ordersRef.current = orders;
+  }, [orders]);
+  const lastOrdersSignatureRef = React.useRef<string>("");
+  const lastAdsSignatureRef = React.useRef<string>("");
+
+  const computeOrdersSignature = (
+    list: OrderRecord[],
+    counts?: Record<string, number>,
+    totalAll?: number
+  ): string => {
+    try {
+      return JSON.stringify({
+        totalAll: totalAll ?? list.length,
+        counts: counts || {},
+        orders: list.map((o) => ({
+          id: o.$id,
+          num: o.order_number,
+          st: o.status,
+          tot: o.total_cents,
+          shp: o.shipping_cents,
+          cn: o.customer_name,
+          cd: o.customer_document,
+          cw: o.customer_whatsapp,
+          pSt: o.payment?.status,
+          pGid: o.payment?.gateway_payment_id,
+          pExp: o.payment?.expires_at,
+          gDiag: o.gateway_diagnosis?.code,
+          addr: o.delivery_address_json,
+          mSheet: o.manufacturing_sheet_json,
+          items: (o.items || []).map(
+            (i) => `${i.$id}:${i.quantity}:${i.cabinet_name}:${i.color_name}:${i.monitor_name}:${i.printer_name}:${i.subtotal_cents}`
+          ),
+        })),
+      });
+    } catch {
+      return String(Date.now());
+    }
+  };
+
+  // Hidratação instantânea do cache local para abertura imediata (0ms) + Checagem de Auth
+  useEffect(() => {
+    try {
+      const cachedOrdersRaw = localStorage.getItem("totem_admin_orders_offline_cache");
+      const cachedCountsRaw = localStorage.getItem("totem_admin_orders_counts_cache");
+      if (cachedOrdersRaw) {
+        const parsedOrders = JSON.parse(cachedOrdersRaw);
+        if (Array.isArray(parsedOrders) && parsedOrders.length > 0) {
+          setOrders(parsedOrders);
+          ordersRef.current = parsedOrders;
+          parsedOrders.forEach((o: OrderRecord) => {
+            if (o.$id) knownOrderIdsRef.current.add(o.$id);
+          });
+        }
+      }
+      if (cachedCountsRaw) {
+        const parsedCounts = JSON.parse(cachedCountsRaw);
+        if (parsedCounts && typeof parsedCounts.statusCounts === "object") {
+          setOrderStatusCounts(parsedCounts.statusCounts);
+        }
+        if (typeof parsedCounts?.totalAll === "number") {
+          setTotalAllOrdersCount(parsedCounts.totalAll);
+        }
+      }
+    } catch {}
+
     fetch("/api/auth/session")
       .then((res) => res.json())
       .then((data) => {
@@ -1010,26 +1075,35 @@ export default function AdminPage() {
       .catch(() => setIsAuthenticated(false));
   }, []);
 
-  // Carregar Pedidos (com Detecção de Novo Pedido Sonoro/Nativo, Badge PWA & Cache Offline)
-  const loadOrders = async (status = statusFilter) => {
-    setIsLoadingOrders(true);
+  // Carregar Pedidos (com Atualização Silenciosa / Oculta por Diff, Sem Piscar a Tela)
+  const loadOrders = async (
+    status = statusFilter,
+    options?: { silent?: boolean }
+  ) => {
+    const isSilent = Boolean(options?.silent);
+    // Só exibe spinner de tela cheia se ainda não houver nenhum pedido na tela
+    if (!isSilent && ordersRef.current.length === 0) {
+      setIsLoadingOrders(true);
+    }
     try {
       const url =
         status && status !== "all" && status !== "ads"
           ? `/api/admin/orders?status=${status}`
           : `/api/admin/orders`;
-      const res = await fetch(url);
+      const res = await fetch(url, { cache: "no-store" });
       const json = await res.json();
       if (json.ok) {
         const fetchedOrders: OrderRecord[] = json.data || [];
-        setOrders(fetchedOrders);
-        setLastSyncTimeStr(
-          new Date().toLocaleTimeString("pt-BR", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          })
-        );
+        const fetchedCounts =
+          json.statusCounts && typeof json.statusCounts === "object"
+            ? json.statusCounts
+            : undefined;
+        const fetchedTotalAll =
+          typeof json.totalAll === "number"
+            ? json.totalAll
+            : !status || status === "all" || status === "ads"
+            ? fetchedOrders.length
+            : undefined;
 
         // Detecta chegada de novos pedidos em tempo real para tocar sino + notificação nativa
         if (knownOrderIdsRef.current.size > 0 && fetchedOrders.length > 0) {
@@ -1049,37 +1123,66 @@ export default function AdminPage() {
           if (o.$id) knownOrderIdsRef.current.add(o.$id);
         });
 
-        // Salva snapshot offline para consulta de emergência sem internet na fábrica
-        try {
-          if (!status || status === "all") {
-            localStorage.setItem(
-              "totem_admin_orders_offline_cache",
-              JSON.stringify(fetchedOrders.slice(0, 25))
-            );
-          }
-        } catch {}
+        // Verifica de forma oculta se houve qualquer mudança real nos dados antes de mexer na tela
+        const nextSignature = `${status || "all"}::${computeOrdersSignature(
+          fetchedOrders,
+          fetchedCounts,
+          fetchedTotalAll
+        )}`;
+        const hasChanges = nextSignature !== lastOrdersSignatureRef.current;
 
-        if (json.statusCounts && typeof json.statusCounts === "object") {
-          setOrderStatusCounts(json.statusCounts);
-          try {
-            const pendingBadgeCount =
-              Number(json.statusCounts.awaiting_payment || 0) +
-              Number(json.statusCounts.paid || 0) +
-              Number(json.statusCounts.awaiting_custom_analysis || 0);
-            if ("setAppBadge" in navigator) {
-              if (pendingBadgeCount > 0) {
-                (navigator as any).setAppBadge(pendingBadgeCount).catch(() => {});
-              } else {
-                (navigator as any).clearAppBadge?.().catch(() => {});
+        if (!isSilent || hasChanges) {
+          lastOrdersSignatureRef.current = nextSignature;
+          setOrders(fetchedOrders);
+          ordersRef.current = fetchedOrders;
+          setLastSyncTimeStr(
+            new Date().toLocaleTimeString("pt-BR", {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            })
+          );
+
+          if (fetchedCounts) {
+            setOrderStatusCounts(fetchedCounts);
+            try {
+              const pendingBadgeCount =
+                Number(fetchedCounts.awaiting_payment || 0) +
+                Number(fetchedCounts.paid || 0) +
+                Number(fetchedCounts.awaiting_custom_analysis || 0);
+              if ("setAppBadge" in navigator) {
+                if (pendingBadgeCount > 0) {
+                  (navigator as any).setAppBadge(pendingBadgeCount).catch(() => {});
+                } else {
+                  (navigator as any).clearAppBadge?.().catch(() => {});
+                }
               }
+            } catch {}
+          }
+          if (typeof fetchedTotalAll === "number") {
+            setTotalAllOrdersCount(fetchedTotalAll);
+          }
+
+          // Salva snapshot local para carregamento instantâneo e modo offline
+          try {
+            if (!status || status === "all") {
+              localStorage.setItem(
+                "totem_admin_orders_offline_cache",
+                JSON.stringify(fetchedOrders.slice(0, 30))
+              );
+            }
+            if (fetchedCounts) {
+              localStorage.setItem(
+                "totem_admin_orders_counts_cache",
+                JSON.stringify({
+                  statusCounts: fetchedCounts,
+                  totalAll: fetchedTotalAll ?? fetchedOrders.length,
+                })
+              );
             }
           } catch {}
         }
-        if (typeof json.totalAll === "number") {
-          setTotalAllOrdersCount(json.totalAll);
-        } else if (!status || status === "all" || status === "ads") {
-          setTotalAllOrdersCount(fetchedOrders.length);
-        }
+
         const modalOrderId = readUrlParam("modalOrder");
         if (modalOrderId && !selectedOrder) {
           const found = fetchedOrders.find(
@@ -1100,10 +1203,11 @@ export default function AdminPage() {
       // Fallback para Cache Local se estiver Offline
       try {
         const cached = localStorage.getItem("totem_admin_orders_offline_cache");
-        if (cached && orders.length === 0) {
+        if (cached && ordersRef.current.length === 0) {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed)) {
             setOrders(parsed);
+            ordersRef.current = parsed;
           }
         }
       } catch {}
@@ -1112,14 +1216,14 @@ export default function AdminPage() {
     }
   };
 
-  // Auto-Sync Inteligente PWA a cada 45 segundos
+  // Auto-Sync Oculto/Silencioso a cada 45 segundos (só atualiza a tela se houver mudanças reais)
   useEffect(() => {
     if (!isAuthenticated || !pwaAutoSync) return;
     const timer = setInterval(() => {
       if (typeof document !== "undefined" && document.visibilityState === "visible") {
-        loadOrders();
+        loadOrders(statusFilter, { silent: true });
         if (statusFilter === "ads") {
-          loadAdsLeads(true);
+          loadAdsLeads(false, true);
         }
       }
     }, 45000);
@@ -1187,8 +1291,10 @@ export default function AdminPage() {
   const [adsSummary, setAdsSummary] = useState<any>(null);
   const [isLoadingAdsLeads, setIsLoadingAdsLeads] = useState(false);
 
-  const loadAdsLeads = async (forceRefresh = false) => {
-    setIsLoadingAdsLeads(true);
+  const loadAdsLeads = async (forceRefresh = false, silent = false) => {
+    if (!silent) {
+      setIsLoadingAdsLeads(true);
+    }
     try {
       const res = await fetch(
         `/api/admin/ads-leads${forceRefresh ? "?refresh=true" : ""}`,
@@ -1196,13 +1302,21 @@ export default function AdminPage() {
       );
       const json = await res.json();
       if (json.success && Array.isArray(json.records)) {
-        setAdsRecords(json.records);
-        setAdsSummary(json.summary || null);
+        const sig = json.records
+          .map((r: AdsLeadCartRecord) => `${r.id}:${r.status}:${r.updatedAt || ""}:${r.commercialNotes || ""}`)
+          .join("|");
+        if (!silent || sig !== lastAdsSignatureRef.current) {
+          lastAdsSignatureRef.current = sig;
+          setAdsRecords(json.records);
+          setAdsSummary(json.summary || null);
+        }
       }
     } catch (err) {
       console.error("Erro ao carregar registros ADS:", err);
     } finally {
-      setIsLoadingAdsLeads(false);
+      if (!silent) {
+        setIsLoadingAdsLeads(false);
+      }
     }
   };
 
@@ -1268,14 +1382,22 @@ export default function AdminPage() {
   useEffect(() => {
     if (isAuthenticated) {
       const initialStatus = readUrlParam("status") || statusFilter;
+      // 1. Prioridade Máxima: carrega Pedidos imediatamente
       if (initialStatus !== "ads") {
         loadOrders(initialStatus);
       } else {
-        loadOrders("all");
+        loadOrders("all", { silent: true });
+        loadAdsLeads(false, false);
       }
-      loadAdsLeads();
-      loadCatalog();
-      loadAnalytics();
+      // 2. Carregamento Escalonado em Segundo Plano (não compete com a abertura dos pedidos)
+      const secondaryTimer = setTimeout(() => {
+        if (initialStatus !== "ads") {
+          loadAdsLeads(false, true);
+        }
+        loadCatalog();
+        loadAnalytics();
+      }, 650);
+      return () => clearTimeout(secondaryTimer);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
@@ -2960,10 +3082,110 @@ export default function AdminPage() {
         {/* ======================================================== */}
         {activeTab === "orders" && (
           <div className="space-y-3.5 sm:space-y-5">
-            {/* Barra de Filtros, Busca e Modo de Visualização (Mobile-First Ultra-Compacta) */}
-            <div className="flex flex-col lg:flex-row gap-2.5 sm:gap-3 items-stretch lg:items-center justify-between">
-              {/* Filtros por Status (1 Linha Deslizante no Mobile com Prioridade para Status com Pedidos > 0) */}
-              <div className="flex items-center flex-nowrap lg:flex-wrap gap-1.5 overflow-x-auto no-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0 pb-0.5 snap-x">
+            {/* Barra de Filtros, Busca e Modo de Visualização (2 Faixas Horizontais Proporcionais no PC / Deslizante no Mobile) */}
+            <div className="p-2.5 sm:p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800/80 space-y-2.5 sm:space-y-3">
+              {/* FAIXA 1: Alternador de Visão + Busca + Ferramentas Comerciais (100% horizontal no PC) */}
+              <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5">
+                {/* Esquerda: Alternador Lista Simplificada vs Visão Detalhada + Status de Sync Oculto */}
+                <div className="flex items-center justify-between lg:justify-start gap-2.5 shrink-0">
+                  <div className="inline-flex items-center p-1 bg-slate-950/90 border border-slate-800 rounded-xl shrink-0 w-full sm:w-auto">
+                    <button
+                      type="button"
+                      onClick={() => toggleOrdersViewMode("simplified")}
+                      className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer ${
+                        ordersViewMode === "simplified"
+                          ? "bg-indigo-600 text-white shadow-sm"
+                          : "text-slate-400 hover:text-white"
+                      }`}
+                      title="Visualização em lista simplificada e ágil"
+                    >
+                      <List className="w-3.5 h-3.5" />
+                      <span>Lista Simplificada</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleOrdersViewMode("detailed")}
+                      className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer ${
+                        ordersViewMode === "detailed"
+                          ? "bg-indigo-600 text-white shadow-sm"
+                          : "text-slate-400 hover:text-white"
+                      }`}
+                      title="Visualização completa com todas as 3 colunas de produção abertas"
+                    >
+                      <Maximize2 className="w-3.5 h-3.5" />
+                      <span>Visão Detalhada</span>
+                    </button>
+                  </div>
+
+                  {lastSyncTimeStr && (
+                    <span
+                      className="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-950/70 border border-slate-800/80 text-[11px] text-slate-400 font-mono"
+                      title="Sincronização oculta ativa: verifica em segundo plano a cada 45s e só atualiza se houver mudança real"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      <span>Sync oculto • {lastSyncTimeStr}</span>
+                    </span>
+                  )}
+                </div>
+
+                {/* Direita: Campo de Busca + Central Remarketing + Calculadora MP */}
+                <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 flex-1 lg:justify-end">
+                  {/* Campo de Busca */}
+                  <div className="relative flex-1 min-w-[200px] lg:max-w-xs xl:max-w-sm">
+                    <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      id="admin-order-search"
+                      name="orderSearch"
+                      aria-label="Buscar pedido, cliente ou CPF/CNPJ"
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Buscar pedido, cliente, CPF/CNPJ..."
+                      className="w-full pl-8 sm:pl-9 pr-3 py-2 bg-slate-950/90 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  {/* Botão Central de Remarketing & Recuperação Comercial (Comercial X-Point) */}
+                  <button
+                    type="button"
+                    onClick={() => setShowRemarketingPanel((prev) => !prev)}
+                    className={`px-2.5 sm:px-3 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 border transition-all active:scale-95 shrink-0 cursor-pointer ${
+                      showRemarketingPanel
+                        ? "bg-indigo-600 text-white border-indigo-400 shadow-md shadow-indigo-600/25"
+                        : "bg-slate-950/90 hover:bg-slate-800 text-indigo-300 border-indigo-500/40"
+                    }`}
+                    title="Central de Remarketing & Recuperação Comercial via WhatsApp (Instância Comercial X-Point • Anti-Loop)"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                    <span className="sm:hidden">Remarketing</span>
+                    <span className="hidden sm:inline">Comercial & Remarketing</span>
+                    {remarketingData?.kpis && (
+                      <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 leading-none">
+                        {remarketingData.kpis.eligibleAssistedCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Botão Calculadora Rápida de Cartão Mercado Pago (Recebimento 100% PIX) */}
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickMpCalculator((prev) => !prev)}
+                    className={`px-2.5 sm:px-3 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 border transition-all active:scale-95 shrink-0 cursor-pointer ${
+                      showQuickMpCalculator
+                        ? "bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/20"
+                        : "bg-slate-950/90 hover:bg-slate-800 text-emerald-400 border-emerald-500/40"
+                    }`}
+                    title="Simular valor seguro a cobrar no Cartão Parcelado do Mercado Pago para receber 100% do valor do PIX à vista"
+                  >
+                    <CreditCard className="w-3.5 h-3.5 shrink-0" />
+                    <span className="sm:hidden">Calc. MP</span>
+                    <span className="hidden sm:inline">Calculadora Cartão MP (100% PIX)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* FAIXA 2: Filtros por Status ocupando 100% da largura horizontal no PC */}
+              <div className="flex items-center flex-nowrap lg:flex-wrap gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 pb-0.5 pt-2 border-t border-slate-800/70 snap-x">
                 <button
                   onClick={() => {
                     setStatusFilter("all");
@@ -2972,7 +3194,7 @@ export default function AdminPage() {
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 snap-start transition-all active:scale-95 border inline-flex items-center gap-1.5 cursor-pointer ${
                     statusFilter === "all"
                       ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
-                      : "bg-slate-900 text-slate-300 hover:bg-slate-800 border-slate-800"
+                      : "bg-slate-950/90 text-slate-300 hover:bg-slate-800 border-slate-800"
                   }`}
                 >
                   <span>Todos</span>
@@ -2995,7 +3217,7 @@ export default function AdminPage() {
                   className={`px-3 py-1.5 rounded-xl text-xs font-extrabold shrink-0 snap-start transition-all active:scale-95 border inline-flex items-center gap-1.5 cursor-pointer ${
                     statusFilter === "ads"
                       ? "bg-gradient-to-r from-indigo-600 to-cyan-600 text-white border-cyan-400 shadow-lg shadow-indigo-500/25"
-                      : "bg-slate-900 text-cyan-400 hover:bg-slate-800 border-cyan-500/40"
+                      : "bg-slate-950/90 text-cyan-400 hover:bg-slate-800 border-cyan-500/40"
                   }`}
                 >
                   <Target className={`w-3.5 h-3.5 ${isLoadingAdsLeads && statusFilter === "ads" ? "animate-spin" : ""}`} />
@@ -3039,8 +3261,8 @@ export default function AdminPage() {
                           isActive
                             ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
                             : count > 0
-                            ? "bg-slate-900 text-slate-200 hover:bg-slate-800 border-indigo-500/35"
-                            : "bg-slate-900/70 text-slate-400 hover:bg-slate-800 border-slate-800/80"
+                            ? "bg-slate-950/90 text-slate-200 hover:bg-slate-800 border-indigo-500/35"
+                            : "bg-slate-950/60 text-slate-400 hover:bg-slate-800 border-slate-800/80"
                         }`}
                       >
                         <span>{config.label}</span>
@@ -3058,93 +3280,6 @@ export default function AdminPage() {
                       </button>
                     );
                   })}
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
-                {/* Linha Mobile Compacta: Busca + Botão Calculadora MP lado a lado */}
-                <div className="flex items-center gap-2 order-1 sm:order-2">
-                  {/* Campo de Busca */}
-                  <div className="relative flex-1 sm:w-60 lg:w-72">
-                    <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      id="admin-order-search"
-                      name="orderSearch"
-                      aria-label="Buscar pedido, cliente ou CPF/CNPJ"
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Buscar pedido, cliente, CPF/CNPJ..."
-                      className="w-full pl-8 sm:pl-9 pr-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                    />
-                  </div>
-
-                  {/* Botão Central de Remarketing & Recuperação Comercial (Comercial X-Point) */}
-                  <button
-                    type="button"
-                    onClick={() => setShowRemarketingPanel((prev) => !prev)}
-                    className={`px-2.5 sm:px-3 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 border transition-all active:scale-95 shrink-0 cursor-pointer ${
-                      showRemarketingPanel
-                        ? "bg-indigo-600 text-white border-indigo-400 shadow-md shadow-indigo-600/25"
-                        : "bg-slate-900 hover:bg-slate-800 text-indigo-300 border-indigo-500/40"
-                    }`}
-                    title="Central de Remarketing & Recuperação Comercial via WhatsApp (Instância Comercial X-Point • Anti-Loop)"
-                  >
-                    <MessageCircle className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
-                    <span className="sm:hidden">Remarketing</span>
-                    <span className="hidden sm:inline">Comercial & Remarketing</span>
-                    {remarketingData?.kpis && (
-                      <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 leading-none">
-                        {remarketingData.kpis.eligibleAssistedCount}
-                      </span>
-                    )}
-                  </button>
-
-                  {/* Botão Calculadora Rápida de Cartão Mercado Pago (Recebimento 100% PIX) */}
-                  <button
-                    type="button"
-                    onClick={() => setShowQuickMpCalculator((prev) => !prev)}
-                    className={`px-2.5 sm:px-3 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 border transition-all active:scale-95 shrink-0 cursor-pointer ${
-                      showQuickMpCalculator
-                        ? "bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/20"
-                        : "bg-slate-900 hover:bg-slate-800 text-emerald-400 border-emerald-500/40"
-                    }`}
-                    title="Simular valor seguro a cobrar no Cartão Parcelado do Mercado Pago para receber 100% do valor do PIX à vista"
-                  >
-                    <CreditCard className="w-3.5 h-3.5 shrink-0" />
-                    <span className="sm:hidden">Calc. MP</span>
-                    <span className="hidden sm:inline">Calculadora Cartão MP (100% PIX)</span>
-                  </button>
-                </div>
-
-                {/* Alternador de Modo de Visualização: Simplificada vs Detalhada */}
-                <div className="inline-flex items-center p-1 bg-slate-900 border border-slate-800 rounded-xl shrink-0 order-2 sm:order-1">
-                  <button
-                    type="button"
-                    onClick={() => toggleOrdersViewMode("simplified")}
-                    className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer ${
-                      ordersViewMode === "simplified"
-                        ? "bg-indigo-600 text-white shadow-sm"
-                        : "text-slate-400 hover:text-white"
-                    }`}
-                    title="Visualização em lista simplificada e ágil"
-                  >
-                    <List className="w-3.5 h-3.5" />
-                    <span>Lista Simplificada</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => toggleOrdersViewMode("detailed")}
-                    className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer ${
-                      ordersViewMode === "detailed"
-                        ? "bg-indigo-600 text-white shadow-sm"
-                        : "text-slate-400 hover:text-white"
-                    }`}
-                    title="Visualização completa com todas as 3 colunas de produção abertas"
-                  >
-                    <Maximize2 className="w-3.5 h-3.5" />
-                    <span>Visão Detalhada</span>
-                  </button>
-                </div>
               </div>
             </div>
 
@@ -3381,14 +3516,14 @@ export default function AdminPage() {
                     >
                       {!isExpanded ? (
                         /* ========================================================================= */
-                        /* MODO: LISTA SIMPLIFICADA (MOBILE CARD COMPACTO / 1 LINHA NO DESKTOP)      */
+                        /* MODO: LISTA SIMPLIFICADA (MOBILE CARD COMPACTO / GRID 12 COLUNAS NO PC)   */
                         /* ========================================================================= */
-                        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-2.5">
-                          {/* 1. CLIENTE, WHATSAPP & CIDADE/UF (+ VALOR TOTAL NO TOPO DIREITO DO MOBILE) */}
-                          <div className="xl:w-[22%] flex items-start xl:items-center justify-between gap-2 min-w-0">
-                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className="flex flex-col lg:grid lg:grid-cols-12 lg:items-center gap-2.5 lg:gap-3.5">
+                          {/* 1. CLIENTE (NOME COMPLETO SEM TRUNCAMENTO), WHATSAPP & CIDADE/UF (3 colunas no PC) */}
+                          <div className="lg:col-span-3 flex items-start lg:items-center justify-between gap-2 min-w-0">
+                            <div className="flex items-start sm:items-center gap-2.5 min-w-0 flex-1">
                               <div
-                                className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-black text-sm border ${
+                                className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-black text-sm border mt-0.5 sm:mt-0 ${
                                   isOrderPaid
                                     ? "bg-emerald-500/15 border-emerald-500/35 text-emerald-300"
                                     : isPaymentFailedOrCancelled
@@ -3399,11 +3534,8 @@ export default function AdminPage() {
                                 {(order.customer_name || "C").trim().charAt(0).toUpperCase()}
                               </div>
                               <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-1.5">
-                                  <p
-                                    className="font-extrabold text-white text-sm sm:text-base tracking-tight truncate"
-                                    title={order.customer_name || "Cliente não informado"}
-                                  >
+                                <div className="flex items-start sm:items-center gap-1.5 flex-wrap">
+                                  <p className="font-extrabold text-white text-sm sm:text-[15px] leading-snug break-words">
                                     {order.customer_name || "Cliente não informado"}
                                   </p>
                                   {waHref && (
@@ -3418,7 +3550,7 @@ export default function AdminPage() {
                                     </a>
                                   )}
                                 </div>
-                                <p className="text-[11px] text-slate-400 font-mono truncate">
+                                <p className="text-[11px] text-slate-400 font-mono leading-tight mt-0.5 break-words">
                                   <span className="text-slate-300 font-semibold">{order.customer_document || "—"}</span>
                                   {addr?.city ? (
                                     <span className="font-sans">
@@ -3429,8 +3561,8 @@ export default function AdminPage() {
                               </div>
                             </div>
 
-                            {/* Preço & Método no Topo Direito exclusivamente em Telas Menores (< xl) */}
-                            <div className="xl:hidden flex flex-col items-end shrink-0 text-right pl-1">
+                            {/* Preço & Método no Topo Direito exclusivamente em Telas Menores (< lg) */}
+                            <div className="lg:hidden flex flex-col items-end shrink-0 text-right pl-1">
                               <span
                                 className={`text-sm font-black font-mono leading-tight ${
                                   isOrderPaid
@@ -3466,27 +3598,27 @@ export default function AdminPage() {
                             </div>
                           </div>
 
-                          {/* 2. ITEM PRINCIPAL RESUMIDO (GABINETE + COR + EQUIPAMENTO PRINCIPAL) */}
-                          <div className="xl:w-[24%] flex items-center gap-2.5 p-2 xl:p-0 rounded-xl xl:rounded-none bg-slate-950/55 xl:bg-transparent border border-slate-800/70 xl:border-0 xl:border-l xl:border-slate-800/80 xl:pl-3 min-w-0">
+                          {/* 2. ITEM PRINCIPAL RESUMIDO (GABINETE + COR + EQUIPAMENTO PRINCIPAL) (3 colunas no PC) */}
+                          <div className="lg:col-span-3 flex items-center gap-2.5 p-2 lg:p-0 rounded-xl lg:rounded-none bg-slate-950/55 lg:bg-transparent border border-slate-800/70 lg:border-0 lg:border-l lg:border-slate-800/80 lg:pl-3 min-w-0">
                             {firstItemThumb && (
                               <div className="w-10 h-10 rounded-lg bg-white border border-slate-700 overflow-hidden flex items-center justify-center p-0.5 shrink-0">
                                 <img src={firstItemThumb} alt="Gabinete" className="w-full h-full object-contain" />
                               </div>
                             )}
-                            <div className="min-w-0 flex-1 space-y-0.5">
-                              <p className="font-bold text-slate-100 text-xs truncate">
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <p className="font-bold text-slate-100 text-xs leading-snug break-words">
                                 {totalItemsQty}x{" "}
                                 {order.items?.map((it) => it.cabinet_name).join(", ") || "Gabinete Padrão"}
                               </p>
                               <div className="flex items-center gap-1 flex-wrap text-[10px]">
                                 {firstItem?.color_name && (
-                                  <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-200 border border-slate-700 font-semibold truncate max-w-[145px]">
+                                  <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-200 border border-slate-700 font-semibold">
                                     {firstItem.color_name}
                                   </span>
                                 )}
                                 {resolvedFirstItem?.isKit ? (
                                   <span
-                                    className={`px-1.5 py-0.5 rounded font-bold border truncate max-w-[180px] ${
+                                    className={`px-1.5 py-0.5 rounded font-bold border ${
                                       !resolvedFirstItem.hasMonitorInKit || !resolvedFirstItem.hasPrinterInKit
                                         ? "bg-amber-500/15 text-amber-300 border-amber-500/40"
                                         : "bg-cyan-950/60 text-cyan-300 border-cyan-500/35"
@@ -3503,7 +3635,7 @@ export default function AdminPage() {
                                   </span>
                                 ) : resolvedFirstItem?.monitorDisplay ? (
                                   <span
-                                    className="px-1.5 py-0.5 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-500/35 font-semibold truncate max-w-[170px]"
+                                    className="px-1.5 py-0.5 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-500/35 font-semibold truncate max-w-[200px]"
                                     title={resolvedFirstItem.monitorDisplay}
                                   >
                                     {resolvedFirstItem.monitorDisplay}
@@ -3518,21 +3650,21 @@ export default function AdminPage() {
                             </div>
                           </div>
 
-                          {/* 3. NÚMERO DO PEDIDO, DATA, FRETE & STATUS */}
-                          <div className="xl:w-[19%] xl:border-l xl:border-slate-800/80 xl:pl-3 min-w-0 flex xl:flex-col items-center xl:items-start justify-between gap-1.5 flex-wrap">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-extrabold text-white text-xs sm:text-sm font-mono tracking-tight">
-                                {order.order_number}
-                              </span>
+                          {/* 3. NÚMERO DO PEDIDO, STATUS, ALERTA & DATA/FRETE (2 colunas isoladas no PC — sem sobrepor o preço) */}
+                          <div className="lg:col-span-2 lg:border-l lg:border-slate-800/80 lg:pl-3 min-w-0 overflow-hidden flex lg:flex-col items-center lg:items-start justify-between gap-1 flex-wrap">
+                            <span className="font-extrabold text-white text-xs font-mono tracking-tight">
+                              {order.order_number}
+                            </span>
+                            <div className="flex items-center gap-1 flex-wrap">
                               <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold border inline-flex items-center gap-1 ${statusInfo.color}`}
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold border inline-flex items-center gap-1 shrink-0 ${statusInfo.color}`}
                               >
                                 <StatusIcon className="w-2.5 h-2.5" />
                                 <span>{statusInfo.label}</span>
                               </span>
                               {orderHasAnyDeviation && (
                                 <span
-                                  className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-amber-500/20 text-amber-300 border border-amber-400 inline-flex items-center gap-0.5"
+                                  className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-amber-500/20 text-amber-300 border border-amber-400 inline-flex items-center gap-0.5 shrink-0"
                                   title="Pedido com personalização no Kit ou observação para a fábrica"
                                 >
                                   <AlertTriangle className="w-2.5 h-2.5" />
@@ -3540,7 +3672,7 @@ export default function AdminPage() {
                                 </span>
                               )}
                             </div>
-                            <p className="text-[11px] text-slate-400 font-mono truncate">
+                            <p className="text-[11px] text-slate-400 font-mono truncate max-w-full">
                               {new Date(order.$createdAt).toLocaleString("pt-BR", {
                                 day: "2-digit",
                                 month: "2-digit",
@@ -3552,10 +3684,10 @@ export default function AdminPage() {
                             </p>
                           </div>
 
-                          {/* 4. VALOR TOTAL & MÉTODO DE PAGAMENTO (VISÍVEL NO DESKTOP XL) */}
-                          <div className="hidden xl:flex xl:w-[11%] xl:border-l xl:border-slate-800/80 xl:pl-3 shrink-0 xl:flex-col items-end justify-between gap-1.5">
+                          {/* 4. VALOR TOTAL & MÉTODO DE PAGAMENTO (1 coluna isolada à direita no Desktop LG+) */}
+                          <div className="hidden lg:flex lg:col-span-1 lg:border-l lg:border-slate-800/80 lg:pl-2.5 shrink-0 lg:flex-col items-end justify-center gap-1 text-right">
                             <span
-                              className={`text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1 ${
+                              className={`text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1 whitespace-nowrap ${
                                 isOrderPaid
                                   ? "text-emerald-400"
                                   : isPaymentFailedOrCancelled
@@ -3566,7 +3698,7 @@ export default function AdminPage() {
                               {isOrderPaid ? (
                                 <>
                                   <CheckCircle2 className="w-3 h-3" />
-                                  <span>Pago ({payMethod === "credit_card" ? "Cartão" : "Pix"})</span>
+                                  <span>{payMethod === "credit_card" ? "Cartão" : "Pix"}</span>
                                 </>
                               ) : (
                                 <>
@@ -3576,7 +3708,7 @@ export default function AdminPage() {
                               )}
                             </span>
                             <span
-                              className={`text-sm sm:text-base font-black font-mono leading-tight ${
+                              className={`text-sm xl:text-[15px] font-black font-mono leading-tight whitespace-nowrap ${
                                 isOrderPaid
                                   ? "text-emerald-400"
                                   : isPaymentFailedOrCancelled
@@ -3588,39 +3720,38 @@ export default function AdminPage() {
                             </span>
                           </div>
 
-                          {/* 5. AÇÕES RÁPIDAS (1 LINHA ERGONÔMICA NO MOBILE & DESKTOP + COMPARTILHAR NATIVO PWA) */}
-                          <div className="shrink-0 flex items-center justify-between sm:justify-end gap-1 sm:gap-1.5 pt-2 xl:pt-0 border-t xl:border-t-0 border-slate-800/70 overflow-x-auto no-scrollbar">
-                            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                          {/* 5. AÇÕES RÁPIDAS PROPORCIONAIS (3 colunas no PC) */}
+                          <div className="lg:col-span-3 flex items-center justify-between sm:justify-end gap-1 sm:gap-1.5 flex-wrap pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-800/70">
+                            <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
                               <button
                                 type="button"
                                 onClick={() => toggleOrderExpanded(order.$id)}
-                                className="px-2 sm:px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-extrabold text-[11px] sm:text-xs inline-flex items-center gap-1 shadow-sm transition-all cursor-pointer shrink-0"
+                                className="px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-extrabold text-[11px] sm:text-xs inline-flex items-center gap-1 shadow-sm transition-all cursor-pointer shrink-0"
                                 title="Clique para abrir todos os detalhes, cobrança Mercado Pago e as 3 colunas do pedido"
                               >
                                 <Eye className="w-3.5 h-3.5" />
                                 <span>Detalhes</span>
-                                <ChevronDown className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                <ChevronDown className="w-3 h-3" />
                               </button>
 
                               <button
                                 type="button"
                                 onClick={() => setPrintingProductionOrder(order)}
-                                className="px-2 sm:px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-[11px] sm:text-xs inline-flex items-center gap-1 shadow-sm shadow-emerald-600/20 transition-all cursor-pointer shrink-0"
+                                className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-[11px] sm:text-xs inline-flex items-center gap-1 shadow-sm shadow-emerald-600/20 transition-all cursor-pointer shrink-0"
                                 title="Imprimir Ordem de Produção para a Fábrica (Sem Valores Monetários + Orientações + Checklist à Caneta)"
                               >
                                 <Printer className="w-3.5 h-3.5" />
-                                <span className="sm:hidden">Produção</span>
-                                <span className="hidden sm:inline">Ordem de Produção</span>
+                                <span>O.P.</span>
                               </button>
 
                               <button
                                 type="button"
                                 onClick={() => setCorreiosLabelOrder(order)}
-                                className="px-2 sm:px-2.5 py-1.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 active:scale-95 text-amber-300 border border-amber-400/50 font-extrabold text-[11px] sm:text-xs inline-flex items-center gap-1 transition-all cursor-pointer shrink-0"
+                                className="px-2 py-1.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 active:scale-95 text-amber-300 border border-amber-400/50 font-extrabold text-[11px] sm:text-xs inline-flex items-center gap-1 transition-all cursor-pointer shrink-0"
                                 title="Lançar Pré-Postagem no Contrato Correios (API CWS) e Imprimir Etiqueta Simplificada"
                               >
                                 <Truck className="w-3.5 h-3.5" />
-                                <span className="xl:hidden 2xl:inline">Etiqueta</span>
+                                <span className="hidden 2xl:inline">Etiqueta</span>
                               </button>
 
                               {isOrderPaid && (
@@ -3633,7 +3764,7 @@ export default function AdminPage() {
                                       Boolean(addr?.customerPaidConfirmationSentAt)
                                     )
                                   }
-                                  className={`px-2 sm:px-2.5 py-1.5 rounded-xl font-bold text-[11px] sm:text-xs inline-flex items-center gap-1 transition-all cursor-pointer shrink-0 border ${
+                                  className={`px-2 py-1.5 rounded-xl font-bold text-[11px] sm:text-xs inline-flex items-center gap-1 transition-all cursor-pointer shrink-0 border ${
                                     addr?.customerPaidConfirmationSentAt
                                       ? "bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border-emerald-500/35"
                                       : "bg-cyan-500/20 hover:bg-cyan-500/30 active:scale-95 text-cyan-300 border-cyan-500/40"
@@ -3651,8 +3782,8 @@ export default function AdminPage() {
                                     {sendingPaidConfirmOrderId === order.$id
                                       ? "Enviando..."
                                       : addr?.customerPaidConfirmationSentAt
-                                      ? "Confirmado WhatsApp ✓"
-                                      : "Confirmar Pedido (Cliente)"}
+                                      ? "Confirmado ✓"
+                                      : "Confirmar"}
                                   </span>
                                 </button>
                               )}
@@ -3662,7 +3793,7 @@ export default function AdminPage() {
                                   <button
                                     type="button"
                                     onClick={() => setSelectedOrderForRemarketing(order.order_number)}
-                                    className={`px-2 sm:px-2.5 py-1.5 rounded-xl font-bold text-[11px] sm:text-xs inline-flex items-center gap-1 transition-all cursor-pointer shrink-0 border ${
+                                    className={`px-2 py-1.5 rounded-xl font-bold text-[11px] sm:text-xs inline-flex items-center gap-1 transition-all cursor-pointer shrink-0 border ${
                                       rmkTarget && !rmkTarget.canSendManual
                                         ? "bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700"
                                         : "bg-indigo-500/20 hover:bg-indigo-500/30 active:scale-95 text-indigo-300 border-indigo-500/40"
@@ -3676,7 +3807,7 @@ export default function AdminPage() {
                                     <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
                                     <span>
                                       {rmkTarget?.alreadyPaidInOtherOrder
-                                        ? `Já Pago (#${rmkTarget.alreadyPaidInOtherOrder.orderNumber.slice(-4)})`
+                                        ? `Pago (#${rmkTarget.alreadyPaidInOtherOrder.orderNumber.slice(-4)})`
                                         : rmkTarget?.supersededByNewerOrder
                                         ? "Duplicado"
                                         : "Recuperar"}
@@ -3686,7 +3817,7 @@ export default function AdminPage() {
                                   <button
                                     type="button"
                                     onClick={() => handleOpenEditOrder(order, "payment_proposal")}
-                                    className="px-2 sm:px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 border border-amber-500/35 font-bold text-[11px] sm:text-xs inline-flex items-center gap-1 transition-all cursor-pointer shrink-0"
+                                    className="px-2 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 border border-amber-500/35 font-bold text-[11px] sm:text-xs inline-flex items-center gap-1 transition-all cursor-pointer shrink-0"
                                     title="Editar itens, adicionar valores extras e gerar nova condição de pagamento"
                                   >
                                     <Plus className="w-3.5 h-3.5" />
@@ -3696,12 +3827,12 @@ export default function AdminPage() {
                               )}
                             </div>
 
-                            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                            <div className="flex items-center gap-1 shrink-0">
                               <button
                                 type="button"
                                 onClick={() => handleShareOrderNative(order)}
                                 className="p-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 active:scale-95 text-cyan-300 border border-cyan-500/35 transition-all cursor-pointer"
-                                title="Compartilhar resumo do pedido no celular (WhatsApp, E-mail, Impressão)"
+                                title="Compartilhar resumo do pedido (WhatsApp, E-mail, Impressão)"
                               >
                                 <Share2 className="w-3.5 h-3.5" />
                               </button>

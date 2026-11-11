@@ -954,7 +954,7 @@ export const AdsOrdersLeadsPanel: React.FC<AdsOrdersLeadsPanelProps> = ({
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-base sm:text-lg font-black text-white truncate">
+                          <h3 className="text-base sm:text-lg font-black text-white leading-snug break-words">
                             {rec.customer.name}
                           </h3>
                           <a

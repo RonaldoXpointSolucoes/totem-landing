@@ -64,36 +64,15 @@ export async function GET(req: Request) {
       const localMatch = localByNumber.get(o.order_number);
       let shippingMethod = parsedAddress?.shippingMethod || localMatch?.shippingMethod || null;
 
-      if (!shippingMethod && o.shipping_cents > 0 && parsedAddress?.cep) {
-        try {
-          const quoteRes = await calculateShippingQuotes({
-            destinationCep: parsedAddress.cep,
-            items: (o.items || []).map((it: any) => {
-              const nameLower = (it.cabinet_name || "").toLowerCase();
-              const modelId = nameLower.includes("parede")
-                ? "cabinet-wall"
-                : nameLower.includes("balc") || nameLower.includes("mesa")
-                ? "cabinet-countertop"
-                : "cabinet-floor";
-              return { modelId, quantity: it.quantity || 1 };
-            }),
-          });
-          if (quoteRes.ok && quoteRes.quotes.length > 0) {
-            const exact = quoteRes.quotes.find((q) => q.priceCents === o.shipping_cents);
-            const fallback = quoteRes.quotes.find((q) => q.isAvailable && q.priceCents > 0);
-            const chosen = exact || fallback;
-            if (chosen) {
-              shippingMethod = {
-                id: chosen.id,
-                name: chosen.name,
-                carrier: chosen.carrier,
-                priceCents: o.shipping_cents,
-                deliveryDaysMin: chosen.deliveryDaysMin,
-                deliveryDaysMax: chosen.deliveryDaysMax,
-              };
-            }
-          }
-        } catch {}
+      if (!shippingMethod && o.shipping_cents > 0) {
+        shippingMethod = {
+          id: "correios_contrato",
+          name: "Frete Contratado (Correios / Transportadora)",
+          carrier: "Correios / Transportadora",
+          priceCents: o.shipping_cents,
+          deliveryDaysMin: 2,
+          deliveryDaysMax: 6,
+        };
       } else if (!shippingMethod && (o.shipping_cents === 0 || !o.shipping_cents)) {
         shippingMethod = {
           id: "retirada_fabrica",
