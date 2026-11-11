@@ -7867,11 +7867,12 @@ export default function AdminPage() {
           onSaveOrientations={async (payload) => {
             const prevAddr = getOrderAddress(printingProductionOrder) || {};
             const prevExec = createDefaultExecutionOrder(prevAddr.executionOrder || null);
-            const nextExec: OrderExecutionData = {
+            const nextExec: OrderExecutionData & { printOverrides?: any } = {
               ...prevExec,
               priority: payload.priority,
               technicianName: payload.operator,
               deadlineDate: payload.targetDate,
+              printOverrides: payload.printOverrides || (prevExec as any).printOverrides || null,
               updatedAt: new Date().toISOString(),
             };
             const nextAddr = {

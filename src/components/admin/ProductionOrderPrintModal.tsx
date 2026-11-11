@@ -5,8 +5,10 @@ import {
   Printer,
   FileText,
   Save,
-  CheckCircle2,
-  AlertTriangle,
+  Plus,
+  Trash2,
+  RotateCcw,
+  Edit3,
 } from "lucide-react";
 import {
   resolveKitEquipmentSummary,
@@ -24,6 +26,53 @@ export interface PrintableOrderItem {
   reader_name?: string | null;
   kit_items_snapshot?: any[] | null;
   delivery_checklist?: DeliveryChecklistItem[] | null;
+}
+
+export interface EditablePrintChecklistItem {
+  id: string;
+  quantity: string;
+  name: string;
+}
+
+export interface EditablePrintRemovedItem {
+  id: string;
+  name: string;
+}
+
+export interface EditablePrintOrderItem {
+  id: string;
+  headerTitle: string;
+  badgeText: string;
+  monitorTitle: string;
+  monitorCutout: string;
+  monitorRemovedAlert: boolean;
+  printerTitle: string;
+  printerSlot: string;
+  printerRemovedAlert: boolean;
+  dimensionsText: string;
+  readerText: string;
+  technicalNote: string;
+  checklistToDeliver: EditablePrintChecklistItem[];
+  checklistNotToDeliver: EditablePrintRemovedItem[];
+}
+
+export interface CustomPrintOverrides {
+  orderNumberLabel?: string;
+  customerName?: string;
+  addressLine1?: string;
+  addressCityState?: string;
+  addressCep?: string;
+  shippingLabel?: string;
+  orderDateStr?: string;
+  targetDateStr?: string;
+  operatorName?: string;
+  priority?: "normal" | "urgent";
+  editableItems?: EditablePrintOrderItem[];
+  complementaryChecks?: string[];
+  orientations?: string;
+  manualLines?: string[];
+  signatureTitles?: string[];
+  signatureDates?: string[];
 }
 
 export interface PrintableOrderData {
@@ -52,6 +101,7 @@ export interface PrintableOrderData {
       targetDispatchDate?: string | null;
       deadlineDate?: string | null;
       plainSummary?: string | null;
+      printOverrides?: CustomPrintOverrides | null;
     } | null;
   } | null;
   shipping?: {
@@ -71,20 +121,114 @@ interface ProductionOrderPrintModalProps {
     operator: string;
     priority: "normal" | "urgent";
     targetDate: string;
+    printOverrides?: CustomPrintOverrides;
   }) => Promise<void> | void;
 }
 
 /**
- * Remove qualquer menção a valores monetários (ex: "R$ 1.100,00", "(+R$ 999)", etc.)
- * garantindo que a Ordem de Produção seja 100% isenta de preços.
+ * Remove valores monetários ("R$ 1.100,00", "(+R$ 999)") e remove "(MaDeFibra BP)"
+ * garantindo que a Ordem de Produção seja limpa e 100% isenta de preços e códigos desnecessários.
  */
-function stripMonetaryValues(text?: string | null): string {
+function cleanPrintText(text?: string | null): string {
   if (!text) return "";
   return String(text)
     .replace(/\(\s*[+-]?\s*R\$\s*[\d.,]+\s*\)/gi, "")
     .replace(/[+-]?\s*R\$\s*[\d.,]+/gi, "")
+    .replace(/\(\s*MaDeFibra\s*BP\s*\)/gi, "")
+    .replace(/\bMaDeFibra\s*BP\b/gi, "")
     .replace(/\s{2,}/g, " ")
     .trim();
+}
+
+function buildDefaultEditableItems(
+  items: PrintableOrderItem[],
+  sheets: any[]
+): EditablePrintOrderItem[] {
+  return items.map((it, idx) => {
+    const sheet = sheets[idx] || null;
+    const itemQty = Math.max(1, Number(it.quantity) || 1);
+    const kitSnapshot = it.kit_items_snapshot || sheet?.kitItemsSnapshot || null;
+    const resolvedEq = resolveKitEquipmentSummary({
+      kitItemsSnapshot: kitSnapshot,
+      monitorName: it.monitor_name,
+      printerName: it.printer_name,
+      readerName: it.reader_name,
+    });
+
+    const hasAssembly = Boolean(
+      sheet?.assemblyService?.includes("Montagem Especializada") ||
+        sheet?.includeAssemblyService ||
+        it.monitor_name?.includes("100% Montado")
+    );
+
+    const rawChecklist: DeliveryChecklistItem[] =
+      Array.isArray(it.delivery_checklist) && it.delivery_checklist.length > 0
+        ? it.delivery_checklist
+        : Array.isArray(sheet?.deliveryChecklist) &&
+          sheet.deliveryChecklist.length > 0
+        ? sheet.deliveryChecklist
+        : buildOrderDeliveryChecklist({
+            cabinetName: it.cabinet_name,
+            colorName: it.color_name,
+            quantity: itemQty,
+            kitItemsSnapshot: kitSnapshot,
+            monitorName: it.monitor_name,
+            printerName: it.printer_name,
+            readerName: it.reader_name,
+            includeAssemblyService: hasAssembly,
+          });
+
+    const cleanCab = cleanPrintText(it.cabinet_name);
+    const cleanCol = cleanPrintText(it.color_name);
+
+    return {
+      id: it.$id || `item-${idx}`,
+      headerTitle: `${itemQty}X ${cleanCab.toUpperCase()} — COR: ${cleanCol.toUpperCase()}`,
+      badgeText: hasAssembly
+        ? "⚙️ ENTREGAR 100% MONTADO"
+        : resolvedEq.isKit
+        ? `📦 KIT (${resolvedEq.selectedCount}/${resolvedEq.totalCount} ITENS)`
+        : "📦 SOMENTE GABINETE",
+      monitorRemovedAlert: Boolean(resolvedEq.isKit && !resolvedEq.hasMonitorInKit),
+      monitorTitle:
+        resolvedEq.isKit && !resolvedEq.hasMonitorInKit
+          ? "🚫 REMOVIDO PELO CLIENTE (NÃO ENVIAR TELA)"
+          : cleanPrintText(resolvedEq.monitorDisplay || it.monitor_name || "Nenhum"),
+      monitorCutout: cleanPrintText(
+        sheet?.screenSpecs?.screenCutoutMm ||
+          'Abertura padrão tela 23.8" (+1.5mm)'
+      ),
+      printerRemovedAlert: Boolean(resolvedEq.isKit && !resolvedEq.hasPrinterInKit),
+      printerTitle:
+        resolvedEq.isKit && !resolvedEq.hasPrinterInKit
+          ? "🚫 REMOVIDA PELO CLIENTE (NÃO ENVIAR IMPR.)"
+          : cleanPrintText(resolvedEq.printerDisplay || it.printer_name || "Sem impressora"),
+      printerSlot: cleanPrintText(
+        sheet?.printerSpecs?.slotOpeningMm ||
+          "Rasgo frontal padrão 80mm c/ berço"
+      ),
+      dimensionsText: sheet?.dimensionsMm?.heightMm
+        ? `${sheet.dimensionsMm.heightMm} × ${sheet.dimensionsMm.widthMm} × ${sheet.dimensionsMm.depthMm} mm`
+        : "Gabarito Homologado CNC",
+      readerText: resolvedEq.hasReader
+        ? cleanPrintText(resolvedEq.readerDisplay)
+        : cleanPrintText(it.reader_name || "Sem leitor"),
+      technicalNote: cleanPrintText(sheet?.customizationNotes || ""),
+      checklistToDeliver: rawChecklist
+        .filter((c) => c.included)
+        .map((c, cIdx) => ({
+          id: c.id || `deliv-${cIdx}`,
+          quantity: `${c.quantity || 1}x`,
+          name: cleanPrintText(c.name),
+        })),
+      checklistNotToDeliver: rawChecklist
+        .filter((c) => !c.included)
+        .map((c, rIdx) => ({
+          id: c.id || `rem-${rIdx}`,
+          name: cleanPrintText(c.name),
+        })),
+    };
+  });
 }
 
 export function ProductionOrderPrintModal({
@@ -93,31 +237,187 @@ export function ProductionOrderPrintModal({
   onSaveOrientations,
 }: ProductionOrderPrintModalProps) {
   const exec = order.address?.executionOrder || null;
+  const savedOverrides = exec?.printOverrides || null;
+  const items = Array.isArray(order.items) ? order.items : [];
+  const sheets = Array.isArray(order.sheets) ? order.sheets : [];
+  const addr = order.address || {};
+  const ship = order.shipping || {};
+
   const initialNotes = [
-    order.address?.customerNotes ? stripMonetaryValues(order.address.customerNotes) : "",
-    exec?.plainSummary ? stripMonetaryValues(exec.plainSummary) : "",
+    order.address?.customerNotes ? cleanPrintText(order.address.customerNotes) : "",
+    exec?.plainSummary ? cleanPrintText(exec.plainSummary) : "",
   ]
     .filter(Boolean)
     .join("\n");
 
-  const [orientations, setOrientations] = useState<string>(initialNotes);
-  const [operatorName, setOperatorName] = useState<string>(
-    exec?.technicianName || exec?.assignedOperator || ""
+  const defaultAddressLine1 = addr.street
+    ? `${addr.street}, nº ${addr.number || "S/N"}${addr.complement ? ` (${addr.complement})` : ""}`
+    : "Endereço não informado";
+  const defaultCityState = `${addr.city || "—"}/${addr.state || "SP"}`;
+  const defaultCep = addr.cep || "—";
+  const defaultShippingLabel = cleanPrintText(ship.name || "A Definir");
+  const defaultOrderDateStr = new Date(order.$createdAt).toLocaleDateString("pt-BR");
+
+  // Estados editáveis de toda a folha A4
+  const [orderNumberLabel, setOrderNumberLabel] = useState<string>(
+    savedOverrides?.orderNumberLabel || order.order_number
   );
-  const [priority, setPriority] = useState<"normal" | "urgent">(
-    exec?.priority === "urgent" ? "urgent" : "normal"
+  const [customerName, setCustomerName] = useState<string>(
+    savedOverrides?.customerName || order.customer_name || ""
+  );
+  const [addressLine1, setAddressLine1] = useState<string>(
+    savedOverrides?.addressLine1 || defaultAddressLine1
+  );
+  const [addressCityState, setAddressCityState] = useState<string>(
+    savedOverrides?.addressCityState || defaultCityState
+  );
+  const [addressCep, setAddressCep] = useState<string>(
+    savedOverrides?.addressCep || defaultCep
+  );
+  const [shippingLabel, setShippingLabel] = useState<string>(
+    savedOverrides?.shippingLabel || defaultShippingLabel
+  );
+  const [orderDateStr, setOrderDateStr] = useState<string>(
+    savedOverrides?.orderDateStr || defaultOrderDateStr
   );
   const [targetDate, setTargetDate] = useState<string>(
     exec?.deadlineDate || exec?.targetDispatchDate || ""
   );
-  const [blankLinesCount, setBlankLinesCount] = useState<number>(3);
+  const [targetDateStr, setTargetDateStr] = useState<string>(
+    savedOverrides?.targetDateStr ||
+      (exec?.deadlineDate || exec?.targetDispatchDate
+        ? new Date((exec?.deadlineDate || exec?.targetDispatchDate) + "T12:00:00").toLocaleDateString("pt-BR")
+        : "___/___/26")
+  );
+  const [operatorName, setOperatorName] = useState<string>(
+    savedOverrides?.operatorName ?? (exec?.technicianName || exec?.assignedOperator || "")
+  );
+  const [priority, setPriority] = useState<"normal" | "urgent">(
+    (savedOverrides?.priority || (exec?.priority === "urgent" ? "urgent" : "normal")) as
+      | "normal"
+      | "urgent"
+  );
+
+  const [editableItems, setEditableItems] = useState<EditablePrintOrderItem[]>(() =>
+    savedOverrides?.editableItems && savedOverrides.editableItems.length > 0
+      ? savedOverrides.editableItems.map((ei) => ({
+          ...ei,
+          headerTitle: cleanPrintText(ei.headerTitle),
+          checklistToDeliver: (ei.checklistToDeliver || []).map((c) => ({
+            ...c,
+            name: cleanPrintText(c.name),
+          })),
+        }))
+      : buildDefaultEditableItems(items, sheets)
+  );
+
+  const [complementaryChecks, setComplementaryChecks] = useState<string[]>(
+    savedOverrides?.complementaryChecks && savedOverrides.complementaryChecks.length > 0
+      ? savedOverrides.complementaryChecks
+      : ["Chave", "Trava Monitor", "Parafusos", "Manuais", "Folder Propaganda"]
+  );
+
+  const [orientations, setOrientations] = useState<string>(
+    savedOverrides?.orientations ?? initialNotes
+  );
+
+  const [manualLines, setManualLines] = useState<string[]>(
+    savedOverrides?.manualLines && savedOverrides.manualLines.length > 0
+      ? savedOverrides.manualLines
+      : ["", "", ""]
+  );
+
+  const [signatureTitles, setSignatureTitles] = useState<string[]>(
+    savedOverrides?.signatureTitles && savedOverrides.signatureTitles.length === 3
+      ? savedOverrides.signatureTitles
+      : [
+          "1. OPERADOR ROUTER CNC / ESTRUTURA",
+          "2. SEPARAÇÃO DE KIT & ELÉTRICA",
+          "3. AUDITORIA FINAL EXPEDIÇÃO (100% OK)",
+        ]
+  );
+
+  const [signatureDates, setSignatureDates] = useState<string[]>(
+    savedOverrides?.signatureDates && savedOverrides.signatureDates.length === 3
+      ? savedOverrides.signatureDates
+      : [
+          "Data: ___/___/2026 • Hora: ___:___",
+          "Data: ___/___/2026 • Hora: ___:___",
+          "Data: ___/___/2026 • Hora: ___:___",
+        ]
+  );
+
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [savedFeedback, setSavedFeedback] = useState<boolean>(false);
 
   const printableRef = useRef<HTMLDivElement>(null);
 
+  const buildCurrentOverrides = (): CustomPrintOverrides => ({
+    orderNumberLabel,
+    customerName,
+    addressLine1,
+    addressCityState,
+    addressCep,
+    shippingLabel,
+    orderDateStr,
+    targetDateStr,
+    operatorName,
+    priority,
+    editableItems,
+    complementaryChecks,
+    orientations,
+    manualLines,
+    signatureTitles,
+    signatureDates,
+  });
+
+  const handleResetToOrderDefaults = () => {
+    setOrderNumberLabel(order.order_number);
+    setCustomerName(order.customer_name || "");
+    setAddressLine1(defaultAddressLine1);
+    setAddressCityState(defaultCityState);
+    setAddressCep(defaultCep);
+    setShippingLabel(defaultShippingLabel);
+    setOrderDateStr(defaultOrderDateStr);
+    setTargetDateStr("___/___/26");
+    setOperatorName(exec?.technicianName || exec?.assignedOperator || "");
+    setPriority(exec?.priority === "urgent" ? "urgent" : "normal");
+    setEditableItems(buildDefaultEditableItems(items, sheets));
+    setComplementaryChecks([
+      "Chave",
+      "Trava Monitor",
+      "Parafusos",
+      "Manuais",
+      "Folder Propaganda",
+    ]);
+    setOrientations(initialNotes);
+    setManualLines(["", "", ""]);
+    setSignatureTitles([
+      "1. OPERADOR ROUTER CNC / ESTRUTURA",
+      "2. SEPARAÇÃO DE KIT & ELÉTRICA",
+      "3. AUDITORIA FINAL EXPEDIÇÃO (100% OK)",
+    ]);
+    setSignatureDates([
+      "Data: ___/___/2026 • Hora: ___:___",
+      "Data: ___/___/2026 • Hora: ___:___",
+      "Data: ___/___/2026 • Hora: ___:___",
+    ]);
+  };
+
   const handleQuickAddOrientation = (snippet: string) => {
-    setOrientations((prev) => (prev.trim() ? `${prev.trim()}\n• ${snippet}` : `• ${snippet}`));
+    setOrientations((prev) =>
+      prev.trim() ? `${prev.trim()}\n• ${snippet}` : `• ${snippet}`
+    );
+  };
+
+  const updateItemField = <K extends keyof EditablePrintOrderItem>(
+    itemIdx: number,
+    field: K,
+    value: EditablePrintOrderItem[K]
+  ) => {
+    setEditableItems((prev) =>
+      prev.map((it, idx) => (idx === itemIdx ? { ...it, [field]: value } : it))
+    );
   };
 
   const handleSaveOnly = async () => {
@@ -129,6 +429,7 @@ export function ProductionOrderPrintModal({
         operator: operatorName.trim(),
         priority,
         targetDate,
+        printOverrides: buildCurrentOverrides(),
       });
       setSavedFeedback(true);
       setTimeout(() => setSavedFeedback(false), 3000);
@@ -146,6 +447,7 @@ export function ProductionOrderPrintModal({
           operator: operatorName.trim(),
           priority,
           targetDate,
+          printOverrides: buildCurrentOverrides(),
         });
       } catch {
         // Prossegue para impressão mesmo se falhar salvamento opcional
@@ -171,7 +473,7 @@ export function ProductionOrderPrintModal({
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <title>O.P. ${order.order_number} — ${order.customer_name}</title>
+  <title>O.P. ${orderNumberLabel} — ${customerName}</title>
   <style>
     @page {
       size: A4 portrait;
@@ -224,35 +526,36 @@ export function ProductionOrderPrintModal({
     printWindow.document.close();
   };
 
-  const items = Array.isArray(order.items) ? order.items : [];
-  const sheets = Array.isArray(order.sheets) ? order.sheets : [];
-  const addr = order.address || {};
-  const ship = order.shipping || {};
-
-  const cncProductionChecks = [
-    "Chave",
-    "Trava Monitor",
-    "Parafusos",
-    "Manuais",
-    "Folder Propaganda",
-  ];
+  // Estilo base para inputs inline na folha A4 interativa
+  const inlineInputBase =
+    "bg-transparent border border-transparent hover:border-indigo-400/70 focus:border-indigo-600 focus:bg-indigo-50/60 rounded px-1 -mx-1 focus:outline-none transition-colors w-full";
 
   return (
     <div className="fixed inset-0 z-[60] bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-3 overflow-y-auto">
-      <div className="bg-slate-900 border-2 border-slate-700 rounded-3xl max-w-[1380px] w-full max-h-[96dvh] flex flex-col overflow-hidden shadow-2xl animate-fade-in">
+      <div className="bg-slate-900 border-2 border-slate-700 rounded-3xl max-w-[1420px] w-full max-h-[96dvh] flex flex-col overflow-hidden shadow-2xl animate-fade-in">
         {/* Cabeçalho Compacto do Modal */}
         <div className="flex flex-wrap items-center justify-between gap-2.5 px-4 py-3 border-b border-slate-800 bg-slate-950 shrink-0">
           <div className="flex items-center gap-3 flex-wrap">
             <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-black text-[10px] uppercase tracking-wider inline-flex items-center gap-1.5">
-              <Printer className="w-3.5 h-3.5" />
-              <span>Ficha A4 Única (1 Página) • Sem Preços</span>
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Ficha A4 100% Editável • Clique em Qualquer Campo para Editar</span>
             </span>
             <h2 className="text-sm sm:text-lg font-black text-white font-mono">
-              O.P. {order.order_number} — {order.customer_name}
+              O.P. {orderNumberLabel} — {customerName}
             </h2>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleResetToOrderDefaults}
+              className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+              title="Restaurar todos os textos para os dados originais do pedido"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Restaurar Padrão</span>
+            </button>
+
             {onSaveOrientations && (
               <button
                 type="button"
@@ -261,9 +564,10 @@ export function ProductionOrderPrintModal({
                 className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/30 font-bold text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 <Save className="w-3.5 h-3.5" />
-                <span>{savedFeedback ? "Orientações Salvas!" : "Salvar Orientações"}</span>
+                <span>{savedFeedback ? "Alterações Salvas!" : "Salvar Alterações"}</span>
               </button>
             )}
+
             <button
               type="button"
               disabled={isSaving}
@@ -283,17 +587,17 @@ export function ProductionOrderPrintModal({
           </div>
         </div>
 
-        {/* Corpo em 2 Colunas: Esquerda (Controles Rápidos) | Direita (Folha A4 Completa Visível) */}
+        {/* Corpo em 2 Colunas: Esquerda (Controles Rápidos) | Direita (Folha A4 Interativa Editável) */}
         <div className="flex-1 overflow-y-auto p-3 sm:p-4 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-          {/* COLUNA ESQUERDA (4 COLS): CONFIGURAÇÃO & ORIENTAÇÕES PARA A FÁBRICA */}
+          {/* COLUNA ESQUERDA (4 COLS): CONFIGURAÇÃO RÁPIDA & ORIENTAÇÕES PARA A FÁBRICA */}
           <div className="lg:col-span-4 bg-slate-950 border border-slate-800 rounded-2xl p-3.5 space-y-3 text-xs lg:sticky lg:top-0">
             <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-2">
               <span className="font-black text-amber-300 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
                 <FileText className="w-4 h-4" />
-                <span>Configurar Ficha & Orientações</span>
+                <span>Preenchimento Rápido & Orientações</span>
               </span>
-              <span className="text-[10px] font-bold text-emerald-400">
-                Cabimento: 1 Folha A4
+              <span className="text-[10px] font-bold text-cyan-400">
+                Edite aqui ou direto na folha →
               </span>
             </div>
 
@@ -318,7 +622,15 @@ export function ProductionOrderPrintModal({
                 <input
                   type="date"
                   value={targetDate}
-                  onChange={(e) => setTargetDate(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setTargetDate(val);
+                    setTargetDateStr(
+                      val
+                        ? new Date(val + "T12:00:00").toLocaleDateString("pt-BR")
+                        : "___/___/26"
+                    );
+                  }}
                   className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-white font-mono text-xs"
                 />
               </div>
@@ -327,7 +639,7 @@ export function ProductionOrderPrintModal({
             <div className="grid grid-cols-2 gap-2.5">
               <div>
                 <label className="block text-slate-400 font-bold text-[10px] uppercase mb-1">
-                  Responsável CNC / Bancada
+                  Operador CNC / Bancada
                 </label>
                 <input
                   type="text"
@@ -339,24 +651,31 @@ export function ProductionOrderPrintModal({
               </div>
               <div>
                 <label className="block text-slate-400 font-bold text-[10px] uppercase mb-1">
-                  Linhas p/ Escrita à Caneta
+                  Linhas Pautadas (Seção 4)
                 </label>
                 <select
-                  value={blankLinesCount}
-                  onChange={(e) => setBlankLinesCount(Number(e.target.value))}
+                  value={manualLines.length}
+                  onChange={(e) => {
+                    const count = Number(e.target.value);
+                    setManualLines((prev) => {
+                      const next = [...prev];
+                      while (next.length < count) next.push("");
+                      return next.slice(0, count);
+                    });
+                  }}
                   className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold text-xs"
                 >
-                  <option value={2}>2 linhas pautadas (Compacto A4)</option>
-                  <option value={3}>3 linhas pautadas (Ideal A4)</option>
-                  <option value={4}>4 linhas pautadas</option>
-                  <option value={0}>Sem linhas em branco</option>
+                  <option value={2}>2 linhas editáveis/pautadas</option>
+                  <option value={3}>3 linhas editáveis/pautadas (Ideal A4)</option>
+                  <option value={4}>4 linhas editáveis/pautadas</option>
+                  <option value={0}>Sem linhas pautadas extras</option>
                 </select>
               </div>
             </div>
 
             <div>
               <label className="block text-amber-200 font-bold text-[11px] mb-1">
-                ✍️ Orientações Impressas no Pedido:
+                ✍️ Orientações de Produção (Seção 4):
               </label>
               <textarea
                 rows={3}
@@ -369,7 +688,7 @@ export function ProductionOrderPrintModal({
 
             <div className="space-y-1.5">
               <span className="block text-[10px] font-bold text-slate-400 uppercase">
-                Atalhos Rápidos (Clique para adicionar):
+                Atalhos Rápidos (Clique para inserir):
               </span>
               <div className="flex flex-col gap-1">
                 {[
@@ -390,6 +709,10 @@ export function ProductionOrderPrintModal({
               </div>
             </div>
 
+            <div className="p-2.5 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-[11px] text-indigo-200 leading-relaxed">
+              💡 <strong>Dica:</strong> Você pode clicar diretamente em <strong>qualquer texto ou linha pontilhada da folha A4 ao lado</strong> (nome do cliente, endereço, modelo do gabinete, monitor, impressora, medidas, checklist ou linhas de observação) para editar ou preencher antes de imprimir.
+            </div>
+
             <button
               type="button"
               disabled={isSaving}
@@ -402,13 +725,12 @@ export function ProductionOrderPrintModal({
           </div>
 
           {/* ========================================================================= */}
-          {/* COLUNA DIREITA (8 COLS): FOLHA A4 ÚNICA OTIMIZADA                         */}
+          {/* COLUNA DIREITA (8 COLS): FOLHA A4 INTERATIVA (CLIQUE E EDITE QUALQUER CAMPO) */}
           {/* ========================================================================= */}
           <div className="lg:col-span-8 bg-white text-slate-950 rounded-2xl p-4 sm:p-6 shadow-2xl border-2 border-slate-300">
-            <div ref={printableRef}>
-              {/* ================================================================= */}
-              {/* CABEÇALHO UNIFICADO: PEDIDO + DESTINATÁRIO + LOGÍSTICA (COMPACTO) */}
-              {/* ================================================================= */}
+            {/* VISÃO INTERATIVA NA TELA (COM INPUTS DIRETO NA FOLHA) */}
+            <div style={{ fontSize: "10px", lineHeight: 1.28 }}>
+              {/* CABEÇALHO UNIFICADO */}
               <div
                 style={{
                   border: "2px solid #0f172a",
@@ -417,7 +739,986 @@ export function ProductionOrderPrintModal({
                   marginBottom: "7px",
                 }}
               >
-                {/* Faixa Superior Escura/Destaque */}
+                <div
+                  style={{
+                    background: "#0f172a",
+                    color: "#ffffff",
+                    padding: "6px 10px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: 900,
+                        letterSpacing: "0.3px",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      ORDEM DE PRODUÇÃO CNC & CHECKLIST DE EXPEDIÇÃO
+                    </div>
+                    <div style={{ fontSize: "9px", color: "#cbd5e1", fontWeight: 700 }}>
+                      TOTEM PRO ENGENHARIA • DOCUMENTO INTERNO DE FÁBRICA (SEM VALORES COMERCIAIS)
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <button
+                      type="button"
+                      onClick={() => setPriority((p) => (p === "urgent" ? "normal" : "urgent"))}
+                      title="Clique para alternar prioridade"
+                      style={{
+                        background: priority === "urgent" ? "#dc2626" : "#334155",
+                        color: "#ffffff",
+                        padding: "3px 7px",
+                        borderRadius: "4px",
+                        fontWeight: 900,
+                        fontSize: "9.5px",
+                        textTransform: "uppercase",
+                        cursor: "pointer",
+                        border: "none",
+                      }}
+                    >
+                      {priority === "urgent" ? "🚨 PRIORIDADE URGENTE" : "FILA PADRÃO"}
+                    </button>
+                    <input
+                      type="text"
+                      value={orderNumberLabel}
+                      onChange={(e) => setOrderNumberLabel(e.target.value)}
+                      style={{
+                        fontFamily: "Consolas, monospace",
+                        fontSize: "14px",
+                        fontWeight: 900,
+                        background: "#ffffff",
+                        color: "#0f172a",
+                        padding: "2px 8px",
+                        borderRadius: "4px",
+                        width: "195px",
+                        textAlign: "center",
+                        border: "1px solid transparent",
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Grade de Dados Essenciais: Cliente (SEM CPF/Tel) | Endereço | Logística */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1.1fr 1.3fr 0.95fr",
+                    gap: "8px",
+                    padding: "6px 10px",
+                    background: "#f8fafc",
+                    fontSize: "9.8px",
+                    alignItems: "center",
+                  }}
+                >
+                  {/* 1. CLIENTE / DESTINATÁRIO (Sem CPF/CNPJ e Sem Telefone conforme solicitado) */}
+                  <div style={{ borderRight: "1px solid #cbd5e1", paddingRight: "8px" }}>
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        fontWeight: 900,
+                        color: "#334155",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.3px",
+                      }}
+                    >
+                      CLIENTE / DESTINATÁRIO
+                    </div>
+                    <input
+                      type="text"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="Nome do cliente / destinatário"
+                      className={inlineInputBase}
+                      style={{
+                        fontSize: "16px",
+                        fontWeight: 900,
+                        color: "#0f172a",
+                        marginTop: "2px",
+                        lineHeight: 1.2,
+                      }}
+                    />
+                  </div>
+
+                  {/* 2. DESTINO & ENDEREÇO DE ENTREGA */}
+                  <div style={{ borderRight: "1px solid #cbd5e1", paddingRight: "8px" }}>
+                    <div
+                      style={{
+                        fontSize: "8.5px",
+                        fontWeight: 900,
+                        color: "#475569",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      DESTINO & ENDEREÇO DE ENTREGA
+                    </div>
+                    <input
+                      type="text"
+                      value={addressLine1}
+                      onChange={(e) => setAddressLine1(e.target.value)}
+                      placeholder="Rua, número, complemento"
+                      className={inlineInputBase}
+                      style={{ fontWeight: 800, color: "#0f172a", marginTop: "1px" }}
+                    />
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        color: "#1e293b",
+                        marginTop: "1px",
+                      }}
+                    >
+                      <strong>Cidade/UF:</strong>
+                      <input
+                        type="text"
+                        value={addressCityState}
+                        onChange={(e) => setAddressCityState(e.target.value)}
+                        className={inlineInputBase}
+                        style={{ width: "115px" }}
+                      />
+                      <span>•</span>
+                      <strong>CEP:</strong>
+                      <input
+                        type="text"
+                        value={addressCep}
+                        onChange={(e) => setAddressCep(e.target.value)}
+                        className={inlineInputBase}
+                        style={{ width: "80px" }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 3. LOGÍSTICA & CONTROLE CNC */}
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "8.5px",
+                        fontWeight: 900,
+                        color: "#475569",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      LOGÍSTICA & CONTROLE CNC
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "1px" }}>
+                      <strong style={{ color: "#0f172a" }}>Envio:</strong>
+                      <input
+                        type="text"
+                        value={shippingLabel}
+                        onChange={(e) => setShippingLabel(e.target.value)}
+                        className={inlineInputBase}
+                        style={{ fontWeight: 900, color: "#0f172a" }}
+                      />
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "3px",
+                        color: "#1e293b",
+                        marginTop: "1px",
+                      }}
+                    >
+                      <strong>Data:</strong>
+                      <input
+                        type="text"
+                        value={orderDateStr}
+                        onChange={(e) => setOrderDateStr(e.target.value)}
+                        className={inlineInputBase}
+                        style={{ width: "66px" }}
+                      />
+                      <span>•</span>
+                      <strong>Meta:</strong>
+                      <input
+                        type="text"
+                        value={targetDateStr}
+                        onChange={(e) => setTargetDateStr(e.target.value)}
+                        className={inlineInputBase}
+                        style={{ width: "66px" }}
+                      />
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        color: "#1e293b",
+                        marginTop: "1px",
+                      }}
+                    >
+                      <strong>Operador:</strong>
+                      <input
+                        type="text"
+                        value={operatorName}
+                        onChange={(e) => setOperatorName(e.target.value)}
+                        placeholder="____________________"
+                        className={inlineInputBase}
+                        style={{ fontWeight: 700 }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* POR ITEM: ESPECIFICAÇÃO TÉCNICA + CHECKLIST COMPLETO */}
+              {editableItems.map((it, idx) => (
+                <div key={it.id || idx} style={{ marginBottom: "7px" }}>
+                  {/* 1. ESPECIFICAÇÃO TÉCNICA DO GABINETE & PERIFÉRICOS */}
+                  <div
+                    style={{
+                      border: "2px solid #0f172a",
+                      borderRadius: "6px",
+                      padding: "6px 9px",
+                      marginBottom: "7px",
+                      background: "#ffffff",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: "8px",
+                        borderBottom: "2px solid #0f172a",
+                        paddingBottom: "5px",
+                        marginBottom: "6px",
+                      }}
+                    >
+                      <input
+                        type="text"
+                        value={it.headerTitle}
+                        onChange={(e) => updateItemField(idx, "headerTitle", e.target.value)}
+                        className={inlineInputBase}
+                        style={{
+                          fontSize: "15.5px",
+                          fontWeight: 900,
+                          color: "#0f172a",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.2px",
+                        }}
+                      />
+                      <input
+                        type="text"
+                        value={it.badgeText}
+                        onChange={(e) => updateItemField(idx, "badgeText", e.target.value)}
+                        style={{
+                          background: "#e2e8f0",
+                          padding: "2px 8px",
+                          borderRadius: "4px",
+                          fontSize: "10px",
+                          fontWeight: 900,
+                          textTransform: "uppercase",
+                          width: "190px",
+                          textAlign: "center",
+                          border: "1px solid transparent",
+                        }}
+                      />
+                    </div>
+
+                    {/* 3 Caixas Lado a Lado: Tela/Recorte • Impressora/Rasgo • Medidas/Leitor */}
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1.15fr 1.15fr 0.9fr",
+                        gap: "6px",
+                        fontSize: "9.8px",
+                      }}
+                    >
+                      {/* TELA / MONITOR */}
+                      <div
+                        style={{
+                          border: it.monitorRemovedAlert
+                            ? "2px solid #dc2626"
+                            : "1px solid #475569",
+                          borderRadius: "5px",
+                          padding: "4px 7px",
+                          background: it.monitorRemovedAlert ? "#fff1f2" : "#f8fafc",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: "8.5px",
+                            fontWeight: 900,
+                            color: "#334155",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          TELA / MONITOR & RECORTE CNC:
+                        </div>
+                        <input
+                          type="text"
+                          value={it.monitorTitle}
+                          onChange={(e) => updateItemField(idx, "monitorTitle", e.target.value)}
+                          className={inlineInputBase}
+                          style={{
+                            fontWeight: 900,
+                            fontSize: "10px",
+                            marginTop: "1px",
+                            color: "#0f172a",
+                          }}
+                        />
+                        <div
+                          style={{
+                            fontSize: "9px",
+                            color: "#334155",
+                            marginTop: "2px",
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: "3px",
+                          }}
+                        >
+                          <strong style={{ flexShrink: 0 }}>Corte:</strong>
+                          <textarea
+                            rows={2}
+                            value={it.monitorCutout}
+                            onChange={(e) => updateItemField(idx, "monitorCutout", e.target.value)}
+                            className={`${inlineInputBase} resize-none`}
+                            style={{ fontSize: "9px", lineHeight: 1.25 }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* IMPRESSORA TÉRMICA */}
+                      <div
+                        style={{
+                          border: it.printerRemovedAlert
+                            ? "2px solid #dc2626"
+                            : "1px solid #475569",
+                          borderRadius: "5px",
+                          padding: "4px 7px",
+                          background: it.printerRemovedAlert ? "#fff1f2" : "#f8fafc",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: "8.5px",
+                            fontWeight: 900,
+                            color: "#334155",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          IMPRESSORA TÉRMICA & RASGO CNC:
+                        </div>
+                        <input
+                          type="text"
+                          value={it.printerTitle}
+                          onChange={(e) => updateItemField(idx, "printerTitle", e.target.value)}
+                          className={inlineInputBase}
+                          style={{
+                            fontWeight: 900,
+                            fontSize: "10px",
+                            marginTop: "1px",
+                            color: "#0f172a",
+                          }}
+                        />
+                        <div
+                          style={{
+                            fontSize: "9px",
+                            color: "#334155",
+                            marginTop: "2px",
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: "3px",
+                          }}
+                        >
+                          <strong style={{ flexShrink: 0 }}>Rasgo:</strong>
+                          <textarea
+                            rows={2}
+                            value={it.printerSlot}
+                            onChange={(e) => updateItemField(idx, "printerSlot", e.target.value)}
+                            className={`${inlineInputBase} resize-none`}
+                            style={{ fontSize: "9px", lineHeight: 1.25 }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* DIMENSÕES & LEITOR */}
+                      <div
+                        style={{
+                          border: "1px solid #475569",
+                          borderRadius: "5px",
+                          padding: "4px 7px",
+                          background: "#f8fafc",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: "8.5px",
+                            fontWeight: 900,
+                            color: "#334155",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          MEDIDAS EXTERNAS & LEITOR:
+                        </div>
+                        <input
+                          type="text"
+                          value={it.dimensionsText}
+                          onChange={(e) => updateItemField(idx, "dimensionsText", e.target.value)}
+                          className={inlineInputBase}
+                          style={{
+                            fontWeight: 900,
+                            fontSize: "10px",
+                            marginTop: "1px",
+                            color: "#0f172a",
+                          }}
+                        />
+                        <div
+                          style={{
+                            fontSize: "9px",
+                            color: "#334155",
+                            marginTop: "2px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "3px",
+                          }}
+                        >
+                          <strong style={{ flexShrink: 0 }}>Leitor:</strong>
+                          <input
+                            type="text"
+                            value={it.readerText}
+                            onChange={(e) => updateItemField(idx, "readerText", e.target.value)}
+                            className={inlineInputBase}
+                            style={{ fontSize: "9px" }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* NOTA TÉCNICA DO ITEM (Editável ou preenchível se vazio) */}
+                    <div
+                      style={{
+                        marginTop: "5px",
+                        padding: "4px 7px",
+                        border: it.technicalNote.trim()
+                          ? "1.5px solid #d97706"
+                          : "1px dashed #cbd5e1",
+                        background: it.technicalNote.trim() ? "#fef3c7" : "#f8fafc",
+                        borderRadius: "4px",
+                        fontWeight: 800,
+                        fontSize: "9.8px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "5px",
+                      }}
+                    >
+                      <span style={{ flexShrink: 0, color: "#92400e" }}>
+                        ⚠️ NOTA TÉCNICA DO ITEM:
+                      </span>
+                      <input
+                        type="text"
+                        value={it.technicalNote}
+                        onChange={(e) => updateItemField(idx, "technicalNote", e.target.value)}
+                        placeholder="(Opcional — clique para preencher uma nota técnica específica deste item)"
+                        className={inlineInputBase}
+                        style={{ fontWeight: 800, color: "#0f172a" }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 2. CHECKLIST DE SEPARAÇÃO & ENTREGA EM 2 COLUNAS */}
+                  <div
+                    style={{
+                      border: "2px solid #0f172a",
+                      borderRadius: "6px",
+                      padding: "6px 9px",
+                      marginBottom: "7px",
+                      background: "#ffffff",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        borderBottom: "1.5px solid #0f172a",
+                        paddingBottom: "3px",
+                        marginBottom: "5px",
+                        fontSize: "10.5px",
+                        fontWeight: 900,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      <span>
+                        2. CHECKLIST DE SEPARAÇÃO & EXPEDIÇÃO — O QUE COLOCAR NA CAIXA (MARCAR [ ✓ ] À CANETA)
+                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextList = [
+                              ...it.checklistToDeliver,
+                              {
+                                id: `custom-${Date.now()}`,
+                                quantity: "1x",
+                                name: "Novo item para envio",
+                              },
+                            ];
+                            updateItemField(idx, "checklistToDeliver", nextList);
+                          }}
+                          className="px-2 py-0.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-[9px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <Plus className="w-2.5 h-2.5" />
+                          <span>+ Item</span>
+                        </button>
+                        <span
+                          style={{
+                            background: "#dcfce7",
+                            color: "#065f46",
+                            border: "1px solid #059669",
+                            padding: "1px 6px",
+                            borderRadius: "4px",
+                            fontSize: "9px",
+                          }}
+                        >
+                          ENVIAR: {it.checklistToDeliver.length} ITENS OBRIGATÓRIOS
+                        </span>
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: "4px 8px",
+                      }}
+                    >
+                      {it.checklistToDeliver.map((chk, cIdx) => (
+                        <div
+                          key={chk.id || cIdx}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            border: "1px solid #64748b",
+                            borderRadius: "4px",
+                            padding: "3.5px 6px",
+                            background: cIdx % 2 === 0 ? "#ffffff" : "#f8fafc",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "5px",
+                              minWidth: 0,
+                              flex: 1,
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: "15px",
+                                height: "15px",
+                                border: "2px solid #0f172a",
+                                borderRadius: "3px",
+                                display: "inline-block",
+                                flexShrink: 0,
+                                background: "#ffffff",
+                              }}
+                            />
+                            <input
+                              type="text"
+                              value={chk.quantity}
+                              onChange={(e) => {
+                                const next = [...it.checklistToDeliver];
+                                next[cIdx] = { ...next[cIdx], quantity: e.target.value };
+                                updateItemField(idx, "checklistToDeliver", next);
+                              }}
+                              className={inlineInputBase}
+                              style={{
+                                fontFamily: "Consolas, monospace",
+                                fontWeight: 900,
+                                fontSize: "10.5px",
+                                color: "#0f172a",
+                                width: "28px",
+                                flexShrink: 0,
+                              }}
+                            />
+                            <input
+                              type="text"
+                              value={chk.name}
+                              onChange={(e) => {
+                                const next = [...it.checklistToDeliver];
+                                next[cIdx] = { ...next[cIdx], name: e.target.value };
+                                updateItemField(idx, "checklistToDeliver", next);
+                              }}
+                              className={inlineInputBase}
+                              style={{
+                                fontWeight: 800,
+                                fontSize: "10px",
+                                color: "#0f172a",
+                              }}
+                            />
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
+                            <span
+                              style={{
+                                fontSize: "8.5px",
+                                fontWeight: 800,
+                                color: "#475569",
+                                borderLeft: "1px dashed #94a3b8",
+                                paddingLeft: "5px",
+                              }}
+                            >
+                              Visto: _____
+                            </span>
+                            {it.checklistToDeliver.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const next = it.checklistToDeliver.filter((_, i) => i !== cIdx);
+                                  updateItemField(idx, "checklistToDeliver", next);
+                                }}
+                                className="text-slate-400 hover:text-rose-600 p-0.5 cursor-pointer"
+                                title="Remover este item do checklist"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* AUDITORIA DE BLOQUEIO: ITENS REMOVIDOS PELO CLIENTE (NÃO ENVIAR) */}
+                    {it.checklistNotToDeliver.length > 0 && (
+                      <div
+                        style={{
+                          marginTop: "6px",
+                          padding: "5px 7px",
+                          border: "2px solid #dc2626",
+                          borderRadius: "5px",
+                          background: "#fff1f2",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: "9.5px",
+                            fontWeight: 900,
+                            textTransform: "uppercase",
+                            color: "#991b1b",
+                            marginBottom: "4px",
+                          }}
+                        >
+                          🚫 ATENÇÃO — ITENS REMOVIDOS PELO CLIENTE (MARCAR [ ✓ ] CONFIRMANDO QUE NÃO FORAM COLOCADOS NA CAIXA):
+                        </div>
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "1fr 1fr",
+                            gap: "4px 8px",
+                          }}
+                        >
+                          {it.checklistNotToDeliver.map((rem, rIdx) => (
+                            <div
+                              key={rem.id || rIdx}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                border: "1px solid #f87171",
+                                borderRadius: "4px",
+                                padding: "3px 6px",
+                                background: "#ffffff",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "6px",
+                                  flex: 1,
+                                  minWidth: 0,
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    width: "14px",
+                                    height: "14px",
+                                    border: "2px solid #991b1b",
+                                    borderRadius: "3px",
+                                    display: "inline-block",
+                                    flexShrink: 0,
+                                  }}
+                                />
+                                <input
+                                  type="text"
+                                  value={rem.name}
+                                  onChange={(e) => {
+                                    const next = [...it.checklistNotToDeliver];
+                                    next[rIdx] = { ...next[rIdx], name: e.target.value };
+                                    updateItemField(idx, "checklistNotToDeliver", next);
+                                  }}
+                                  className={inlineInputBase}
+                                  style={{
+                                    fontWeight: 800,
+                                    fontSize: "9.8px",
+                                    textDecoration: "line-through",
+                                    color: "#881337",
+                                  }}
+                                />
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
+                                <span
+                                  style={{
+                                    fontSize: "8.5px",
+                                    fontWeight: 900,
+                                    color: "#991b1b",
+                                  }}
+                                >
+                                  🚫 NÃO ENVIAR
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = it.checklistNotToDeliver.filter((_, i) => i !== rIdx);
+                                    updateItemField(idx, "checklistNotToDeliver", next);
+                                  }}
+                                  className="text-rose-400 hover:text-rose-700 p-0.5 cursor-pointer"
+                                  title="Remover este alerta"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* 3. CHECKLIST COMPLEMENTAR DE ENVIO (EDITÁVEL) */}
+              <div
+                style={{
+                  border: "2px solid #0f172a",
+                  borderRadius: "6px",
+                  padding: "6px 9px",
+                  marginBottom: "7px",
+                  background: "#ffffff",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    borderBottom: "1.5px solid #0f172a",
+                    paddingBottom: "3px",
+                    marginBottom: "5px",
+                    fontSize: "10.5px",
+                    fontWeight: 900,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  <span>3. CHECKLIST COMPLEMENTAR DE ENVIO (MARCAR [ ✓ ] À CANETA)</span>
+                  <span style={{ fontSize: "9px", color: "#334155" }}>CONFERÊNCIA OBRIGATÓRIA</span>
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: `repeat(${Math.max(1, complementaryChecks.length)}, 1fr)`,
+                    gap: "6px",
+                  }}
+                >
+                  {complementaryChecks.map((stepText, sIdx) => (
+                    <div
+                      key={sIdx}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        border: "1.5px solid #475569",
+                        borderRadius: "5px",
+                        padding: "5px 7px",
+                        background: "#f8fafc",
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: "16px",
+                          height: "16px",
+                          border: "2px solid #0f172a",
+                          borderRadius: "3px",
+                          display: "inline-block",
+                          flexShrink: 0,
+                          background: "#ffffff",
+                        }}
+                      />
+                      <input
+                        type="text"
+                        value={stepText}
+                        onChange={(e) => {
+                          const next = [...complementaryChecks];
+                          next[sIdx] = e.target.value;
+                          setComplementaryChecks(next);
+                        }}
+                        className={inlineInputBase}
+                        style={{ fontWeight: 900, fontSize: "10.5px", color: "#0f172a" }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 4. ORIENTAÇÕES DE PRODUÇÃO & LINHAS PAUTADAS CLICÁVEIS PARA PREENCHIMENTO */}
+              <div
+                style={{
+                  border: "2px solid #0f172a",
+                  background: "#fffbeb",
+                  borderRadius: "6px",
+                  padding: "6px 9px",
+                  marginBottom: "7px",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    borderBottom: "1px solid #f59e0b",
+                    paddingBottom: "3px",
+                    marginBottom: "4px",
+                    fontSize: "10px",
+                    fontWeight: 900,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  <span>4. ORIENTAÇÕES DE PRODUÇÃO & ANOTAÇÕES MANUAIS NA BANCADA</span>
+                  <span style={{ fontSize: "8.5px", color: "#78350f" }}>
+                    CLIQUE NAS LINHAS ABAIXO PARA DIGITAR OU DEIXE EM BRANCO P/ CANETA
+                  </span>
+                </div>
+
+                {orientations.trim() && (
+                  <textarea
+                    rows={2}
+                    value={orientations}
+                    onChange={(e) => setOrientations(e.target.value)}
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      color: "#0f172a",
+                      width: "100%",
+                      background: "#ffffff",
+                      border: "1px solid #0f172a",
+                      borderRadius: "4px",
+                      padding: "5px 7px",
+                      marginBottom: manualLines.length > 0 ? "4px" : "0",
+                    }}
+                  />
+                )}
+
+                {manualLines.length > 0 && (
+                  <div>
+                    {manualLines.map((lineText, lIdx) => (
+                      <div
+                        key={lIdx}
+                        style={{
+                          borderBottom: "1px dashed #475569",
+                          height: "20px",
+                          width: "100%",
+                          display: "flex",
+                          alignItems: "center",
+                        }}
+                      >
+                        <input
+                          type="text"
+                          value={lineText}
+                          onChange={(e) => {
+                            const next = [...manualLines];
+                            next[lIdx] = e.target.value;
+                            setManualLines(next);
+                          }}
+                          placeholder={
+                            lIdx === 0 && !orientations.trim()
+                              ? "Clique aqui para digitar uma observação nesta linha antes de imprimir (ou deixe em branco para escrever à caneta)..."
+                              : ""
+                          }
+                          className="w-full bg-transparent focus:bg-amber-100/60 focus:outline-none text-[10.5px] font-bold text-slate-900 placeholder-amber-700/45 px-1"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 5. ASSINATURAS DE RESPONSABILIDADE EM 3 COLUNAS */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr 1fr",
+                  gap: "8px",
+                  marginTop: "4px",
+                }}
+              >
+                {signatureTitles.map((sigTitle, sIdx) => (
+                  <div
+                    key={sIdx}
+                    style={{
+                      border: "1.5px solid #334155",
+                      borderRadius: "6px",
+                      padding: "5px 8px",
+                      textAlign: "center",
+                      background: "#f8fafc",
+                    }}
+                  >
+                    <div
+                      style={{
+                        borderBottom: "1.5px solid #0f172a",
+                        height: "20px",
+                        marginBottom: "3px",
+                      }}
+                    />
+                    <input
+                      type="text"
+                      value={sigTitle}
+                      onChange={(e) => {
+                        const next = [...signatureTitles];
+                        next[sIdx] = e.target.value;
+                        setSignatureTitles(next);
+                      }}
+                      className={`${inlineInputBase} text-center`}
+                      style={{ fontWeight: 900, fontSize: "9px", textTransform: "uppercase" }}
+                    />
+                    <input
+                      type="text"
+                      value={signatureDates[sIdx] || ""}
+                      onChange={(e) => {
+                        const next = [...signatureDates];
+                        next[sIdx] = e.target.value;
+                        setSignatureDates(next);
+                      }}
+                      className={`${inlineInputBase} text-center`}
+                      style={{ fontSize: "8.5px", color: "#475569", marginTop: "1px" }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ========================================================================= */}
+            {/* DOM ESTÁTICO OCULTO PARA IMPRESSÃO A4 PERFEITA (REFLECTE 100% DAS EDIÇÕES) */}
+            {/* ========================================================================= */}
+            <div ref={printableRef} style={{ display: "none" }}>
+              {/* CABEÇALHO UNIFICADO */}
+              <div
+                style={{
+                  border: "2px solid #0f172a",
+                  borderRadius: "6px",
+                  overflow: "hidden",
+                  marginBottom: "7px",
+                }}
+              >
                 <div
                   style={{
                     background: "#0f172a",
@@ -469,63 +1770,85 @@ export function ProductionOrderPrintModal({
                         borderRadius: "4px",
                       }}
                     >
-                      {order.order_number}
+                      {orderNumberLabel}
                     </span>
                   </div>
                 </div>
 
-                {/* Grade de Dados Essenciais do Pedido, Cliente e Entrega */}
+                {/* Grade de Dados Essenciais: Cliente (Sem CPF/Tel) | Endereço | Logística */}
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1.15fr 1.25fr 0.9fr",
+                    gridTemplateColumns: "1.1fr 1.3fr 0.95fr",
                     gap: "8px",
                     padding: "6px 10px",
                     background: "#f8fafc",
                     fontSize: "9.8px",
+                    alignItems: "center",
                   }}
                 >
                   <div style={{ borderRight: "1px solid #cbd5e1", paddingRight: "8px" }}>
-                    <div style={{ fontSize: "10px", fontWeight: 900, color: "#334155", textTransform: "uppercase", letterSpacing: "0.3px" }}>
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        fontWeight: 900,
+                        color: "#334155",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.3px",
+                      }}
+                    >
                       CLIENTE / DESTINATÁRIO
                     </div>
-                    <div style={{ fontSize: "16px", fontWeight: 900, color: "#0f172a", marginTop: "2px", lineHeight: 1.15 }}>
-                      {order.customer_name}
-                    </div>
-                    <div style={{ fontSize: "10.5px", color: "#1e293b", marginTop: "3px" }}>
-                      <strong>CPF/CNPJ:</strong> {order.customer_document || "—"} •{" "}
-                      <strong>Tel:</strong> {order.customer_whatsapp || "—"}
+                    <div
+                      style={{
+                        fontSize: "16px",
+                        fontWeight: 900,
+                        color: "#0f172a",
+                        marginTop: "2px",
+                        lineHeight: 1.15,
+                      }}
+                    >
+                      {customerName}
                     </div>
                   </div>
 
                   <div style={{ borderRight: "1px solid #cbd5e1", paddingRight: "8px" }}>
-                    <div style={{ fontSize: "8.5px", fontWeight: 900, color: "#475569", textTransform: "uppercase" }}>
+                    <div
+                      style={{
+                        fontSize: "8.5px",
+                        fontWeight: 900,
+                        color: "#475569",
+                        textTransform: "uppercase",
+                      }}
+                    >
                       DESTINO & ENDEREÇO DE ENTREGA
                     </div>
                     <div style={{ fontWeight: 800, color: "#0f172a", marginTop: "1px" }}>
-                      {addr.street ? `${addr.street}, nº ${addr.number || "S/N"}` : "Endereço não informado"}
-                      {addr.complement ? ` (${addr.complement})` : ""}
+                      {addressLine1}
                     </div>
                     <div style={{ color: "#1e293b", marginTop: "1px" }}>
-                      <strong>Cidade/UF:</strong> {addr.city || "—"}/{addr.state || "SP"} •{" "}
-                      <strong>CEP:</strong> {addr.cep || "—"}
+                      <strong>Cidade/UF:</strong> {addressCityState} •{" "}
+                      <strong>CEP:</strong> {addressCep}
                     </div>
                   </div>
 
                   <div>
-                    <div style={{ fontSize: "8.5px", fontWeight: 900, color: "#475569", textTransform: "uppercase" }}>
+                    <div
+                      style={{
+                        fontSize: "8.5px",
+                        fontWeight: 900,
+                        color: "#475569",
+                        textTransform: "uppercase",
+                      }}
+                    >
                       LOGÍSTICA & CONTROLE CNC
                     </div>
                     <div style={{ fontWeight: 900, color: "#0f172a", marginTop: "1px" }}>
-                      Envio: {stripMonetaryValues(ship.name || "A Definir")}
+                      Envio: {shippingLabel}
                     </div>
                     <div style={{ color: "#1e293b", marginTop: "1px" }}>
-                      <strong>Data:</strong>{" "}
-                      {new Date(order.$createdAt).toLocaleDateString("pt-BR")} •{" "}
-                      <strong>Meta:</strong>{" "}
-                      {targetDate
-                        ? new Date(targetDate + "T12:00:00").toLocaleDateString("pt-BR")
-                        : "___/___/26"}
+                      <strong>Data:</strong> {orderDateStr} •{" "}
+                      <strong>Meta:</strong> {targetDateStr}
                     </div>
                     <div style={{ color: "#1e293b", marginTop: "1px" }}>
                       <strong>Operador:</strong> {operatorName.trim() || "____________________"}
@@ -534,414 +1857,375 @@ export function ProductionOrderPrintModal({
                 </div>
               </div>
 
-              {/* ================================================================= */}
-              {/* POR ITEM: ESPECIFICAÇÃO TÉCNICA + CHECKLIST COMPLETO EM 2 COLUNAS */}
-              {/* ================================================================= */}
-              {items.map((it, idx) => {
-                const sheet = sheets[idx] || null;
-                const itemQty = Math.max(1, Number(it.quantity) || 1);
-                const kitSnapshot =
-                  it.kit_items_snapshot || sheet?.kitItemsSnapshot || null;
-                const resolvedEq = resolveKitEquipmentSummary({
-                  kitItemsSnapshot: kitSnapshot,
-                  monitorName: it.monitor_name,
-                  printerName: it.printer_name,
-                  readerName: it.reader_name,
-                });
-
-                const hasAssembly = Boolean(
-                  sheet?.assemblyService?.includes("Montagem Especializada") ||
-                    sheet?.includeAssemblyService ||
-                    it.monitor_name?.includes("100% Montado")
-                );
-
-                const itemChecklist: DeliveryChecklistItem[] =
-                  Array.isArray(it.delivery_checklist) && it.delivery_checklist.length > 0
-                    ? it.delivery_checklist
-                    : Array.isArray(sheet?.deliveryChecklist) &&
-                      sheet.deliveryChecklist.length > 0
-                    ? sheet.deliveryChecklist
-                    : buildOrderDeliveryChecklist({
-                        cabinetName: it.cabinet_name,
-                        colorName: it.color_name,
-                        quantity: itemQty,
-                        kitItemsSnapshot: kitSnapshot,
-                        monitorName: it.monitor_name,
-                        printerName: it.printer_name,
-                        readerName: it.reader_name,
-                        includeAssemblyService: hasAssembly,
-                      });
-
-                const checklistToDeliver = itemChecklist.filter((c) => c.included);
-                const checklistNotToDeliver = itemChecklist.filter((c) => !c.included);
-
-                return (
-                  <div key={it.$id || idx} style={{ marginBottom: "7px" }}>
-                    {/* 1. ESPECIFICAÇÃO TÉCNICA DO GABINETE & PERIFÉRICOS */}
+              {/* POR ITEM (IMPRESSÃO) */}
+              {editableItems.map((it, idx) => (
+                <div key={it.id || idx} style={{ marginBottom: "7px" }}>
+                  <div
+                    style={{
+                      border: "2px solid #0f172a",
+                      borderRadius: "6px",
+                      padding: "6px 9px",
+                      marginBottom: "7px",
+                      background: "#ffffff",
+                    }}
+                  >
                     <div
                       style={{
-                        border: "2px solid #0f172a",
-                        borderRadius: "6px",
-                        padding: "6px 9px",
-                        marginBottom: "7px",
-                        background: "#ffffff",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        borderBottom: "2px solid #0f172a",
+                        paddingBottom: "5px",
+                        marginBottom: "6px",
                       }}
                     >
-                      <div
+                      <span
                         style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          borderBottom: "2px solid #0f172a",
-                          paddingBottom: "5px",
-                          marginBottom: "6px",
+                          fontSize: "15.5px",
+                          fontWeight: 900,
+                          color: "#0f172a",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.2px",
                         }}
                       >
-                        <span
-                          style={{
-                            fontSize: "15.5px",
-                            fontWeight: 900,
-                            color: "#0f172a",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.2px",
-                          }}
-                        >
-                          {itemQty}x {stripMonetaryValues(it.cabinet_name)} — COR: {stripMonetaryValues(it.color_name)}
-                        </span>
-                        <span
-                          style={{
-                            background: "#e2e8f0",
-                            padding: "2px 8px",
-                            borderRadius: "4px",
-                            fontSize: "10px",
-                            fontWeight: 900,
-                            textTransform: "uppercase",
-                          }}
-                        >
-                          {hasAssembly
-                            ? "⚙️ ENTREGAR 100% MONTADO"
-                            : resolvedEq.isKit
-                            ? `📦 KIT (${resolvedEq.selectedCount}/${resolvedEq.totalCount} ITENS)`
-                            : "📦 SOMENTE GABINETE"}
-                        </span>
-                      </div>
-
-                      {/* 3 Caixas Lado a Lado: Tela/Recorte • Impressora/Rasgo • Medidas/Leitor */}
-                      <div
+                        {cleanPrintText(it.headerTitle)}
+                      </span>
+                      <span
                         style={{
-                          display: "grid",
-                          gridTemplateColumns: "1.15fr 1.15fr 0.9fr",
-                          gap: "6px",
-                          fontSize: "9.8px",
-                        }}
-                      >
-                        {/* TELA / MONITOR */}
-                        <div
-                          style={{
-                            border:
-                              resolvedEq.isKit && !resolvedEq.hasMonitorInKit
-                                ? "2px solid #dc2626"
-                                : "1px solid #475569",
-                            borderRadius: "5px",
-                            padding: "4px 7px",
-                            background:
-                              resolvedEq.isKit && !resolvedEq.hasMonitorInKit
-                                ? "#fff1f2"
-                                : "#f8fafc",
-                          }}
-                        >
-                          <div style={{ fontSize: "8.5px", fontWeight: 900, color: "#334155", textTransform: "uppercase" }}>
-                            TELA / MONITOR & RECORTE CNC:
-                          </div>
-                          <div style={{ fontWeight: 900, fontSize: "10px", marginTop: "1px", color: "#0f172a" }}>
-                            {resolvedEq.isKit && !resolvedEq.hasMonitorInKit
-                              ? "🚫 REMOVIDO PELO CLIENTE (NÃO ENVIAR TELA)"
-                              : stripMonetaryValues(resolvedEq.monitorDisplay || it.monitor_name)}
-                          </div>
-                          <div style={{ fontSize: "9px", color: "#334155", marginTop: "1px" }}>
-                            <strong>Corte:</strong>{" "}
-                            {stripMonetaryValues(
-                              sheet?.screenSpecs?.screenCutoutMm ||
-                                'Abertura padrão tela 23.8" (+1.5mm)'
-                            )}
-                          </div>
-                        </div>
-
-                        {/* IMPRESSORA TÉRMICA */}
-                        <div
-                          style={{
-                            border:
-                              resolvedEq.isKit && !resolvedEq.hasPrinterInKit
-                                ? "2px solid #dc2626"
-                                : "1px solid #475569",
-                            borderRadius: "5px",
-                            padding: "4px 7px",
-                            background:
-                              resolvedEq.isKit && !resolvedEq.hasPrinterInKit
-                                ? "#fff1f2"
-                                : "#f8fafc",
-                          }}
-                        >
-                          <div style={{ fontSize: "8.5px", fontWeight: 900, color: "#334155", textTransform: "uppercase" }}>
-                            IMPRESSORA TÉRMICA & RASGO CNC:
-                          </div>
-                          <div style={{ fontWeight: 900, fontSize: "10px", marginTop: "1px", color: "#0f172a" }}>
-                            {resolvedEq.isKit && !resolvedEq.hasPrinterInKit
-                              ? "🚫 REMOVIDA PELO CLIENTE (NÃO ENVIAR IMPR.)"
-                              : stripMonetaryValues(resolvedEq.printerDisplay || it.printer_name)}
-                          </div>
-                          <div style={{ fontSize: "9px", color: "#334155", marginTop: "1px" }}>
-                            <strong>Rasgo:</strong>{" "}
-                            {stripMonetaryValues(
-                              sheet?.printerSpecs?.slotOpeningMm ||
-                                "Rasgo frontal padrão 80mm c/ berço"
-                            )}
-                          </div>
-                        </div>
-
-                        {/* DIMENSÕES & LEITOR */}
-                        <div
-                          style={{
-                            border: "1px solid #475569",
-                            borderRadius: "5px",
-                            padding: "4px 7px",
-                            background: "#f8fafc",
-                          }}
-                        >
-                          <div style={{ fontSize: "8.5px", fontWeight: 900, color: "#334155", textTransform: "uppercase" }}>
-                            MEDIDAS EXTERNAS & LEITOR:
-                          </div>
-                          <div style={{ fontWeight: 900, fontSize: "10px", marginTop: "1px", color: "#0f172a" }}>
-                            {sheet?.dimensionsMm?.heightMm
-                              ? `${sheet.dimensionsMm.heightMm} × ${sheet.dimensionsMm.widthMm} × ${sheet.dimensionsMm.depthMm} mm`
-                              : "Gabarito Homologado CNC"}
-                          </div>
-                          <div style={{ fontSize: "9px", color: "#334155", marginTop: "1px" }}>
-                            <strong>Leitor:</strong>{" "}
-                            {resolvedEq.hasReader
-                              ? stripMonetaryValues(resolvedEq.readerDisplay)
-                              : stripMonetaryValues(it.reader_name || "Sem leitor")}
-                          </div>
-                        </div>
-                      </div>
-
-                      {sheet?.customizationNotes && (
-                        <div
-                          style={{
-                            marginTop: "5px",
-                            padding: "4px 7px",
-                            border: "1.5px solid #d97706",
-                            background: "#fef3c7",
-                            borderRadius: "4px",
-                            fontWeight: 800,
-                            fontSize: "9.8px",
-                          }}
-                        >
-                          ⚠️ NOTA TÉCNICA DO ITEM: {stripMonetaryValues(sheet.customizationNotes)}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* ================================================================= */}
-                    {/* 2. CHECKLIST DE SEPARAÇÃO & ENTREGA EM 2 COLUNAS (TODOS OS ITENS) */}
-                    {/* ================================================================= */}
-                    <div
-                      style={{
-                        border: "2px solid #0f172a",
-                        borderRadius: "6px",
-                        padding: "6px 9px",
-                        marginBottom: "7px",
-                        background: "#ffffff",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          borderBottom: "1.5px solid #0f172a",
-                          paddingBottom: "3px",
-                          marginBottom: "5px",
-                          fontSize: "10.5px",
+                          background: "#e2e8f0",
+                          padding: "2px 8px",
+                          borderRadius: "4px",
+                          fontSize: "10px",
                           fontWeight: 900,
                           textTransform: "uppercase",
                         }}
                       >
-                        <span>
-                          2. CHECKLIST DE SEPARAÇÃO & EXPEDIÇÃO — O QUE COLOCAR NA CAIXA (MARCAR [ ✓ ] À CANETA)
-                        </span>
-                        <span
-                          style={{
-                            background: "#dcfce7",
-                            color: "#065f46",
-                            border: "1px solid #059669",
-                            padding: "1px 6px",
-                            borderRadius: "4px",
-                            fontSize: "9px",
-                          }}
-                        >
-                          ENVIAR: {checklistToDeliver.length} ITENS OBRIGATÓRIOS
-                        </span>
-                      </div>
+                        {it.badgeText}
+                      </span>
+                    </div>
 
-                      {/* Grade em 2 Colunas Lado a Lado para Economizar Metade da Altura da Página A4 */}
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1.15fr 1.15fr 0.9fr",
+                        gap: "6px",
+                        fontSize: "9.8px",
+                      }}
+                    >
                       <div
                         style={{
-                          display: "grid",
-                          gridTemplateColumns: "1fr 1fr",
-                          gap: "4px 8px",
+                          border: it.monitorRemovedAlert
+                            ? "2px solid #dc2626"
+                            : "1px solid #475569",
+                          borderRadius: "5px",
+                          padding: "4px 7px",
+                          background: it.monitorRemovedAlert ? "#fff1f2" : "#f8fafc",
                         }}
                       >
-                        {checklistToDeliver.map((chk, cIdx) => (
-                          <div
-                            key={chk.id || cIdx}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              border: "1px solid #64748b",
-                              borderRadius: "4px",
-                              padding: "3.5px 6px",
-                              background: cIdx % 2 === 0 ? "#ffffff" : "#f8fafc",
-                            }}
-                          >
-                            <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
-                              <span
-                                style={{
-                                  width: "15px",
-                                  height: "15px",
-                                  border: "2px solid #0f172a",
-                                  borderRadius: "3px",
-                                  display: "inline-block",
-                                  flexShrink: 0,
-                                  background: "#ffffff",
-                                }}
-                              />
-                              <span
-                                style={{
-                                  fontFamily: "Consolas, monospace",
-                                  fontWeight: 900,
-                                  fontSize: "10.5px",
-                                  color: "#0f172a",
-                                  flexShrink: 0,
-                                }}
-                              >
-                                {chk.quantity}x
-                              </span>
-                              <span
-                                style={{
-                                  fontWeight: 800,
-                                  fontSize: "10px",
-                                  color: "#0f172a",
-                                }}
-                              >
-                                {stripMonetaryValues(chk.name)}
-                              </span>
-                            </div>
+                        <div
+                          style={{
+                            fontSize: "8.5px",
+                            fontWeight: 900,
+                            color: "#334155",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          TELA / MONITOR & RECORTE CNC:
+                        </div>
+                        <div
+                          style={{
+                            fontWeight: 900,
+                            fontSize: "10px",
+                            marginTop: "1px",
+                            color: "#0f172a",
+                          }}
+                        >
+                          {cleanPrintText(it.monitorTitle)}
+                        </div>
+                        <div style={{ fontSize: "9px", color: "#334155", marginTop: "1px" }}>
+                          <strong>Corte:</strong> {cleanPrintText(it.monitorCutout)}
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          border: it.printerRemovedAlert
+                            ? "2px solid #dc2626"
+                            : "1px solid #475569",
+                          borderRadius: "5px",
+                          padding: "4px 7px",
+                          background: it.printerRemovedAlert ? "#fff1f2" : "#f8fafc",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: "8.5px",
+                            fontWeight: 900,
+                            color: "#334155",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          IMPRESSORA TÉRMICA & RASGO CNC:
+                        </div>
+                        <div
+                          style={{
+                            fontWeight: 900,
+                            fontSize: "10px",
+                            marginTop: "1px",
+                            color: "#0f172a",
+                          }}
+                        >
+                          {cleanPrintText(it.printerTitle)}
+                        </div>
+                        <div style={{ fontSize: "9px", color: "#334155", marginTop: "1px" }}>
+                          <strong>Rasgo:</strong> {cleanPrintText(it.printerSlot)}
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          border: "1px solid #475569",
+                          borderRadius: "5px",
+                          padding: "4px 7px",
+                          background: "#f8fafc",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: "8.5px",
+                            fontWeight: 900,
+                            color: "#334155",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          MEDIDAS EXTERNAS & LEITOR:
+                        </div>
+                        <div
+                          style={{
+                            fontWeight: 900,
+                            fontSize: "10px",
+                            marginTop: "1px",
+                            color: "#0f172a",
+                          }}
+                        >
+                          {cleanPrintText(it.dimensionsText)}
+                        </div>
+                        <div style={{ fontSize: "9px", color: "#334155", marginTop: "1px" }}>
+                          <strong>Leitor:</strong> {cleanPrintText(it.readerText)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {it.technicalNote.trim() && (
+                      <div
+                        style={{
+                          marginTop: "5px",
+                          padding: "4px 7px",
+                          border: "1.5px solid #d97706",
+                          background: "#fef3c7",
+                          borderRadius: "4px",
+                          fontWeight: 800,
+                          fontSize: "9.8px",
+                        }}
+                      >
+                        ⚠️ NOTA TÉCNICA DO ITEM: {cleanPrintText(it.technicalNote)}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 2. CHECKLIST DE SEPARAÇÃO & ENTREGA (IMPRESSÃO) */}
+                  <div
+                    style={{
+                      border: "2px solid #0f172a",
+                      borderRadius: "6px",
+                      padding: "6px 9px",
+                      marginBottom: "7px",
+                      background: "#ffffff",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        borderBottom: "1.5px solid #0f172a",
+                        paddingBottom: "3px",
+                        marginBottom: "5px",
+                        fontSize: "10.5px",
+                        fontWeight: 900,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      <span>
+                        2. CHECKLIST DE SEPARAÇÃO & EXPEDIÇÃO — O QUE COLOCAR NA CAIXA (MARCAR [ ✓ ] À CANETA)
+                      </span>
+                      <span
+                        style={{
+                          background: "#dcfce7",
+                          color: "#065f46",
+                          border: "1px solid #059669",
+                          padding: "1px 6px",
+                          borderRadius: "4px",
+                          fontSize: "9px",
+                        }}
+                      >
+                        ENVIAR: {it.checklistToDeliver.length} ITENS OBRIGATÓRIOS
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: "4px 8px",
+                      }}
+                    >
+                      {it.checklistToDeliver.map((chk, cIdx) => (
+                        <div
+                          key={chk.id || cIdx}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            border: "1px solid #64748b",
+                            borderRadius: "4px",
+                            padding: "3.5px 6px",
+                            background: cIdx % 2 === 0 ? "#ffffff" : "#f8fafc",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
                             <span
                               style={{
-                                fontSize: "8.5px",
-                                fontWeight: 800,
-                                color: "#475569",
-                                borderLeft: "1px dashed #94a3b8",
-                                paddingLeft: "5px",
-                                marginLeft: "4px",
+                                width: "15px",
+                                height: "15px",
+                                border: "2px solid #0f172a",
+                                borderRadius: "3px",
+                                display: "inline-block",
+                                flexShrink: 0,
+                                background: "#ffffff",
+                              }}
+                            />
+                            <span
+                              style={{
+                                fontFamily: "Consolas, monospace",
+                                fontWeight: 900,
+                                fontSize: "10.5px",
+                                color: "#0f172a",
                                 flexShrink: 0,
                               }}
                             >
-                              Visto: _____
+                              {chk.quantity}
+                            </span>
+                            <span
+                              style={{
+                                fontWeight: 800,
+                                fontSize: "10px",
+                                color: "#0f172a",
+                              }}
+                            >
+                              {cleanPrintText(chk.name)}
                             </span>
                           </div>
-                        ))}
-                      </div>
+                          <span
+                            style={{
+                              fontSize: "8.5px",
+                              fontWeight: 800,
+                              color: "#475569",
+                              borderLeft: "1px dashed #94a3b8",
+                              paddingLeft: "5px",
+                              marginLeft: "4px",
+                              flexShrink: 0,
+                            }}
+                          >
+                            Visto: _____
+                          </span>
+                        </div>
+                      ))}
+                    </div>
 
-                      {/* AUDITORIA DE BLOQUEIO: ITENS REMOVIDOS PELO CLIENTE (NÃO ENVIAR) */}
-                      {checklistNotToDeliver.length > 0 && (
+                    {it.checklistNotToDeliver.length > 0 && (
+                      <div
+                        style={{
+                          marginTop: "6px",
+                          padding: "5px 7px",
+                          border: "2px solid #dc2626",
+                          borderRadius: "5px",
+                          background: "#fff1f2",
+                        }}
+                      >
                         <div
                           style={{
-                            marginTop: "6px",
-                            padding: "5px 7px",
-                            border: "2px solid #dc2626",
-                            borderRadius: "5px",
-                            background: "#fff1f2",
+                            fontSize: "9.5px",
+                            fontWeight: 900,
+                            textTransform: "uppercase",
+                            color: "#991b1b",
+                            marginBottom: "4px",
                           }}
                         >
-                          <div
-                            style={{
-                              fontSize: "9.5px",
-                              fontWeight: 900,
-                              textTransform: "uppercase",
-                              color: "#991b1b",
-                              marginBottom: "4px",
-                            }}
-                          >
-                            🚫 ATENÇÃO — ITENS REMOVIDOS PELO CLIENTE (MARCAR [ ✓ ] CONFIRMANDO QUE NÃO FORAM COLOCADOS NA CAIXA):
-                          </div>
-                          <div
-                            style={{
-                              display: "grid",
-                              gridTemplateColumns: "1fr 1fr",
-                              gap: "4px 8px",
-                            }}
-                          >
-                            {checklistNotToDeliver.map((rem, rIdx) => (
-                              <div
-                                key={rem.id || rIdx}
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "space-between",
-                                  border: "1px solid #f87171",
-                                  borderRadius: "4px",
-                                  padding: "3px 6px",
-                                  background: "#ffffff",
-                                }}
-                              >
-                                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                                  <span
-                                    style={{
-                                      width: "14px",
-                                      height: "14px",
-                                      border: "2px solid #991b1b",
-                                      borderRadius: "3px",
-                                      display: "inline-block",
-                                      flexShrink: 0,
-                                    }}
-                                  />
-                                  <span
-                                    style={{
-                                      fontWeight: 800,
-                                      fontSize: "9.8px",
-                                      textDecoration: "line-through",
-                                      color: "#881337",
-                                    }}
-                                  >
-                                    {stripMonetaryValues(rem.name)}
-                                  </span>
-                                </div>
+                          🚫 ATENÇÃO — ITENS REMOVIDOS PELO CLIENTE (MARCAR [ ✓ ] CONFIRMANDO QUE NÃO FORAM COLOCADOS NA CAIXA):
+                        </div>
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "1fr 1fr",
+                            gap: "4px 8px",
+                          }}
+                        >
+                          {it.checklistNotToDeliver.map((rem, rIdx) => (
+                            <div
+                              key={rem.id || rIdx}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                border: "1px solid #f87171",
+                                borderRadius: "4px",
+                                padding: "3px 6px",
+                                background: "#ffffff",
+                              }}
+                            >
+                              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                                 <span
                                   style={{
-                                    fontSize: "8.5px",
-                                    fontWeight: 900,
-                                    color: "#991b1b",
+                                    width: "14px",
+                                    height: "14px",
+                                    border: "2px solid #991b1b",
+                                    borderRadius: "3px",
+                                    display: "inline-block",
                                     flexShrink: 0,
                                   }}
+                                />
+                                <span
+                                  style={{
+                                    fontWeight: 800,
+                                    fontSize: "9.8px",
+                                    textDecoration: "line-through",
+                                    color: "#881337",
+                                  }}
                                 >
-                                  🚫 NÃO ENVIAR
+                                  {cleanPrintText(rem.name)}
                                 </span>
                               </div>
-                            ))}
-                          </div>
+                              <span
+                                style={{
+                                  fontSize: "8.5px",
+                                  fontWeight: 900,
+                                  color: "#991b1b",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                🚫 NÃO ENVIAR
+                              </span>
+                            </div>
+                          ))}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
-                );
-              })}
+                </div>
+              ))}
 
-              {/* ================================================================= */}
-              {/* 3. CHECKLIST DE ACESSÓRIOS & IMPRESSOS (5 ITENS LADO A LADO)      */}
-              {/* ================================================================= */}
+              {/* 3. CHECKLIST COMPLEMENTAR DE ENVIO (IMPRESSÃO) */}
               <div
                 style={{
                   border: "2px solid #0f172a",
@@ -971,11 +2255,11 @@ export function ProductionOrderPrintModal({
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(5, 1fr)",
+                    gridTemplateColumns: `repeat(${Math.max(1, complementaryChecks.length)}, 1fr)`,
                     gap: "6px",
                   }}
                 >
-                  {cncProductionChecks.map((stepText, sIdx) => (
+                  {complementaryChecks.map((stepText, sIdx) => (
                     <div
                       key={sIdx}
                       style={{
@@ -1000,17 +2284,15 @@ export function ProductionOrderPrintModal({
                         }}
                       />
                       <span style={{ fontWeight: 900, fontSize: "10.5px", color: "#0f172a" }}>
-                        {stepText}
+                        {cleanPrintText(stepText)}
                       </span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* ================================================================= */}
-              {/* 4. ORIENTAÇÕES TÉCNICAS & LINHAS PAUTADAS PARA CANETA             */}
-              {/* ================================================================= */}
-              {(orientations.trim() || blankLinesCount > 0) && (
+              {/* 4. ORIENTAÇÕES TÉCNICAS & LINHAS PAUTADAS (IMPRESSÃO) */}
+              {(orientations.trim() || manualLines.length > 0) && (
                 <div
                   style={{
                     border: "2px solid #0f172a",
@@ -1048,33 +2330,37 @@ export function ProductionOrderPrintModal({
                         border: "1px solid #0f172a",
                         borderRadius: "4px",
                         padding: "5px 7px",
-                        marginBottom: blankLinesCount > 0 ? "4px" : "0",
+                        marginBottom: manualLines.length > 0 ? "4px" : "0",
                       }}
                     >
-                      {stripMonetaryValues(orientations)}
+                      {cleanPrintText(orientations)}
                     </div>
                   )}
 
-                  {blankLinesCount > 0 && (
+                  {manualLines.length > 0 && (
                     <div>
-                      {Array.from({ length: blankLinesCount }).map((_, idx) => (
+                      {manualLines.map((lineText, idx) => (
                         <div
                           key={idx}
                           style={{
                             borderBottom: "1px dashed #475569",
-                            height: "17px",
+                            minHeight: "17px",
                             width: "100%",
+                            fontSize: "10px",
+                            fontWeight: 700,
+                            color: "#0f172a",
+                            paddingTop: "1px",
                           }}
-                        />
+                        >
+                          {cleanPrintText(lineText)}
+                        </div>
                       ))}
                     </div>
                   )}
                 </div>
               )}
 
-              {/* ================================================================= */}
-              {/* 5. ASSINATURAS DE RESPONSABILIDADE EM 3 COLUNAS                   */}
-              {/* ================================================================= */}
+              {/* 5. ASSINATURAS DE RESPONSABILIDADE (IMPRESSÃO) */}
               <div
                 style={{
                   display: "grid",
@@ -1083,13 +2369,9 @@ export function ProductionOrderPrintModal({
                   marginTop: "4px",
                 }}
               >
-                {[
-                  "1. OPERADOR ROUTER CNC / ESTRUTURA",
-                  "2. SEPARAÇÃO DE KIT & ELÉTRICA",
-                  "3. AUDITORIA FINAL EXPEDIÇÃO (100% OK)",
-                ].map((sigTitle) => (
+                {signatureTitles.map((sigTitle, sIdx) => (
                   <div
-                    key={sigTitle}
+                    key={sIdx}
                     style={{
                       border: "1.5px solid #334155",
                       borderRadius: "6px",
@@ -1109,7 +2391,7 @@ export function ProductionOrderPrintModal({
                       {sigTitle}
                     </div>
                     <div style={{ fontSize: "8.5px", color: "#475569", marginTop: "1px" }}>
-                      Data: ___/___/2026 • Hora: ___:___
+                      {signatureDates[sIdx] || "Data: ___/___/2026 • Hora: ___:___"}
                     </div>
                   </div>
                 ))}
