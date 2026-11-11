@@ -18,6 +18,10 @@ import {
 import { KitSubItem } from "@/types/catalog";
 import { AdminOrderVisualEditor } from "@/components/admin/AdminOrderVisualEditor";
 import { ProductionOrderPrintModal } from "@/components/admin/ProductionOrderPrintModal";
+import {
+  OrdersTrelloKanbanBoard,
+  TrelloCardMetadata,
+} from "@/components/admin/OrdersTrelloKanbanBoard";
 import CorreiosLabelModal from "@/components/admin/CorreiosLabelModal";
 import { CatalogManager } from "@/components/admin/CatalogManager";
 import { MarketingSettingsManager } from "@/components/admin/MarketingSettingsManager";
@@ -74,6 +78,7 @@ import {
   ChevronUp,
   List,
   Maximize2,
+  Columns3,
   Database,
   ExternalLink,
   BarChart3,
@@ -640,12 +645,12 @@ export default function AdminPage() {
   const [searchQuery, setSearchQuery] = useUrlParamState<string>("q", "");
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
 
-  // Modo de Exibição de Pedidos: "simplified" (lista compacta executiva) ou "detailed" (visão 3 colunas completa)
-  const [ordersViewMode, setOrdersViewMode] = useUrlParamState<"simplified" | "detailed">(
+  // Modo de Exibição de Pedidos: "simplified" (lista compacta executiva), "detailed" (visão 3 colunas completa) ou "kanban" (Quadro Trello de Estágios)
+  const [ordersViewMode, setOrdersViewMode] = useUrlParamState<"simplified" | "detailed" | "kanban">(
     "view",
     "simplified",
     {
-      validValues: ["simplified", "detailed"] as const,
+      validValues: ["simplified", "detailed", "kanban"] as const,
       writeDefaultToUrl: true,
     }
   );
@@ -667,15 +672,19 @@ export default function AdminPage() {
     if (!rawView) {
       try {
         const savedMode = localStorage.getItem("totem_admin_orders_view_mode");
-        if (savedMode === "simplified" || savedMode === "detailed") {
+        if (savedMode === "simplified" || savedMode === "detailed" || savedMode === "kanban") {
           setOrdersViewMode(savedMode);
         }
       } catch {}
     }
   }, [setOrdersViewMode]);
 
-  const toggleOrdersViewMode = (mode: "simplified" | "detailed") => {
+  const toggleOrdersViewMode = (mode: "simplified" | "detailed" | "kanban") => {
     setOrdersViewMode(mode);
+    if (mode === "kanban" && statusFilter !== "all") {
+      setStatusFilter("all");
+      loadOrders("all", { silent: true });
+    }
     try {
       localStorage.setItem("totem_admin_orders_view_mode", mode);
     } catch {}
@@ -1440,8 +1449,30 @@ export default function AdminPage() {
     }
   };
 
-  // Atualizar Status do Pedido
+  // Atualizar Status do Pedido (com atualização otimista imediata em 0ms para fluidez no Quadro Trello)
   const handleUpdateOrderStatus = async (orderId: string, newStatus: string) => {
+    const prevOrdersSnapshot = ordersRef.current;
+    const targetOrder = prevOrdersSnapshot.find((o) => o.$id === orderId);
+    const oldStatus = targetOrder?.status;
+
+    if (targetOrder && oldStatus !== newStatus) {
+      const nextOrders = prevOrdersSnapshot.map((o) =>
+        o.$id === orderId ? { ...o, status: newStatus } : o
+      );
+      setOrders(nextOrders);
+      ordersRef.current = nextOrders;
+      if (oldStatus) {
+        setOrderStatusCounts((prev) => ({
+          ...prev,
+          [oldStatus]: Math.max(0, (Number(prev[oldStatus]) || 1) - 1),
+          [newStatus]: (Number(prev[newStatus]) || 0) + 1,
+        }));
+      }
+      if (selectedOrder && selectedOrder.$id === orderId) {
+        setSelectedOrder((prev) => (prev ? { ...prev, status: newStatus } : null));
+      }
+    }
+
     try {
       const res = await fetch(`/api/admin/orders/${orderId}`, {
         method: "PATCH",
@@ -1451,13 +1482,70 @@ export default function AdminPage() {
       const json = await res.json();
       if (json.ok) {
         addAuditLog("Atualização de Status", `Pedido #${orderId.substring(0, 8)}`, `Transição para "${newStatus}"`);
-        loadOrders();
-        if (selectedOrder && selectedOrder.$id === orderId) {
-          setSelectedOrder((prev) => (prev ? { ...prev, status: newStatus } : null));
-        }
+        loadOrders(statusFilter, { silent: true });
+      } else {
+        loadOrders(statusFilter, { silent: true });
       }
     } catch (err) {
       console.error("Erro ao mudar status:", err);
+      loadOrders(statusFilter, { silent: true });
+    }
+  };
+
+  // Salvar Metadados do Card no Quadro Trello (Etiquetas, Checklist, Comentários, Capa, Operador e Prazo SLA)
+  const handleSaveTrelloMetadata = async (order: OrderRecord, nextMeta: TrelloCardMetadata) => {
+    try {
+      const prevAddr = getOrderAddress(order) || ({} as ParsedDeliveryAddress);
+      const prevExec = createDefaultExecutionOrder(prevAddr.executionOrder || null);
+
+      const nextExec: OrderExecutionData = {
+        ...prevExec,
+        technicianName:
+          nextMeta.assignedOperator !== undefined ? nextMeta.assignedOperator : prevExec.technicianName,
+        priority: nextMeta.priority !== undefined ? nextMeta.priority : prevExec.priority,
+        deadlineDate:
+          nextMeta.dueDate !== undefined ? nextMeta.dueDate : prevExec.deadlineDate,
+        trelloCard: {
+          ...(prevExec.trelloCard || {}),
+          ...nextMeta,
+          updatedAt: new Date().toISOString(),
+        },
+      };
+
+      const nextDeliveryAddress = {
+        ...prevAddr,
+        executionOrder: nextExec,
+      };
+      const serializedAddr = JSON.stringify(nextDeliveryAddress);
+
+      // Atualização otimista imediata na tela (0ms)
+      setOrders((prev) => {
+        const updated = prev.map((o) =>
+          o.$id === order.$id
+            ? {
+                ...o,
+                delivery_address: nextDeliveryAddress,
+                delivery_address_json: serializedAddr,
+              }
+            : o
+        );
+        ordersRef.current = updated;
+        return updated;
+      });
+
+      const res = await fetch(`/api/admin/orders/${order.$id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          delivery_address_json: serializedAddr,
+        }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        loadOrders(statusFilter, { silent: true });
+      }
+    } catch (err) {
+      console.error("Erro ao salvar metadados Trello do pedido:", err);
     }
   };
 
@@ -3086,7 +3174,7 @@ export default function AdminPage() {
             <div className="p-2.5 sm:p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800/80 space-y-2.5 sm:space-y-3">
               {/* FAIXA 1: Alternador de Visão + Busca + Ferramentas Comerciais (100% horizontal no PC) */}
               <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5">
-                {/* Esquerda: Alternador Lista Simplificada vs Visão Detalhada + Status de Sync Oculto */}
+                {/* Esquerda: Alternador Lista Simplificada vs Visão Detalhada vs Quadro Trello + Status de Sync Oculto */}
                 <div className="flex items-center justify-between lg:justify-start gap-2.5 shrink-0">
                   <div className="inline-flex items-center p-1 bg-slate-950/90 border border-slate-800 rounded-xl shrink-0 w-full sm:w-auto">
                     <button
@@ -3114,6 +3202,19 @@ export default function AdminPage() {
                     >
                       <Maximize2 className="w-3.5 h-3.5" />
                       <span>Visão Detalhada</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleOrdersViewMode("kanban")}
+                      className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer ${
+                        ordersViewMode === "kanban"
+                          ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/30 border border-indigo-400/50"
+                          : "text-indigo-300 hover:text-white hover:bg-indigo-500/10"
+                      }`}
+                      title="Quadro Trello (Kanban) de alta performance com arrastar e soltar, etiquetas, checklists, prazos SLA e tela cheia"
+                    >
+                      <Columns3 className="w-3.5 h-3.5" />
+                      <span>Quadro Trello</span>
                     </button>
                   </div>
 
@@ -3406,13 +3507,13 @@ export default function AdminPage() {
               onDataLoaded={(rmkData) => setRemarketingData(rmkData)}
             />
 
-            {/* Listagem de Pedidos ou Painel ADS (Carrinhos Abandonados & Conversões) */}
+            {/* Listagem de Pedidos, Quadro Trello (Kanban) ou Painel ADS (Carrinhos Abandonados & Conversões) */}
             {statusFilter === "ads" ? (
               <AdsOrdersLeadsPanel
                 records={adsRecords}
                 summary={adsSummary}
                 loading={isLoadingAdsLeads}
-                ordersViewMode={ordersViewMode}
+                ordersViewMode={ordersViewMode === "detailed" ? "detailed" : "simplified"}
                 searchQuery={searchQuery}
                 onRefresh={() => loadAdsLeads(true)}
                 onUpdateRecord={handleUpdateAdsRecord}
@@ -3423,6 +3524,28 @@ export default function AdminPage() {
                 <RefreshCw className="w-8 h-8 animate-spin text-indigo-500" />
                 <span className="text-sm">Carregando pedidos do Appwrite...</span>
               </div>
+            ) : ordersViewMode === "kanban" ? (
+              <OrdersTrelloKanbanBoard
+                orders={filteredOrders}
+                getOrderAddress={getOrderAddress}
+                getOrderShipping={getOrderShipping}
+                getOrderPaymentMethod={getOrderPaymentMethod}
+                isOrderConfirmedPaid={isOrderConfirmedPaid}
+                getOrderSheets={getOrderSheets}
+                getItemCabinetImage={getItemCabinetImage}
+                getItemAlertInfo={getItemAlertInfo}
+                onMoveOrderStage={handleUpdateOrderStatus}
+                onSaveTrelloMetadata={handleSaveTrelloMetadata}
+                onOpenOrderDetailsModal={(order) => setSelectedOrder(order)}
+                onOpenEditOrder={(order, section) => handleOpenEditOrder(order, section || "all")}
+                onOpenPrintProductionOrder={(order) => setPrintingProductionOrder(order)}
+                onOpenCorreiosLabel={(order) => setCorreiosLabelOrder(order)}
+                onSendPaidConfirmation={(order, forceResend) =>
+                  handleSendPaidConfirmationToCustomer(order, Boolean(forceResend))
+                }
+                onOpenRemarketingForOrder={(orderNumber) => setSelectedOrderForRemarketing(orderNumber)}
+                onDeleteOrder={(order) => setDeletingOrder(order)}
+              />
             ) : filteredOrders.length === 0 ? (
               <div className="py-16 text-center bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6">
                 <Package className="w-12 h-12 text-slate-600 mx-auto mb-3" />

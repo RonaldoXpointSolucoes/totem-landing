@@ -59,6 +59,7 @@ export interface OrderExecutionData {
   attachments: ExecutionAttachment[];
   checklist: ExecutionChecklistItem[];
   updatedAt: string;
+  trelloCard?: Record<string, any>;
 }
 
 export const DEFAULT_EXECUTION_CHECKLIST: ExecutionChecklistItem[] = [
@@ -81,6 +82,7 @@ export function createDefaultExecutionOrder(existing?: Partial<OrderExecutionDat
         ? existing!.checklist
         : DEFAULT_EXECUTION_CHECKLIST.map((c) => ({ ...c })),
     updatedAt: existing?.updatedAt || new Date().toISOString(),
+    trelloCard: existing?.trelloCard || undefined,
   };
 }
 
