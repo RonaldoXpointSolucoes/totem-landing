@@ -7,11 +7,12 @@ import { APPWRITE_CONFIG } from "@/lib/appwrite/config";
 import { findOrderByNumber } from "@/lib/orders/orderStore";
 
 const DEFAULT_WHATSAPP_API_URL = "https://wh1ss8sy848ufj6zh8t492y7.69.62.92.212.sslip.io";
-// Instância Interna de Alertas Administrativos (FoodNext -> Ronaldo / Daniela)
+// Instância Interna de Alertas Administrativos (FoodNext -> node alpha-worker / ALFA-A)
 const DEFAULT_WHATSAPP_INSTANCE = "cc4efe36-f391-4b3d-a24c-ddcd8a293cf6";
 const DEFAULT_WHATSAPP_API_KEY = "sk_inst_c79464fa9eea45b0860033430a3cf30d";
 
-// Instância Oficial Exclusiva para Comunicação com Clientes e Remarketing ("Comercial X-Point")
+// Instância Oficial Exclusiva para Comunicação com Clientes e Remarketing ("Comercial X-Point" -> node production-worker / PROD-C)
+const DEFAULT_COMMERCIAL_WHATSAPP_API_URL = "https://owckk0k8w8soo40w40owc4ss.69.62.92.212.sslip.io";
 export const COMMERCIAL_WHATSAPP_INSTANCE_NAME = "Comercial X-Point";
 export const COMMERCIAL_WHATSAPP_INSTANCE_ID = "f695a096-cb11-48aa-b603-27f0d41ae97d";
 export const COMMERCIAL_WHATSAPP_PHONE = "5511991649959";
@@ -61,6 +62,9 @@ function getWhatsAppConfig() {
   const instance = (process.env.WHATSAPP_INSTANCE_ID || DEFAULT_WHATSAPP_INSTANCE).trim();
   const apiKey = (process.env.WHATSAPP_API_KEY || DEFAULT_WHATSAPP_API_KEY).trim();
 
+  const commercialBaseUrl = (
+    process.env.WHATSAPP_COMMERCIAL_API_URL || DEFAULT_COMMERCIAL_WHATSAPP_API_URL
+  ).replace(/\/+$/, "");
   const commercialInstance = (
     process.env.WHATSAPP_COMMERCIAL_INSTANCE || COMMERCIAL_WHATSAPP_INSTANCE_NAME
   ).trim();
@@ -88,11 +92,11 @@ function getWhatsAppConfig() {
     }
   }
 
-  return { baseUrl, instance, apiKey, commercialInstance, commercialApiKey, recipients };
+  return { baseUrl, instance, apiKey, commercialBaseUrl, commercialInstance, commercialApiKey, recipients };
 }
 
 /**
- * Consulta o status ao vivo da instância "Comercial X-Point" no servidor WhatsApp.
+ * Consulta o status ao vivo da instância "Comercial X-Point" no servidor WhatsApp de Produção (PROD-C).
  */
 export async function checkCommercialWhatsAppStatus(): Promise<{
   ok: boolean;
@@ -102,10 +106,10 @@ export async function checkCommercialWhatsAppStatus(): Promise<{
   state: string;
   error?: string;
 }> {
-  const { baseUrl, commercialInstance, commercialApiKey } = getWhatsAppConfig();
+  const { commercialBaseUrl, commercialInstance, commercialApiKey } = getWhatsAppConfig();
   try {
     const res = await fetch(
-      `${baseUrl}/instance/${encodeURIComponent(commercialInstance)}/status`,
+      `${commercialBaseUrl}/instance/${encodeURIComponent(commercialInstance)}/status`,
       {
         method: "GET",
         headers: { apikey: commercialApiKey },
@@ -151,12 +155,19 @@ export async function sendWhatsAppTextMessage(
   number: string,
   text: string,
   maxAttempts = 3,
-  customInstanceConfig?: { instance: string; apiKey: string }
+  customInstanceConfig?: { instance: string; apiKey: string; baseUrl?: string }
 ): Promise<{ ok: boolean; status?: number; error?: string; instanceUsed?: string }> {
   const cfg = getWhatsAppConfig();
-  const baseUrl = cfg.baseUrl;
   const instance = customInstanceConfig?.instance || cfg.instance;
   const apiKey = customInstanceConfig?.apiKey || cfg.apiKey;
+  const isCommercialTarget =
+    instance === cfg.commercialInstance ||
+    instance === COMMERCIAL_WHATSAPP_INSTANCE_ID ||
+    apiKey === cfg.commercialApiKey ||
+    apiKey === COMMERCIAL_WHATSAPP_API_KEY;
+  const baseUrl = (
+    customInstanceConfig?.baseUrl || (isCommercialTarget ? cfg.commercialBaseUrl : cfg.baseUrl)
+  ).replace(/\/+$/, "");
   const cleanNumber = sanitizePhoneNumber(number);
 
   if (!cleanNumber || cleanNumber.length < 10) {
@@ -670,6 +681,7 @@ export async function sendCustomerOrderConfirmedWhatsApp(params: {
   }
 
   inFlightOrderConfirmationSet.add(rawKey);
+  let lockedOrderNumber: string | null = null;
 
   try {
     const details = await getOrderWithDetails(rawKey);
@@ -705,7 +717,10 @@ export async function sendCustomerOrderConfirmedWhatsApp(params: {
           orderNumber,
         };
       }
-      inFlightOrderConfirmationSet.add(orderNumber);
+      if (orderNumber !== rawKey) {
+        inFlightOrderConfirmationSet.add(orderNumber);
+        lockedOrderNumber = orderNumber;
+      }
 
       try {
         if (ord.delivery_address_json) {
@@ -894,6 +909,9 @@ export async function sendCustomerOrderConfirmedWhatsApp(params: {
     };
   } finally {
     inFlightOrderConfirmationSet.delete(rawKey);
+    if (lockedOrderNumber) {
+      inFlightOrderConfirmationSet.delete(lockedOrderNumber);
+    }
   }
 }
 
@@ -1015,6 +1033,7 @@ export async function sendDirectWhatsAppToCustomer(params: {
   const res = await sendWhatsAppTextMessage(fullNumber, cleanMsg, 3, {
     instance: cfg.commercialInstance,
     apiKey: cfg.commercialApiKey,
+    baseUrl: cfg.commercialBaseUrl,
   });
 
   if (!res.ok) {
