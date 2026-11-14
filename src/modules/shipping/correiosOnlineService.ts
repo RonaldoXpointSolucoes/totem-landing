@@ -1,6 +1,7 @@
 import { ShippingQuote } from "@/types/shipping";
 import { CorreiosPackageInput } from "./correiosService";
 import { CORREIOS_CONTRACT_METADATA } from "./receiptGroundTruth";
+import { loadPersistentCorreiosConfig } from "./correiosSettingsPersistence";
 
 interface CachedToken {
   token: string;
@@ -22,8 +23,15 @@ function sleep(ms: number): Promise<void> {
  * Tenta até 3 vezes antes de desistir em caso de oscilação de rede/timeout.
  */
 async function getCorreiosJwtToken(forceRefresh = false): Promise<string | null> {
-  const usuario = process.env.CORREIOS_USUARIO || process.env.CORREIOS_CNPJ;
-  const senhaApi = process.env.CORREIOS_SENHA_API || process.env.CORREIOS_TOKEN;
+  const persistent = await loadPersistentCorreiosConfig();
+  const usuario =
+    persistent?.cwsUser ||
+    process.env.CORREIOS_USUARIO ||
+    process.env.CORREIOS_CNPJ;
+  const senhaApi =
+    persistent?.cwsPassword ||
+    process.env.CORREIOS_SENHA_API ||
+    process.env.CORREIOS_TOKEN;
   const cartao = process.env.CORREIOS_CARTAO_POSTAGEM || CORREIOS_CONTRACT_METADATA.postcardNumber;
 
   if (!usuario || !senhaApi) {

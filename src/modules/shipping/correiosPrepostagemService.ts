@@ -2,6 +2,11 @@ import fs from "fs";
 import path from "path";
 import { CORREIOS_CONTRACT_METADATA } from "./receiptGroundTruth";
 import { calculateCorreiosInsuranceCents } from "./correiosService";
+import {
+  getCachedPersistentCorreiosConfig,
+  loadPersistentCorreiosConfig,
+  savePersistentCorreiosConfig,
+} from "./correiosSettingsPersistence";
 
 const CWS_BASE_URL = "https://api.correios.com.br";
 const SETTINGS_FILE = path.join(process.cwd(), "src", "data", "correios_contract_settings.json");
@@ -71,6 +76,7 @@ export interface CorreiosContractConfig {
   pickupAddresses: CorreiosPickupAddress[];
   selectedPickupAddressId: string;
   cwsUser: string;
+  cwsCanonicalIdCorreios?: string;
   cwsPassword: string;
   cwsLastVerifiedAt?: string;
   cwsIsVerified?: boolean;
@@ -399,12 +405,12 @@ export function sanitizeExistingShipment(
   };
 }
 
-export function getCorreiosContractConfig(): CorreiosContractConfig {
+function buildDefaultCorreiosContractConfig(): CorreiosContractConfig {
   const envOriginCep = (process.env.SHIPPING_ORIGIN_CEP || "").replace(/\D/g, "");
   const effectiveSenderCep =
     !envOriginCep || envOriginCep === "06754000" ? REAL_XPOINT_SENDER_ADDRESS.cep : envOriginCep;
 
-  const defaultConfig: CorreiosContractConfig = {
+  return {
     senderName: "X-Point Soluções Tecnológicas Ltda",
     senderTradeName: "Totem Pro — X-Point Engenharia",
     cnpj: process.env.CORREIOS_CNPJ || CORREIOS_CONTRACT_METADATA.cnpj,
@@ -422,61 +428,101 @@ export function getCorreiosContractConfig(): CorreiosContractConfig {
     pickupAddresses: DEFAULT_PICKUP_ADDRESSES,
     selectedPickupAddressId: DEFAULT_PICKUP_ADDRESSES[0].id,
     cwsUser: process.env.CORREIOS_USUARIO || process.env.CORREIOS_CNPJ || CORREIOS_CONTRACT_METADATA.cnpj,
+    cwsCanonicalIdCorreios: "",
     cwsPassword: process.env.CORREIOS_SENHA_API || process.env.CORREIOS_TOKEN || "",
     cwsIsVerified: false,
   };
+}
+
+function mergeParsedCorreiosConfig(
+  defaultConfig: CorreiosContractConfig,
+  parsed: Record<string, any> | null | undefined
+): CorreiosContractConfig {
+  if (!parsed || typeof parsed !== "object") {
+    return defaultConfig;
+  }
+
+  const savedAddr = parsed.senderAddress || {};
+  const isOldPlaceholderAddr =
+    savedAddr.cep === "06754000" ||
+    savedAddr.cep === "06754-000" ||
+    savedAddr.street === "Av. Industrial";
+
+  const pickupAddresses: CorreiosPickupAddress[] =
+    Array.isArray(parsed.pickupAddresses) && parsed.pickupAddresses.length > 0
+      ? parsed.pickupAddresses
+      : DEFAULT_PICKUP_ADDRESSES;
+
+  const selectedId =
+    parsed.selectedPickupAddressId &&
+    pickupAddresses.some((p) => p.id === parsed.selectedPickupAddressId)
+      ? parsed.selectedPickupAddressId
+      : pickupAddresses[0].id;
+
+  const selectedPickup = pickupAddresses.find((p) => p.id === selectedId) || pickupAddresses[0];
+
+  const envPassword = (process.env.CORREIOS_SENHA_API || process.env.CORREIOS_TOKEN || "").trim();
+  const savedPassword = typeof parsed.cwsPassword === "string" ? parsed.cwsPassword.trim() : "";
+
+  return {
+    ...defaultConfig,
+    ...parsed,
+    pickupAddresses,
+    selectedPickupAddressId: selectedId,
+    senderName: selectedPickup?.senderName || parsed.senderName || defaultConfig.senderName,
+    cnpj: selectedPickup?.cnpj || parsed.cnpj || defaultConfig.cnpj,
+    senderPhone: selectedPickup?.phone || parsed.senderPhone || defaultConfig.senderPhone,
+    senderEmail: selectedPickup?.email || parsed.senderEmail || defaultConfig.senderEmail,
+    senderAddress: selectedPickup
+      ? {
+          cep: selectedPickup.cep,
+          street: selectedPickup.street,
+          number: selectedPickup.number,
+          complement: selectedPickup.complement,
+          neighborhood: selectedPickup.neighborhood,
+          city: selectedPickup.city,
+          state: selectedPickup.state,
+        }
+      : isOldPlaceholderAddr
+      ? REAL_XPOINT_SENDER_ADDRESS
+      : {
+          ...defaultConfig.senderAddress,
+          ...savedAddr,
+        },
+    cwsUser: (parsed.cwsUser && String(parsed.cwsUser).trim()) || defaultConfig.cwsUser,
+    cwsCanonicalIdCorreios:
+      (parsed.cwsCanonicalIdCorreios && String(parsed.cwsCanonicalIdCorreios).trim()) ||
+      defaultConfig.cwsCanonicalIdCorreios,
+    cwsPassword: savedPassword || envPassword || "",
+  };
+}
+
+function applyConfigToProcessEnv(cfg: CorreiosContractConfig): void {
+  process.env.CORREIOS_CONTRATO = cfg.contractNumber;
+  process.env.CORREIOS_CARTAO_POSTAGEM = cfg.postcardNumber;
+  process.env.CORREIOS_CNPJ = cfg.cnpj;
+  process.env.CORREIOS_COD_SERVICO_SEDEX = cfg.sedexServiceCode;
+  process.env.CORREIOS_COD_SERVICO_PAC = cfg.pacServiceCode;
+  if (cfg.cwsUser && cfg.cwsUser.trim()) {
+    process.env.CORREIOS_USUARIO = cfg.cwsUser.trim();
+  }
+  if (cfg.cwsPassword && cfg.cwsPassword.trim()) {
+    process.env.CORREIOS_SENHA_API = cfg.cwsPassword.trim();
+  }
+}
+
+export function getCorreiosContractConfig(): CorreiosContractConfig {
+  const defaultConfig = buildDefaultCorreiosContractConfig();
+  const cachedPersistent = getCachedPersistentCorreiosConfig();
+  if (cachedPersistent) {
+    return mergeParsedCorreiosConfig(defaultConfig, cachedPersistent);
+  }
 
   try {
     if (fs.existsSync(SETTINGS_FILE)) {
       const raw = fs.readFileSync(SETTINGS_FILE, "utf-8");
       const parsed = JSON.parse(raw);
-      const savedAddr = parsed.senderAddress || {};
-      const isOldPlaceholderAddr =
-        savedAddr.cep === "06754000" ||
-        savedAddr.cep === "06754-000" ||
-        savedAddr.street === "Av. Industrial";
-
-      const pickupAddresses: CorreiosPickupAddress[] =
-        Array.isArray(parsed.pickupAddresses) && parsed.pickupAddresses.length > 0
-          ? parsed.pickupAddresses
-          : DEFAULT_PICKUP_ADDRESSES;
-
-      const selectedId =
-        parsed.selectedPickupAddressId &&
-        pickupAddresses.some((p) => p.id === parsed.selectedPickupAddressId)
-          ? parsed.selectedPickupAddressId
-          : pickupAddresses[0].id;
-
-      const selectedPickup = pickupAddresses.find((p) => p.id === selectedId) || pickupAddresses[0];
-
-      return {
-        ...defaultConfig,
-        ...parsed,
-        pickupAddresses,
-        selectedPickupAddressId: selectedId,
-        senderName: selectedPickup?.senderName || parsed.senderName || defaultConfig.senderName,
-        cnpj: selectedPickup?.cnpj || parsed.cnpj || defaultConfig.cnpj,
-        senderPhone: selectedPickup?.phone || parsed.senderPhone || defaultConfig.senderPhone,
-        senderEmail: selectedPickup?.email || parsed.senderEmail || defaultConfig.senderEmail,
-        senderAddress: selectedPickup
-          ? {
-              cep: selectedPickup.cep,
-              street: selectedPickup.street,
-              number: selectedPickup.number,
-              complement: selectedPickup.complement,
-              neighborhood: selectedPickup.neighborhood,
-              city: selectedPickup.city,
-              state: selectedPickup.state,
-            }
-          : isOldPlaceholderAddr
-          ? REAL_XPOINT_SENDER_ADDRESS
-          : {
-              ...defaultConfig.senderAddress,
-              ...savedAddr,
-            },
-        cwsUser: parsed.cwsUser || defaultConfig.cwsUser,
-        cwsPassword: parsed.cwsPassword || defaultConfig.cwsPassword,
-      };
+      return mergeParsedCorreiosConfig(defaultConfig, parsed);
     }
   } catch (err) {
     console.warn("[Correios Prepostagem] Aviso ao ler correios_contract_settings.json:", err);
@@ -485,9 +531,32 @@ export function getCorreiosContractConfig(): CorreiosContractConfig {
   return defaultConfig;
 }
 
-export function saveCorreiosContractConfig(partial: Partial<CorreiosContractConfig>): CorreiosContractConfig {
-  const current = getCorreiosContractConfig();
+/**
+ * Carrega as configurações persistentes do Appwrite (`totem_db.app_settings`) para memória e `process.env`,
+ * garantindo que credenciais CWS e endereços de coleta sobrevivam a qualquer redeploy no Coolify.
+ */
+export async function hydrateCorreiosContractConfig(forceRefresh = false): Promise<CorreiosContractConfig> {
+  const defaultConfig = buildDefaultCorreiosContractConfig();
+  const persistent = await loadPersistentCorreiosConfig({ forceRefresh });
+  if (persistent) {
+    const merged = mergeParsedCorreiosConfig(defaultConfig, persistent);
+    applyConfigToProcessEnv(merged);
+    try {
+      const dir = path.dirname(SETTINGS_FILE);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(SETTINGS_FILE, JSON.stringify(merged, null, 2), "utf-8");
+    } catch {}
+    return merged;
+  }
+  const localCfg = getCorreiosContractConfig();
+  applyConfigToProcessEnv(localCfg);
+  return localCfg;
+}
 
+function buildNextConfigForSave(
+  current: CorreiosContractConfig,
+  partial: Partial<CorreiosContractConfig> & { clearCwsPassword?: boolean }
+): CorreiosContractConfig {
   const pickupAddresses =
     Array.isArray(partial.pickupAddresses) && partial.pickupAddresses.length > 0
       ? partial.pickupAddresses
@@ -502,9 +571,22 @@ export function saveCorreiosContractConfig(partial: Partial<CorreiosContractConf
   const activePickup =
     pickupAddresses.find((p) => p.id === selectedPickupAddressId) || pickupAddresses[0];
 
+  const rawIncomingPassword = typeof partial.cwsPassword === "string" ? partial.cwsPassword.trim() : undefined;
+  const shouldKeepExistingPassword =
+    !partial.clearCwsPassword && (!rawIncomingPassword || rawIncomingPassword.startsWith("***"));
+
+  const resolvedPassword = partial.clearCwsPassword
+    ? ""
+    : shouldKeepExistingPassword
+    ? current.cwsPassword
+    : rawIncomingPassword!;
+
+  const { clearCwsPassword: _ignored, ...restPartial } = partial;
+
   const next: CorreiosContractConfig = {
     ...current,
-    ...partial,
+    ...restPartial,
+    cwsPassword: resolvedPassword,
     pickupAddresses,
     selectedPickupAddressId,
     senderName: activePickup?.senderName || partial.senderName || current.senderName,
@@ -532,6 +614,10 @@ export function saveCorreiosContractConfig(partial: Partial<CorreiosContractConf
     next.senderAddress = { ...REAL_XPOINT_SENDER_ADDRESS };
   }
 
+  return next;
+}
+
+function writeLocalConfigFiles(next: CorreiosContractConfig): void {
   try {
     const dir = path.dirname(SETTINGS_FILE);
     if (!fs.existsSync(dir)) {
@@ -542,15 +628,7 @@ export function saveCorreiosContractConfig(partial: Partial<CorreiosContractConf
     console.warn("[Correios Prepostagem] Aviso ao salvar correios_contract_settings.json:", err);
   }
 
-  process.env.CORREIOS_CONTRATO = next.contractNumber;
-  process.env.CORREIOS_CARTAO_POSTAGEM = next.postcardNumber;
-  process.env.CORREIOS_CNPJ = next.cnpj;
-  process.env.CORREIOS_COD_SERVICO_SEDEX = next.sedexServiceCode;
-  process.env.CORREIOS_COD_SERVICO_PAC = next.pacServiceCode;
-  process.env.CORREIOS_USUARIO = next.cwsUser;
-  if (next.cwsPassword !== undefined) {
-    process.env.CORREIOS_SENHA_API = next.cwsPassword;
-  }
+  applyConfigToProcessEnv(next);
 
   try {
     if (fs.existsSync(ENV_FILE)) {
@@ -575,13 +653,33 @@ export function saveCorreiosContractConfig(partial: Partial<CorreiosContractConf
       fs.writeFileSync(ENV_FILE, content, "utf-8");
     }
   } catch {}
+}
 
+export function saveCorreiosContractConfig(
+  partial: Partial<CorreiosContractConfig> & { clearCwsPassword?: boolean }
+): CorreiosContractConfig {
+  const current = getCorreiosContractConfig();
+  const next = buildNextConfigForSave(current, partial);
+  writeLocalConfigFiles(next);
+  void savePersistentCorreiosConfig(next);
   return next;
+}
+
+export async function saveCorreiosContractConfigAsync(
+  partial: Partial<CorreiosContractConfig> & { clearCwsPassword?: boolean }
+): Promise<{ config: CorreiosContractConfig; persistedToAppwrite: boolean }> {
+  const current = await hydrateCorreiosContractConfig();
+  const next = buildNextConfigForSave(current, partial);
+  writeLocalConfigFiles(next);
+  const persistedToAppwrite = await savePersistentCorreiosConfig(next);
+  return { config: next, persistedToAppwrite };
 }
 
 export async function authenticateCorreiosCws(customConfig?: Partial<CorreiosContractConfig>): Promise<{
   ok: boolean;
   token?: string;
+  canonicalIdCorreios?: string;
+  authorizedApis?: number[];
   expiresAt?: string;
   error?: string;
   statusCode?: number;
@@ -592,7 +690,15 @@ export async function authenticateCorreiosCws(customConfig?: Partial<CorreiosCon
 }> {
   const startMs = Date.now();
   const endpoint = `${CWS_BASE_URL}/token/v1/autentica/cartaopostagem`;
-  const cfg = { ...getCorreiosContractConfig(), ...(customConfig || {}) };
+  const hydrated = await hydrateCorreiosContractConfig();
+  const incomingCustom = customConfig ? { ...customConfig } : {};
+  if (
+    typeof incomingCustom.cwsPassword === "string" &&
+    (!incomingCustom.cwsPassword.trim() || incomingCustom.cwsPassword.trim().startsWith("***"))
+  ) {
+    delete incomingCustom.cwsPassword;
+  }
+  const cfg = { ...hydrated, ...incomingCustom };
   const usuario = (cfg.cwsUser || cfg.cnpj || "").trim();
   const senhaApi = (cfg.cwsPassword || "").trim();
   const cartao = (cfg.postcardNumber || "").replace(/\D/g, "");
@@ -671,13 +777,25 @@ export async function authenticateCorreiosCws(customConfig?: Partial<CorreiosCon
           continue;
         }
       } else if (parsedBody && parsedBody.token) {
-        saveCorreiosContractConfig({
+        const canonicalIdCorreios = String(
+          parsedBody.id || parsedBody.idCorreios || parsedBody.usuario || usuario
+        ).trim();
+        const authorizedApis: number[] = Array.isArray(parsedBody.cartaoPostagem?.api)
+          ? parsedBody.cartaoPostagem.api
+          : Array.isArray(parsedBody.api)
+          ? parsedBody.api
+          : [];
+        await saveCorreiosContractConfigAsync({
+          ...incomingCustom,
+          cwsCanonicalIdCorreios: canonicalIdCorreios,
           cwsIsVerified: true,
           cwsLastVerifiedAt: new Date().toISOString(),
         });
         return {
           ok: true,
           token: parsedBody.token,
+          canonicalIdCorreios,
+          authorizedApis,
           expiresAt: parsedBody.expiraEm,
           statusCode: res.status,
           endpoint,
@@ -685,11 +803,12 @@ export async function authenticateCorreiosCws(customConfig?: Partial<CorreiosCon
           requestPayload,
           responsePayload: {
             ambiente: parsedBody.ambiente,
-            id: parsedBody.id,
+            id: canonicalIdCorreios,
             cnpj: parsedBody.cnpj,
             contrato: parsedBody.cartaoPostagem?.contrato || cfg.contractNumber,
             cartao: parsedBody.cartaoPostagem?.numero || cartao,
             dr: parsedBody.cartaoPostagem?.dr,
+            api: authorizedApis,
             expiraEm: parsedBody.expiraEm,
             tokenPreview: `${String(parsedBody.token).slice(0, 18)}...`,
           },
@@ -857,10 +976,10 @@ export async function launchOrderCorreiosPrepostagem(params: {
 
   // Se o usuário selecionou um endereço de coleta específico, persiste-o como último selecionado
   if (params.pickupAddressId) {
-    saveCorreiosContractConfig({ selectedPickupAddressId: params.pickupAddressId });
+    await saveCorreiosContractConfigAsync({ selectedPickupAddressId: params.pickupAddressId });
   }
 
-  const cfg = getCorreiosContractConfig();
+  const cfg = await hydrateCorreiosContractConfig();
   const isPac = params.serviceCode === cfg.pacServiceCode || params.serviceCode === "03298";
   const serviceCode = isPac ? cfg.pacServiceCode : cfg.sedexServiceCode;
   const serviceName = isPac ? "PAC CONTRATO AG" : "SEDEX CONTRATO AG";
@@ -1374,8 +1493,12 @@ export async function launchOrderCorreiosPrepostagem(params: {
     httpStatus: authRes.statusCode || 201,
     details: [
       `Token JWT obtido com sucesso (expira em: ${authRes.expiresAt || "24h"})`,
+      `idCorreios Autenticado: ${authRes.canonicalIdCorreios || cfg.cwsUser || cfg.cnpj}`,
       `Contrato vinculado: ${authRes.responsePayload?.contrato || cfg.contractNumber}`,
       `Cartão de Postagem: ${authRes.responsePayload?.cartao || cfg.postcardNumber}`,
+      ...(Array.isArray(authRes.authorizedApis) && authRes.authorizedApis.length > 0
+        ? [`APIs autorizadas no cartão: [${authRes.authorizedApis.join(", ")}]`]
+        : []),
     ],
     requestPayload: authRes.requestPayload,
     responsePayload: authRes.responsePayload,
@@ -1387,6 +1510,19 @@ export async function launchOrderCorreiosPrepostagem(params: {
   const step6Start = Date.now();
   const prepostagemEndpoint = `${CWS_BASE_URL}/prepostagem/v1/prepostagens`;
   const token = authRes.token!;
+  const resolvedIdCorreios = (
+    authRes.canonicalIdCorreios ||
+    cfg.cwsCanonicalIdCorreios ||
+    cfg.cwsUser ||
+    cfg.cnpj
+  ).replace(/\s+/g, "");
+  const cleanSenderDoc = (senderObj.cnpj || cfg.cnpj || "").replace(/\D/g, "");
+  const cleanSenderCep = (senderObj.cep || "").replace(/\D/g, "");
+  const cleanRecipientDoc = (cleanRecipient.document || "").replace(/\D/g, "");
+  const cleanRecipientCep = (cleanRecipient.cep || "").replace(/\D/g, "");
+  const normalizedInvoiceKey = (params.invoiceKey || "").replace(/\D/g, "");
+  const hasValidNfeKey = normalizedInvoiceKey.length === 44;
+
   const processedVolumes: CorreiosVolumeSpec[] = [];
   const createdPrepostagemIds: string[] = [];
   const step6Details: string[] = [];
@@ -1422,24 +1558,31 @@ export async function launchOrderCorreiosPrepostagem(params: {
               valorReais: declaredReais > 0 ? declaredReais : 1240,
             },
           ]
-    ).map((ci) => ({
-      conteudo: sanitizeCwsString(ci.conteudo || "Gabinete Autoatendimento", 60),
-      quantidade: String(Math.max(1, Math.round(Number(ci.quantidade) || 1))),
-      valor: Number(ci.valorReais || declaredReais || 100).toFixed(2),
-    }));
+    ).map((ci) => {
+      const sanitizedDesc = sanitizeCwsString(ci.conteudo || "Gabinete Autoatendimento Totem Pro", 60);
+      const finalDesc =
+        sanitizedDesc.length >= 5
+          ? sanitizedDesc
+          : `${sanitizedDesc} Totem Pro`.trim().slice(0, 60);
+      return {
+        conteudo: finalDesc,
+        quantidade: String(Math.max(1, Math.round(Number(ci.quantidade) || 1))),
+        valor: Math.max(1, Number(ci.valorReais || declaredReais || 100)).toFixed(2),
+      };
+    });
 
     const cwsPayload: Record<string, any> = {
-      idCorreios: (cfg.cwsUser || cfg.cnpj).replace(/\s+/g, ""),
+      idCorreios: resolvedIdCorreios,
       remetente: {
         nome: senderObj.name,
-        cpfCnpj: senderObj.cnpj,
+        cpfCnpj: cleanSenderDoc,
         dddCelular: senderPhoneParsed.ddd,
         celular: senderPhoneParsed.number,
         email: senderObj.email,
         endereco: {
-          cep: senderObj.cep,
+          cep: cleanSenderCep,
           logradouro: senderObj.street,
-          numero: senderObj.number,
+          numero: senderObj.number || "S/N",
           ...(senderObj.complement ? { complemento: senderObj.complement } : {}),
           bairro: senderObj.neighborhood,
           cidade: senderObj.city,
@@ -1448,15 +1591,15 @@ export async function launchOrderCorreiosPrepostagem(params: {
       },
       destinatario: {
         nome: cleanRecipient.name,
-        cpfCnpj: cleanRecipient.document,
+        cpfCnpj: cleanRecipientDoc,
         ...(recPhoneParsed.isMobile
           ? { dddCelular: recPhoneParsed.ddd, celular: recPhoneParsed.number }
           : { dddTelefone: recPhoneParsed.ddd, telefone: recPhoneParsed.number }),
         ...(cleanRecipient.email ? { email: cleanRecipient.email } : {}),
         endereco: {
-          cep: cleanRecipient.cep,
+          cep: cleanRecipientCep,
           logradouro: cleanRecipient.street,
-          numero: cleanRecipient.number,
+          numero: cleanRecipient.number || "S/N",
           ...(cleanRecipient.complement ? { complemento: cleanRecipient.complement } : {}),
           bairro: cleanRecipient.neighborhood,
           cidade: cleanRecipient.city,
@@ -1469,28 +1612,28 @@ export async function launchOrderCorreiosPrepostagem(params: {
       alturaInformada: String(heightCm),
       larguraInformada: String(widthCm),
       comprimentoInformado: String(lengthCm),
-      cienteObjetoNaoProibido: 1,
+      cienteObjetoNaoProibido: "1",
       solicitarColeta: "N",
       observacao: sanitizeCwsString(
         params.observations || `Pedido ${params.orderNumber} Vol ${i + 1}/${totalVolumes}`,
         50
       ),
       ...(listaServicoAdicional.length > 0 ? { listaServicoAdicional } : {}),
-      ...(params.invoiceKey && params.invoiceKey.replace(/\D/g, "").length === 44
+      // Regra vigente Correios PPN: itensDeclaracaoConteudo é obrigatório mesmo quando chaveNFe é informada
+      itensDeclaracaoConteudo,
+      ...(hasValidNfeKey
         ? {
-            chaveNFe: params.invoiceKey.replace(/\D/g, ""),
+            chaveNFe: normalizedInvoiceKey,
             ...(params.invoiceNumber ? { numeroNotaFiscal: params.invoiceNumber } : {}),
           }
-        : {
-            itensDeclaracaoConteudo,
-          }),
+        : {}),
     };
 
     step6Requests.push({ volume: i + 1, payload: cwsPayload });
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
       let res = await fetch(prepostagemEndpoint, {
         method: "POST",
         headers: {
@@ -1505,6 +1648,28 @@ export async function launchOrderCorreiosPrepostagem(params: {
 
       step6HttpStatus = res.status;
       let resJson = await res.json().catch(() => ({}));
+
+      if (
+        !res.ok &&
+        JSON.stringify(resJson).toLowerCase().includes("cienteobjetonaoproibido")
+      ) {
+        step6Details.push(
+          `⚠️ Volume ${i + 1}: Reenviando com formato alternativo cienteObjetoNaoProibido="S"...`
+        );
+        const retryCientePayload = { ...cwsPayload, cienteObjetoNaoProibido: "S" };
+        const retryRes = await fetch(prepostagemEndpoint, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify(retryCientePayload),
+        });
+        step6HttpStatus = retryRes.status;
+        res = retryRes;
+        resJson = await retryRes.json().catch(() => ({}));
+      }
 
       if (
         !res.ok &&
@@ -1532,10 +1697,15 @@ export async function launchOrderCorreiosPrepostagem(params: {
 
       step6Responses.push({ volume: i + 1, status: res.status, response: resJson });
 
-      if (res.ok && (resJson.codigoObjeto || resJson.id)) {
-        if (resJson.id) createdPrepostagemIds.push(String(resJson.id));
+      const returnedTrackingCode = String(
+        resJson?.codigoObjeto || resJson?.objetoPostal?.codigoObjeto || ""
+      ).trim();
+      const returnedPrepostagemId = resJson?.id ? String(resJson.id).trim() : "";
+
+      if (res.ok && returnedTrackingCode && returnedPrepostagemId) {
+        createdPrepostagemIds.push(returnedPrepostagemId);
         step6Details.push(
-          `✅ Volume ${i + 1}/${totalVolumes} registrado nos Correios! Código de Rastreio Oficial: ${resJson.codigoObjeto} (ID Pré-Postagem: ${resJson.id || "OK"}).`
+          `✅ Volume ${i + 1}/${totalVolumes} registrado nos Correios! Rastreio Oficial: ${returnedTrackingCode} (ID Pré-Postagem: ${returnedPrepostagemId} • idCorreios: ${resolvedIdCorreios}).`
         );
         processedVolumes.push({
           ...vol,
@@ -1546,18 +1716,20 @@ export async function launchOrderCorreiosPrepostagem(params: {
           lengthCm,
           weightGrams,
           declaredValueReais: declaredReais,
-          trackingCode: resJson.codigoObjeto,
-          prepostagemId: resJson.id ? String(resJson.id) : undefined,
+          trackingCode: returnedTrackingCode,
+          prepostagemId: returnedPrepostagemId,
           plpNumber: resJson.numeroPlp ? String(resJson.numeroPlp) : undefined,
           status: "cws_registered",
-          cwsMessage: `Pré-postagem oficial registrada na API CWS dos Correios (ID: ${resJson.id || resJson.codigoObjeto}).`,
+          cwsMessage: `Pré-postagem oficial registrada na API CWS dos Correios (ID: ${returnedPrepostagemId}, idCorreios: ${resolvedIdCorreios}).`,
         });
       } else {
         step6Failed = true;
         const msgsList = Array.isArray(resJson?.msgs)
           ? resJson.msgs.join(" | ")
           : resJson?.mensagem || resJson?.message || resJson?.causa || JSON.stringify(resJson);
-        step6ErrorSummary = `Correios CWS recusou o Volume ${i + 1} (HTTP ${res.status}): ${msgsList}`;
+        step6ErrorSummary = res.ok
+          ? `Correios CWS retornou HTTP ${res.status} sem codigoObjeto/id válidos para aparecer no painel: ${JSON.stringify(resJson)}`
+          : `Correios CWS recusou o Volume ${i + 1} (HTTP ${res.status}): ${msgsList}`;
         step6Details.push(`❌ ${step6ErrorSummary}`);
       }
     } catch (err: any) {
@@ -1663,18 +1835,32 @@ export async function launchOrderCorreiosPrepostagem(params: {
         const rotuloJson = await rotuloRes.json().catch(() => ({}));
         if (rotuloJson?.idRecibo) {
           step7Details.push(`Recibo de rótulo assíncrono gerado na CWS: ${rotuloJson.idRecibo}.`);
-          await new Promise((r) => setTimeout(r, 1400));
-          const downloadRes = await fetch(
-            `${CWS_BASE_URL}/prepostagem/v1/prepostagens/rotulo/download/assincrono/${rotuloJson.idRecibo}`,
-            {
-              headers: { Authorization: `Bearer ${token}` },
+          const pollDelaysMs = [1200, 1500, 2000, 2500, 3000];
+          for (let attempt = 0; attempt < pollDelaysMs.length; attempt++) {
+            await new Promise((r) => setTimeout(r, pollDelaysMs[attempt]));
+            const downloadRes = await fetch(
+              `${CWS_BASE_URL}/prepostagem/v1/prepostagens/rotulo/download/assincrono/${rotuloJson.idRecibo}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  Accept: "application/json",
+                },
+              }
+            );
+            if (downloadRes.status === 202) {
+              continue;
             }
-          );
-          if (downloadRes.ok) {
-            const dlJson = await downloadRes.json().catch(() => ({}));
-            if (dlJson?.dados) {
-              officialLabelPdfBase64 = dlJson.dados;
-              step7Details.push("PDF oficial nativo da CWS baixado com sucesso e pronto para impressão.");
+            if (downloadRes.ok) {
+              const dlJson = await downloadRes.json().catch(() => ({}));
+              if (dlJson?.dados) {
+                officialLabelPdfBase64 = dlJson.dados;
+                step7Details.push(
+                  `PDF oficial nativo da CWS baixado com sucesso na tentativa ${attempt + 1}/${pollDelaysMs.length} e pronto para impressão.`
+                );
+                break;
+              }
+            } else {
+              break;
             }
           }
         }
@@ -1682,7 +1868,7 @@ export async function launchOrderCorreiosPrepostagem(params: {
       if (!officialLabelPdfBase64) {
         step7Status = "warning";
         step7Details.push(
-          "Pré-postagem registrada nos Correios! O rótulo vetorial com QR Code e código de rastreio oficial já está pronto para impressão imediata."
+          "Pré-postagem registrada nos Correios! O PDF assíncrono da CWS ainda não finalizou o processamento; o rótulo vetorial com QR Code e código de rastreio oficial já está pronto para impressão imediata."
         );
       }
     } catch (err: any) {
@@ -1740,6 +1926,129 @@ export async function launchOrderCorreiosPrepostagem(params: {
       .map((v) => v.trackingCode)
       .join(", ")}`,
   };
+}
+
+export interface CorreiosPanelPrepostagemSummary {
+  id: string;
+  codigoObjeto: string;
+  status: string;
+  codigoServico: string;
+  destinatarioNome: string;
+  destinatarioCep: string;
+  dataPrePostagem: string;
+}
+
+/**
+ * Consulta ao vivo a API CWS v2 (`GET /prepostagem/v2/prepostagens`) para listar as pré-postagens
+ * atualmente visíveis no painel oficial do cliente em prepostagem.correios.com.br.
+ */
+export async function listCorreiosPanelPrepostagens(options?: {
+  status?: string;
+  size?: number;
+}): Promise<{
+  ok: boolean;
+  items: CorreiosPanelPrepostagemSummary[];
+  totalElements: number;
+  endpoint: string;
+  httpStatus?: number;
+  authIdCorreios?: string;
+  contractNumber?: string;
+  postcardNumber?: string;
+  error?: string;
+}> {
+  const cfg = await hydrateCorreiosContractConfig();
+  const size = Math.min(50, Math.max(1, options?.size ?? 25));
+  const queryParams = new URLSearchParams({
+    page: "0",
+    size: String(size),
+  });
+  if (options?.status) {
+    queryParams.set("status", options.status);
+  }
+  const endpoint = `${CWS_BASE_URL}/prepostagem/v2/prepostagens?${queryParams.toString()}`;
+
+  const authRes = await authenticateCorreiosCws();
+  if (!authRes.ok || !authRes.token) {
+    return {
+      ok: false,
+      items: [],
+      totalElements: 0,
+      endpoint,
+      httpStatus: authRes.statusCode,
+      contractNumber: cfg.contractNumber,
+      postcardNumber: cfg.postcardNumber,
+      error: authRes.error || "Não foi possível autenticar na CWS para consultar o painel dos Correios.",
+    };
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const res = await fetch(endpoint, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${authRes.token}`,
+        Accept: "application/json",
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg =
+        json?.msgs?.[0] || json?.mensagem || json?.message || `HTTP ${res.status} ao consultar /v2/prepostagens`;
+      return {
+        ok: false,
+        items: [],
+        totalElements: 0,
+        endpoint,
+        httpStatus: res.status,
+        authIdCorreios: authRes.canonicalIdCorreios,
+        contractNumber: cfg.contractNumber,
+        postcardNumber: cfg.postcardNumber,
+        error: msg,
+      };
+    }
+
+    const rawItens = Array.isArray(json?.itens)
+      ? json.itens
+      : Array.isArray(json?.content)
+      ? json.content
+      : [];
+
+    const items: CorreiosPanelPrepostagemSummary[] = rawItens.map((it: any) => ({
+      id: String(it?.id || ""),
+      codigoObjeto: String(it?.codigoObjeto || ""),
+      status: String(it?.status || it?.situacao || "PREPOSTADO"),
+      codigoServico: String(it?.codigoServico || ""),
+      destinatarioNome: String(it?.destinatario?.nome || ""),
+      destinatarioCep: String(it?.destinatario?.endereco?.cep || ""),
+      dataPrePostagem: String(it?.dataHoraPrePostagem || it?.dataCadastro || it?.dataPrePostagem || ""),
+    }));
+
+    return {
+      ok: true,
+      items,
+      totalElements: Number(json?.page?.totalElements ?? json?.totalElements ?? items.length),
+      endpoint,
+      httpStatus: res.status,
+      authIdCorreios: authRes.canonicalIdCorreios,
+      contractNumber: cfg.contractNumber,
+      postcardNumber: cfg.postcardNumber,
+    };
+  } catch (err: any) {
+    return {
+      ok: false,
+      items: [],
+      totalElements: 0,
+      endpoint,
+      authIdCorreios: authRes.canonicalIdCorreios,
+      contractNumber: cfg.contractNumber,
+      postcardNumber: cfg.postcardNumber,
+      error: `Erro de conexão ao consultar pré-postagens no painel Correios: ${err?.message || "Timeout"}`,
+    };
+  }
 }
 
 export { calculateCorreiosInsuranceCents };

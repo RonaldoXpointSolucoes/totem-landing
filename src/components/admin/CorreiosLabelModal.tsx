@@ -225,6 +225,24 @@ export default function CorreiosLabelModal({
   const [showCwsPassword, setShowCwsPassword] = useState(false);
   const [savingConfig, setSavingConfig] = useState(false);
   const [testingCws, setTestingCws] = useState(false);
+  const [syncingPanel, setSyncingPanel] = useState(false);
+  const [panelPrepostagens, setPanelPrepostagens] = useState<
+    Array<{
+      id: string;
+      codigoObjeto: string;
+      status: string;
+      codigoServico: string;
+      destinatarioNome: string;
+      destinatarioCep: string;
+      dataPrePostagem: string;
+    }>
+  >([]);
+  const [panelSyncMeta, setPanelSyncMeta] = useState<{
+    checkedAt: string;
+    totalElements: number;
+    authIdCorreios?: string;
+    error?: string;
+  } | null>(null);
   const [lookingUpCep, setLookingUpCep] = useState(false);
   const [lookingUpPickupCep, setLookingUpPickupCep] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "warn" | "error"; text: string } | null>(null);
@@ -325,11 +343,21 @@ export default function CorreiosLabelModal({
             setContractConfig((prev) => ({
               ...prev,
               ...json.contractConfig,
+              cwsPassword: "",
               senderAddress: {
                 ...prev.senderAddress,
                 ...(json.contractConfig.senderAddress || {}),
               },
             }));
+
+            // Se ainda não há Token CWS configurado e o pedido ainda não tem pré-postagem oficial na CWS,
+            // abre automaticamente o assistente para evitar geração acidental só local.
+            if (
+              !json.contractConfig.hasCwsPassword &&
+              json.existingShipment?.mode !== "cws_live"
+            ) {
+              setShowActivationWizard(true);
+            }
 
             if (Array.isArray(json.contractConfig.pickupAddresses) && json.contractConfig.pickupAddresses.length > 0) {
               setPickupAddresses(json.contractConfig.pickupAddresses);
@@ -637,7 +665,7 @@ export default function CorreiosLabelModal({
       const json = await res.json();
       if (json.ok) {
         if (json.contractConfig) {
-          setContractConfig((prev) => ({ ...prev, ...json.contractConfig }));
+          setContractConfig((prev) => ({ ...prev, ...json.contractConfig, cwsPassword: "" }));
         }
         setFeedback({
           type: json.authCheck && !json.authCheck.ok ? "warn" : "success",
@@ -674,16 +702,58 @@ export default function CorreiosLabelModal({
       });
       const json = await res.json();
       if (json.contractConfig) {
-        setContractConfig((prev) => ({ ...prev, ...json.contractConfig }));
+        setContractConfig((prev) => ({ ...prev, ...json.contractConfig, cwsPassword: "" }));
       }
       setFeedback({
         type: json.ok ? "success" : "error",
         text: json.message || json.error || "Teste concluído.",
       });
+      if (json.ok) {
+        void handleSyncCwsPanel();
+      }
     } catch (err: any) {
       setFeedback({ type: "error", text: "Erro ao testar conexão CWS: " + err?.message });
     } finally {
       setTestingCws(false);
+    }
+  };
+
+  const handleSyncCwsPanel = async () => {
+    setSyncingPanel(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}/correios-label`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "sync_cws_panel",
+          size: 25,
+        }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setPanelPrepostagens(Array.isArray(json.items) ? json.items : []);
+        setPanelSyncMeta({
+          checkedAt: new Date().toISOString(),
+          totalElements: Number(json.totalElements || json.items?.length || 0),
+          authIdCorreios: json.authIdCorreios,
+        });
+      } else {
+        setPanelPrepostagens([]);
+        setPanelSyncMeta({
+          checkedAt: new Date().toISOString(),
+          totalElements: 0,
+          authIdCorreios: json.authIdCorreios,
+          error: json.error || "Não foi possível consultar /v2/prepostagens nos Correios.",
+        });
+      }
+    } catch (err: any) {
+      setPanelSyncMeta({
+        checkedAt: new Date().toISOString(),
+        totalElements: 0,
+        error: err?.message || "Erro de rede ao consultar Painel Correios.",
+      });
+    } finally {
+      setSyncingPanel(false);
     }
   };
 
@@ -836,6 +906,10 @@ export default function CorreiosLabelModal({
         text: json.message,
       });
 
+      if (mode === "cws_live") {
+        void handleSyncCwsPanel();
+      }
+
       if (onLabelSaved && json.shipment) {
         onLabelSaved(json.shipment);
       }
@@ -915,25 +989,14 @@ export default function CorreiosLabelModal({
           state: contractConfig.senderAddress.state,
         };
 
-    const activeShipment: CorreiosShipmentRecord = shipmentToPrint ||
-      generatedShipment || {
-        orderId,
-        orderNumber,
-        serviceCode,
-        serviceName: serviceCode === "03298" ? "PAC CONTRATO AG" : "SEDEX CONTRATO AG",
-        contractNumber: contractConfig.contractNumber,
-        postcardNumber: contractConfig.postcardNumber,
-        agency: contractConfig.agency,
-        mode: "simplified",
-        invoiceNumber,
-        invoiceKey,
-        observations,
-        sender: currentSender,
-        recipient,
-        volumes,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+    const activeShipment = shipmentToPrint || generatedShipment;
+    if (!activeShipment) {
+      setFeedback({
+        type: "warn",
+        text: "Nenhuma pré-postagem/etiqueta gerada ainda neste pedido. Clique em 'Lançar na API Correios & Gerar Etiqueta' primeiro para registrá-la no painel dos Correios.",
+      });
+      return;
+    }
 
     const isSedex = activeShipment.serviceCode !== "03298";
     const serviceShort = isSedex ? "SEDEX" : "PAC";
@@ -1363,6 +1426,17 @@ export default function CorreiosLabelModal({
 
             <button
               type="button"
+              onClick={() => void handleSyncCwsPanel()}
+              disabled={syncingPanel}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold border bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border-cyan-500/40 flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+              title="Consultar ao vivo na API CWS dos Correios as pré-postagens visíveis no painel prepostagem.correios.com.br"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${syncingPanel ? "animate-spin" : ""}`} />
+              <span>{syncingPanel ? "Consultando CWS..." : "Consultar Painel Correios"}</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setShowActivationWizard((prev) => !prev)}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1.5 transition-all cursor-pointer ${
                 showActivationWizard
@@ -1404,6 +1478,60 @@ export default function CorreiosLabelModal({
           ) : (
             <>
               {/* Feedback de Operação */}
+              {panelSyncMeta && (
+                <div
+                  className={`p-3.5 rounded-2xl border text-xs space-y-2 ${
+                    panelSyncMeta.error
+                      ? "bg-rose-950/35 border-rose-500/40 text-rose-200"
+                      : "bg-cyan-950/30 border-cyan-500/40 text-cyan-100"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="font-extrabold flex items-center gap-2">
+                      <Terminal className="w-4 h-4 text-cyan-400" />
+                      <span>
+                        {panelSyncMeta.error
+                          ? "Falha ao consultar Painel Oficial dos Correios (CWS v2)"
+                          : `Painel Correios (prepostagem.correios.com.br) — ${panelPrepostagens.length} registro(s) recente(s) encontrado(s)`}
+                      </span>
+                    </div>
+                    {panelSyncMeta.authIdCorreios && (
+                      <span className="text-[11px] font-mono text-cyan-300">
+                        idCorreios: {panelSyncMeta.authIdCorreios}
+                      </span>
+                    )}
+                  </div>
+                  {panelSyncMeta.error ? (
+                    <p className="text-[11px] text-rose-300">{panelSyncMeta.error}</p>
+                  ) : panelPrepostagens.length === 0 ? (
+                    <p className="text-[11px] text-slate-300">
+                      A API dos Correios respondeu normalmente, mas ainda não há pré-postagens ativas neste contrato/usuário.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+                      {panelPrepostagens.slice(0, 8).map((item) => (
+                        <div
+                          key={`${item.id}-${item.codigoObjeto}`}
+                          className="p-2 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between gap-2 text-[11px]"
+                        >
+                          <div className="min-w-0">
+                            <div className="font-mono font-bold text-amber-300 truncate">
+                              {item.codigoObjeto || item.id}
+                            </div>
+                            <div className="text-slate-400 truncate">
+                              {item.destinatarioNome || "Destinatário"} • CEP {item.destinatarioCep}
+                            </div>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold text-[10px] shrink-0">
+                            {item.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {feedback && (
                 <div
                   className={`p-3.5 rounded-2xl border text-xs flex items-start justify-between gap-3 ${
@@ -2123,19 +2251,33 @@ export default function CorreiosLabelModal({
                 )}
               </div>
 
-              {/* Se já existe etiqueta/pré-postagem gerada, mostra barra de impressão rápida em 1 clique */}
-              {generatedShipment && (
-                <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/60 via-slate-900 to-cyan-950/40 border-2 border-emerald-500/50 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                  <div className="space-y-1">
+              {/* Se já existe etiqueta/pré-postagem gerada, diferencia claramente CWS oficial vs rascunho local */}
+              {generatedShipment && (() => {
+                const isOfficiallyRegistered =
+                  generatedShipment.mode === "cws_live" &&
+                  generatedShipment.volumes.some((v) => Boolean(v.prepostagemId && v.trackingCode));
+
+                return (
+                <div
+                  className={`p-4 rounded-2xl border-2 flex flex-col lg:flex-row lg:items-center justify-between gap-4 ${
+                    isOfficiallyRegistered
+                      ? "bg-gradient-to-r from-emerald-950/60 via-slate-900 to-cyan-950/40 border-emerald-500/50"
+                      : "bg-gradient-to-r from-amber-950/50 via-slate-900 to-rose-950/35 border-amber-500/60"
+                  }`}
+                >
+                  <div className="space-y-1.5">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>
-                          {generatedShipment.mode === "cws_live"
-                            ? "Pré-Postagem Oficial CWS Registrada"
-                            : "Etiqueta com QR Code & Declaração Pronta"}
+                      {isOfficiallyRegistered ? (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Lançada no Painel Oficial dos Correios (CWS)</span>
                         </span>
-                      </span>
+                      ) : (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-500/20 text-amber-300 border border-amber-400/50 flex items-center gap-1">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          <span>Etiqueta Local (Modo Simplificado) — NÃO Enviada ao Painel Correios</span>
+                        </span>
+                      )}
                       <span className="text-xs font-extrabold text-white">
                         {generatedShipment.serviceName} (Cód. {generatedShipment.serviceCode})
                       </span>
@@ -2143,6 +2285,14 @@ export default function CorreiosLabelModal({
                         • {generatedShipment.volumes.length} volume(s)
                       </span>
                     </div>
+
+                    {!isOfficiallyRegistered && (
+                      <p className="text-[11px] text-amber-200/90 leading-relaxed">
+                        Esta etiqueta foi gerada apenas localmente no modo simplificado (sem envio à API oficial). Para aparecer em{" "}
+                        <strong className="text-white">prepostagem.correios.com.br</strong>, ative o Token CWS e clique em{" "}
+                        <strong className="text-white">&quot;Lançar na API Correios &amp; Gerar Etiqueta&quot;</strong>.
+                      </p>
+                    )}
 
                     <div className="flex items-center gap-2 flex-wrap pt-1">
                       {generatedShipment.volumes.map((v, i) => (
@@ -2154,8 +2304,13 @@ export default function CorreiosLabelModal({
                             Vol {i + 1}:
                           </span>
                           <strong>
-                            {v.trackingCode ? v.trackingCode : "Aguardando Postagem / CWS"}
+                            {v.trackingCode ? v.trackingCode : "Aguardando Lançamento CWS"}
                           </strong>
+                          {v.prepostagemId && (
+                            <span className="text-[10px] font-sans text-emerald-400">
+                              (ID {v.prepostagemId.slice(0, 8)}…)
+                            </span>
+                          )}
                           {v.trackingCode && (
                             <button
                               type="button"
@@ -2206,7 +2361,8 @@ export default function CorreiosLabelModal({
                     )}
                   </div>
                 </div>
-              )}
+                );
+              })()}
 
               {/* Grid Principal: 1. Destinatário & Serviço | 2. Volumes & Medidas */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
@@ -2651,7 +2807,7 @@ export default function CorreiosLabelModal({
             {contractConfig.hasCwsPassword ? (
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 font-bold text-xs">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span>Módulo API CWS Configurado & Ativo</span>
+                <span>API Oficial Correios CWS Conectada</span>
                 <button
                   type="button"
                   onClick={() => setShowActivationWizard((p) => !p)}
@@ -2661,46 +2817,46 @@ export default function CorreiosLabelModal({
                 </button>
               </div>
             ) : (
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs">
-                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-                <span className="font-semibold">
-                  Módulo Simplificado Ativo
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-rose-500/15 border border-rose-500/45 text-rose-200 text-xs">
+                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span className="font-bold">
+                  API Correios CWS Desconectada (Token Pendente)
                 </span>
                 <button
                   type="button"
                   onClick={() => setShowActivationWizard(true)}
                   className="px-2.5 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-[11px] transition-all cursor-pointer shadow-sm"
                 >
-                  ⚡ Ativar Módulo API CWS Passo a Passo
+                  ⚡ Ativar Token CWS Agora
                 </button>
               </div>
             )}
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2.5">
-            {/* Botão 1: Gerar Etiqueta de Endereçamento Simplificada (Com QR Code, Sem depender de API) */}
+            {/* Botão Secundário de Contingência Offline */}
             <button
               type="button"
               disabled={Boolean(submittingMode) || loading}
               onClick={() => handleGenerateLabel("simplified")}
-              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-amber-300 border border-amber-400/50 font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
-              title="Prepara a Etiqueta Oficial com QR Code + Declaração de Conteúdo em 1 Folha A4 usando dados reais"
+              className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-95 text-slate-300 border border-slate-700 font-semibold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+              title="Uso emergencial apenas local — NÃO registra a pré-postagem no painel dos Correios (prepostagem.correios.com.br)"
             >
-              <Zap className="w-4 h-4" />
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
               <span>
                 {submittingMode === "simplified"
                   ? "Preparando..."
-                  : "Gerar Etiqueta Simplificada (QR Code)"}
+                  : "Rascunho Local (Sem Painel Correios)"}
               </span>
             </button>
 
-            {/* Botão 2: Lançar no Sistema dos Correios via API CWS + Rastrear Migalhas */}
+            {/* Botão Principal: Lançar no Sistema dos Correios via API CWS + Rastrear Migalhas */}
             <button
               type="button"
               disabled={Boolean(submittingMode) || loading}
               onClick={() => handleGenerateLabel("cws_live")}
               className="px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 font-black text-xs flex items-center gap-2 shadow-lg shadow-amber-400/20 transition-all cursor-pointer disabled:opacity-50"
-              title="Conecta na API Oficial CWS dos Correios, valida as 7 etapas em formato de migalhas e gera o código de rastreio oficial"
+              title="Conecta na API Oficial CWS dos Correios, lança a pré-postagem para aparecer no painel prepostagem.correios.com.br e gera o código de rastreio"
             >
               <Send className="w-4 h-4" />
               <span>
@@ -2710,16 +2866,20 @@ export default function CorreiosLabelModal({
               </span>
             </button>
 
-            {/* Botão 3: Imprimir Direto */}
+            {/* Botão 3: Imprimir Direto (somente após gerar etiqueta/pré-postagem) */}
             <button
               type="button"
-              disabled={loading}
+              disabled={loading || !generatedShipment}
               onClick={() => handlePrintLabels("a4_full")}
-              className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 transition-all cursor-pointer disabled:opacity-50"
-              title="Abrir janela de impressão imediata da Etiqueta Correios com QR Code + Declaração de Conteúdo sem cortes"
+              className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              title={
+                generatedShipment
+                  ? "Abrir janela de impressão imediata da Etiqueta Correios com QR Code + Declaração de Conteúdo"
+                  : "Lance a pré-postagem nos Correios primeiro para habilitar a impressão"
+              }
             >
               <Printer className="w-4 h-4" />
-              <span>Imprimir Agora</span>
+              <span>{generatedShipment ? "Imprimir Agora" : "Lance CWS para Imprimir"}</span>
             </button>
           </div>
         </div>

@@ -3871,7 +3871,7 @@ export default function AdminPage() {
                                 type="button"
                                 onClick={() => setCorreiosLabelOrder(order)}
                                 className="px-2 py-1.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 active:scale-95 text-amber-300 border border-amber-400/50 font-extrabold text-[11px] sm:text-xs inline-flex items-center gap-1 transition-all cursor-pointer shrink-0"
-                                title="Lançar Pré-Postagem no Contrato Correios (API CWS) e Imprimir Etiqueta Simplificada"
+                                title="Lançar Pré-Postagem na API Oficial dos Correios (CWS) e Gerar/Imprimir Etiqueta"
                               >
                                 <Truck className="w-3.5 h-3.5" />
                                 <span className="hidden 2xl:inline">Etiqueta</span>
@@ -4152,7 +4152,7 @@ export default function AdminPage() {
                                   type="button"
                                   onClick={() => setCorreiosLabelOrder(order)}
                                   className="px-2.5 py-2 sm:px-3.5 sm:py-2 rounded-xl bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 font-black text-[11px] sm:text-xs flex items-center justify-center sm:justify-start gap-1.5 shadow-md shadow-amber-400/20 transition-all shrink-0 cursor-pointer"
-                                  title="Lançar Pré-Postagem no sistema dos Correios pela API usando seu Contrato 9912722993 e Imprimir Etiqueta Simplificada"
+                                  title="Lançar Pré-Postagem na API Oficial dos Correios (CWS) usando seu Contrato 9912722993 e Imprimir Etiqueta"
                                 >
                                   <Truck className="w-3.5 h-3.5 shrink-0" />
                                   <span className="truncate sm:hidden">Etiqueta Correios</span>
@@ -4594,11 +4594,12 @@ export default function AdminPage() {
                                 </p>
                               </div>
 
-                              {(addr as any)?.correiosShipment?.volumes?.some((v: any) => v.trackingCode && v.prepostagemId) && (
+                              {(addr as any)?.correiosShipment?.mode === "cws_live" &&
+                                (addr as any)?.correiosShipment?.volumes?.some((v: any) => v.trackingCode && v.prepostagemId) && (
                                 <div className="pt-1.5 border-t border-slate-800 space-y-1">
                                   <div className="flex items-center justify-between text-[10px]">
-                                    <span className="font-black uppercase text-amber-300">
-                                      Rastreio Oficial CWS {(addr as any).correiosShipment.contractNumber}:
+                                    <span className="font-black uppercase text-emerald-300">
+                                      Registrada nos Correios CWS {(addr as any).correiosShipment.contractNumber}:
                                     </span>
                                     <span className="text-emerald-400 font-bold">
                                       {(addr as any).correiosShipment.volumes.length} vol(s)
@@ -4610,12 +4611,20 @@ export default function AdminPage() {
                                       .map((v: any, vi: number) => (
                                         <span
                                           key={vi}
-                                          className="px-2 py-0.5 rounded bg-slate-950 border border-amber-500/40 text-amber-300 font-mono text-[10px] font-bold"
+                                          className="px-2 py-0.5 rounded bg-slate-950 border border-emerald-500/40 text-emerald-300 font-mono text-[10px] font-bold"
                                         >
                                           {v.trackingCode}
                                         </span>
                                       ))}
                                   </div>
+                                </div>
+                              )}
+
+                              {(addr as any)?.correiosShipment &&
+                                !((addr as any)?.correiosShipment?.mode === "cws_live" &&
+                                  (addr as any)?.correiosShipment?.volumes?.some((v: any) => v.trackingCode && v.prepostagemId)) && (
+                                <div className="pt-1.5 border-t border-amber-500/30 text-[10px] font-bold text-amber-300">
+                                  ⚠ Etiqueta local simplificada — ainda não lançada no Painel dos Correios (CWS).
                                 </div>
                               )}
 
@@ -4626,9 +4635,12 @@ export default function AdminPage() {
                               >
                                 <Printer className="w-3.5 h-3.5" />
                                 <span>
-                                  {(addr as any)?.correiosShipment
-                                    ? "Reimprimir / Atualizar Etiqueta Correios"
-                                    : "Gerar & Imprimir Etiqueta Correios"}
+                                  {(addr as any)?.correiosShipment?.mode === "cws_live" &&
+                                  (addr as any)?.correiosShipment?.volumes?.some((v: any) => v.trackingCode && v.prepostagemId)
+                                    ? "Ver Pré-Postagem CWS / Reimprimir"
+                                    : (addr as any)?.correiosShipment
+                                    ? "Lançar na API Correios (Substituir Rascunho)"
+                                    : "Lançar na API Correios & Gerar Etiqueta"}
                                 </span>
                               </button>
                             </div>

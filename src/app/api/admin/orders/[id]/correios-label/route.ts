@@ -4,14 +4,25 @@ import { getAuthSession, LEGACY_ADMIN_COOKIE, LEGACY_SECRET } from "@/lib/auth/s
 import { getOrderWithDetails, updateOrderAdmin } from "@/lib/appwrite/server";
 import { findOrderByNumber, updateLocalOrderAdmin } from "@/lib/orders/orderStore";
 import {
-  getCorreiosContractConfig,
-  saveCorreiosContractConfig,
+  hydrateCorreiosContractConfig,
+  saveCorreiosContractConfigAsync,
   authenticateCorreiosCws,
+  listCorreiosPanelPrepostagens,
   buildDefaultVolumesFromOrder,
   launchOrderCorreiosPrepostagem,
   sanitizeExistingShipment,
   lookupDneCep,
+  type CorreiosContractConfig,
 } from "@/modules/shipping/correiosPrepostagemService";
+
+function sanitizeContractConfigForClient(cfg: CorreiosContractConfig) {
+  return {
+    ...cfg,
+    cwsPassword: "",
+    hasCwsPassword: Boolean(cfg.cwsPassword && cfg.cwsPassword.trim()),
+    cwsPasswordLen: cfg.cwsPassword ? cfg.cwsPassword.trim().length : 0,
+  };
+}
 import { logEcosystemEvent } from "@/lib/logging/ecosystemLogger";
 
 async function verifyAuth(): Promise<boolean> {
@@ -88,7 +99,7 @@ export async function GET(
   try {
     const { id } = await params;
     const orderData = await resolveOrderData(id);
-    const config = getCorreiosContractConfig();
+    const config = await hydrateCorreiosContractConfig();
     const defaultPlan = buildDefaultVolumesFromOrder({
       items: orderData.items,
       subtotal_cents: orderData.subtotalCents,
@@ -152,10 +163,7 @@ export async function GET(
 
     return NextResponse.json({
       ok: true,
-      contractConfig: {
-        ...config,
-        hasCwsPassword: Boolean(config.cwsPassword && config.cwsPassword.trim()),
-      },
+      contractConfig: sanitizeContractConfigForClient(config),
       existingShipment,
       defaultDraft: {
         orderId: orderData.id,
@@ -193,52 +201,63 @@ export async function POST(
     const action = body.action || "generate_label";
 
     if (action === "save_config" || action === "save_pickup_addresses") {
-      const saved = saveCorreiosContractConfig(body.config || {});
+      const { config: saved, persistedToAppwrite } = await saveCorreiosContractConfigAsync(body.config || {});
       let authCheck: any = null;
       if (action === "save_config" && saved.cwsPassword && saved.cwsPassword.trim()) {
         authCheck = await authenticateCorreiosCws(saved);
       }
+      const latestCfg = await hydrateCorreiosContractConfig();
       return NextResponse.json({
         ok: true,
+        persistedToAppwrite,
         message:
           action === "save_pickup_addresses"
             ? "Endereço de coleta salvo e definido como ativo!"
             : authCheck?.ok
-            ? `Módulo CWS Correios Ativado e Autenticado com Sucesso (Cartão ${saved.postcardNumber})!`
-            : "Configurações do Contrato Correios salvas com sucesso!",
-        contractConfig: {
-          ...saved,
-          hasCwsPassword: Boolean(saved.cwsPassword && saved.cwsPassword.trim()),
-        },
+            ? `Módulo CWS Correios Ativado e Autenticado com Sucesso (Cartão ${latestCfg.postcardNumber} • Persistido em Nuvem: ${
+                persistedToAppwrite ? "Sim" : "Local"
+              })!`
+            : `Configurações do Contrato Correios salvas${persistedToAppwrite ? " em definitivo no banco de dados" : ""}!`,
+        contractConfig: sanitizeContractConfigForClient(latestCfg),
         authCheck,
       });
     }
 
     if (action === "test_cws_connection") {
+      let persistedToAppwrite = false;
       if (body.config) {
-        saveCorreiosContractConfig(body.config);
+        const resSave = await saveCorreiosContractConfigAsync(body.config);
+        persistedToAppwrite = resSave.persistedToAppwrite;
       }
       const authRes = await authenticateCorreiosCws(body.config);
-      const updatedCfg = getCorreiosContractConfig();
+      const updatedCfg = await hydrateCorreiosContractConfig(true);
       return NextResponse.json({
         ok: authRes.ok,
+        persistedToAppwrite,
         expiresAt: authRes.expiresAt,
+        canonicalIdCorreios: authRes.canonicalIdCorreios,
+        authorizedApis: authRes.authorizedApis,
         error: authRes.error,
         statusCode: authRes.statusCode,
         endpoint: authRes.endpoint,
         durationMs: authRes.durationMs,
         requestPayload: authRes.requestPayload,
         responsePayload: authRes.responsePayload,
-        contractConfig: {
-          ...updatedCfg,
-          hasCwsPassword: Boolean(updatedCfg.cwsPassword && updatedCfg.cwsPassword.trim()),
-        },
+        contractConfig: sanitizeContractConfigForClient(updatedCfg),
         message: authRes.ok
-          ? `Módulo CWS Correios ATIVO! Autenticação validada com sucesso (HTTP ${authRes.statusCode || 201}) para o Cartão ${
-              updatedCfg.postcardNumber
-            }.`
+          ? `Módulo CWS Correios ATIVO! Autenticação validada (HTTP ${authRes.statusCode || 201}) • idCorreios: ${
+              authRes.canonicalIdCorreios || updatedCfg.cwsUser
+            } • Cartão ${updatedCfg.postcardNumber}.`
           : authRes.error,
       });
+    }
+
+    if (action === "sync_cws_panel") {
+      const panelRes = await listCorreiosPanelPrepostagens({
+        size: Number(body.size) || 25,
+        status: typeof body.status === "string" && body.status ? body.status : undefined,
+      });
+      return NextResponse.json(panelRes);
     }
 
     const orderData = await resolveOrderData(id);
