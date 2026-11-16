@@ -2,6 +2,8 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { CartItem, TotemConfiguration } from "@/types/order";
+import { SharedAssemblyMeta } from "@/types/sharedCart";
+import { resolveCartConflictDecision } from "@/modules/cart/sharedAssembly";
 import { calculateTotemPrice } from "@/modules/pricing/pricingEngine";
 import {
   calculateSelectiveCouponDiscount,
@@ -41,10 +43,25 @@ interface CartContextType {
 
   // Link Track & UTM Campaign Attribution
   campaignTracking: CampaignTrackingData | null;
+
+  // Montagem Compartilhada Ativa
+  activeSharedAssembly: SharedAssemblyMeta | null;
+  replaceCartFromSharedAssembly: (
+    newItems: CartItem[],
+    coupon?: SelectiveCoupon | null,
+    meta?: SharedAssemblyMeta | null
+  ) => void;
+  mergeCartFromSharedAssembly: (
+    newItems: CartItem[],
+    coupon?: SelectiveCoupon | null,
+    meta?: SharedAssemblyMeta | null
+  ) => void;
+  clearActiveSharedAssembly: () => void;
 }
 
 const CART_STORAGE_KEY = "totem_pro_cart_items_v1";
 const COUPON_STORAGE_KEY = "totem_pro_applied_coupon_v1";
+const SHARED_ASSEMBLY_STORAGE_KEY = "totem_active_shared_assembly_v1";
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
@@ -58,6 +75,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [couponError, setCouponError] = useState<string | null>(null);
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
   const [campaignTracking, setCampaignTracking] = useState<CampaignTrackingData | null>(null);
+  const [activeSharedAssembly, setActiveSharedAssembly] = useState<SharedAssemblyMeta | null>(null);
 
   // 1. Carregar itens, cupom e tracking de campanha na montagem
   useEffect(() => {
@@ -113,6 +131,16 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const persisted = getPersistedCampaignTracking();
         if (persisted) setCampaignTracking(persisted);
       }
+
+      try {
+        const storedSharedRaw = sessionStorage.getItem(SHARED_ASSEMBLY_STORAGE_KEY);
+        if (storedSharedRaw) {
+          const parsedShared = JSON.parse(storedSharedRaw);
+          if (parsedShared?.shareCode) {
+            setActiveSharedAssembly(parsedShared);
+          }
+        }
+      } catch {}
     } catch (err) {
       console.error("Falha ao recuperar dados do localStorage:", err);
     } finally {
@@ -205,6 +233,84 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(nextItems));
       }
     } catch {}
+  };
+
+  const persistCouponSync = (coupon: SelectiveCoupon | null) => {
+    try {
+      if (typeof window !== "undefined") {
+        if (coupon) {
+          localStorage.setItem(COUPON_STORAGE_KEY, JSON.stringify(coupon));
+        } else {
+          localStorage.removeItem(COUPON_STORAGE_KEY);
+        }
+      }
+    } catch {}
+  };
+
+  const persistSharedAssemblySync = (meta: SharedAssemblyMeta | null) => {
+    setActiveSharedAssembly(meta);
+    try {
+      if (typeof window !== "undefined") {
+        if (meta) {
+          sessionStorage.setItem(SHARED_ASSEMBLY_STORAGE_KEY, JSON.stringify(meta));
+        } else {
+          sessionStorage.removeItem(SHARED_ASSEMBLY_STORAGE_KEY);
+        }
+      }
+    } catch {}
+  };
+
+  const clearPendingPaymentDraft = () => {
+    try {
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("totem_pending_payment");
+      }
+    } catch {}
+  };
+
+  const clearActiveSharedAssembly = () => {
+    persistSharedAssemblySync(null);
+  };
+
+  const replaceCartFromSharedAssembly = (
+    newItems: CartItem[],
+    coupon?: SelectiveCoupon | null,
+    meta?: SharedAssemblyMeta | null
+  ) => {
+    const resolved = resolveCartConflictDecision([], newItems, "replace");
+    persistCartItemsSync(resolved);
+    setItems(resolved);
+    setEditingItem(null);
+
+    const nextCoupon = coupon && coupon.active ? coupon : null;
+    persistCouponSync(nextCoupon);
+    setAppliedCoupon(nextCoupon);
+    setCouponError(null);
+
+    clearPendingPaymentDraft();
+    persistSharedAssemblySync(meta || null);
+  };
+
+  const mergeCartFromSharedAssembly = (
+    newItems: CartItem[],
+    coupon?: SelectiveCoupon | null,
+    meta?: SharedAssemblyMeta | null
+  ) => {
+    setItems((prev) => {
+      const merged = resolveCartConflictDecision(prev, newItems, "merge");
+      persistCartItemsSync(merged);
+      return merged;
+    });
+    setEditingItem(null);
+
+    if (coupon && coupon.active && !appliedCoupon) {
+      persistCouponSync(coupon);
+      setAppliedCoupon(coupon);
+      setCouponError(null);
+    }
+
+    clearPendingPaymentDraft();
+    persistSharedAssemblySync(meta || null);
   };
 
   // Adicionar novo item
@@ -311,6 +417,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     persistCartItemsSync([]);
     setEditingItem(null);
     setAppliedCoupon(null);
+    persistCouponSync(null);
+    clearActiveSharedAssembly();
   };
 
   const totalItems = items.reduce((acc, curr) => acc + curr.quantity, 0);
@@ -344,6 +452,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         applyCoupon,
         removeCoupon,
         campaignTracking,
+        activeSharedAssembly,
+        replaceCartFromSharedAssembly,
+        mergeCartFromSharedAssembly,
+        clearActiveSharedAssembly,
       }}
     >
       {children}
