@@ -16,6 +16,7 @@ export const APPWRITE_CONFIG = {
     compatibilityRules: "compatibility_rules",
     carts: "carts",
     cartItems: "cart_items",
+    sharedCarts: "shared_carts",
     orders: "orders",
     orderItems: "order_items",
     payments: "payments",

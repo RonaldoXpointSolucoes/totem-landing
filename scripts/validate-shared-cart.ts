@@ -18,6 +18,11 @@ import {
   buildSharedWhatsappSummaryText,
   resolveCartConflictDecision,
 } from "../src/modules/cart/sharedAssembly";
+import {
+  createSharedCart,
+  getSharedCartByCode,
+  deleteSharedCartLocalForTest,
+} from "../src/lib/cart/sharedCartStore";
 
 async function runTests() {
   console.log("=== Validação: Compartilhamento de Montagem & Carrinho ===");
@@ -203,6 +208,28 @@ async function runTests() {
   assert.match(waText, /MNT-AB34CD/);
   assert.match(waText, /PARCEIRO10/);
   console.log("✓ Teste 5: Resumo formatado para WhatsApp passou");
+
+  // 6. Persistência do Store + Zero Dados Pessoais + Recálculo ao Ler + 404 para código inexistente
+  const created = await createSharedCart({
+    title: "Montagem Teste Loja",
+    items: dirtySerialized,
+  });
+  assert.match(created.record.shareCode, /^MNT-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/);
+  assert.equal(created.hydrated.items.length, 2);
+  const serializedRecordText = JSON.stringify(created.record);
+  assert.equal(serializedRecordText.includes("unitPriceCents"), false);
+
+  const fetched = await getSharedCartByCode(created.record.shareCode.toLowerCase());
+  assert.ok(fetched, "Montagem recém-salva deve ser encontrada pelo código em minúsculas");
+  assert.equal(fetched!.assembly.shareCode, created.record.shareCode);
+  assert.equal(fetched!.assembly.title, "Montagem Teste Loja");
+  assert.equal(fetched!.assembly.items[0].unitPriceCents > 1000, true, "Preço recalculado no servidor na leitura");
+  assert.equal(fetched!.assembly.viewsCount >= 1, true, "Contador de visualizações incrementado");
+
+  const missing = await getSharedCartByCode("MNT-NAO999");
+  assert.equal(missing, null, "Código inexistente deve retornar null");
+  deleteSharedCartLocalForTest(created.record.shareCode);
+  console.log("✓ Teste 6: Persistência e reidratação no sharedCartStore passou");
 }
 
 runTests().catch((err) => {
