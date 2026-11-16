@@ -27,6 +27,17 @@ export const Navbar: React.FC<NavbarProps> = ({ className = "" }) => {
         }
       })
       .catch(() => {});
+
+    const handleAuthChanged = (event: Event) => {
+      const customEvent = event as CustomEvent<any>;
+      if (customEvent?.detail) {
+        setCustomer(customEvent.detail);
+      }
+    };
+    window.addEventListener("totem:customer-auth-changed", handleAuthChanged);
+    return () => {
+      window.removeEventListener("totem:customer-auth-changed", handleAuthChanged);
+    };
   }, []);
 
   const isConfigurator = pathname.startsWith("/monte-seu-totem") || pathname.startsWith("/configurador");

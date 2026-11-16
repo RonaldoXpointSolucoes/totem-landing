@@ -10,6 +10,7 @@ interface CustomerAuthModalProps {
   onClose: () => void;
   onSuccess?: (customer: any) => void;
   initialTab?: "whatsapp" | "google";
+  redirectOnSuccess?: string | null;
 }
 
 export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
@@ -17,6 +18,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
   onClose,
   onSuccess,
   initialTab = "whatsapp",
+  redirectOnSuccess = "/cliente",
 }) => {
   const [activeTab, setActiveTab] = useState<"whatsapp" | "google">(initialTab);
   const [phoneInput, setPhoneInput] = useState("");
@@ -34,11 +36,12 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      setActiveTab(initialTab);
       setErrorMsg("");
       setSuccessMsg("");
       setIsLoading(false);
     }
-  }, [isOpen]);
+  }, [isOpen, initialTab]);
 
   if (!isOpen || !mounted) return null;
 
@@ -74,12 +77,17 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
 
       const data = await res.json();
       if (res.ok && data.ok) {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("totem:customer-auth-changed", { detail: data.customer }));
+        }
         setSuccessMsg("Identificado com sucesso!");
         if (onSuccess) onSuccess(data.customer);
         setTimeout(() => {
           onClose();
-          window.location.href = "/cliente";
-        }, 600);
+          if (redirectOnSuccess) {
+            window.location.href = redirectOnSuccess;
+          }
+        }, redirectOnSuccess ? 600 : 250);
       } else {
         setErrorMsg(data.error || "Falha ao entrar com WhatsApp.");
       }
@@ -113,12 +121,17 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
 
       const data = await res.json();
       if (res.ok && data.ok) {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("totem:customer-auth-changed", { detail: data.customer }));
+        }
         setSuccessMsg("Autenticado com Google!");
         if (onSuccess) onSuccess(data.customer);
         setTimeout(() => {
           onClose();
-          window.location.href = "/cliente";
-        }, 600);
+          if (redirectOnSuccess) {
+            window.location.href = redirectOnSuccess;
+          }
+        }, redirectOnSuccess ? 600 : 250);
       } else {
         setErrorMsg(data.error || "Falha ao autenticar com Google.");
       }
