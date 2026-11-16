@@ -45,7 +45,10 @@ import {
   Boxes,
   Wrench,
   Sparkles,
+  Share2,
 } from "lucide-react";
+import { ShareAssemblyModal } from "@/components/cart/ShareAssemblyModal";
+import { CartItem } from "@/types/order";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 
 interface ConfiguratorWizardProps {
@@ -61,7 +64,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
   onOpenCart,
   onBackToHome,
 }) => {
-  const { addItem, updateItem, editingItem, setEditingItem } = useCart();
+  const { items: cartItems, appliedCoupon, addItem, updateItem, editingItem, setEditingItem } = useCart();
 
   // Catálogo dinâmico sincronizado com o Appwrite (com fallback imediato para dados estáticos)
   const [catalog, setCatalog] = useState({
@@ -308,6 +311,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
   // Modais de apoio
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
   const [isCartSuccessModalOpen, setIsCartSuccessModalOpen] = useState(false);
+  const [isShareAfterBuildOpen, setIsShareAfterBuildOpen] = useState(false);
   const [isMobileViewerOpen, setIsMobileViewerOpen] = useState(false);
   const hasTrackedModelRef = React.useRef(false);
 
@@ -335,6 +339,46 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
       includeAssemblyService: isKitSelected && includeAssemblyService,
     });
   }, [selectedModel, selectedColor, selectedMonitor, selectedPrinter, useReader, selectedReader, isKitSelected, kitAdjustmentCents, includeAssemblyService]);
+
+  const currentBuiltShareItems = useMemo<CartItem[]>(() => {
+    const targetId = editingItem?.id || lastAddedItemId;
+    const matched = targetId ? cartItems.find((i) => i.id === targetId) : null;
+    if (matched) return [matched];
+    const cfg: TotemConfiguration = {
+      model: selectedModel,
+      color: selectedColor,
+      monitor: selectedMonitor,
+      printer: selectedPrinter,
+      barcodeReader: useReader ? selectedReader : null,
+      customizationNotes: customizationNotes.trim() || undefined,
+      calculatedPriceCents: pricing.pixTotalPriceCents,
+      includeAssemblyService: isKitSelected ? includeAssemblyService : false,
+      assemblyServicePriceCents: isKitSelected && includeAssemblyService ? 99900 : 0,
+    };
+    return [
+      {
+        id: targetId || "current-built-item",
+        configuration: cfg,
+        quantity: 1,
+        unitPriceCents: pricing.pixTotalPriceCents,
+        subtotalCents: pricing.pixTotalPriceCents,
+      },
+    ];
+  }, [
+    editingItem?.id,
+    lastAddedItemId,
+    cartItems,
+    selectedModel,
+    selectedColor,
+    selectedMonitor,
+    selectedPrinter,
+    useReader,
+    selectedReader,
+    customizationNotes,
+    pricing.pixTotalPriceCents,
+    isKitSelected,
+    includeAssemblyService,
+  ]);
 
   const isNextDisabled =
     (step === 3 && !selectedMonitor) ||
@@ -1228,6 +1272,19 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
             Configurar Outro Gabinete
           </Button>
           <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              setIsCartSuccessModalOpen(false);
+              setIsShareAfterBuildOpen(true);
+            }}
+            className="text-[#0071e3] dark:text-cyan-300 border border-[#0071e3]/30"
+          >
+            <Share2 className="w-3.5 h-3.5 mr-1.5" />
+            Compartilhar Montagem
+          </Button>
+          <Button
             variant="primary"
             size="sm"
             onClick={() => {
@@ -1240,6 +1297,16 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
           </Button>
         </div>
       </Modal>
+
+      {/* Modal de Compartilhamento Imediato Após Montar o Totem */}
+      <ShareAssemblyModal
+        isOpen={isShareAfterBuildOpen}
+        onClose={() => setIsShareAfterBuildOpen(false)}
+        itemsToShare={currentBuiltShareItems}
+        appliedCoupon={appliedCoupon}
+        mode="single_item"
+        onGoToCart={onOpenCart}
+      />
 
       {/* Modal de Visualização de Fotos e Vídeos Mobile */}
       <Modal

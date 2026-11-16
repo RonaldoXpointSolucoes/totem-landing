@@ -31,7 +31,10 @@ import {
   QrCode,
   Ruler,
   Sparkles,
+  Share2,
 } from "lucide-react";
+import { ShareAssemblyModal } from "./ShareAssemblyModal";
+import { CartItem } from "@/types/order";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
@@ -63,9 +66,15 @@ export const CartView: React.FC<CartViewProps> = ({
     finalTotalPriceCents,
     applyCoupon,
     removeCoupon,
+    activeSharedAssembly,
   } = useCart();
 
   const [couponInput, setCouponInput] = useState("");
+  const [shareModalState, setShareModalState] = useState<{
+    isOpen: boolean;
+    items: CartItem[];
+    mode: "cart" | "single_item";
+  }>({ isOpen: false, items: [], mode: "cart" });
 
   // Estados de Frete Antecipado por CEP no Carrinho
   const [shippingCep, setShippingCep] = useState("");
@@ -850,23 +859,47 @@ export const CartView: React.FC<CartViewProps> = ({
       {/* Cabeçalho do Carrinho */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-black/10 dark:border-slate-800">
         <div>
-          <Badge variant="accent" className="text-xs mb-1.5">
-            Carrinho de Compras Multicomponentes
-          </Badge>
+          <div className="flex flex-wrap items-center gap-2 mb-1.5">
+            <Badge variant="accent" className="text-xs">
+              Carrinho de Compras Multicomponentes
+            </Badge>
+            {activeSharedAssembly && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-[#0071e3] dark:text-cyan-300 border border-indigo-500/25 text-[10px] font-bold">
+                <Share2 className="w-3 h-3 shrink-0" />
+                Montagem {activeSharedAssembly.shareCode} carregada
+              </span>
+            )}
+          </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1d1d1f] dark:text-white">
             Seus Totens Configurados ({totalItems} {totalItems === 1 ? "unidade" : "unidades"})
           </h1>
         </div>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onContinueShopping}
-          className="w-full sm:w-auto"
-        >
-          <PlusCircle className="w-4 h-4 mr-1.5 text-[#0071e3]" />
-          Configurar Outro Totem
-        </Button>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() =>
+              setShareModalState({ isOpen: true, items, mode: "cart" })
+            }
+            className="w-full sm:w-auto font-bold border border-[#0071e3]/25 bg-blue-50/70 hover:bg-blue-100/80 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/50 text-[#0071e3] dark:text-cyan-300"
+            title="Gerar link pronto desta montagem para outra pessoa apenas entrar na conta e pagar"
+          >
+            <Share2 className="w-4 h-4 mr-1.5" />
+            Compartilhar Montagem
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onContinueShopping}
+            className="w-full sm:w-auto"
+          >
+            <PlusCircle className="w-4 h-4 mr-1.5 text-[#0071e3]" />
+            Configurar Outro Totem
+          </Button>
+        </div>
       </div>
 
       {/* Grid: Lista de Itens + Resumo do Pedido */}
@@ -1239,8 +1272,26 @@ export const CartView: React.FC<CartViewProps> = ({
                     </span>
                   </div>
 
-                  {/* Ações: Duplicar, Editar, Excluir */}
-                  <div className="flex items-center gap-2">
+                  {/* Ações: Compartilhar, Duplicar, Editar, Excluir */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setShareModalState({
+                          isOpen: true,
+                          items: [item],
+                          mode: "single_item",
+                        })
+                      }
+                      title="Gerar link compartilhável exclusivo deste totem configurado"
+                      className="h-9 px-3 text-xs font-bold text-[#0071e3] dark:text-cyan-300 border-[#0071e3]/25 hover:bg-blue-50 dark:hover:bg-indigo-950/40 active:scale-95 transition-transform"
+                    >
+                      <Share2 className="w-3.5 h-3.5 mr-1.5" />
+                      Compartilhar
+                    </Button>
+
                     <Button
                       variant="secondary"
                       size="sm"
@@ -1608,6 +1659,17 @@ export const CartView: React.FC<CartViewProps> = ({
                 Avançar para o Checkout <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
 
+              <button
+                type="button"
+                onClick={() =>
+                  setShareModalState({ isOpen: true, items, mode: "cart" })
+                }
+                className="w-full py-2.5 px-3.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/15 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/50 border border-[#0071e3]/35 text-[#0071e3] dark:text-cyan-300 text-xs font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm"
+              >
+                <Share2 className="w-4 h-4 shrink-0" />
+                <span>Compartilhar Link Desta Montagem</span>
+              </button>
+
               {/* BOTÃO DE CAPTURA B2B: RECEBER ORÇAMENTO FORMAL EM PDF NO WHATSAPP */}
               <button
                 type="button"
@@ -1727,6 +1789,15 @@ export const CartView: React.FC<CartViewProps> = ({
           </Card>
         </div>
       </div>
+
+      <ShareAssemblyModal
+        isOpen={shareModalState.isOpen}
+        onClose={() => setShareModalState((prev) => ({ ...prev, isOpen: false }))}
+        itemsToShare={shareModalState.items}
+        appliedCoupon={appliedCoupon}
+        mode={shareModalState.mode}
+        defaultTitle={activeSharedAssembly?.title || ""}
+      />
     </div>
   );
 };
