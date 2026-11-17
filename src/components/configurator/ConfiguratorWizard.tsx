@@ -111,6 +111,13 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
 }) => {
   const { items: cartItems, appliedCoupon, addItem, updateItem, editingItem, setEditingItem } = useCart();
 
+  // Snapshot inicial da query string antes que qualquer sincronização de URL rode
+  const [initialUrlParams] = useState<URLSearchParams | null>(() =>
+    typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null
+  );
+  const [isCatalogLoaded, setIsCatalogLoaded] = useState(false);
+  const userSwitchedModeBeforeCatalogRef = React.useRef(false);
+
   // Catálogo dinâmico sincronizado com o Appwrite (com fallback imediato para dados estáticos)
   const [catalog, setCatalog] = useState({
     models: CABINET_MODELS,
@@ -141,14 +148,48 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
 
           setSelectedModel((prev) => {
             const match = freshModels.find((m) => m.id === prev.id || m.slug === prev.slug);
-            return match || prev;
+            if (match) return match;
+            const urlModelId = !editingItem ? (initialUrlParams?.get("modelo")?.trim() || initialModelId || "") : "";
+            if (urlModelId) {
+              const fromUrl = freshModels.find((m) => m.id === urlModelId || m.slug === urlModelId);
+              if (fromUrl) return fromUrl;
+            }
+            return prev;
           });
           setSelectedColor((prev) => {
             const match = freshColors.find((c) => c.id === prev.id || c.slug === prev.slug);
-            return match || prev;
+            if (match) return match;
+            const urlColorId = !editingItem ? (initialUrlParams?.get("cor")?.trim() || "") : "";
+            if (urlColorId) {
+              const fromUrl = freshColors.find((c) => c.id === urlColorId || c.slug === urlColorId);
+              if (fromUrl) return fromUrl;
+            }
+            return prev;
           });
           setSelectedMonitor((prev) => {
-            if (!prev) return prev;
+            if (!prev) {
+              if (!editingItem && !userSwitchedModeBeforeCatalogRef.current && initialUrlParams) {
+                const modoParam = initialUrlParams.get("modo")?.trim() || "";
+                const monParam = initialUrlParams.get("monitor")?.trim() || "";
+                if (modoParam === "kit") {
+                  const foundKit =
+                    (monParam ? freshMonitors.find((m) => m.id === monParam && isItemKit(m)) : null) ||
+                    freshMonitors.find((m) => isItemKit(m));
+                  if (foundKit) {
+                    return buildInitialKitMonitorFromUrl(foundKit, initialUrlParams, freshMonitors);
+                  }
+                }
+                if (monParam) {
+                  const found = freshMonitors.find((m) => m.id === monParam);
+                  if (found) {
+                    return isItemKit(found)
+                      ? buildInitialKitMonitorFromUrl(found, initialUrlParams, freshMonitors)
+                      : found;
+                  }
+                }
+              }
+              return prev;
+            }
             const match = freshMonitors.find(
               (m) => m.id === prev.id || (isItemKit(prev) && isItemKit(m))
             );
@@ -156,8 +197,8 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
             if (isItemKit(prev)) {
               const merged = mergeServerCatalogKitItems(match, prev.kitItems);
               let resolvedCutout = prev.cutoutMonitor || null;
-              if (!resolvedCutout && typeof window !== "undefined") {
-                const cutoutId = new URLSearchParams(window.location.search).get("recorteMonitor")?.trim() || "";
+              if (!resolvedCutout && !editingItem && !userSwitchedModeBeforeCatalogRef.current && initialUrlParams) {
+                const cutoutId = initialUrlParams.get("recorteMonitor")?.trim() || "";
                 if (cutoutId) {
                   const foundCutout = freshMonitors.find((m) => m.id === cutoutId && !isItemKit(m));
                   if (foundCutout) {
@@ -178,9 +219,39 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
             if (prev.isCustom) return prev;
             return match;
           });
+          setSelectedPrinter((prev) => {
+            if (!prev) {
+              if (!editingItem && !userSwitchedModeBeforeCatalogRef.current && initialUrlParams) {
+                const prtId = initialUrlParams.get("impressora")?.trim() || "";
+                if (prtId) {
+                  const found = freshPrinters.find((p) => p.id === prtId);
+                  if (found) return found;
+                }
+              }
+              return prev;
+            }
+            return freshPrinters.find((p) => p.id === prev.id) || prev;
+          });
+          setSelectedReader((prev) => {
+            if (!prev) {
+              if (!editingItem && !userSwitchedModeBeforeCatalogRef.current && initialUrlParams) {
+                const rdrId = initialUrlParams.get("leitor")?.trim() || "";
+                if (rdrId && rdrId !== "none") {
+                  const found = freshReaders.find((r) => r.id === rdrId);
+                  if (found) return found;
+                }
+              }
+              return prev;
+            }
+            return freshReaders.find((r) => r.id === prev.id) || prev;
+          });
         }
       })
-      .catch((err) => console.warn("Catálogo offline:", err));
+      .catch((err) => console.warn("Catálogo offline:", err))
+      .finally(() => {
+        setIsCatalogLoaded(true);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 1. Estado da Configuração (se estiver em edição, carrega a configuração existente)
@@ -391,8 +462,9 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     return calculateKitTotalCents(activeKitItems);
   }, [isKitSelected, activeKitItems]);
 
-  // Sincronizar todos os parâmetros de rota na URL sem reload (preservando F5 em qualquer etapa)
+  // Sincronizar todos os parâmetros de rota na URL sem reload (aguardando carga do catálogo para não apagar IDs dinâmicos)
   useEffect(() => {
+    if (!isCatalogLoaded) return;
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
       if (url.pathname.includes("monte-seu-totem") || url.pathname.includes("configurador")) {
@@ -474,6 +546,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     useReader,
     selectedReader?.id,
     includeAssemblyService,
+    isCatalogLoaded,
   ]);
 
   // Modais de apoio
@@ -616,6 +689,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
 
   // Troca imediata para Rota A ("Quero APENAS o Gabinete") -> pula direto para escolha de Monitor
   const handleChooseCabinetMode = () => {
+    userSwitchedModeBeforeCatalogRef.current = true;
     setPurchaseMode("cabinet");
     setIncludeAssemblyService(false);
     if (isItemKit(selectedMonitor)) {
@@ -638,6 +712,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
 
   // Troca imediata para Rota B ("Quero Gabinete + Kit de Montagem") -> abre personalização do Kit + Montagem
   const handleChooseKitMode = () => {
+    userSwitchedModeBeforeCatalogRef.current = true;
     setPurchaseMode("kit");
     // Limpa eventual leitor selecionado na rota "Apenas Gabinete" para não vazar cobrança oculta no Kit
     setSelectedReader(null);
