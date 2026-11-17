@@ -9,7 +9,14 @@ import {
   HOMOLOGATED_READERS,
 } from "@/modules/catalog/catalogData";
 import { calculateTotemPrice, formatBRL } from "@/modules/pricing/pricingEngine";
-import { CabinetModel, ColorOption, MonitorOption, PrinterOption, BarcodeReaderOption } from "@/types/catalog";
+import {
+  CabinetModel,
+  ColorOption,
+  MonitorOption,
+  PrinterOption,
+  BarcodeReaderOption,
+  KitSubItem,
+} from "@/types/catalog";
 import {
   isItemKit,
   getEffectiveKitItems,
@@ -22,6 +29,8 @@ import { TotemConfiguration } from "@/types/order";
 import { useCart } from "@/modules/cart/CartContext";
 import { StepModel } from "./StepModel";
 import { StepColor } from "./StepColor";
+import { StepPurchaseMode } from "./StepPurchaseMode";
+import { StepKit } from "./StepKit";
 import { StepMonitor } from "./StepMonitor";
 import { StepPrinter } from "./StepPrinter";
 import { StepReader } from "./StepReader";
@@ -46,6 +55,9 @@ import {
   Wrench,
   Sparkles,
   Share2,
+  Layers,
+  Package,
+  SlidersHorizontal,
 } from "lucide-react";
 import { ShareAssemblyModal } from "@/components/cart/ShareAssemblyModal";
 import { CartItem } from "@/types/order";
@@ -147,10 +159,25 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
   const [selectedMonitor, setSelectedMonitor] = useState<MonitorOption | null>(() => {
     if (editingItem) return editingItem.configuration.monitor || null;
     if (typeof window !== "undefined") {
-      const monParam = new URLSearchParams(window.location.search).get("monitor");
+      const params = new URLSearchParams(window.location.search);
+      const monParam = params.get("monitor");
       if (monParam) {
         const found = HOMOLOGATED_MONITORS.find((m) => m.id === monParam);
         if (found) return found;
+      }
+      if (params.get("modo") === "kit") {
+        const defaultKit = HOMOLOGATED_MONITORS.find((m) => isItemKit(m));
+        if (defaultKit) {
+          const effective = getEffectiveKitItems(defaultKit);
+          return {
+            ...defaultKit,
+            isKit: true,
+            kitItems: effective,
+            priceAdjustmentCents: calculateKitTotalCents(effective),
+            cutoutMonitor: null,
+            notes: JSON.stringify({ kitItems: effective }),
+          };
+        }
       }
     }
     return null;
@@ -212,20 +239,74 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
   });
   const [lastAddedItemId, setLastAddedItemId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (editingItem) {
-      setIncludeAssemblyService(Boolean(editingItem.configuration.includeAssemblyService));
-    }
-  }, [editingItem]);
-
-  // Passo atual
+  // Passo lógico atual (1..6) + modalidade escolhida (Apenas Gabinete vs Gabinete + Kit)
   const [step, setStep] = useState<number>(() => {
     if (initialStep && initialStep >= 1 && initialStep <= 6) return initialStep;
     return 1;
   });
-  // Sub-passo obrigatório quando o cliente escolhe o Kit sem Monitor (para informar qual monitor vai usar no gabinete)
-  const [isKitCutoutMonitorStep, setIsKitCutoutMonitorStep] = useState<boolean>(false);
+
+  const [purchaseMode, setPurchaseMode] = useState<"cabinet" | "kit" | null>(() => {
+    if (editingItem) {
+      if (isItemKit(editingItem.configuration.monitor)) return "kit";
+      if (editingItem.configuration.monitor) return "cabinet";
+      return null;
+    }
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const monParam = params.get("monitor");
+      if (monParam) {
+        const found = HOMOLOGATED_MONITORS.find((m) => m.id === monParam);
+        if (found) return isItemKit(found) ? "kit" : "cabinet";
+      }
+      const modoParam = params.get("modo");
+      if (modoParam === "kit") return "kit";
+      if (modoParam === "cabinet" || modoParam === "gabinete") return "cabinet";
+    }
+    return null;
+  });
+
+  const [step3View, setStep3View] = useState<
+    "choice" | "cabinet-monitor" | "kit-config" | "kit-cutout-monitor"
+  >(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const visao = params.get("visao");
+      if (visao === "modalidade") return "choice";
+      if (visao === "monitor") return "cabinet-monitor";
+      if (visao === "kit") return "kit-config";
+      if (visao === "recorte-monitor") return "kit-cutout-monitor";
+      const monParam = params.get("monitor");
+      if (monParam) {
+        const found = HOMOLOGATED_MONITORS.find((m) => m.id === monParam);
+        if (found) return isItemKit(found) ? "kit-config" : "cabinet-monitor";
+      }
+      const modoParam = params.get("modo");
+      if (modoParam === "kit") return "kit-config";
+      if (modoParam === "cabinet" || modoParam === "gabinete") return "cabinet-monitor";
+    }
+    if (editingItem) {
+      return isItemKit(editingItem.configuration.monitor)
+        ? "kit-config"
+        : editingItem.configuration.monitor
+        ? "cabinet-monitor"
+        : "choice";
+    }
+    return "choice";
+  });
   const totalSteps = 6;
+
+  useEffect(() => {
+    if (editingItem) {
+      setIncludeAssemblyService(Boolean(editingItem.configuration.includeAssemblyService));
+      if (isItemKit(editingItem.configuration.monitor)) {
+        setPurchaseMode("kit");
+        setStep3View("kit-config");
+      } else if (editingItem.configuration.monitor) {
+        setPurchaseMode("cabinet");
+        setStep3View("cabinet-monitor");
+      }
+    }
+  }, [editingItem]);
 
   // Identificação Reativa de Seleção do Kit de Montagem
   const isKitSelected = isItemKit(selectedMonitor);
@@ -252,10 +333,10 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
   const requiresCutoutPrinterForKit = isKitSelected && !hasPrinterInKit;
 
   useEffect(() => {
-    if (step !== 3 || !requiresCutoutMonitorForKit) {
-      setIsKitCutoutMonitorStep(false);
+    if (step3View === "kit-cutout-monitor" && !requiresCutoutMonitorForKit) {
+      setStep3View(purchaseMode === "kit" ? "kit-config" : "choice");
     }
-  }, [step, requiresCutoutMonitorForKit]);
+  }, [step3View, requiresCutoutMonitorForKit, purchaseMode]);
 
   const kitAdjustmentCents = useMemo(() => {
     if (!isKitSelected) return 0;
@@ -271,6 +352,22 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
         url.searchParams.set("etapa", step.toString());
         if (selectedColor?.id) {
           url.searchParams.set("cor", selectedColor.id);
+        }
+        if (purchaseMode) {
+          url.searchParams.set("modo", purchaseMode);
+        } else {
+          url.searchParams.delete("modo");
+        }
+        if (step === 3) {
+          const visaoMap: Record<typeof step3View, string> = {
+            choice: "modalidade",
+            "cabinet-monitor": "monitor",
+            "kit-config": "kit",
+            "kit-cutout-monitor": "recorte-monitor",
+          };
+          url.searchParams.set("visao", visaoMap[step3View]);
+        } else {
+          url.searchParams.delete("visao");
         }
         if (selectedMonitor?.id) {
           url.searchParams.set("monitor", selectedMonitor.id);
@@ -299,6 +396,8 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     }
   }, [
     step,
+    step3View,
+    purchaseMode,
     selectedModel.id,
     selectedColor?.id,
     selectedMonitor?.id,
@@ -380,54 +479,194 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     includeAssemblyService,
   ]);
 
+  // Preços comparativos autoritativos para os 2 cards da pergunta inicial (Apenas Gabinete vs Gabinete + Kit)
+  const defaultKitMonitor = useMemo(() => {
+    return (
+      catalog.monitors.find((m) => isItemKit(m)) ||
+      HOMOLOGATED_MONITORS.find((m) => isItemKit(m)) ||
+      null
+    );
+  }, [catalog.monitors]);
+
+  const previewKitItems = useMemo(() => {
+    if (isKitSelected) return activeKitItems;
+    return getEffectiveKitItems(defaultKitMonitor || undefined);
+  }, [isKitSelected, activeKitItems, defaultKitMonitor]);
+
+  const previewKitOnlyCents = useMemo(() => {
+    return calculateKitTotalCents(previewKitItems);
+  }, [previewKitItems]);
+
+  const previewKitAccessoryCount = useMemo(() => {
+    return previewKitItems.filter(
+      (i) =>
+        i.category !== "monitor" &&
+        i.id !== "kit-monitor-touch" &&
+        i.category !== "printer" &&
+        i.id !== "KIT-IMP-001"
+    ).length;
+  }, [previewKitItems]);
+
+  const cabinetPreviewPricing = useMemo(() => {
+    return calculateTotemPrice({
+      cabinet: selectedModel,
+      color: selectedColor,
+      monitor: null,
+      printer: null,
+      barcodeReader: null,
+      customization: null,
+      includeAssemblyService: false,
+    });
+  }, [selectedModel, selectedColor]);
+
+  const kitPreviewPricing = useMemo(() => {
+    const kitTarget: MonitorOption | null = defaultKitMonitor
+      ? { ...defaultKitMonitor, isKit: true, kitItems: previewKitItems }
+      : null;
+    return calculateTotemPrice({
+      cabinet: selectedModel,
+      color: selectedColor,
+      monitor: kitTarget,
+      printer: null,
+      barcodeReader: null,
+      customization: null,
+      kitAdjustmentCents: previewKitOnlyCents,
+      includeAssemblyService: false,
+    });
+  }, [selectedModel, selectedColor, defaultKitMonitor, previewKitItems, previewKitOnlyCents]);
+
   const isNextDisabled =
-    (step === 3 && !selectedMonitor) ||
-    (step === 3 && isKitCutoutMonitorStep && requiresCutoutMonitorForKit && !selectedCutoutMonitor) ||
+    (step === 3 && step3View === "choice" && !purchaseMode) ||
+    (step === 3 && step3View === "cabinet-monitor" && (!selectedMonitor || isItemKit(selectedMonitor))) ||
+    (step === 3 && step3View === "kit-config" && !isKitSelected) ||
+    (step === 3 && step3View === "kit-cutout-monitor" && requiresCutoutMonitorForKit && !selectedCutoutMonitor) ||
     (step === 4 && (!isKitSelected || requiresCutoutPrinterForKit) && !selectedPrinter) ||
     (step === 5 && !isKitSelected && useReader && !selectedReader);
 
-  // Quando o cliente confirma a personalização do Kit no modal:
-  // - Se desabilitou o monitor do Kit, abre imediatamente o novo passo obrigatório "Seu Monitor"
-  // - Se manteve o monitor do Kit mas desabilitou a impressora do Kit, avança imediatamente para o passo "Sua Impressora"
-  const handleKitConfirmed = (updatedKit: MonitorOption) => {
-    const items = getEffectiveKitItems(updatedKit);
-    const monInKit = doesKitIncludeMonitor(items);
-    const prtInKit = doesKitIncludePrinter(items);
-    if (!monInKit) {
-      setStep(3);
-      setIsKitCutoutMonitorStep(true);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } else if (!prtInKit) {
-      setIsKitCutoutMonitorStep(false);
-      setStep(4);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } else {
-      setIsKitCutoutMonitorStep(false);
+  // Troca imediata para Rota A ("Quero APENAS o Gabinete") -> pula direto para escolha de Monitor
+  const handleChooseCabinetMode = () => {
+    setPurchaseMode("cabinet");
+    setIncludeAssemblyService(false);
+    if (isItemKit(selectedMonitor)) {
+      const recoveredMonitor =
+        selectedMonitor?.cutoutMonitor && !isItemKit(selectedMonitor.cutoutMonitor)
+          ? selectedMonitor.cutoutMonitor
+          : null;
+      setSelectedMonitor(recoveredMonitor);
     }
+    setStep(3);
+    setStep3View("cabinet-monitor");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // Navegação para Frente: respeita a obrigatoriedade de informar Monitor e/ou Impressora quando desabilitados no Kit
+  // Troca imediata para Rota B ("Quero Gabinete + Kit de Montagem") -> abre personalização do Kit + Montagem
+  const handleChooseKitMode = () => {
+    setPurchaseMode("kit");
+    if (!isItemKit(selectedMonitor) && defaultKitMonitor) {
+      const effectiveItems = getEffectiveKitItems(defaultKitMonitor);
+      const totalCents = calculateKitTotalCents(effectiveItems);
+      const kitObj: MonitorOption = {
+        ...defaultKitMonitor,
+        isKit: true,
+        kitItems: effectiveItems,
+        priceAdjustmentCents: totalCents,
+        cutoutMonitor: null,
+        notes: JSON.stringify({ kitItems: effectiveItems }),
+      };
+      setSelectedMonitor(kitObj);
+      if (doesKitIncludePrinter(effectiveItems)) {
+        setSelectedPrinter(null);
+      }
+      trackEvent(ANALYTICS_EVENTS.SELECT_MONITOR, {
+        monitorId: kitObj.id,
+        monitorName: kitObj.displayName || "Kit de Montagem",
+      });
+    }
+    setStep(3);
+    setStep3View("kit-config");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Atualiza sub-itens do Kit e limpa recorte extra se o equipamento voltou para o Kit
+  const handleUpdateKitItems = (updatedItems: KitSubItem[]) => {
+    const base = isItemKit(selectedMonitor) ? selectedMonitor : defaultKitMonitor;
+    if (!base) return;
+    const totalCents = calculateKitTotalCents(updatedItems);
+    const monIncluded = doesKitIncludeMonitor(updatedItems);
+    const prtIncluded = doesKitIncludePrinter(updatedItems);
+    if (prtIncluded) {
+      setSelectedPrinter(null);
+    }
+    setSelectedMonitor({
+      ...base,
+      isKit: true,
+      kitItems: updatedItems,
+      priceAdjustmentCents: totalCents,
+      cutoutMonitor: monIncluded ? null : selectedMonitor?.cutoutMonitor || null,
+      notes: JSON.stringify({ kitItems: updatedItems }),
+    });
+  };
+
+  // Navegação para Frente: respeita a rota escolhida (Apenas Gabinete vs Kit com ou sem monitor/impressora)
   const handleNext = () => {
-    if (step === 3 && !selectedMonitor) {
+    if (step === 1) {
+      setStep(2);
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
-    if (step === 3 && isKitSelected) {
-      if (requiresCutoutMonitorForKit && (!isKitCutoutMonitorStep || !selectedCutoutMonitor)) {
-        if (!isKitCutoutMonitorStep) {
-          setIsKitCutoutMonitorStep(true);
-          window.scrollTo({ top: 0, behavior: "smooth" });
+    if (step === 2) {
+      setStep(3);
+      setStep3View(
+        purchaseMode === "cabinet"
+          ? "cabinet-monitor"
+          : purchaseMode === "kit"
+          ? "kit-config"
+          : "choice"
+      );
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    if (step === 3) {
+      if (step3View === "choice") {
+        if (purchaseMode === "cabinet") {
+          handleChooseCabinetMode();
+        } else if (purchaseMode === "kit") {
+          handleChooseKitMode();
         }
         return;
       }
-      setIsKitCutoutMonitorStep(false);
-      if (requiresCutoutPrinterForKit) {
+      if (step3View === "cabinet-monitor") {
+        if (!selectedMonitor || isItemKit(selectedMonitor)) return;
         setStep(4);
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
-      setStep(6);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
+      if (step3View === "kit-config") {
+        if (requiresCutoutMonitorForKit) {
+          setStep3View("kit-cutout-monitor");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
+        if (requiresCutoutPrinterForKit) {
+          setStep(4);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
+        setStep(6);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      if (step3View === "kit-cutout-monitor") {
+        if (requiresCutoutMonitorForKit && !selectedCutoutMonitor) return;
+        if (requiresCutoutPrinterForKit) {
+          setStep(4);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
+        setStep(6);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
     }
     if (step === 4) {
       if ((!isKitSelected || requiresCutoutPrinterForKit) && !selectedPrinter) {
@@ -438,42 +677,67 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
-    }
-    if (step === 5 && !isKitSelected && useReader && !selectedReader) {
+      setStep(5);
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
-    if (step < totalSteps) {
-      setStep((prev) => prev + 1);
+    if (step === 5) {
+      if (!isKitSelected && useReader && !selectedReader) {
+        return;
+      }
+      setStep(6);
       window.scrollTo({ top: 0, behavior: "smooth" });
-    } else {
-      handleAddToCart();
+      return;
     }
+    handleAddToCart();
   };
 
-  // Navegação para Trás: retorna inteligentemente para Impressora ou Seu Monitor caso tenham sido exigidos no Kit
+  // Navegação para Trás: espelha exatamente a rota ativa sem deixar becos sem saída
   const handleBack = () => {
-    if (step === 3 && isKitCutoutMonitorStep) {
-      setIsKitCutoutMonitorStep(false);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
-    }
-    if (step === 4 && isKitSelected) {
-      setStep(3);
-      if (requiresCutoutMonitorForKit) {
-        setIsKitCutoutMonitorStep(true);
-      }
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
-    }
-    if (step === 6 && isKitSelected) {
-      if (requiresCutoutPrinterForKit) {
-        setStep(4);
-      } else if (requiresCutoutMonitorForKit) {
-        setStep(3);
-        setIsKitCutoutMonitorStep(true);
+    if (step === 6) {
+      if (isKitSelected) {
+        if (requiresCutoutPrinterForKit) {
+          setStep(4);
+        } else if (requiresCutoutMonitorForKit) {
+          setStep(3);
+          setStep3View("kit-cutout-monitor");
+        } else {
+          setStep(3);
+          setStep3View("kit-config");
+        }
       } else {
-        setStep(3);
+        setStep(5);
       }
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    if (step === 5) {
+      setStep(4);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    if (step === 4) {
+      setStep(3);
+      if (isKitSelected) {
+        setStep3View(requiresCutoutMonitorForKit ? "kit-cutout-monitor" : "kit-config");
+      } else {
+        setStep3View("cabinet-monitor");
+      }
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    if (step === 3) {
+      if (step3View === "kit-cutout-monitor") {
+        setStep3View("kit-config");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      if (step3View === "cabinet-monitor" || step3View === "kit-config") {
+        setStep3View("choice");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      setStep(2);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
@@ -645,53 +909,235 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     setReaderConfigured(false);
     setCustomizationNotes("");
     setIncludeAssemblyService(false);
+    setPurchaseMode(null);
+    setStep3View("choice");
     setLastAddedItemId(null);
     setStep(1);
     setIsCartSuccessModalOpen(false);
   };
 
-  // Passos lógicos estruturados como Cardápio Digital Interativo
-  const effectiveCurrentStepId = step === 3 && isKitCutoutMonitorStep ? 3.5 : step;
+  // Passos dinâmicos conforme a rota escolhida (Apenas Gabinete vs Gabinete + Kit)
+  type StepKey =
+    | "1"
+    | "2"
+    | "3-choice"
+    | "3-mon"
+    | "3-kit"
+    | "3-cutout-mon"
+    | "4"
+    | "5"
+    | "6"
+    | "future-equip"
+    | "future-rev";
 
-  const CONFIG_STEPS = [
-    { id: 1, displayNum: "1", label: "Formato", subtitle: "Gabinete", icon: Box },
-    { id: 2, displayNum: "2", label: "Acabamento", subtitle: "MDF BP", icon: Palette },
-    {
-      id: 3,
-      displayNum: "3",
-      label: isKitSelected ? "Kit" : "Monitor",
-      subtitle: isKitSelected ? "Kit Montagem" : "Touch",
-      icon: isKitSelected ? Boxes : Tv,
-    },
-    ...(requiresCutoutMonitorForKit
-      ? [
-          {
-            id: 3.5,
-            displayNum: "3B",
-            label: "Seu Monitor",
-            subtitle: selectedCutoutMonitor ? selectedCutoutMonitor.displayName : "Qual Monitor?",
-            icon: Tv,
-            isCutoutStep: true,
-          },
-        ]
-      : []),
-    {
-      id: 4,
-      displayNum: "4",
-      label: requiresCutoutPrinterForKit ? "Sua Impressora" : "Impressora",
-      subtitle: isKitSelected
-        ? hasPrinterInKit
-          ? "No Kit"
-          : selectedPrinter
-          ? selectedPrinter.displayName
-          : "Qual Impressora?"
-        : "Térmica",
-      icon: Printer,
-      isSkipped: isKitSelected && hasPrinterInKit,
-    },
-    { id: 5, displayNum: "5", label: "Leitor", subtitle: isKitSelected ? "No Kit" : "Código 2D", icon: QrCode, isSkipped: isKitSelected },
-    { id: 6, displayNum: "6", label: "Revisão", subtitle: "Ficha CNC", icon: CheckCircle2 },
-  ];
+  interface ConfigStepPill {
+    id: StepKey;
+    displayNum: string;
+    label: string;
+    subtitle: string;
+    icon: React.ComponentType<{ className?: string }>;
+    isPreviewOnly?: boolean;
+  }
+
+  const activeStepKey: StepKey = useMemo(() => {
+    if (step === 1) return "1";
+    if (step === 2) return "2";
+    if (step === 3) {
+      if (step3View === "cabinet-monitor") return "3-mon";
+      if (step3View === "kit-config") return "3-kit";
+      if (step3View === "kit-cutout-monitor") return "3-cutout-mon";
+      return "3-choice";
+    }
+    if (step === 4) return "4";
+    if (step === 5) return "5";
+    return "6";
+  }, [step, step3View]);
+
+  const CONFIG_STEPS: ConfigStepPill[] = useMemo(() => {
+    const baseSteps: Omit<ConfigStepPill, "displayNum">[] = [
+      { id: "1", label: "Formato", subtitle: "Gabinete", icon: Box },
+      { id: "2", label: "Acabamento", subtitle: "MDF BP", icon: Palette },
+      {
+        id: "3-choice",
+        label: "Modalidade",
+        subtitle:
+          purchaseMode === "kit"
+            ? "Gabinete + Kit"
+            : purchaseMode === "cabinet"
+            ? "Só Gabinete"
+            : "Gabinete ou Kit?",
+        icon: purchaseMode === "kit" ? Boxes : purchaseMode === "cabinet" ? Package : Layers,
+      },
+    ];
+
+    if (purchaseMode === "cabinet") {
+      baseSteps.push(
+        { id: "3-mon", label: "Monitor", subtitle: "Furação CNC", icon: Tv },
+        { id: "4", label: "Impressora", subtitle: "Térmica", icon: Printer },
+        { id: "5", label: "Leitor", subtitle: "Código 2D", icon: QrCode },
+        { id: "6", label: "Revisão", subtitle: "Ficha CNC", icon: CheckCircle2 }
+      );
+    } else if (purchaseMode === "kit") {
+      baseSteps.push({
+        id: "3-kit",
+        label: "Kit & Montagem",
+        subtitle: includeAssemblyService ? "100% Montado" : "Em Peças",
+        icon: SlidersHorizontal,
+      });
+      if (requiresCutoutMonitorForKit) {
+        baseSteps.push({
+          id: "3-cutout-mon",
+          label: "Seu Monitor",
+          subtitle: selectedCutoutMonitor ? selectedCutoutMonitor.displayName : "Furação CNC",
+          icon: Tv,
+        });
+      }
+      if (requiresCutoutPrinterForKit) {
+        baseSteps.push({
+          id: "4",
+          label: "Sua Impressora",
+          subtitle: selectedPrinter ? selectedPrinter.displayName : "Rasgo CNC",
+          icon: Printer,
+        });
+      }
+      baseSteps.push({
+        id: "6",
+        label: "Revisão",
+        subtitle: "Ficha CNC",
+        icon: CheckCircle2,
+      });
+    } else {
+      baseSteps.push(
+        { id: "future-equip", label: "Equipamentos", subtitle: "Após escolher acima", icon: Tv, isPreviewOnly: true },
+        { id: "future-rev", label: "Revisão", subtitle: "Ficha CNC", icon: CheckCircle2, isPreviewOnly: true }
+      );
+    }
+
+    return baseSteps.map((item, idx) => ({
+      ...item,
+      displayNum: String(idx + 1),
+    }));
+  }, [
+    purchaseMode,
+    includeAssemblyService,
+    requiresCutoutMonitorForKit,
+    selectedCutoutMonitor,
+    requiresCutoutPrinterForKit,
+    selectedPrinter,
+  ]);
+
+  const activeStepIndex = Math.max(
+    0,
+    CONFIG_STEPS.findIndex((s) => s.id === activeStepKey)
+  );
+  const displayStepNumber = activeStepIndex + 1;
+  const displayTotalSteps = CONFIG_STEPS.length;
+
+  const handleClickStepperPill = (id: StepKey) => {
+    if (id === "1") {
+      setStep(1);
+      return;
+    }
+    if (id === "2") {
+      setStep(2);
+      return;
+    }
+    if (id === "3-choice" || id === "future-equip" || id === "future-rev") {
+      setStep(3);
+      setStep3View("choice");
+      return;
+    }
+    if (id === "3-mon") {
+      setStep(3);
+      setStep3View("cabinet-monitor");
+      return;
+    }
+    if (id === "3-kit") {
+      setStep(3);
+      setStep3View("kit-config");
+      return;
+    }
+    if (id === "3-cutout-mon") {
+      setStep(3);
+      setStep3View("kit-cutout-monitor");
+      return;
+    }
+    if (id === "4") {
+      if (!purchaseMode) {
+        setStep(3);
+        setStep3View("choice");
+        return;
+      }
+      if (purchaseMode === "cabinet" && (!selectedMonitor || isItemKit(selectedMonitor))) {
+        setStep(3);
+        setStep3View("cabinet-monitor");
+        return;
+      }
+      if (purchaseMode === "kit" && requiresCutoutMonitorForKit && !selectedCutoutMonitor) {
+        setStep(3);
+        setStep3View("kit-cutout-monitor");
+        return;
+      }
+      setStep(4);
+      return;
+    }
+    if (id === "5") {
+      if (purchaseMode !== "cabinet") {
+        setStep(3);
+        setStep3View("choice");
+        return;
+      }
+      if (!selectedMonitor || isItemKit(selectedMonitor)) {
+        setStep(3);
+        setStep3View("cabinet-monitor");
+        return;
+      }
+      if (!selectedPrinter) {
+        setStep(4);
+        return;
+      }
+      setStep(5);
+      return;
+    }
+    if (id === "6") {
+      if (!purchaseMode) {
+        setStep(3);
+        setStep3View("choice");
+        return;
+      }
+      if (purchaseMode === "cabinet") {
+        if (!selectedMonitor || isItemKit(selectedMonitor)) {
+          setStep(3);
+          setStep3View("cabinet-monitor");
+          return;
+        }
+        if (!selectedPrinter) {
+          setStep(4);
+          return;
+        }
+        if (!readerConfigured || (useReader && !selectedReader)) {
+          setStep(5);
+          return;
+        }
+      } else {
+        if (!isKitSelected) {
+          setStep(3);
+          setStep3View("kit-config");
+          return;
+        }
+        if (requiresCutoutMonitorForKit && !selectedCutoutMonitor) {
+          setStep(3);
+          setStep3View("kit-cutout-monitor");
+          return;
+        }
+        if (requiresCutoutPrinterForKit && !selectedPrinter) {
+          setStep(4);
+          return;
+        }
+      }
+      setStep(6);
+    }
+  };
 
   return (
     <div className="flex-1 flex flex-col justify-start pb-44 sm:pb-40">
@@ -730,96 +1176,52 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
               </button>
 
               <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-                <span>Etapa <strong>0{step}</strong> de <strong>06</strong></span>
+                <span>
+                  Etapa <strong>0{displayStepNumber}</strong> de <strong>0{displayTotalSteps}</strong>
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Barra de Categorias / Passos (Estilo Cardápio Digital) */}
+          {/* Barra de Categorias / Passos Adaptativa */}
           <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar p-1 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-black/10 dark:border-slate-800 backdrop-blur-md shadow-sm">
-            {CONFIG_STEPS.map((s) => {
+            {CONFIG_STEPS.map((s, idx) => {
               const Icon = s.icon;
-              const isActive = s.id === effectiveCurrentStepId;
-              const isCompleted = s.id < effectiveCurrentStepId;
-              const isSkippedByKit = Boolean((s as any).isSkipped);
+              const isActive = idx === activeStepIndex;
+              const isCompleted = idx < activeStepIndex;
+              const isPreviewOnly = Boolean(s.isPreviewOnly);
 
               return (
                 <button
                   key={s.id}
-                  onClick={() => {
-                    if (isSkippedByKit) {
-                      setIsKitCutoutMonitorStep(false);
-                      setStep(3);
-                      return;
-                    }
-                    if (s.id === 3.5) {
-                      setStep(3);
-                      setIsKitCutoutMonitorStep(true);
-                      return;
-                    }
-                    if (s.id === 3) {
-                      setIsKitCutoutMonitorStep(false);
-                      setStep(3);
-                      return;
-                    }
-                    if (s.id > 3 && !selectedMonitor) {
-                      setIsKitCutoutMonitorStep(false);
-                      setStep(3);
-                      return;
-                    }
-                    if (s.id > 3.5 && requiresCutoutMonitorForKit && !selectedCutoutMonitor) {
-                      setStep(3);
-                      setIsKitCutoutMonitorStep(true);
-                      return;
-                    }
-                    if (s.id > 4 && (!isKitSelected || requiresCutoutPrinterForKit) && !selectedPrinter) {
-                      setIsKitCutoutMonitorStep(false);
-                      setStep(4);
-                      return;
-                    }
-                    if (s.id > 5 && !isKitSelected && (!readerConfigured || (useReader && !selectedReader))) {
-                      setIsKitCutoutMonitorStep(false);
-                      setStep(5);
-                      return;
-                    }
-                    setIsKitCutoutMonitorStep(false);
-                    setStep(s.id);
-                  }}
+                  type="button"
+                  onClick={() => handleClickStepperPill(s.id)}
                   className={`flex items-center gap-2 py-1.5 px-2.5 sm:px-3 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
                     isActive
                       ? "bg-[#0071e3] text-white shadow-md shadow-blue-500/25 ring-2 ring-[#0071e3]/30"
-                      : isSkippedByKit
-                      ? "bg-slate-100 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 border border-dashed border-slate-300 dark:border-slate-700 hover:bg-slate-200/60"
+                      : isPreviewOnly
+                      ? "bg-slate-100/80 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 border border-dashed border-slate-300 dark:border-slate-700 hover:bg-slate-200/60"
                       : isCompleted
                       ? "bg-blue-50 dark:bg-indigo-950/40 text-[#0071e3] dark:text-indigo-300 hover:bg-blue-100"
                       : "text-slate-700 dark:text-slate-300 hover:bg-black/5 hover:text-black dark:hover:text-white"
                   }`}
-                  title={
-                    isSkippedByKit
-                      ? `${s.label} já incluso no Kit de Montagem`
-                      : `Passo ${s.displayNum}: ${s.label}`
-                  }
+                  title={`Passo ${s.displayNum}: ${s.label}`}
                 >
                   <div
                     className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black shrink-0 ${
                       isActive
                         ? "bg-white/20 text-white"
-                        : isSkippedByKit
+                        : isPreviewOnly
                         ? "bg-slate-200 dark:bg-slate-700 text-slate-500"
                         : isCompleted
                         ? "bg-[#0071e3] text-white"
                         : "bg-black/5 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-black/10 dark:border-slate-700"
                     }`}
                   >
-                    {isCompleted ? <Check className="w-2.5 h-2.5 stroke-[3]" /> : isSkippedByKit ? "✓" : s.displayNum}
+                    {isCompleted ? <Check className="w-2.5 h-2.5 stroke-[3]" /> : s.displayNum}
                   </div>
                   <Icon className="w-3.5 h-3.5 shrink-0 opacity-90" />
                   <span className="truncate">{s.label}</span>
-                  {isSkippedByKit && (
-                    <span className="text-[9px] font-extrabold uppercase px-1 py-0.2 rounded bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300">
-                      Kit
-                    </span>
-                  )}
                 </button>
               );
             })}
@@ -834,9 +1236,11 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
               <div className="flex items-center justify-between shrink-0">
                 <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   {step === 3
-                    ? isKitCutoutMonitorStep
+                    ? step3View === "choice"
+                      ? "Visualização do Gabinete"
+                      : step3View === "kit-cutout-monitor"
                       ? "Seu Monitor (Furação CNC)"
-                      : isKitSelected
+                      : step3View === "kit-config"
                       ? "Kit de Montagem Completo"
                       : "Visualização do Monitor"
                     : step === 4
@@ -846,7 +1250,13 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                     : "Visualização do Gabinete"}
                 </span>
                 <Badge variant={isKitSelected ? "primary" : "secondary"} className="text-[9px]">
-                  {isKitSelected && step === 3 ? "Pacote Hardware" : step >= 3 && step <= 5 ? "Item Selecionado" : "Fotos Reais"}
+                  {step === 3 && step3View === "choice"
+                    ? "Fotos Reais"
+                    : isKitSelected && step === 3
+                    ? "Pacote Hardware"
+                    : step >= 3 && step <= 5
+                    ? "Item Selecionado"
+                    : "Fotos Reais"}
                 </Badge>
               </div>
 
@@ -856,14 +1266,14 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                   selectedModel={selectedModel}
                   selectedColor={selectedColor}
                   selectedMonitor={
-                    step === 3 && isKitCutoutMonitorStep && selectedCutoutMonitor
+                    step === 3 && step3View === "kit-cutout-monitor" && selectedCutoutMonitor
                       ? selectedCutoutMonitor
                       : selectedMonitor
                   }
                   selectedPrinter={selectedPrinter}
                   selectedReader={selectedReader}
                   useReader={useReader}
-                  currentStep={step}
+                  currentStep={step === 3 && step3View === "choice" ? 2 : step}
                   hasPrinter={!!selectedPrinter}
                   hasScanner={useReader && !!selectedReader}
                 />
@@ -895,6 +1305,14 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                     </span>
                   </div>
                 </div>
+                {purchaseMode && (
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="shrink-0 font-medium">Modalidade:</span>
+                    <span className="font-bold text-[#0071e3] dark:text-cyan-400 text-right leading-tight">
+                      {purchaseMode === "kit" ? "Gabinete + Kit" : "Apenas Gabinete"}
+                    </span>
+                  </div>
+                )}
                 {selectedMonitor ? (
                   <>
                     <div className="flex justify-between items-center gap-2">
@@ -922,7 +1340,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                       </div>
                     )}
                   </>
-                ) : step === 3 ? (
+                ) : step === 3 && step3View === "cabinet-monitor" ? (
                   <div className="flex justify-between items-center gap-2">
                     <span className="shrink-0 font-medium">Monitor:</span>
                     <span className="font-bold text-amber-600 dark:text-amber-400 text-right leading-tight flex items-center gap-1 justify-end">
@@ -955,29 +1373,37 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                   </div>
                 )}
 
-                {(isKitSelected || (readerConfigured && (!useReader || selectedReader))) && (
+                {!isKitSelected && readerConfigured && (!useReader || selectedReader) && (
                   <div className="flex justify-between items-center gap-2">
                     <span className="shrink-0 font-medium">Leitor 2D:</span>
                     <span className="font-semibold text-[#1d1d1f] dark:text-white text-right leading-tight">
-                      {isKitSelected
-                        ? activeKitItems.find((i) => i.category === "reader")?.selected
-                          ? "Incluso no Kit"
-                          : "Removido do Kit"
-                        : useReader && selectedReader
+                      {useReader && selectedReader
                         ? selectedReader.displayName
                         : "Sem leitor (Gabinete liso)"}
                     </span>
                   </div>
                 )}
 
-                {isKitSelected && includeAssemblyService && (
+                {isKitSelected && (
                   <div className="flex justify-between items-center gap-2">
-                    <span className="shrink-0 font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                      <Wrench className="w-3 h-3" />
+                    <span
+                      className={`shrink-0 font-medium flex items-center gap-1 ${
+                        includeAssemblyService
+                          ? "text-amber-600 dark:text-amber-400"
+                          : "text-slate-500 dark:text-slate-400"
+                      }`}
+                    >
+                      {includeAssemblyService && <Wrench className="w-3 h-3" />}
                       Montagem:
                     </span>
-                    <span className="font-extrabold text-amber-600 dark:text-amber-400 text-right leading-tight text-[11px]">
-                      100% Montado (+ R$ 999)
+                    <span
+                      className={`text-right leading-tight text-[11px] ${
+                        includeAssemblyService
+                          ? "font-extrabold text-amber-600 dark:text-amber-400"
+                          : "font-semibold text-[#1d1d1f] dark:text-white"
+                      }`}
+                    >
+                      {includeAssemblyService ? "100% Montado (+ R$ 999)" : "Em peças (R$ 0)"}
                     </span>
                   </div>
                 )}
@@ -1023,7 +1449,22 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
               />
             )}
 
-            {step === 3 && (
+            {step === 3 && step3View === "choice" && (
+              <StepPurchaseMode
+                cabinetName={selectedModel.name}
+                purchaseMode={purchaseMode}
+                cabinetPixCents={cabinetPreviewPricing.pixTotalPriceCents}
+                cabinetCardCents={cabinetPreviewPricing.cardTotalPriceCents}
+                kitPixCents={kitPreviewPricing.pixTotalPriceCents}
+                kitCardCents={kitPreviewPricing.cardTotalPriceCents}
+                kitOnlyCents={previewKitOnlyCents}
+                kitAccessoryCount={previewKitAccessoryCount}
+                onSelectCabinet={handleChooseCabinetMode}
+                onSelectKit={handleChooseKitMode}
+              />
+            )}
+
+            {step === 3 && step3View === "cabinet-monitor" && (
               <StepMonitor
                 monitors={catalog.monitors}
                 selectedMonitor={selectedMonitor}
@@ -1032,10 +1473,53 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                 cabinetName={selectedModel.name}
                 cabinetBasePixCents={selectedModel.pixPriceCents || selectedModel.basePriceCents}
                 cabinetBaseCardCents={selectedModel.basePriceCents}
-                isKitCutoutMonitorMode={isKitCutoutMonitorStep && requiresCutoutMonitorForKit}
-                onKitConfirmed={handleKitConfirmed}
-                onEnterKitCutoutMonitorStep={() => {
-                  setIsKitCutoutMonitorStep(true);
+                isKitCutoutMonitorMode={false}
+                onSwitchPurchaseMode={() => {
+                  setStep3View("choice");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              />
+            )}
+
+            {step === 3 && step3View === "kit-config" && (
+              <StepKit
+                kitMonitor={
+                  (isKitSelected && selectedMonitor) ||
+                  defaultKitMonitor ||
+                  HOMOLOGATED_MONITORS.find((m) => isItemKit(m)) ||
+                  HOMOLOGATED_MONITORS[0]
+                }
+                cabinetName={selectedModel.name}
+                cabinetBasePixCents={cabinetPreviewPricing.pixTotalPriceCents}
+                includeAssemblyService={includeAssemblyService}
+                onToggleAssemblyService={setIncludeAssemblyService}
+                onUpdateKitItems={handleUpdateKitItems}
+                onSwitchToCabinet={handleChooseCabinetMode}
+                selectedCutoutMonitorName={selectedCutoutMonitor?.displayName || null}
+                selectedCutoutPrinterName={selectedPrinter?.displayName || null}
+                onJumpToCutoutMonitor={() => {
+                  setStep3View("kit-cutout-monitor");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                onJumpToCutoutPrinter={() => {
+                  setStep(4);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              />
+            )}
+
+            {step === 3 && step3View === "kit-cutout-monitor" && (
+              <StepMonitor
+                monitors={catalog.monitors}
+                selectedMonitor={selectedMonitor}
+                onSelectMonitor={handleSelectMonitor}
+                onRequestCustomization={() => setIsCustomModalOpen(true)}
+                cabinetName={selectedModel.name}
+                cabinetBasePixCents={selectedModel.pixPriceCents || selectedModel.basePriceCents}
+                cabinetBaseCardCents={selectedModel.basePriceCents}
+                isKitCutoutMonitorMode={requiresCutoutMonitorForKit}
+                onSwitchPurchaseMode={() => {
+                  setStep3View("kit-config");
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
               />
@@ -1077,27 +1561,20 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                 customizationNotes={customizationNotes}
                 onChangeNotes={setCustomizationNotes}
                 onEditStep={(stepNum) => {
-                  setIsKitCutoutMonitorStep(false);
-                  setStep(stepNum);
+                  if (stepNum === 3) {
+                    setStep(3);
+                    setStep3View(isKitSelected || purchaseMode === "kit" ? "kit-config" : "cabinet-monitor");
+                  } else {
+                    setStep(stepNum);
+                  }
+                  window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
                 onEditCutoutMonitor={() => {
                   setStep(3);
-                  setIsKitCutoutMonitorStep(true);
+                  setStep3View("kit-cutout-monitor");
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
-                onRemoveKit={() => {
-                  const fallbackMon =
-                    selectedCutoutMonitor ||
-                    catalog.monitors.find((m) => !isItemKit(m) && (m.priceAdjustmentCents || 0) === 0) ||
-                    catalog.monitors.find((m) => !isItemKit(m)) ||
-                    null;
-                  setSelectedMonitor(
-                    fallbackMon ? { ...fallbackMon, isKit: false, cutoutMonitor: null } : null
-                  );
-                  setIncludeAssemblyService(false);
-                  setIsKitCutoutMonitorStep(false);
-                  setStep(3);
-                }}
+                onRemoveKit={handleChooseCabinetMode}
                 onAddToCart={handleAddToCart}
               />
             )}
@@ -1107,25 +1584,31 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
 
       {/* Barra Fixa Inferior Mobile */}
       <StickyBottomBar
-        currentStep={step}
-        totalSteps={totalSteps}
+        currentStep={displayStepNumber}
+        totalSteps={displayTotalSteps}
         totalPriceCents={pricing.totalPriceCents}
         cardTotalPriceCents={pricing.cardTotalPriceCents}
         onNext={handleNext}
         onBack={handleBack}
-        isLastStep={step === totalSteps}
+        isLastStep={step === 6}
         isNextDisabled={isNextDisabled}
         nextButtonLabel={
-          step === 3 && !selectedMonitor
+          step === 3 && step3View === "choice" && !purchaseMode
+            ? "Escolha uma Opção"
+            : step === 3 && step3View === "cabinet-monitor" && (!selectedMonitor || isItemKit(selectedMonitor))
             ? "Selecione o Monitor"
-            : step === 3 && isKitSelected && requiresCutoutMonitorForKit && !isKitCutoutMonitorStep && !selectedCutoutMonitor
+            : step === 3 && step3View === "kit-config" && requiresCutoutMonitorForKit && !selectedCutoutMonitor
             ? "Informar Meu Monitor"
-            : step === 3 && isKitSelected && isKitCutoutMonitorStep && !selectedCutoutMonitor
-            ? "Selecione seu Monitor"
-            : step === 3 && isKitSelected && requiresCutoutPrinterForKit
+            : step === 3 && step3View === "kit-config" && requiresCutoutPrinterForKit
             ? "Informar Minha Impressora"
-            : step === 3 && isKitSelected
+            : step === 3 && step3View === "kit-config"
             ? "Avançar para Revisão"
+            : step === 3 && step3View === "kit-cutout-monitor" && !selectedCutoutMonitor
+            ? "Selecione seu Monitor"
+            : step === 3 && step3View === "kit-cutout-monitor"
+            ? requiresCutoutPrinterForKit
+              ? "Informar Minha Impressora"
+              : "Avançar para Revisão"
             : step === 4 && (!isKitSelected || requiresCutoutPrinterForKit) && !selectedPrinter
             ? "Selecione a Impressora"
             : step === 4 && isKitSelected

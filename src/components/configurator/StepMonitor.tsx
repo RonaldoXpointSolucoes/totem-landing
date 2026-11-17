@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { MonitorOption, KitSubItem } from "@/types/catalog";
+import { MonitorOption } from "@/types/catalog";
 import { Card, Input } from "@/components/ui";
 import {
   Check,
@@ -9,24 +9,17 @@ import {
   Tv,
   HelpCircle,
   Edit3,
-  Eye,
   Plus,
-  Boxes,
   Ruler,
   Package,
-  XCircle,
-  Info,
-  SlidersHorizontal,
+  ArrowLeftRight,
 } from "lucide-react";
 import {
   isItemKit,
   getEffectiveKitItems,
-  calculateKitTotalCents,
   doesKitIncludeMonitor,
-  doesKitIncludePrinter,
 } from "@/modules/catalog/kitDefaults";
 import { formatBRL } from "@/modules/pricing/pricingEngine";
-import { KitCustomizationModal } from "./KitCustomizationModal";
 import { CustomMonitorModal } from "./CustomMonitorModal";
 
 interface StepMonitorProps {
@@ -44,6 +37,8 @@ interface StepMonitorProps {
   isKitCutoutMonitorMode?: boolean;
   onKitConfirmed?: (updatedKit: MonitorOption) => void;
   onEnterKitCutoutMonitorStep?: () => void;
+  /** Atalho opcional para voltar à pergunta de modalidade (Apenas Gabinete vs Kit) ou às peças do Kit */
+  onSwitchPurchaseMode?: () => void;
 }
 
 export const StepMonitor: React.FC<StepMonitorProps> = ({
@@ -52,17 +47,12 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
   onSelectMonitor,
   onRequestCustomization,
   cabinetName = "Gabinete Totem Pro",
-  cabinetBasePixCents = 110000,
-  cabinetBaseCardCents = 133000,
   isKitCutoutMonitorMode = false,
-  onKitConfirmed,
-  onEnterKitCutoutMonitorStep,
+  onSwitchPurchaseMode,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editorTargetMonitor, setEditorTargetMonitor] = useState<MonitorOption | null>(null);
-  const [isKitModalOpen, setIsKitModalOpen] = useState(false);
-  const [activeKitTarget, setActiveKitTarget] = useState<MonitorOption | null>(null);
 
   const sortedMonitors = React.useMemo(() => {
     return [...monitors].sort((a, b) => {
@@ -72,87 +62,34 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
     });
   }, [monitors]);
 
-  const filteredMonitors = React.useMemo(() => {
-    return sortedMonitors.filter((m) =>
-      `${m.brand} ${m.model} ${m.displayName}`
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase())
-    );
+  const standardMonitors = React.useMemo(() => {
+    return sortedMonitors
+      .filter((m) => !isItemKit(m))
+      .filter((m) =>
+        `${m.brand} ${m.model} ${m.displayName}`
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase())
+      );
   }, [sortedMonitors, searchTerm]);
-
-  const standardMonitors = React.useMemo(
-    () => filteredMonitors.filter((m) => !isItemKit(m)),
-    [filteredMonitors]
-  );
-
-  const kitMonitors = React.useMemo(
-    () => filteredMonitors.filter((m) => isItemKit(m)),
-    [filteredMonitors]
-  );
 
   const isSelectedKit = isItemKit(selectedMonitor);
   const currentKitItems = isSelectedKit ? getEffectiveKitItems(selectedMonitor) : [];
   const hasMonitorInSelectedKit = isSelectedKit ? doesKitIncludeMonitor(currentKitItems) : false;
-  const hasPrinterInSelectedKit = isSelectedKit ? doesKitIncludePrinter(currentKitItems) : false;
   const activeCutoutMonitor = isSelectedKit ? selectedMonitor?.cutoutMonitor || null : null;
 
-  // Abrir modal interativo de medidas do monitor (Outro Monitor / Sob Medida)
+  const isCutoutForKitFlow =
+    isKitCutoutMonitorMode || (isSelectedKit && !hasMonitorInSelectedKit);
+
+  const effectiveHighlightedMonitor = isSelectedKit
+    ? activeCutoutMonitor
+    : selectedMonitor;
+
   const handleOpenEditor = (targetMon?: MonitorOption) => {
     const fallbackTarget = isSelectedKit ? activeCutoutMonitor : selectedMonitor;
     setEditorTargetMonitor(targetMon || fallbackTarget || null);
     setIsEditorOpen(true);
   };
 
-  // Abrir modal didático de confirmação e personalização dos sub-itens do Kit
-  const handleOpenKitModal = (targetMon?: MonitorOption) => {
-    const base = targetMon || (isItemKit(selectedMonitor) ? selectedMonitor : null);
-    if (!base) return;
-    const currentSource =
-      selectedMonitor && selectedMonitor.id === base.id && selectedMonitor.kitItems
-        ? selectedMonitor
-        : base;
-    const effectiveItems = getEffectiveKitItems(currentSource);
-    setActiveKitTarget({ ...currentSource, isKit: true, kitItems: effectiveItems });
-    setIsKitModalOpen(true);
-  };
-
-  // Remover o Kit e selecionar apenas o gabinete (primeiro monitor homologado com furação R$ 0)
-  const handleRemoveKit = () => {
-    const fallbackStandard =
-      activeCutoutMonitor ||
-      sortedMonitors.find((m) => !isItemKit(m) && (m.priceAdjustmentCents || 0) === 0) ||
-      sortedMonitors.find((m) => !isItemKit(m));
-    if (fallbackStandard) {
-      onSelectMonitor({ ...fallbackStandard, isKit: false, cutoutMonitor: null });
-    }
-    setIsKitModalOpen(false);
-  };
-
-  // Salvar subitens do kit e recalcular preço dinamicamente
-  const handleSaveKitItems = (updatedItems: KitSubItem[]) => {
-    const base = activeKitTarget || (isItemKit(selectedMonitor) ? selectedMonitor : null);
-    if (!base) return;
-    const selectedCount = updatedItems.filter((i) => i.selected).length;
-    if (selectedCount === 0) {
-      handleRemoveKit();
-      return;
-    }
-    const totalCents = calculateKitTotalCents(updatedItems);
-    const monIncluded = doesKitIncludeMonitor(updatedItems);
-    const updated: MonitorOption = {
-      ...base,
-      isKit: true,
-      kitItems: updatedItems,
-      priceAdjustmentCents: totalCents,
-      cutoutMonitor: monIncluded ? null : selectedMonitor?.cutoutMonitor || null,
-      notes: JSON.stringify({ kitItems: updatedItems }),
-    };
-    onSelectMonitor(updated);
-    setIsKitModalOpen(false);
-    onKitConfirmed?.(updated);
-  };
-
-  // Selecionar o monitor para furação CNC quando o cliente escolheu o Kit sem monitor
   const handleSelectCutoutMonitorForKit = (mon: MonitorOption) => {
     if (!selectedMonitor || !isItemKit(selectedMonitor)) {
       onSelectMonitor(mon);
@@ -170,98 +107,79 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
     onSelectMonitor(updatedKitWithCutout);
   };
 
-  // Ao clicar num monitor padrão:
-  // - Se estiver no modo de informar o monitor para o Kit sem tela (ou se o Kit sem tela estiver ativo),
-  //   vincula esse monitor como `cutoutMonitor` do Kit (+ R$ 0,00 de furação).
-  // - Caso contrário, seleciona o monitor padrão na Opção 1 (Só Gabinete).
   const handleSelect = (mon: MonitorOption) => {
-    if (isItemKit(mon)) {
-      handleOpenKitModal(mon);
-    } else if (isKitCutoutMonitorMode || (isSelectedKit && !hasMonitorInSelectedKit)) {
+    if (isCutoutForKitFlow) {
       handleSelectCutoutMonitorForKit(mon);
     } else {
       onSelectMonitor(mon);
     }
   };
 
-  const effectiveHighlightedMonitor = isSelectedKit
-    ? activeCutoutMonitor
-    : selectedMonitor;
-
   return (
     <div className="space-y-4">
-      {/* Cabeçalho Didático */}
-      {isKitCutoutMonitorMode ? (
-        <div className="space-y-3">
-          <div className="text-center sm:text-left space-y-1">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-black uppercase tracking-wider shadow-xs">
-                  <Tv className="w-3 h-3" />
-                  Passo Obrigatório • Kit Sem Monitor
-                </span>
-                <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-500/20">
-                  Furação no Gabinete Grátis (+ R$ 0,00)
-                </span>
-              </div>
+      {/* Cabeçalho Didático e Limpo */}
+      {isCutoutForKitFlow ? (
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-black uppercase tracking-wider shadow-xs">
+                <Tv className="w-3 h-3" />
+                Kit Sem Monitor • Furação CNC
+              </span>
+              <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-500/20">
+                Corte Grátis (+ R$ 0,00)
+              </span>
             </div>
-            <h2 className="text-lg sm:text-2xl font-black text-[#1d1d1f] dark:text-white tracking-tight pt-1">
-              Qual é o monitor que você vai usar no seu {cabinetName}?
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-              Como você desabilitou o monitor dentro do <strong>Kit de Montagem</strong>, informe abaixo qual será o <u>seu monitor</u> para fazermos o recorte e a furação CNC exata no gabinete (<strong className="text-emerald-600 dark:text-emerald-400">+ R$ 0,00</strong>):
-            </p>
+
+            {onSwitchPurchaseMode && (
+              <button
+                type="button"
+                onClick={onSwitchPurchaseMode}
+                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-black/10 dark:border-slate-700 text-[11px] font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <ArrowLeftRight className="w-3 h-3" />
+                <span>Voltar ao Kit</span>
+              </button>
+            )}
           </div>
 
-          {/* Barra Resumo do Kit Parcial Ativo */}
-          {isSelectedKit && (
-            <div className="p-3 rounded-xl bg-blue-50/90 dark:bg-indigo-950/50 border border-[#0071e3]/40 dark:border-indigo-500/40 flex flex-wrap items-center justify-between gap-2 text-xs">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-7 h-7 rounded-lg bg-[#0071e3] text-white flex items-center justify-center shrink-0">
-                  <Boxes className="w-3.5 h-3.5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="font-black text-[#1d1d1f] dark:text-white truncate">
-                    Kit Parcial Ativo ({currentKitItems.filter((i) => i.selected).length} de {currentKitItems.length} itens • + {formatBRL(calculateKitTotalCents(currentKitItems))})
-                  </p>
-                  <p className="text-[11px] text-slate-600 dark:text-slate-300 truncate">
-                    {activeCutoutMonitor ? (
-                      <span className="text-emerald-700 dark:text-emerald-400 font-bold">
-                        ✓ Seu monitor p/ furação CNC: {activeCutoutMonitor.displayName} (+ R$ 0,00)
-                      </span>
-                    ) : (
-                      <span className="text-amber-700 dark:text-amber-300 font-bold">
-                        ⚠️ Selecione abaixo qual monitor você vai usar para liberar o próximo passo
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => handleOpenKitModal()}
-                  className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 hover:bg-blue-50 border border-blue-200 dark:border-indigo-700 text-[#0071e3] dark:text-cyan-300 text-[11px] font-bold flex items-center gap-1 cursor-pointer shadow-2xs"
-                >
-                  <SlidersHorizontal className="w-3 h-3" />
-                  <span>Editar Peças do Kit</span>
-                </button>
-              </div>
-            </div>
-          )}
+          <h2 className="text-lg sm:text-2xl font-black text-[#1d1d1f] dark:text-white tracking-tight">
+            Qual é o monitor que você vai usar no seu {cabinetName}?
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+            Como você removeu o monitor do Kit, informe abaixo qual será o <u>seu monitor</u> para fazermos o recorte CNC exato (<strong className="text-emerald-600 dark:text-emerald-400">+ R$ 0,00</strong>).
+          </p>
         </div>
       ) : (
-        <div className="text-center sm:text-left space-y-1">
+        <div className="space-y-1.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg sm:text-2xl font-black text-[#1d1d1f] dark:text-white tracking-tight">
-              Qual monitor será instalado no seu {cabinetName}?
-            </h2>
-            <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-500/20">
-              Furação no Gabinete Grátis (+ R$ 0,00)
-            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-[10px] font-black uppercase tracking-wide">
+                <Package className="w-3 h-3" />
+                Rota Apenas Gabinete
+              </span>
+              <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-500/20">
+                Furação Grátis (+ R$ 0,00)
+              </span>
+            </div>
+
+            {onSwitchPurchaseMode && (
+              <button
+                type="button"
+                onClick={onSwitchPurchaseMode}
+                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-black/10 dark:border-slate-700 text-[11px] font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <ArrowLeftRight className="w-3 h-3" />
+                <span>Trocar para Gabinete + Kit</span>
+              </button>
+            )}
           </div>
+
+          <h2 className="text-lg sm:text-2xl font-black text-[#1d1d1f] dark:text-white tracking-tight">
+            Qual monitor será instalado no seu {cabinetName}?
+          </h2>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-            Escolha na <strong>Opção 1</strong> se você quer comprar <u>somente o gabinete</u> (furação gratuita <strong className="text-emerald-600 dark:text-emerald-400">+ R$ 0,00</strong>) ou na <strong>Opção 2</strong> se deseja comprar o <u>Gabinete + Kit Completo de Equipamentos</u>.
+            Selecione o modelo abaixo apenas para fazermos o recorte VESA e a abertura frontal exata na Router CNC.
           </p>
         </div>
       )}
@@ -290,479 +208,183 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
         </button>
       </div>
 
-      {/* Alerta de Seleção Obrigatória */}
-      {!selectedMonitor && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs animate-in fade-in duration-200">
+      {/* Alerta Sutil de Seleção Obrigatória */}
+      {!effectiveHighlightedMonitor && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs">
           <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
           <span className="font-semibold">
-            Seleção obrigatória: escolha abaixo se quer apenas a furação para sua tela (+ R$ 0,00) ou o Kit de Montagem Completo.
+            {isCutoutForKitFlow
+              ? "Selecione abaixo qual monitor você utilizará no gabinete para liberar o próximo passo."
+              : "Selecione um monitor da lista ou informe as medidas em \"Sob Medida\" para avançar."}
           </span>
         </div>
       )}
 
-      {isSelectedKit && !hasMonitorInSelectedKit && !activeCutoutMonitor && (
-        <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-800 dark:text-amber-200 text-xs animate-in fade-in duration-200">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
-            <span className="font-bold">
-              Você desmarcou o Monitor do Kit! Selecione abaixo qual é o monitor que você vai usar no gabinete (+ R$ 0,00).
-            </span>
-          </div>
-          {!isKitCutoutMonitorMode && onEnterKitCutoutMonitorStep && (
-            <button
-              type="button"
-              onClick={onEnterKitCutoutMonitorStep}
-              className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold cursor-pointer shrink-0 shadow-2xs"
-            >
-              Escolher Meu Monitor Agora →
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* =====================================================================
-          OPÇÃO 1: LISTA DE MONITORES PADRÃO (SÓ GABINETE OU FURAÇÃO DO KIT SEM MONITOR)
-         ===================================================================== */}
-      <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50/80 dark:bg-slate-900/40 border border-black/10 dark:border-slate-800 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-black/10 dark:border-slate-800">
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-[10px] font-black uppercase tracking-wide">
-                {isKitCutoutMonitorMode || (isSelectedKit && !hasMonitorInSelectedKit) ? (
-                  <>
-                    <Tv className="w-3 h-3" />
-                    Selecione o Monitor que você vai usar com o Gabinete + Kit
-                  </>
-                ) : (
-                  <>
-                    <Package className="w-3 h-3" />
-                    Opção 1: Quero APENAS o Gabinete (Sem Eletrônicos)
-                  </>
-                )}
-              </span>
-              <span className="text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400">
-                + R$ 0,00 (Apenas furação sob medida)
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-600 dark:text-slate-400">
-              {isKitCutoutMonitorMode || (isSelectedKit && !hasMonitorInSelectedKit)
-                ? "Escolha na lista abaixo (ou clique em 'Outro Monitor Sob Medida') qual modelo de monitor você vai instalar no gabinete:"
-                : "Você já tem ou vai comprar a tela por fora? Selecione o modelo abaixo apenas para fazermos o recorte exato no gabinete:"}
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-          {standardMonitors.map((mon) => {
-            const isSelected = effectiveHighlightedMonitor?.id === mon.id;
-            return (
-              <Card
-                key={mon.id}
-                interactive
-                selected={isSelected}
-                onClick={() => handleSelect(mon)}
-                className="p-3 sm:p-3.5 rounded-xl flex items-center justify-between gap-2.5 bg-white dark:bg-slate-900"
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div
-                    className={`w-11 h-11 rounded-xl border p-1 flex items-center justify-center shrink-0 overflow-hidden transition-all ${
-                      isSelected
-                        ? "border-[#0071e3] bg-white dark:bg-slate-900 shadow-sm ring-2 ring-[#0071e3]/30"
-                        : "border-black/10 dark:border-slate-800 bg-white dark:bg-slate-950"
-                    }`}
-                  >
-                    {mon.image ? (
-                      <img
-                        src={mon.image}
-                        alt={mon.displayName}
-                        className="w-full h-full object-contain drop-shadow-sm transition-transform duration-200 group-hover:scale-105"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <Tv className="w-5 h-5 text-slate-400" />
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[10px] font-bold text-[#0071e3] dark:text-cyan-400 uppercase tracking-wider">
-                        {mon.brand}
-                      </span>
-                      {mon.sizeInches && (
-                        <span className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold bg-black/5 dark:bg-slate-800 px-1.5 py-0.2 rounded">
-                          {mon.sizeInches}&quot;
-                        </span>
-                      )}
-                      {!isSelectedKit && (mon.priceAdjustmentCents || 0) > 0 && (
-                        <span className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 px-1.5 py-0.2 rounded border border-emerald-500/30">
-                          + {formatBRL(mon.priceAdjustmentCents || 0)}
-                        </span>
-                      )}
-                    </div>
-                    <h3 className="text-xs font-bold text-[#1d1d1f] dark:text-white truncate">
-                      {mon.displayName}
-                    </h3>
-                    <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold truncate">
-                      {isSelectedKit && !hasMonitorInSelectedKit
-                        ? "Furação CNC p/ seu Monitor (+ R$ 0,00)"
-                        : (mon.priceAdjustmentCents || 0) > 0
-                        ? `Equipamento incluso (+ ${formatBRL(mon.priceAdjustmentCents || 0)})`
-                        : "Só Gabinete • Furação grátis (+ R$ 0,00)"}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {isSelected && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenEditor(mon);
-                      }}
-                      title="Ajustar medidas deste display"
-                      className="p-1 rounded-lg text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-black/5 dark:hover:bg-slate-800 transition-all"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                  <div
-                    className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
-                      isSelected
-                        ? "border-[#0071e3] bg-[#0071e3] text-white shadow-sm"
-                        : "border-black/15 dark:border-slate-700 bg-black/5 dark:bg-slate-800"
-                    }`}
-                  >
-                    {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-
-          {/* Card Especial para Personalizar / Outro Monitor (Sob Medida) */}
-          {(!searchTerm ||
-            "outro monitor sob medida personalizada medidas display".includes(
-              searchTerm.toLowerCase()
-            )) && (
+      {/* Grade Limpa de Monitores para Recorte CNC */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        {standardMonitors.map((mon) => {
+          const isSelected = effectiveHighlightedMonitor?.id === mon.id;
+          return (
             <Card
+              key={mon.id}
               interactive
-              selected={effectiveHighlightedMonitor?.isCustom}
-              onClick={() =>
-                handleOpenEditor(
-                  effectiveHighlightedMonitor?.isCustom
-                    ? effectiveHighlightedMonitor
-                    : undefined
-                )
-              }
-              className={`p-3 sm:p-3.5 rounded-xl flex items-center justify-between gap-2.5 border-dashed transition-all ${
-                effectiveHighlightedMonitor?.isCustom
-                  ? "border-[#0071e3] bg-blue-50/80 dark:bg-indigo-600/20 ring-2 ring-[#0071e3]/25"
-                  : "border-indigo-300 dark:border-indigo-500/40 bg-indigo-50/30 dark:bg-slate-950 hover:border-indigo-500"
-              }`}
+              selected={isSelected}
+              onClick={() => handleSelect(mon)}
+              className="p-3 sm:p-3.5 rounded-xl flex items-center justify-between gap-2.5 bg-white dark:bg-slate-900 min-h-[68px] active:scale-[0.985] transition-all cursor-pointer"
             >
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-10 h-10 rounded-xl border border-indigo-400/40 bg-indigo-100 dark:bg-indigo-600/30 text-indigo-600 dark:text-indigo-300 flex items-center justify-center shrink-0">
-                  {effectiveHighlightedMonitor?.isCustom ? (
-                    <Ruler className="w-4 h-4" />
+                <div
+                  className={`w-11 h-11 rounded-xl border p-1 flex items-center justify-center shrink-0 overflow-hidden transition-all ${
+                    isSelected
+                      ? "border-[#0071e3] bg-white dark:bg-slate-900 shadow-sm ring-2 ring-[#0071e3]/30"
+                      : "border-black/10 dark:border-slate-800 bg-white dark:bg-slate-950"
+                  }`}
+                >
+                  {mon.image ? (
+                    <img
+                      src={mon.image}
+                      alt={mon.displayName}
+                      className="w-full h-full object-contain drop-shadow-sm transition-transform duration-200 group-hover:scale-105"
+                      loading="lazy"
+                    />
                   ) : (
-                    <Plus className="w-4 h-4" />
+                    <Tv className="w-5 h-5 text-slate-400" />
                   )}
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
-                      {effectiveHighlightedMonitor?.isCustom
-                        ? effectiveHighlightedMonitor.brand
-                        : "Outro Monitor"}
+                    <span className="text-[10px] font-bold text-[#0071e3] dark:text-cyan-400 uppercase tracking-wider">
+                      {mon.brand}
                     </span>
-                    <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-1.5 py-0.2 rounded">
-                      Furação Grátis (+ R$ 0,00)
-                    </span>
+                    {mon.sizeInches && (
+                      <span className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold bg-black/5 dark:bg-slate-800 px-1.5 py-0.2 rounded">
+                        {mon.sizeInches}&quot;
+                      </span>
+                    )}
+                    {!isCutoutForKitFlow && (mon.priceAdjustmentCents || 0) > 0 && (
+                      <span className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 px-1.5 py-0.2 rounded border border-emerald-500/30">
+                        + {formatBRL(mon.priceAdjustmentCents || 0)}
+                      </span>
+                    )}
                   </div>
                   <h3 className="text-xs font-bold text-[#1d1d1f] dark:text-white truncate">
-                    {effectiveHighlightedMonitor?.isCustom
-                      ? effectiveHighlightedMonitor.displayName
-                      : "Meu monitor não está na lista (Sob Medida)"}
+                    {mon.displayName}
                   </h3>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
-                    {effectiveHighlightedMonitor?.isCustom &&
-                    effectiveHighlightedMonitor.customDimensions
-                      ? `Monitor: ${effectiveHighlightedMonitor.customDimensions.outerWidthCm}×${effectiveHighlightedMonitor.customDimensions.outerHeightCm}cm • Tela: ${effectiveHighlightedMonitor.customDimensions.screenWidthCm}×${effectiveHighlightedMonitor.customDimensions.screenHeightCm}cm`
-                      : "Informe as medidas para fazermos a furação exata (+ R$ 0,00)"}
+                  <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold truncate">
+                    {isCutoutForKitFlow
+                      ? "Furação CNC p/ seu Monitor (+ R$ 0,00)"
+                      : (mon.priceAdjustmentCents || 0) > 0
+                      ? `Só Gabinete • Ajuste p/ tela (+ ${formatBRL(mon.priceAdjustmentCents || 0)})`
+                      : "Só Gabinete • Furação grátis (+ R$ 0,00)"}
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-1.5 shrink-0">
-                {effectiveHighlightedMonitor?.isCustom && (
-                  <span className="hidden sm:inline-flex px-2 py-1 rounded-lg bg-white/80 dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 text-[10px] font-bold text-indigo-600 dark:text-indigo-300">
-                    Editar Medidas
-                  </span>
+                {isSelected && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenEditor(mon);
+                    }}
+                    title="Ajustar medidas deste display"
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-black/5 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                  </button>
                 )}
                 <div
-                  className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
-                    effectiveHighlightedMonitor?.isCustom
+                  className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+                    isSelected
                       ? "border-[#0071e3] bg-[#0071e3] text-white shadow-sm"
-                      : "border-indigo-400/40 bg-white dark:bg-slate-900 text-indigo-500"
+                      : "border-black/15 dark:border-slate-700 bg-black/5 dark:bg-slate-800"
                   }`}
                 >
-                  {effectiveHighlightedMonitor?.isCustom ? (
-                    <Check className="w-3.5 h-3.5 stroke-[3]" />
-                  ) : (
-                    <Edit3 className="w-3 h-3" />
-                  )}
+                  {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
                 </div>
               </div>
             </Card>
-          )}
-        </div>
-      </div>
+          );
+        })}
 
-      {/* =====================================================================
-          OPÇÃO 2 (OPCIONAL): GABINETE + KIT DE MONTAGEM COMPLETO
-          (Oculto quando estamos no sub-passo exclusivo de escolher o Monitor para o Kit sem tela)
-         ===================================================================== */}
-      {!isKitCutoutMonitorMode && kitMonitors.length > 0 && (
-        <div
-          className={`p-3.5 sm:p-4 rounded-2xl border-2 transition-all space-y-3 ${
-            isSelectedKit
-              ? "bg-gradient-to-br from-blue-50/90 via-indigo-50/60 to-white dark:from-indigo-950/60 dark:via-slate-900 dark:to-slate-900 border-[#0071e3] shadow-md ring-2 ring-[#0071e3]/20"
-              : "bg-gradient-to-br from-blue-50/40 via-indigo-50/20 to-white dark:from-slate-900/90 dark:to-slate-950 border-blue-200 dark:border-indigo-800/70"
-          }`}
-        >
-          <div className="flex flex-wrap items-start justify-between gap-2 pb-2 border-b border-blue-200/70 dark:border-indigo-900/70">
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#0071e3] text-white text-[10px] font-black uppercase tracking-wide shadow-2xs">
-                  <Boxes className="w-3 h-3" />
-                  Opção 2 (Opcional): Quero Gabinete + Kit de Montagem Completo
-                </span>
-                <span className="text-[10px] font-bold text-[#0071e3] dark:text-cyan-400 bg-blue-100/80 dark:bg-indigo-950 px-2 py-0.5 rounded-full border border-blue-300 dark:border-indigo-700">
-                  Peças Eletrônicas + Acessórios Inclusos
-                </span>
+        {/* Card Especial para Personalizar / Outro Monitor (Sob Medida) */}
+        {(!searchTerm ||
+          "outro monitor sob medida personalizada medidas display".includes(
+            searchTerm.toLowerCase()
+          )) && (
+          <Card
+            interactive
+            selected={effectiveHighlightedMonitor?.isCustom}
+            onClick={() =>
+              handleOpenEditor(
+                effectiveHighlightedMonitor?.isCustom
+                  ? effectiveHighlightedMonitor
+                  : undefined
+              )
+            }
+            className={`p-3 sm:p-3.5 rounded-xl flex items-center justify-between gap-2.5 border-dashed min-h-[68px] transition-all active:scale-[0.985] cursor-pointer ${
+              effectiveHighlightedMonitor?.isCustom
+                ? "border-[#0071e3] bg-blue-50/80 dark:bg-indigo-600/20 ring-2 ring-[#0071e3]/25"
+                : "border-indigo-300 dark:border-indigo-500/40 bg-indigo-50/30 dark:bg-slate-950 hover:border-indigo-500"
+            }`}
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-10 h-10 rounded-xl border border-indigo-400/40 bg-indigo-100 dark:bg-indigo-600/30 text-indigo-600 dark:text-indigo-300 flex items-center justify-center shrink-0">
+                {effectiveHighlightedMonitor?.isCustom ? (
+                  <Ruler className="w-4 h-4" />
+                ) : (
+                  <Plus className="w-4 h-4" />
+                )}
               </div>
-              <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed">
-                <strong>Deseja receber também os equipamentos para montar o totem?</strong> Ao selecionar o Kit abaixo, você receberá o <strong>{cabinetName}</strong> + PC All-in-One Touch 23.8&quot; Core i5, Impressora Térmica 80mm, 2 Coolers, Botão Liga/Desliga, Régua e Cabos:
-              </p>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+                    {effectiveHighlightedMonitor?.isCustom
+                      ? effectiveHighlightedMonitor.brand
+                      : "Outro Monitor"}
+                  </span>
+                  <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-1.5 py-0.2 rounded">
+                    Furação Grátis (+ R$ 0,00)
+                  </span>
+                </div>
+                <h3 className="text-xs font-bold text-[#1d1d1f] dark:text-white truncate">
+                  {effectiveHighlightedMonitor?.isCustom
+                    ? effectiveHighlightedMonitor.displayName
+                    : "Meu monitor não está na lista (Sob Medida)"}
+                </h3>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                  {effectiveHighlightedMonitor?.isCustom &&
+                  effectiveHighlightedMonitor.customDimensions
+                    ? `Monitor: ${effectiveHighlightedMonitor.customDimensions.outerWidthCm}×${effectiveHighlightedMonitor.customDimensions.outerHeightCm}cm • Tela: ${effectiveHighlightedMonitor.customDimensions.screenWidthCm}×${effectiveHighlightedMonitor.customDimensions.screenHeightCm}cm`
+                    : "Informe as medidas para fazermos a furação exata (+ R$ 0,00)"}
+                </p>
+              </div>
             </div>
-          </div>
 
-          {kitMonitors.map((mon) => {
-            const isSelected = selectedMonitor?.id === mon.id;
-            const kitItems =
-              isSelected && selectedMonitor?.kitItems
-                ? selectedMonitor.kitItems
-                : getEffectiveKitItems(mon);
-            const kitTotalCents = calculateKitTotalCents(kitItems);
-            const activeSubItems = kitItems.filter((i) => i.selected);
-            const monInKit = doesKitIncludeMonitor(kitItems);
-            const prtInKit = doesKitIncludePrinter(kitItems);
-
-            return (
+            <div className="flex items-center gap-1.5 shrink-0">
+              {effectiveHighlightedMonitor?.isCustom && (
+                <span className="hidden sm:inline-flex px-2 py-1 rounded-lg bg-white/80 dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 text-[10px] font-bold text-indigo-600 dark:text-indigo-300">
+                  Editar Medidas
+                </span>
+              )}
               <div
-                key={mon.id}
-                onClick={() => handleSelect(mon)}
-                className={`p-3.5 rounded-xl border transition-all cursor-pointer space-y-3 ${
-                  isSelected
-                    ? "bg-white dark:bg-slate-900 border-[#0071e3] shadow-sm"
-                    : "bg-white/90 dark:bg-slate-900/80 border-blue-200 dark:border-indigo-800/70 hover:border-[#0071e3]"
+                className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+                  effectiveHighlightedMonitor?.isCustom
+                    ? "border-[#0071e3] bg-[#0071e3] text-white shadow-sm"
+                    : "border-indigo-400/40 bg-white dark:bg-slate-900 text-indigo-500"
                 }`}
               >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div
-                      className={`w-12 h-12 rounded-xl border p-1 flex items-center justify-center shrink-0 overflow-hidden transition-all ${
-                        isSelected
-                          ? "border-[#0071e3] bg-white dark:bg-slate-900 shadow-sm"
-                          : "border-blue-200 dark:border-slate-800 bg-white dark:bg-slate-950"
-                      }`}
-                    >
-                      {mon.image ? (
-                        <img
-                          src={mon.image}
-                          alt={mon.displayName}
-                          className="w-full h-full object-contain drop-shadow-sm"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <Boxes className="w-6 h-6 text-[#0071e3]" />
-                      )}
-                    </div>
-
-                    <div className="min-w-0 space-y-0.5">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <h3 className="text-sm sm:text-base font-black text-[#1d1d1f] dark:text-white">
-                          {mon.displayName} (Equipamentos + Peças)
-                        </h3>
-                        {isSelected ? (
-                          <span className="text-[10px] font-black text-white bg-emerald-600 px-2 py-0.5 rounded-full">
-                            ✓ KIT ADICIONADO AO GABINETE
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-bold text-[#0071e3] dark:text-cyan-300 bg-blue-50 dark:bg-indigo-950 px-2 py-0.5 rounded-full border border-blue-200 dark:border-indigo-800">
-                            Clique para ver peças e confirmar
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                        {activeSubItems.length} de {kitItems.length} componentes selecionados •{" "}
-                        <strong className="text-[#0071e3] dark:text-cyan-400">
-                          Adicional do Kit: + {formatBRL(kitTotalCents)}
-                        </strong>{" "}
-                        (Gabinete + Kit ={" "}
-                        <strong className="text-emerald-600 dark:text-emerald-400">
-                          {formatBRL(cabinetBasePixCents + kitTotalCents)} no PIX
-                        </strong>
-                        )
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenKitModal(mon);
-                      }}
-                      className="px-3 py-1.5 rounded-xl bg-[#0071e3] hover:bg-[#0077ed] text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-                    >
-                      {isSelected ? (
-                        <>
-                          <SlidersHorizontal className="w-3.5 h-3.5" />
-                          <span>Editar Peças do Kit</span>
-                        </>
-                      ) : (
-                        <>
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>Ver Peças e Adicionar Kit</span>
-                        </>
-                      )}
-                    </button>
-
-                    {isSelected && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRemoveKit();
-                        }}
-                        className="px-2.5 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-300 text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
-                        title="Remover o Kit e comprar apenas o Gabinete"
-                      >
-                        <XCircle className="w-3.5 h-3.5 shrink-0" />
-                        <span>Remover Kit (Só Gabinete)</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Lista Visual Rápida dos Componentes do Kit (Clicável para marcar/desmarcar direto) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-2 border-t border-black/5 dark:border-slate-800">
-                  {kitItems.map((sub) => (
-                    <div
-                      key={sub.id}
-                      onClick={(e) => {
-                        if (isSelected) {
-                          e.stopPropagation();
-                          const nextItems = kitItems.map((item) =>
-                            item.id === sub.id ? { ...item, selected: !item.selected } : item
-                          );
-                          const nextCount = nextItems.filter((i) => i.selected).length;
-                          if (nextCount === 0) {
-                            handleRemoveKit();
-                          } else {
-                            const nextTotal = calculateKitTotalCents(nextItems);
-                            const nextHasMon = doesKitIncludeMonitor(nextItems);
-                            onSelectMonitor({
-                              ...mon,
-                              ...(selectedMonitor || {}),
-                              isKit: true,
-                              kitItems: nextItems,
-                              priceAdjustmentCents: nextTotal,
-                              cutoutMonitor: nextHasMon ? null : selectedMonitor?.cutoutMonitor || null,
-                              notes: JSON.stringify({ kitItems: nextItems }),
-                            });
-                          }
-                        }
-                      }}
-                      title={
-                        isSelected
-                          ? sub.selected
-                            ? `Clique para remover "${sub.name}" do Kit`
-                            : `Clique para incluir "${sub.name}" no Kit`
-                          : "Clique para personalizar as peças do Kit"
-                      }
-                      className={`px-2.5 py-1.5 rounded-lg border text-[11px] flex items-center justify-between gap-2 transition-all ${
-                        sub.selected
-                          ? "bg-blue-50/60 dark:bg-indigo-950/30 border-blue-200/80 dark:border-indigo-800/80 text-slate-800 dark:text-slate-200 hover:border-[#0071e3]"
-                          : "bg-slate-50 dark:bg-slate-950/40 border-black/5 text-slate-400 line-through opacity-60 hover:opacity-90"
-                      }`}
-                    >
-                      <span className="truncate font-semibold">
-                        {sub.selected ? "✓ " : "✕ "}
-                        {sub.name}
-                      </span>
-                      <span className="font-black text-[#0071e3] dark:text-cyan-400 shrink-0">
-                        {sub.selected ? `+${formatBRL(sub.priceCents)}` : "Removido"}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                {isSelected && (!monInKit || !prtInKit) && (
-                  <div
-                    onClick={(e) => e.stopPropagation()}
-                    className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 flex flex-wrap items-center justify-between gap-2 text-[11px] text-amber-900 dark:text-amber-200"
-                  >
-                    <div className="space-y-0.5">
-                      {!monInKit && (
-                        <p className="font-bold">
-                          {activeCutoutMonitor
-                            ? `✓ Seu Monitor p/ furação no gabinete: ${activeCutoutMonitor.displayName} (+ R$ 0,00)`
-                            : "⚠️ Monitor do Kit desabilitado: informe qual monitor você vai usar no gabinete."}
-                        </p>
-                      )}
-                      {!prtInKit && (
-                        <p className="font-bold">
-                          🖨️ Impressora do Kit desabilitada: no próximo passo você informará qual impressora vai usar no gabinete.
-                        </p>
-                      )}
-                    </div>
-                    {!monInKit && onEnterKitCutoutMonitorStep && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onEnterKitCutoutMonitorStep();
-                        }}
-                        className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold cursor-pointer shrink-0 shadow-2xs"
-                      >
-                        {activeCutoutMonitor ? "Alterar Meu Monitor" : "Informar Meu Monitor →"}
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {isSelected && (
-                  <div className="p-2.5 rounded-lg bg-emerald-50/90 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 flex items-start gap-2 text-[11px] text-emerald-900 dark:text-emerald-200">
-                    <Info className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                    <span>
-                      <strong>Confirmação ativa:</strong> Você está comprando o{" "}
-                      <strong>{cabinetName} ({formatBRL(cabinetBasePixCents)})</strong> +{" "}
-                      <strong>
-                        {activeSubItems.length} {activeSubItems.length === 1 ? "peça do Kit" : "peças do Kit"} (+ {formatBRL(kitTotalCents)})
-                      </strong>
-                      . Se desejava comprar <u>apenas o gabinete</u>, clique em{" "}
-                      <strong>&quot;Remover Kit (Só Gabinete)&quot;</strong> acima.
-                    </span>
-                  </div>
+                {effectiveHighlightedMonitor?.isCustom ? (
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                ) : (
+                  <Edit3 className="w-3 h-3" />
                 )}
               </div>
-            );
-          })}
-        </div>
-      )}
+            </div>
+          </Card>
+        )}
+      </div>
 
       {/* Link Discreto para Personalização Especial de Engenharia */}
       <div className="pt-1 text-center">
@@ -776,36 +398,19 @@ export const StepMonitor: React.FC<StepMonitorProps> = ({
         </button>
       </div>
 
-      {/* Modal Interativo de Medidas do Monitor Sob Medida (Tela Grande + Diagrama Visual) */}
+      {/* Modal Interativo de Medidas do Monitor Sob Medida */}
       <CustomMonitorModal
         isOpen={isEditorOpen}
         onClose={() => setIsEditorOpen(false)}
         initialMonitor={editorTargetMonitor}
         onSave={(customMon) => {
-          if (isKitCutoutMonitorMode || (isSelectedKit && !hasMonitorInSelectedKit)) {
+          if (isCutoutForKitFlow) {
             handleSelectCutoutMonitorForKit(customMon);
           } else {
             onSelectMonitor(customMon);
           }
           setIsEditorOpen(false);
         }}
-      />
-
-      {/* Modal Didático de Confirmação e Personalização do Kit de Montagem */}
-      <KitCustomizationModal
-        isOpen={isKitModalOpen}
-        onClose={() => setIsKitModalOpen(false)}
-        initialItems={
-          activeKitTarget?.kitItems ||
-          (isItemKit(selectedMonitor)
-            ? getEffectiveKitItems(selectedMonitor)
-            : getEffectiveKitItems())
-        }
-        onSave={handleSaveKitItems}
-        onRemoveKit={handleRemoveKit}
-        cabinetName={cabinetName}
-        cabinetBasePixCents={cabinetBasePixCents}
-        cabinetBaseCardCents={cabinetBaseCardCents}
       />
     </div>
   );
