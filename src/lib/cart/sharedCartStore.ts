@@ -30,27 +30,162 @@ const LOCAL_SHARED_CARTS_FILE = path.join(DATA_DIR, "shared_carts.json");
 
 let collectionEnsured = false;
 
-async function appwriteAdminFetch(apiPath: string, method = "GET", body?: unknown) {
+type AppwriteAdminResponse = { ok: boolean; status: number; data: any };
+type AppwriteAdminRequester = (
+  apiPath: string,
+  method?: string,
+  body?: unknown
+) => Promise<AppwriteAdminResponse>;
+
+async function appwriteAdminFetch(
+  apiPath: string,
+  method = "GET",
+  body?: unknown
+): Promise<AppwriteAdminResponse> {
   const apiKey = APPWRITE_CONFIG.apiKey || process.env.APPWRITE_API_KEY || "";
   if (!apiKey) return { ok: false, status: 401, data: null };
 
-  const res = await fetch(`${APPWRITE_CONFIG.endpoint}${apiPath}`, {
-    method,
-    headers: {
-      "X-Appwrite-Project": APPWRITE_CONFIG.projectId,
-      "X-Appwrite-Key": apiKey,
-      "Content-Type": "application/json",
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
-
-  let data: any = null;
   try {
-    data = await res.json();
+    const res = await fetch(`${APPWRITE_CONFIG.endpoint}${apiPath}`, {
+      method,
+      headers: {
+        "X-Appwrite-Project": APPWRITE_CONFIG.projectId,
+        "X-Appwrite-Key": apiKey,
+        "Content-Type": "application/json",
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+
+    let data: any = null;
+    try {
+      data = await res.json();
+    } catch {
+      data = null;
+    }
+    return { ok: res.ok, status: res.status, data };
   } catch {
-    data = null;
+    return { ok: false, status: 0, data: null };
   }
-  return { ok: res.ok, status: res.status, data };
+}
+
+export async function provisionSharedCartsCollection(options?: {
+  requester?: AppwriteAdminRequester;
+  dbId?: string;
+  colId?: string;
+  pollIntervalMs?: number;
+  maxPolls?: number;
+}): Promise<boolean> {
+  const req = options?.requester || appwriteAdminFetch;
+  const dbId = options?.dbId || APPWRITE_CONFIG.databaseId;
+  const colId = options?.colId || APPWRITE_CONFIG.collections.sharedCarts;
+  const pollIntervalMs = options?.pollIntervalMs ?? 500;
+  const maxPolls = options?.maxPolls ?? 16;
+
+  const checkRes = await req(`/databases/${dbId}/collections/${colId}`, "GET");
+  let existingData = checkRes.ok ? checkRes.data : null;
+
+  if (!checkRes.ok) {
+    if (checkRes.status !== 404) {
+      return false;
+    }
+
+    // Provisionamento automático idempotente da coleção 'shared_carts'
+    const createCol = await req(`/databases/${dbId}/collections`, "POST", {
+      collectionId: colId,
+      name: "Montagens Compartilhadas de Carrinho",
+      permissions: [],
+      documentSecurity: false,
+    });
+
+    if (!createCol.ok && createCol.status !== 409) {
+      console.warn("[SharedCartStore] Falha ao criar coleção shared_carts:", createCol.data);
+      return false;
+    }
+
+    const strAttrs: Array<[string, number, boolean, string | null]> = [
+      ["share_code", 64, true, null],
+      ["title", 160, false, ""],
+      ["coupon_code", 64, false, ""],
+      ["payload_json", 65535, true, null],
+      ["created_at", 64, true, null],
+    ];
+
+    for (const [key, size, required, def] of strAttrs) {
+      await req(`/databases/${dbId}/collections/${colId}/attributes/string`, "POST", {
+        key,
+        size,
+        required,
+        ...(required || def === null ? {} : { default: def }),
+      });
+    }
+
+    const intAttrs: Array<[string, boolean, number | null]> = [
+      ["items_count", true, null],
+      ["pix_total_cents", true, null],
+      ["card_total_cents", true, null],
+      ["views_count", false, 0],
+    ];
+
+    for (const [key, required, def] of intAttrs) {
+      await req(`/databases/${dbId}/collections/${colId}/attributes/integer`, "POST", {
+        key,
+        required,
+        ...(required || def === null ? {} : { default: def }),
+      });
+    }
+  }
+
+  // Verifica e aguarda TODOS os 9 atributos ficarem 'available' ANTES de criar o índice
+  let readyData: any = existingData;
+  let allAttributesReady = false;
+
+  const isCollectionReady = (colData: any): boolean => {
+    const attrs = Array.isArray(colData?.attributes) ? colData.attributes : [];
+    const availableCount = attrs.filter((a: any) => a.status === "available").length;
+    const shareCodeReady = attrs.some(
+      (a: any) => a.key === "share_code" && a.status === "available"
+    );
+    return availableCount >= 9 && shareCodeReady;
+  };
+
+  if (readyData && isCollectionReady(readyData)) {
+    allAttributesReady = true;
+  } else {
+    for (let attempt = 0; attempt < maxPolls; attempt++) {
+      await new Promise((r) => setTimeout(r, pollIntervalMs));
+      const colInfo = await req(`/databases/${dbId}/collections/${colId}`, "GET");
+      if (colInfo.ok && isCollectionReady(colInfo.data)) {
+        readyData = colInfo.data;
+        allAttributesReady = true;
+        break;
+      }
+    }
+  }
+
+  if (!allAttributesReady) {
+    return false;
+  }
+
+  const indexes = Array.isArray(readyData?.indexes) ? readyData.indexes : [];
+  const hasShareCodeIndex = indexes.some(
+    (idx: any) =>
+      idx.key === "idx_shared_cart_code" ||
+      (Array.isArray(idx.attributes) && idx.attributes.includes("share_code"))
+  );
+
+  if (!hasShareCodeIndex) {
+    const idxRes = await req(`/databases/${dbId}/collections/${colId}/indexes`, "POST", {
+      key: "idx_shared_cart_code",
+      type: "key",
+      attributes: ["share_code"],
+    });
+    if (!idxRes.ok && idxRes.status !== 409) {
+      console.warn("[SharedCartStore] Falha ao criar índice idx_shared_cart_code:", idxRes.data);
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export async function ensureSharedCartsCollection(): Promise<boolean> {
@@ -58,84 +193,11 @@ export async function ensureSharedCartsCollection(): Promise<boolean> {
   if (!apiKey) return false;
   if (collectionEnsured) return true;
 
-  const dbId = APPWRITE_CONFIG.databaseId;
-  const colId = APPWRITE_CONFIG.collections.sharedCarts;
-
-  const checkRes = await appwriteAdminFetch(`/databases/${dbId}/collections/${colId}`, "GET");
-  if (checkRes.ok) {
+  const ready = await provisionSharedCartsCollection();
+  if (ready) {
     collectionEnsured = true;
-    return true;
   }
-
-  if (checkRes.status !== 404) {
-    return false;
-  }
-
-  // Provisionamento automático idempotente da coleção 'shared_carts'
-  const createCol = await appwriteAdminFetch(`/databases/${dbId}/collections`, "POST", {
-    collectionId: colId,
-    name: "Montagens Compartilhadas de Carrinho",
-    permissions: [],
-    documentSecurity: false,
-  });
-
-  if (!createCol.ok && createCol.status !== 409) {
-    console.warn("[SharedCartStore] Falha ao criar coleção shared_carts:", createCol.data);
-    return false;
-  }
-
-  const strAttrs: Array<[string, number, boolean, string | null]> = [
-    ["share_code", 64, true, null],
-    ["title", 160, false, ""],
-    ["coupon_code", 64, false, ""],
-    ["payload_json", 65535, true, null],
-    ["created_at", 64, true, null],
-  ];
-
-  for (const [key, size, required, def] of strAttrs) {
-    await appwriteAdminFetch(`/databases/${dbId}/collections/${colId}/attributes/string`, "POST", {
-      key,
-      size,
-      required,
-      ...(required || def === null ? {} : { default: def }),
-    });
-  }
-
-  const intAttrs: Array<[string, boolean, number | null]> = [
-    ["items_count", true, null],
-    ["pix_total_cents", true, null],
-    ["card_total_cents", true, null],
-    ["views_count", false, 0],
-  ];
-
-  for (const [key, required, def] of intAttrs) {
-    await appwriteAdminFetch(`/databases/${dbId}/collections/${colId}/attributes/integer`, "POST", {
-      key,
-      required,
-      ...(required || def === null ? {} : { default: def }),
-    });
-  }
-
-  await appwriteAdminFetch(`/databases/${dbId}/collections/${colId}/indexes`, "POST", {
-    key: "idx_shared_cart_code",
-    type: "key",
-    attributes: ["share_code"],
-  });
-
-  // Aguarda propagação inicial dos atributos no Appwrite (até ~6s)
-  for (let attempt = 0; attempt < 12; attempt++) {
-    await new Promise((r) => setTimeout(r, 500));
-    const colInfo = await appwriteAdminFetch(`/databases/${dbId}/collections/${colId}`, "GET");
-    const attrs = Array.isArray(colInfo.data?.attributes) ? colInfo.data.attributes : [];
-    const readyCount = attrs.filter((a: any) => a.status === "available").length;
-    if (readyCount >= 9) {
-      collectionEnsured = true;
-      return true;
-    }
-  }
-
-  collectionEnsured = true;
-  return true;
+  return ready;
 }
 
 function readLocalSharedCarts(): SharedCartRecord[] {

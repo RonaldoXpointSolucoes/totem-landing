@@ -22,6 +22,7 @@ import {
   createSharedCart,
   getSharedCartByCode,
   deleteSharedCartLocalForTest,
+  provisionSharedCartsCollection,
 } from "../src/lib/cart/sharedCartStore";
 
 async function runTests() {
@@ -230,6 +231,72 @@ async function runTests() {
   assert.equal(missing, null, "Código inexistente deve retornar null");
   deleteSharedCartLocalForTest(created.record.shareCode);
   console.log("✓ Teste 6: Persistência e reidratação no sharedCartStore passou");
+
+  // 7. Regressão Important #1: índice share_code só pode ser criado APÓS atributos ficarem 'available'
+  const callOrder: string[] = [];
+  let pollCount = 0;
+  let shareCodeAvailable = false;
+  const mockRequester = async (apiPath: string, method = "GET") => {
+    callOrder.push(`${method} ${apiPath}`);
+    if (method === "GET" && apiPath.endsWith("/collections/shared_carts")) {
+      if (pollCount === 0 && !callOrder.some((c) => c.startsWith("POST /databases/db/collections/shared_carts/attributes"))) {
+        return { ok: false, status: 404, data: null };
+      }
+      pollCount++;
+      if (pollCount >= 2) {
+        shareCodeAvailable = true;
+        const readyAttrs = [
+          "share_code", "title", "coupon_code", "payload_json", "created_at",
+          "items_count", "pix_total_cents", "card_total_cents", "views_count",
+        ].map((key) => ({ key, status: "available" }));
+        return { ok: true, status: 200, data: { attributes: readyAttrs, indexes: [] } };
+      }
+      return { ok: true, status: 200, data: { attributes: [{ key: "share_code", status: "processing" }], indexes: [] } };
+    }
+    if (method === "POST" && apiPath.endsWith("/indexes")) {
+      assert.equal(
+        shareCodeAvailable,
+        true,
+        "Índice idx_shared_cart_code não pode ser criado antes de share_code estar 'available'"
+      );
+      return { ok: true, status: 201, data: {} };
+    }
+    return { ok: true, status: 201, data: {} };
+  };
+
+  const okProvision = await provisionSharedCartsCollection({
+    requester: mockRequester,
+    dbId: "db",
+    colId: "shared_carts",
+    pollIntervalMs: 1,
+    maxPolls: 5,
+  });
+  assert.equal(okProvision, true, "Provisionamento deve retornar true após propagação");
+  assert.equal(
+    callOrder.some((c) => c === "POST /databases/db/collections/shared_carts/indexes"),
+    true,
+    "Deve criar índice idx_shared_cart_code após atributos disponíveis"
+  );
+
+  // Cenário timeout: atributos nunca ficam available -> deve retornar false e não criar índice
+  const stuckRequester = async (apiPath: string, method = "GET") => {
+    if (method === "GET" && apiPath.endsWith("/collections/shared_carts")) {
+      return { ok: true, status: 200, data: { attributes: [{ key: "share_code", status: "processing" }], indexes: [] } };
+    }
+    if (method === "POST" && apiPath.endsWith("/indexes")) {
+      throw new Error("Não deveria tentar criar índice enquanto atributos não estão disponíveis");
+    }
+    return { ok: true, status: 201, data: {} };
+  };
+  const stuckResult = await provisionSharedCartsCollection({
+    requester: stuckRequester,
+    dbId: "db",
+    colId: "shared_carts",
+    pollIntervalMs: 1,
+    maxPolls: 2,
+  });
+  assert.equal(stuckResult, false, "Timeout de propagação deve retornar false para permitir retry posterior");
+  console.log("✓ Teste 7: Regressão ensureSharedCartsCollection ordem índice/atributos passou");
 }
 
 runTests().catch((err) => {
