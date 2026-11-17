@@ -308,10 +308,14 @@ export function initClientTelemetry(): void {
             const isExpectedAuthCheckOrFailure =
               response.status === 401 &&
               (url.includes("/api/admin/auth") || url.includes("/api/auth/"));
+            const isExpectedLookupNotFound =
+              (response.status === 404 && url.includes("/api/carts/share/")) ||
+              ((response.status === 400 || response.status === 404) &&
+                url.includes("/api/coupons/validate"));
 
             recordClientBreadcrumb("api", `Falha ${response.status} em ${url} (${duration}ms)`);
 
-            if (!isExpectedAuthCheckOrFailure) {
+            if (!isExpectedAuthCheckOrFailure && !isExpectedLookupNotFound) {
               // Para erros de servidor (5xx) ou falhas críticas de checkout/frete, reporta
               const isCriticalApi =
                 url.includes("/shipping/quote") ||

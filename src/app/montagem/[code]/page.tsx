@@ -61,6 +61,7 @@ export default async function SharedAssemblyPage({
         <SharedAssemblyLoader
           code={code}
           initialAssembly={result?.assembly || null}
+          initialCheckedOnServer={true}
         />
       </main>
       <Footer />

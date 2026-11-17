@@ -25,11 +25,13 @@ import {
 interface SharedAssemblyLoaderProps {
   code: string;
   initialAssembly: HydratedSharedCartPayload | null;
+  initialCheckedOnServer?: boolean;
 }
 
 export const SharedAssemblyLoader: React.FC<SharedAssemblyLoaderProps> = ({
   code,
   initialAssembly,
+  initialCheckedOnServer = false,
 }) => {
   const router = useRouter();
   const {
@@ -43,17 +45,21 @@ export const SharedAssemblyLoader: React.FC<SharedAssemblyLoaderProps> = ({
   } = useCart();
 
   const [assembly, setAssembly] = useState<HydratedSharedCartPayload | null>(initialAssembly);
-  const [isFetching, setIsFetching] = useState<boolean>(!initialAssembly);
-  const [notFoundError, setNotFoundError] = useState<string | null>(null);
+  const [isFetching, setIsFetching] = useState<boolean>(!initialAssembly && !initialCheckedOnServer);
+  const [notFoundError, setNotFoundError] = useState<string | null>(
+    !initialAssembly && initialCheckedOnServer
+      ? "Esta montagem compartilhada não foi encontrada ou expirou."
+      : null
+  );
   const [phase, setPhase] = useState<"checking" | "conflict" | "redirecting" | "not_found">(
-    initialAssembly ? "checking" : "checking"
+    !initialAssembly && initialCheckedOnServer ? "not_found" : "checking"
   );
 
   const decisionMadeRef = useRef(false);
 
-  // Caso não tenha vindo hidratado do SSR, tenta carregar pela API pública
+  // Caso não tenha vindo verificado pelo SSR, tenta carregar pela API pública
   useEffect(() => {
-    if (initialAssembly) return;
+    if (initialAssembly || initialCheckedOnServer) return;
     let cancelled = false;
     setIsFetching(true);
 

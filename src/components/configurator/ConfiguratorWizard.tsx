@@ -70,6 +70,39 @@ interface ConfiguratorWizardProps {
   onBackToHome?: () => void;
 }
 
+function buildInitialKitMonitorFromUrl(
+  baseKit: MonitorOption,
+  params: URLSearchParams,
+  monitorsList: MonitorOption[]
+): MonitorOption {
+  const removedRaw = params.get("kitRemovidos") || "";
+  const removedSet = new Set(
+    removedRaw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+  );
+  const baseEffective = getEffectiveKitItems(baseKit);
+  const effective = baseEffective.map((sub) =>
+    removedSet.has(sub.id) ? { ...sub, selected: false } : sub
+  );
+  const cutoutId = params.get("recorteMonitor")?.trim() || "";
+  const cutoutMatch = cutoutId
+    ? monitorsList.find((m) => m.id === cutoutId && !isItemKit(m)) || null
+    : null;
+
+  return {
+    ...baseKit,
+    isKit: true,
+    kitItems: effective,
+    priceAdjustmentCents: calculateKitTotalCents(effective),
+    cutoutMonitor: cutoutMatch
+      ? { ...cutoutMatch, isKit: false, priceAdjustmentCents: 0 }
+      : null,
+    notes: JSON.stringify({ kitItems: effective }),
+  };
+}
+
 export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
   initialModelId,
   initialStep,
@@ -122,11 +155,27 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
             if (!match) return prev;
             if (isItemKit(prev)) {
               const merged = mergeServerCatalogKitItems(match, prev.kitItems);
+              let resolvedCutout = prev.cutoutMonitor || null;
+              if (!resolvedCutout && typeof window !== "undefined") {
+                const cutoutId = new URLSearchParams(window.location.search).get("recorteMonitor")?.trim() || "";
+                if (cutoutId) {
+                  const foundCutout = freshMonitors.find((m) => m.id === cutoutId && !isItemKit(m));
+                  if (foundCutout) {
+                    resolvedCutout = { ...foundCutout, isKit: false, priceAdjustmentCents: 0 };
+                  }
+                }
+              } else if (resolvedCutout && !resolvedCutout.isCustom) {
+                const freshCutout = freshMonitors.find((m) => m.id === resolvedCutout!.id && !isItemKit(m));
+                if (freshCutout) {
+                  resolvedCutout = { ...freshCutout, isKit: false, priceAdjustmentCents: 0 };
+                }
+              }
               return {
                 ...merged,
-                cutoutMonitor: prev.cutoutMonitor || null,
+                cutoutMonitor: resolvedCutout,
               };
             }
+            if (prev.isCustom) return prev;
             return match;
           });
         }
@@ -161,22 +210,21 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const monParam = params.get("monitor");
+      const modoParam = params.get("modo");
+      if (modoParam === "kit") {
+        const defaultKit =
+          (monParam ? HOMOLOGATED_MONITORS.find((m) => m.id === monParam && isItemKit(m)) : null) ||
+          HOMOLOGATED_MONITORS.find((m) => isItemKit(m));
+        if (defaultKit) {
+          return buildInitialKitMonitorFromUrl(defaultKit, params, HOMOLOGATED_MONITORS);
+        }
+      }
       if (monParam) {
         const found = HOMOLOGATED_MONITORS.find((m) => m.id === monParam);
-        if (found) return found;
-      }
-      if (params.get("modo") === "kit") {
-        const defaultKit = HOMOLOGATED_MONITORS.find((m) => isItemKit(m));
-        if (defaultKit) {
-          const effective = getEffectiveKitItems(defaultKit);
-          return {
-            ...defaultKit,
-            isKit: true,
-            kitItems: effective,
-            priceAdjustmentCents: calculateKitTotalCents(effective),
-            cutoutMonitor: null,
-            notes: JSON.stringify({ kitItems: effective }),
-          };
+        if (found) {
+          return isItemKit(found)
+            ? buildInitialKitMonitorFromUrl(found, params, HOMOLOGATED_MONITORS)
+            : found;
         }
       }
     }
@@ -374,19 +422,37 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
         } else {
           url.searchParams.delete("monitor");
         }
+        if (isKitSelected) {
+          const removedIds = activeKitItems.filter((i) => !i.selected).map((i) => i.id);
+          if (removedIds.length > 0) {
+            url.searchParams.set("kitRemovidos", removedIds.join(","));
+          } else {
+            url.searchParams.delete("kitRemovidos");
+          }
+          if (selectedMonitor?.cutoutMonitor?.id) {
+            url.searchParams.set("recorteMonitor", selectedMonitor.cutoutMonitor.id);
+          } else {
+            url.searchParams.delete("recorteMonitor");
+          }
+        } else {
+          url.searchParams.delete("kitRemovidos");
+          url.searchParams.delete("recorteMonitor");
+        }
         if (selectedPrinter?.id) {
           url.searchParams.set("impressora", selectedPrinter.id);
         } else {
           url.searchParams.delete("impressora");
         }
-        if (!useReader) {
+        if (isKitSelected) {
+          url.searchParams.delete("leitor");
+        } else if (!useReader) {
           url.searchParams.set("leitor", "none");
         } else if (selectedReader?.id) {
           url.searchParams.set("leitor", selectedReader.id);
         } else {
           url.searchParams.delete("leitor");
         }
-        if (includeAssemblyService) {
+        if (isKitSelected && includeAssemblyService) {
           url.searchParams.set("montagem", "1");
         } else {
           url.searchParams.delete("montagem");
@@ -398,9 +464,12 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     step,
     step3View,
     purchaseMode,
+    isKitSelected,
+    activeKitItems,
     selectedModel.id,
     selectedColor?.id,
     selectedMonitor?.id,
+    selectedMonitor?.cutoutMonitor?.id,
     selectedPrinter?.id,
     useReader,
     selectedReader?.id,
@@ -425,6 +494,8 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     }
   }, [step, selectedModel]);
 
+  const effectiveStandaloneReader = isKitSelected ? null : useReader ? selectedReader : null;
+
   // 2. Motor de Cálculo de Preço Reativo e Autoritativo
   const pricing = useMemo(() => {
     return calculateTotemPrice({
@@ -432,12 +503,12 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
       color: selectedColor,
       monitor: selectedMonitor,
       printer: selectedPrinter,
-      barcodeReader: useReader ? selectedReader : null,
+      barcodeReader: effectiveStandaloneReader,
       customization: null,
       kitAdjustmentCents: isKitSelected ? kitAdjustmentCents : undefined,
       includeAssemblyService: isKitSelected && includeAssemblyService,
     });
-  }, [selectedModel, selectedColor, selectedMonitor, selectedPrinter, useReader, selectedReader, isKitSelected, kitAdjustmentCents, includeAssemblyService]);
+  }, [selectedModel, selectedColor, selectedMonitor, selectedPrinter, effectiveStandaloneReader, isKitSelected, kitAdjustmentCents, includeAssemblyService]);
 
   const currentBuiltShareItems = useMemo<CartItem[]>(() => {
     const targetId = editingItem?.id || lastAddedItemId;
@@ -448,7 +519,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
       color: selectedColor,
       monitor: selectedMonitor,
       printer: selectedPrinter,
-      barcodeReader: useReader ? selectedReader : null,
+      barcodeReader: effectiveStandaloneReader,
       customizationNotes: customizationNotes.trim() || undefined,
       calculatedPriceCents: pricing.pixTotalPriceCents,
       includeAssemblyService: isKitSelected ? includeAssemblyService : false,
@@ -548,10 +619,16 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     setPurchaseMode("cabinet");
     setIncludeAssemblyService(false);
     if (isItemKit(selectedMonitor)) {
-      const recoveredMonitor =
-        selectedMonitor?.cutoutMonitor && !isItemKit(selectedMonitor.cutoutMonitor)
-          ? selectedMonitor.cutoutMonitor
-          : null;
+      const cutout = selectedMonitor?.cutoutMonitor;
+      let recoveredMonitor: MonitorOption | null = null;
+      if (cutout && !isItemKit(cutout)) {
+        if (cutout.isCustom) {
+          recoveredMonitor = cutout;
+        } else {
+          const canonicalMatch = catalog.monitors.find((m) => m.id === cutout.id && !isItemKit(m));
+          recoveredMonitor = canonicalMatch || cutout;
+        }
+      }
       setSelectedMonitor(recoveredMonitor);
     }
     setStep(3);
@@ -562,6 +639,10 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
   // Troca imediata para Rota B ("Quero Gabinete + Kit de Montagem") -> abre personalização do Kit + Montagem
   const handleChooseKitMode = () => {
     setPurchaseMode("kit");
+    // Limpa eventual leitor selecionado na rota "Apenas Gabinete" para não vazar cobrança oculta no Kit
+    setSelectedReader(null);
+    setUseReader(false);
+    setReaderConfigured(false);
     if (!isItemKit(selectedMonitor) && defaultKitMonitor) {
       const effectiveItems = getEffectiveKitItems(defaultKitMonitor);
       const totalCents = calculateKitTotalCents(effectiveItems);
@@ -813,7 +894,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
       color: selectedColor,
       monitor: selectedMonitor,
       printer: selectedPrinter,
-      barcodeReader: useReader ? selectedReader : null,
+      barcodeReader: effectiveStandaloneReader,
       customizationNotes: customizationNotes.trim() || undefined,
       calculatedPriceCents: pricing.pixTotalPriceCents,
       includeAssemblyService: isKitSelected ? includeAssemblyService : false,
@@ -841,8 +922,8 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
       monitorName: selectedMonitor?.displayName || "",
       printerId: selectedPrinter?.id || "",
       printerName: selectedPrinter?.displayName || "",
-      readerId: useReader && selectedReader ? selectedReader.id : "",
-      readerName: useReader && selectedReader ? selectedReader.displayName : "",
+      readerId: effectiveStandaloneReader ? effectiveStandaloneReader.id : "",
+      readerName: effectiveStandaloneReader ? effectiveStandaloneReader.displayName : "",
       isKitSelected,
       pixPriceCents: pricing.pixTotalPriceCents,
       cardPriceCents: pricing.totalPriceCents,
@@ -867,7 +948,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
       color: selectedColor,
       monitor: selectedMonitor,
       printer: selectedPrinter,
-      barcodeReader: useReader ? selectedReader : null,
+      barcodeReader: effectiveStandaloneReader,
       customization: null,
       kitAdjustmentCents: isKitSelected ? kitAdjustmentCents : undefined,
       includeAssemblyService: isKitSelected && nextVal,
@@ -880,7 +961,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
         color: selectedColor,
         monitor: selectedMonitor,
         printer: selectedPrinter,
-        barcodeReader: useReader ? selectedReader : null,
+        barcodeReader: effectiveStandaloneReader,
         customizationNotes: customizationNotes.trim() || undefined,
         calculatedPriceCents: updatedPricing.pixTotalPriceCents,
         includeAssemblyService: isKitSelected ? nextVal : false,
@@ -1553,8 +1634,8 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                 color={selectedColor}
                 monitor={selectedMonitor}
                 printer={selectedPrinter}
-                reader={selectedReader}
-                useReader={useReader}
+                reader={effectiveStandaloneReader}
+                useReader={!isKitSelected && useReader}
                 pricing={pricing}
                 includeAssemblyService={includeAssemblyService}
                 onToggleAssemblyService={setIncludeAssemblyService}
@@ -1803,11 +1884,15 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
           <TotemViewer3DWrapper
             selectedModel={selectedModel}
             selectedColor={selectedColor}
-            selectedMonitor={selectedMonitor}
+            selectedMonitor={
+              step === 3 && step3View === "kit-cutout-monitor" && selectedCutoutMonitor
+                ? selectedCutoutMonitor
+                : selectedMonitor
+            }
             selectedPrinter={selectedPrinter}
             selectedReader={selectedReader}
             useReader={useReader}
-            currentStep={step}
+            currentStep={step === 3 && step3View === "choice" ? 2 : step}
             hasPrinter={!!selectedPrinter}
             hasScanner={useReader && !!selectedReader}
           />
