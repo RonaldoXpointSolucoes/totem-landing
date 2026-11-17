@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { formatBRL } from "@/modules/pricing/pricingEngine";
+import { formatBRL, simulateMercadoPagoCardBreakdown } from "@/modules/pricing/pricingEngine";
 import { Button } from "@/components/ui";
 import { ArrowRight, ShoppingCart, ChevronLeft } from "lucide-react";
 
@@ -57,11 +57,14 @@ export const StickyBottomBar: React.FC<StickyBottomBarProps> = ({
                 {formatBRL(totalPriceCents)}
               </span>
             </div>
-            {cardTotalPriceCents && cardTotalPriceCents > totalPriceCents && (
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium leading-tight">
-                ou em até 10x de {formatBRL(Math.round(cardTotalPriceCents / 10))} no cartão
-              </span>
-            )}
+            {cardTotalPriceCents && cardTotalPriceCents > totalPriceCents && (() => {
+              const cardSim = simulateMercadoPagoCardBreakdown(totalPriceCents);
+              return (
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium leading-tight truncate max-w-[210px] sm:max-w-none">
+                  Cartão: 1x {formatBRL(cardSim.safeCardChargeCents)} · 10x ~{formatBRL(cardSim.buyer10xInstallmentCents)} (MP)
+                </span>
+              );
+            })()}
           </div>
         </div>
 

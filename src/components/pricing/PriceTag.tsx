@@ -1,12 +1,12 @@
 "use client";
 
 import React from "react";
-import { formatBRL } from "@/modules/pricing/pricingEngine";
+import { formatBRL, simulateMercadoPagoCardBreakdown } from "@/modules/pricing/pricingEngine";
 import { Zap, CreditCard } from "lucide-react";
 
 export interface PriceTagProps {
   pixPriceCents: number;
-  cardPriceCents: number;
+  cardPriceCents?: number;
   anchorPriceCents?: number;
   installments?: number;
   size?: "sm" | "md" | "lg";
@@ -16,7 +16,6 @@ export interface PriceTagProps {
 
 export function PriceTag({
   pixPriceCents,
-  cardPriceCents,
   anchorPriceCents,
   installments = 10,
   size = "md",
@@ -24,20 +23,20 @@ export function PriceTag({
   className = "",
 }: PriceTagProps) {
   const safePix = Math.max(0, pixPriceCents);
-  const safeCard = Math.max(0, cardPriceCents || safePix);
+  const cardSim = simulateMercadoPagoCardBreakdown(safePix);
+  const safeCard1x = cardSim.safeCardChargeCents;
   const safeInstallments = Math.max(1, installments);
-  const monthlyCents = Math.round(safeCard / safeInstallments);
 
-  // Calcula desconto do PIX em relação ao cartão se houver diferença
+  // Calcula economia real do PIX frente ao parcelado 10x (ou âncora)
   const discountPercent =
-    safeCard > safePix
-      ? Math.round(((safeCard - safePix) / safeCard) * 100)
+    cardSim.buyer10xTotalCents > safePix
+      ? Math.round(((cardSim.buyer10xTotalCents - safePix) / cardSim.buyer10xTotalCents) * 100)
       : 0;
 
   return (
     <div className={`space-y-1 ${className}`}>
       {/* Preço Âncora "De" (se configurado) */}
-      {showAnchor && anchorPriceCents && anchorPriceCents > safeCard && (
+      {showAnchor && anchorPriceCents && anchorPriceCents > safeCard1x && (
         <div className="flex items-center gap-1.5">
           <span className="text-[11px] text-slate-600 dark:text-slate-400 line-through font-medium">
             De {formatBRL(anchorPriceCents)}
@@ -69,16 +68,19 @@ export function PriceTag({
         </span>
       </div>
 
-      {/* Linha Secundária: Parcelamento no Cartão */}
-      {safeCard > 0 && (
-        <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400 font-medium">
-          <CreditCard className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+      {/* Linha Secundária: Cartão 1x real + 10x fiel ao Mercado Pago */}
+      {safeCard1x > 0 && (
+        <div className="flex items-start gap-1.5 text-[11px] sm:text-xs text-slate-600 dark:text-slate-400 font-medium leading-snug">
+          <CreditCard className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
           <span>
-            ou em até{" "}
+            ou{" "}
             <strong className="text-slate-800 dark:text-slate-200 font-bold">
-              {safeInstallments}x de {formatBRL(monthlyCents)}
+              1x de {formatBRL(safeCard1x)}
             </strong>{" "}
-            no cartão
+            no cartão{" "}
+            <span className="text-slate-500 dark:text-slate-400">
+              (ou até {safeInstallments}x de ~{formatBRL(cardSim.buyer10xInstallmentCents)} c/ juros MP)
+            </span>
           </span>
         </div>
       )}

@@ -8,7 +8,12 @@ import {
   HOMOLOGATED_PRINTERS,
   HOMOLOGATED_READERS,
 } from "@/modules/catalog/catalogData";
-import { calculateTotemPrice, formatBRL } from "@/modules/pricing/pricingEngine";
+import {
+  ASSEMBLY_SERVICE_PRICE_CENTS,
+  calculateTotemPrice,
+  formatBRL,
+  simulateMercadoPagoCardBreakdown,
+} from "@/modules/pricing/pricingEngine";
 import {
   CabinetModel,
   ColorOption,
@@ -1001,7 +1006,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
       readerName: effectiveStandaloneReader ? effectiveStandaloneReader.displayName : "",
       isKitSelected,
       pixPriceCents: pricing.pixTotalPriceCents,
-      cardPriceCents: pricing.totalPriceCents,
+      cardPriceCents: pricing.cardTotalPriceCents,
       totalCents: pricing.pixTotalPriceCents,
       totalPriceCents: pricing.totalPriceCents,
       customizationNotes: customizationNotes.trim() || "",
@@ -1576,11 +1581,19 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                       {formatBRL(pricing.pixTotalPriceCents)}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center text-[11px] text-slate-500 dark:text-slate-400">
-                    <span>No Cartão:</span>
-                    <span className="font-medium text-slate-600 dark:text-slate-300">
-                      ou em até 10x de {formatBRL(Math.round(pricing.cardTotalPriceCents / 10))} no cartão
-                    </span>
+                  <div className="space-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                    <div className="flex justify-between items-center gap-2">
+                      <span>Cartão 1x (à vista):</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-200">
+                        {formatBRL(pricing.cardTotalPriceCents)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center gap-2">
+                      <span>Cartão em 10x (juros MP):</span>
+                      <span className="font-medium text-slate-600 dark:text-slate-300">
+                        ~10x de {formatBRL(pricing.card10xInstallmentCents)}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1816,8 +1829,9 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                   no PIX à vista
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                ou em até 10x de {formatBRL(Math.round(pricing.cardTotalPriceCents / 10))} no cartão
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium leading-snug">
+                Cartão: <strong className="text-slate-700 dark:text-slate-200">1x de {formatBRL(pricing.cardTotalPriceCents)}</strong>{" "}
+                · ou até 10x de ~{formatBRL(pricing.card10xInstallmentCents)} (Total ~{formatBRL(pricing.card10xTotalPriceCents)} c/ juros MP)
               </p>
             </div>
           </div>
@@ -1876,10 +1890,11 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                   <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-amber-500/20">
                     <div className="text-xs">
                       <span className="font-black text-amber-600 dark:text-amber-400 text-sm">
-                        + R$ 999,00
+                        + {formatBRL(ASSEMBLY_SERVICE_PRICE_CENTS)} no PIX
                       </span>
-                      <span className="text-[10px] text-slate-500 ml-1">
-                        ou em até 10x de R$ 99,90
+                      <span className="text-[10px] text-slate-500 ml-1 block sm:inline">
+                        ou 1x {formatBRL(simulateMercadoPagoCardBreakdown(ASSEMBLY_SERVICE_PRICE_CENTS).safeCardChargeCents)} · ~10x de{" "}
+                        {formatBRL(simulateMercadoPagoCardBreakdown(ASSEMBLY_SERVICE_PRICE_CENTS).buyer10xInstallmentCents)} (MP)
                       </span>
                     </div>
                     <Button

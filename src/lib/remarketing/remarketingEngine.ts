@@ -5,6 +5,7 @@ import { APPWRITE_CONFIG } from "@/lib/appwrite/config";
 import { getServerDatabases, listAllOrdersAdmin } from "@/lib/appwrite/server";
 import { getAllLocalOrders } from "@/lib/orders/orderStore";
 import { checkoutStatusToken } from "@/lib/payments/mercadoPago";
+import { estimateMercadoPago10xFromCardCharge } from "@/modules/pricing/pricingEngine";
 import {
   COMMERCIAL_WHATSAPP_INSTANCE_ID,
   COMMERCIAL_WHATSAPP_INSTANCE_NAME,
@@ -388,8 +389,14 @@ export function buildRemarketingTemplates(params: {
       : `Olá! Tudo bem?`;
 
   const totalFormatted = formatBRL(params.totalCents);
+  const card10xEst =
+    params.paymentMethod === "credit_card"
+      ? estimateMercadoPago10xFromCardCharge(params.totalCents)
+      : null;
   const methodText =
-    params.paymentMethod === "credit_card" ? "Cartão de Crédito (até 10x)" : "PIX à Vista";
+    params.paymentMethod === "credit_card" && card10xEst
+      ? `Cartão de Crédito (1x ${totalFormatted} ou até 10x de ~${formatBRL(card10xEst.buyer10xInstallmentCents)} c/ juros MP)`
+      : "PIX à Vista";
 
   const softSupport =
     `${greeting}\n\n` +

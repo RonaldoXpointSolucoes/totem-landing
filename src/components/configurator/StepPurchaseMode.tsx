@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Card } from "@/components/ui";
-import { formatBRL } from "@/modules/pricing/pricingEngine";
+import { formatBRL, simulateMercadoPagoCardBreakdown } from "@/modules/pricing/pricingEngine";
 import {
   Package,
   Boxes,
@@ -45,6 +45,8 @@ export const StepPurchaseMode: React.FC<StepPurchaseModeProps> = ({
 }) => {
   const isCabinet = purchaseMode === "cabinet";
   const isKit = purchaseMode === "kit";
+  const cabinetCardSim = simulateMercadoPagoCardBreakdown(cabinetPixCents);
+  const kitCardSim = simulateMercadoPagoCardBreakdown(kitPixCents);
 
   return (
     <div className="space-y-4">
@@ -127,8 +129,9 @@ export const StepPurchaseMode: React.FC<StepPurchaseModeProps> = ({
                   no PIX • Valor atual
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                ou até 10x de {formatBRL(Math.round(cabinetCardCents / 10))} no cartão
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                Cartão: <strong className="text-slate-700 dark:text-slate-200">1x de {formatBRL(cabinetCardSim.safeCardChargeCents)}</strong>{" "}
+                · até 10x de ~{formatBRL(cabinetCardSim.buyer10xInstallmentCents)} (c/ juros MP)
               </p>
             </div>
 
@@ -205,8 +208,9 @@ export const StepPurchaseMode: React.FC<StepPurchaseModeProps> = ({
                   no PIX (Gabinete + Kit)
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                ou até 10x de {formatBRL(Math.round(kitCardCents / 10))} no cartão
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                Cartão: <strong className="text-slate-700 dark:text-slate-200">1x de {formatBRL(kitCardSim.safeCardChargeCents)}</strong>{" "}
+                · até 10x de ~{formatBRL(kitCardSim.buyer10xInstallmentCents)} (c/ juros MP)
               </p>
             </div>
 

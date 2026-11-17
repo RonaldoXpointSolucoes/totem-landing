@@ -62,6 +62,27 @@ export interface MercadoPagoCardSimulation {
 }
 
 /**
+ * Calcula a simulação de parcelamento em 10x aplicada pelo Mercado Pago sobre um valor já protegido (1x) do cartão.
+ */
+export function estimateMercadoPago10xFromCardCharge(cardChargeCents: number): {
+  card1xCents: number;
+  buyer10xInterestCents: number;
+  buyer10xTotalCents: number;
+  buyer10xInstallmentCents: number;
+} {
+  const safeCardChargeCents = Math.max(0, Math.round(Number(cardChargeCents) || 0));
+  const buyer10xInterestCents = Math.round(safeCardChargeCents * MERCADOPAGO_BUYER_10X_FINANCING_RATE);
+  const buyer10xTotalCents = safeCardChargeCents + buyer10xInterestCents;
+  const buyer10xInstallmentCents = Math.round(buyer10xTotalCents / 10);
+  return {
+    card1xCents: safeCardChargeCents,
+    buyer10xInterestCents,
+    buyer10xTotalCents,
+    buyer10xInstallmentCents,
+  };
+}
+
+/**
  * Simula todos os valores financeiros da cobrança em Cartão de Crédito no Mercado Pago ("Parcelado Cliente").
  */
 export function simulateMercadoPagoCardBreakdown(pixTargetCents: number): MercadoPagoCardSimulation {
@@ -80,9 +101,8 @@ export function simulateMercadoPagoCardBreakdown(pixTargetCents: number): Mercad
   const ifChargedWithoutProtectionNetCents = Math.max(0, safePix - ifChargedWithoutProtectionFeeCents);
 
   // Acréscimo de parcelamento cobrado do comprador pelo Mercado Pago caso ele escolha 10x (+20,65%)
-  const buyer10xInterestCents = Math.round(safeCardChargeCents * MERCADOPAGO_BUYER_10X_FINANCING_RATE);
-  const buyer10xTotalCents = safeCardChargeCents + buyer10xInterestCents;
-  const buyer10xInstallmentCents = Math.round(buyer10xTotalCents / 10);
+  const { buyer10xInterestCents, buyer10xTotalCents, buyer10xInstallmentCents } =
+    estimateMercadoPago10xFromCardCharge(safeCardChargeCents);
 
   return {
     pixTargetCents: safePix,
@@ -123,6 +143,8 @@ export interface PriceBreakdown {
   totalPriceCents: number;
   pixTotalPriceCents: number;
   cardTotalPriceCents: number;
+  card10xTotalPriceCents: number;
+  card10xInstallmentCents: number;
   maxInstallments: number;
 }
 
@@ -194,7 +216,9 @@ export function calculateTotemPrice(input: PriceCalculationInput): PriceBreakdow
     assemblyServiceAdjustmentCents;
 
   // Valor total a ser cobrado no Cartão com proteção integral (Gross-Up ÷ 0,95 sobre todo o item: Gabinete + Cor + Kit + Montagem)
-  const cardTotalPriceCents = calculateSafeCardChargeCents(pixTotalPriceCents);
+  // e simulação fiel do parcelamento em 10x aplicado pelo Mercado Pago (+20,65% sobre o valor cobrado no link)
+  const cardBreakdown = simulateMercadoPagoCardBreakdown(pixTotalPriceCents);
+  const cardTotalPriceCents = cardBreakdown.safeCardChargeCents;
 
   return {
     basePriceCents: cardBasePriceCents,
@@ -209,6 +233,8 @@ export function calculateTotemPrice(input: PriceCalculationInput): PriceBreakdow
     totalPriceCents: pixTotalPriceCents,
     pixTotalPriceCents,
     cardTotalPriceCents,
+    card10xTotalPriceCents: cardBreakdown.buyer10xTotalCents,
+    card10xInstallmentCents: cardBreakdown.buyer10xInstallmentCents,
     maxInstallments,
   };
 }

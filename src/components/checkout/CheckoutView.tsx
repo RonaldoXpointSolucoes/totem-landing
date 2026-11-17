@@ -5,7 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/modules/cart/CartContext";
 import { CustomerAuthModal } from "@/components/auth/CustomerAuthModal";
-import { formatBRL, calculateTotemPrice, calculateSafeCardChargeCents } from "@/modules/pricing/pricingEngine";
+import {
+  formatBRL,
+  calculateTotemPrice,
+  calculateSafeCardChargeCents,
+  simulateMercadoPagoCardBreakdown,
+  estimateMercadoPago10xFromCardCharge,
+} from "@/modules/pricing/pricingEngine";
 import { resolveKitEquipmentSummary } from "@/modules/catalog/kitDefaults";
 import { CustomerInfo, DeliveryAddress, OrderDetails, ManufacturingSpec } from "@/types/order";
 import { ShippingQuote, ShippingOptionId } from "@/types/shipping";
@@ -442,7 +448,8 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   const shippingCents = selectedShippingQuote ? selectedShippingQuote.priceCents : 0;
   const pixSubtotalCents = appliedCoupon && finalTotalPriceCents !== undefined ? finalTotalPriceCents : totalPriceCents;
   const pixTotalWithShippingCents = Math.max(0, pixSubtotalCents + shippingCents);
-  const cardTotalWithShippingCents = calculateSafeCardChargeCents(pixTotalWithShippingCents);
+  const checkoutCardBreakdown = simulateMercadoPagoCardBreakdown(pixTotalWithShippingCents);
+  const cardTotalWithShippingCents = checkoutCardBreakdown.safeCardChargeCents;
   const cardSubtotalCents = Math.max(0, cardTotalWithShippingCents - shippingCents);
   const effectiveSubtotalCents = paymentMethod === "credit_card" ? cardSubtotalCents : pixSubtotalCents;
   const finalTotalCents = paymentMethod === "credit_card" ? cardTotalWithShippingCents : pixTotalWithShippingCents;
@@ -1269,12 +1276,20 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   // TELA 2: AGUARDANDO PAGAMENTO PIX
   // ----------------------------------------------------
   if (step === "awaiting_card" && orderDetails) {
+    const awaitCard10x = estimateMercadoPago10xFromCardCharge(orderDetails.totalCents);
     return (
       <div className="max-w-lg mx-auto px-4 py-12 space-y-5 text-center">
         <CreditCard className="w-12 h-12 mx-auto text-blue-600" />
         <h1 className="text-2xl font-bold">Pagamento com Cartão de Crédito</h1>
-        <p>Pedido <strong>{orderDetails.orderNumber}</strong> · {formatBRL(orderDetails.totalCents)}</p>
-        <p className="text-sm text-slate-600 dark:text-slate-300">Conclua o pagamento no ambiente seguro do Mercado Pago. Você pode escolher até 10 parcelas ou combinar 2 cartões/saldo Mercado Pago.</p>
+        <p>
+          Pedido <strong>{orderDetails.orderNumber}</strong> ·{" "}
+          <strong>1x de {formatBRL(orderDetails.totalCents)}</strong>
+        </p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          No Mercado Pago, você paga <strong>1x de {formatBRL(orderDetails.totalCents)}</strong> (à vista no cartão) ou pode parcelar em até{" "}
+          <strong>10x de ~{formatBRL(awaitCard10x.buyer10xInstallmentCents)}</strong> (Total ~{formatBRL(awaitCard10x.buyer10xTotalCents)} com juros do parcelamento aplicados pela operadora).
+        </p>
+        <p className="text-sm text-slate-600 dark:text-slate-300">Conclua o pagamento no ambiente seguro do Mercado Pago. Você pode escolher de 1x até 10 parcelas ou combinar 2 cartões/saldo Mercado Pago.</p>
         {orderDetails.payment.checkoutUrl && (
           <a href={orderDetails.payment.checkoutUrl} className="block rounded-xl bg-blue-600 hover:bg-blue-500 px-4 py-3.5 font-bold text-white shadow-lg shadow-blue-600/20 transition">
             Continuar no Mercado Pago (Cartão até 10x)
@@ -2375,7 +2390,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   readerName: item.configuration.barcodeReader?.displayName,
                 });
                 const itemPixSubtotal = itemPricing.pixTotalPriceCents * item.quantity;
-                const itemCardSubtotal = itemPricing.cardTotalPriceCents * item.quantity;
+                const itemCardSim = simulateMercadoPagoCardBreakdown(itemPixSubtotal);
                 const monitorSummaryText = kitEq.isKit
                   ? kitEq.hasMonitorInKit
                     ? kitEq.includedSubItems.find((s) => s.category === "monitor")?.name || kitEq.kitMonitorModel
@@ -2411,7 +2426,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                           {formatBRL(itemPixSubtotal)} <span className="text-[9px] uppercase font-extrabold">no PIX</span>
                         </div>
                         <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                          {formatBRL(itemCardSubtotal)} no cartão (10x)
+                          Cartão: 1x {formatBRL(itemCardSim.safeCardChargeCents)} · 10x ~{formatBRL(itemCardSim.buyer10xInstallmentCents)} (MP)
                         </div>
                       </div>
                     </div>
@@ -2582,12 +2597,19 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                     {formatBRL(pixSubtotalCents + shippingCents)}
                   </span>
                 </div>
-                <div className="flex justify-between items-center text-[11px] text-slate-500 dark:text-slate-400 px-1">
-                  <span>No cartão:</span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-300">
-                    {formatBRL(cardSubtotalCents + shippingCents)} · até 10x
-
-                  </span>
+                <div className="space-y-1 text-[11px] text-slate-500 dark:text-slate-400 px-1">
+                  <div className="flex justify-between items-center gap-2">
+                    <span>Cartão 1x (à vista no cartão):</span>
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">
+                      {formatBRL(checkoutCardBreakdown.safeCardChargeCents)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center gap-2">
+                    <span>Parcelado em 10x (juros MP):</span>
+                    <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                      ~10x de {formatBRL(checkoutCardBreakdown.buyer10xInstallmentCents)} ({formatBRL(checkoutCardBreakdown.buyer10xTotalCents)})
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2610,10 +2632,39 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
               </label>
               <label className={`flex gap-3 rounded-xl border p-3 cursor-pointer ${paymentMethod === "credit_card" ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30" : "border-slate-200 dark:border-slate-700"}`}>
                 <input type="radio" name="paymentMethod" value="credit_card" checked={paymentMethod === "credit_card"} onChange={() => setPaymentMethod("credit_card")} />
-                <span className="text-sm"><strong className="block">Cartão de crédito em até 10x</strong><span>{formatBRL(cardSubtotalCents + shippingCents)} · acréscimos e parcelas informados pelo Mercado Pago</span></span>
+                <span className="text-sm space-y-0.5">
+                  <strong className="block">Cartão de crédito (1x ou até 10x no Mercado Pago)</strong>
+                  <span className="block text-xs text-slate-600 dark:text-slate-300 leading-snug">
+                    <strong>1x de {formatBRL(checkoutCardBreakdown.safeCardChargeCents)}</strong> (sem juros de parcelamento) ·{" "}
+                    <strong>até 10x de ~{formatBRL(checkoutCardBreakdown.buyer10xInstallmentCents)}</strong>{" "}
+                    (Total ~{formatBRL(checkoutCardBreakdown.buyer10xTotalCents)} c/ juros MP)
+                  </span>
+                </span>
               </label>
+              {paymentMethod === "credit_card" && (
+                <div className="p-2.5 rounded-xl bg-indigo-50/90 dark:bg-indigo-950/35 border border-indigo-200 dark:border-indigo-800/70 text-[11px] text-indigo-950 dark:text-indigo-200 space-y-1 leading-relaxed">
+                  <p className="font-bold">Transparência do parcelamento no Mercado Pago:</p>
+                  <p>
+                    Em <strong>1x no cartão</strong>, você paga exatamente{" "}
+                    <strong>{formatBRL(checkoutCardBreakdown.safeCardChargeCents)}</strong> (cobre apenas a taxa de 4,98% da operadora). Ao optar por{" "}
+                    <strong>2x a 10x</strong>, o Mercado Pago aplica os juros do parcelamento diretamente na tela final (ex.:{" "}
+                    <strong>10x de ~{formatBRL(checkoutCardBreakdown.buyer10xInstallmentCents)}</strong> = Total ~{formatBRL(checkoutCardBreakdown.buyer10xTotalCents)}).
+                  </p>
+                </div>
+              )}
               <p className="text-xs text-slate-500">Pagamento processado com segurança pelo Mercado Pago.</p>
-              <p className="flex justify-between text-sm font-bold"><span>Total selecionado</span><span>{formatBRL(finalTotalCents)}</span></p>
+              <div className="space-y-0.5">
+                <p className="flex justify-between text-sm font-bold">
+                  <span>{paymentMethod === "credit_card" ? "Total base (1x no cartão)" : "Total selecionado (PIX)"}</span>
+                  <span>{formatBRL(finalTotalCents)}</span>
+                </p>
+                {paymentMethod === "credit_card" && (
+                  <p className="flex justify-between text-[11px] text-indigo-700 dark:text-indigo-300 font-semibold">
+                    <span>Simulação em 10x no MP (c/ juros):</span>
+                    <span>10x de ~{formatBRL(checkoutCardBreakdown.buyer10xInstallmentCents)} (Total ~{formatBRL(checkoutCardBreakdown.buyer10xTotalCents)})</span>
+                  </p>
+                )}
+              </div>
             </fieldset>
 
             {errorMsg && (
@@ -2638,7 +2689,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                 </span>
               ) : (
                 <>
-                  {paymentMethod === "pix" ? "Gerar Pix e concluir pedido" : "Pagar com cartão em até 10x"}
+                  {paymentMethod === "pix" ? "Gerar Pix e concluir pedido" : "Pagar com cartão (Mercado Pago)"}
                   <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
                 </>
               )}

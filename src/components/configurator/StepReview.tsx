@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { CabinetModel, ColorOption, MonitorOption, PrinterOption, BarcodeReaderOption } from "@/types/catalog";
-import { formatBRL, PriceBreakdown } from "@/modules/pricing/pricingEngine";
+import { formatBRL, PriceBreakdown, simulateMercadoPagoCardBreakdown } from "@/modules/pricing/pricingEngine";
 import { Card, Button, Badge } from "@/components/ui";
 import { Edit3, ShoppingCart, ShieldCheck, Boxes, Check, PackageCheck, AlertCircle, Tag, Loader2, Zap, CreditCard, Wrench, Package, Sparkles, XCircle } from "lucide-react";
 import { isItemKit, getEffectiveKitItems, calculateKitTotalCents } from "@/modules/catalog/kitDefaults";
@@ -55,8 +55,8 @@ export const StepReview: React.FC<StepReviewProps> = ({
   const itemDiscountCents = appliedCoupon
     ? Math.round(model.basePriceCents * (appliedCoupon.discountPercent / 100))
     : 0;
-  const finalTotemPriceCents = Math.max(0, pricing.cardTotalPriceCents - itemDiscountCents);
   const reviewPixTotal = Math.max(0, pricing.pixTotalPriceCents - itemDiscountCents);
+  const reviewCardSim = simulateMercadoPagoCardBreakdown(reviewPixTotal);
 
   const monitorSubItem = kitItems.find((i) => i.category === "monitor");
   const printerSubItem = kitItems.find((i) => i.category === "printer");
@@ -609,15 +609,24 @@ export const StepReview: React.FC<StepReviewProps> = ({
               </span>
             </div>
 
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1.5">
-              <CreditCard className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-              <span>
-                ou em até{" "}
-                <strong className="text-slate-700 dark:text-slate-200 font-bold">
-                  10x de {formatBRL(Math.round(finalTotemPriceCents / 10))}
-                </strong>{" "}
-                no cartão
-              </span>
+            <div className="text-xs text-slate-600 dark:text-slate-300 font-medium flex items-start gap-1.5">
+              <CreditCard className="w-3.5 h-3.5 text-indigo-500 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <div>
+                  No cartão em{" "}
+                  <strong className="text-slate-800 dark:text-white font-bold">
+                    1x de {formatBRL(reviewCardSim.safeCardChargeCents)}
+                  </strong>{" "}
+                  <span className="text-slate-500 dark:text-slate-400">(sem juros de parcelamento)</span>
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Ou parcelado no Mercado Pago: até{" "}
+                  <strong className="text-slate-700 dark:text-slate-200 font-bold">
+                    10x de ~{formatBRL(reviewCardSim.buyer10xInstallmentCents)}
+                  </strong>{" "}
+                  (Total ~{formatBRL(reviewCardSim.buyer10xTotalCents)} c/ juros da operadora)
+                </div>
+              </div>
             </div>
 
             {isKit && includeAssemblyService && (

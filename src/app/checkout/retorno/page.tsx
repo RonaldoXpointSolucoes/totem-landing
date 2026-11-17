@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useCart } from "@/modules/cart/CartContext";
-import { formatBRL } from "@/modules/pricing/pricingEngine";
+import { formatBRL, estimateMercadoPago10xFromCardCharge } from "@/modules/pricing/pricingEngine";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics/tracker";
 import {
   CheckCircle2,
@@ -394,11 +394,19 @@ function PaymentReturnContent() {
 
               <div className="text-center pt-1">
                 <span className="text-[11px] uppercase tracking-wider text-slate-500 font-bold block">
-                  Valor Total do Pedido
+                  {status.method === "credit_card" ? "Valor Base do Pedido (1x no Cartão)" : "Valor Total do Pedido"}
                 </span>
                 <span className="text-3xl font-black text-blue-600 dark:text-indigo-400 mt-0.5 block">
                   {formatBRL(status.totalCents)}
                 </span>
+                {status.method === "credit_card" && !status.isPaid && (() => {
+                  const est = estimateMercadoPago10xFromCardCharge(status.totalCents);
+                  return (
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-1">
+                      Em 1x sem acréscimos adicionais · ou em 10x de ~{formatBRL(est.buyer10xInstallmentCents)} (Total ~{formatBRL(est.buyer10xTotalCents)} c/ juros no Mercado Pago)
+                    </span>
+                  );
+                })()}
               </div>
             </div>
           )}

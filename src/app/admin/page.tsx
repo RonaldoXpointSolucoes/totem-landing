@@ -5,6 +5,7 @@ import {
   formatBRL,
   calculateSafeCardChargeCents,
   simulateMercadoPagoCardBreakdown,
+  estimateMercadoPago10xFromCardCharge,
 } from "@/modules/pricing/pricingEngine";
 import { siteConfig } from "@/config/site";
 import {
@@ -1666,6 +1667,9 @@ export default function AdminPage() {
       .filter((ch) => ch.type === "discount" || Number(ch.amountCents) < 0)
       .reduce((acc, ch) => acc + Math.abs(Number(ch.amountCents) || 0) * Math.max(1, Number(ch.quantity) || 1), 0);
 
+    const isCardMethod = getOrderPaymentMethod(order) === "credit_card";
+    const card10xEst = isCardMethod ? estimateMercadoPago10xFromCardCharge(order.total_cents) : null;
+
     return [
       `Olá *${order.customer_name || "Cliente"}*! Tudo bem?`,
       `Segue o resumo atualizado e a condição de pagamento do seu pedido na *Totem Pro — X-Point Engenharia*:`,
@@ -1680,9 +1684,11 @@ export default function AdminPage() {
       ...(extraAdditionsCents > 0 ? [`• Acréscimos / Serviços Extras: + ${formatBRL(extraAdditionsCents)}`] : []),
       ...(extraDiscountsCents > 0 ? [`• Descontos Concedidos: - ${formatBRL(extraDiscountsCents)}`] : []),
       `• Frete (${shipping.name}): ${order.shipping_cents > 0 ? formatBRL(order.shipping_cents) : "Grátis / Isento"}`,
-      `*VALOR TOTAL: ${formatBRL(order.total_cents)}*`,
+      isCardMethod && card10xEst
+        ? `*VALOR BASE (Cartão 1x): ${formatBRL(order.total_cents)}*\n_(No Mercado Pago: 1x sem juros adicionais ou até 10x de ~${formatBRL(card10xEst.buyer10xInstallmentCents)} • Total ~${formatBRL(card10xEst.buyer10xTotalCents)} c/ juros da operadora)_`
+        : `*VALOR TOTAL (PIX): ${formatBRL(order.total_cents)}*`,
       ``,
-      `🔗 *Link Seguro de Pagamento (Pix à Vista ou Cartão em até 10x):*`,
+      `🔗 *Link Seguro de Pagamento (Pix à Vista ou Cartão 1x a 10x MP):*`,
       payUrl,
     ].join("\n");
   };

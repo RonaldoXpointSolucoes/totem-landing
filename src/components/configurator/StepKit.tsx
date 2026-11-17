@@ -8,7 +8,11 @@ import {
   doesKitIncludeMonitor,
   doesKitIncludePrinter,
 } from "@/modules/catalog/kitDefaults";
-import { formatBRL } from "@/modules/pricing/pricingEngine";
+import {
+  formatBRL,
+  ASSEMBLY_SERVICE_PRICE_CENTS,
+  simulateMercadoPagoCardBreakdown,
+} from "@/modules/pricing/pricingEngine";
 import {
   Boxes,
   Check,
@@ -362,8 +366,10 @@ export const StepKit: React.FC<StepKitProps> = ({
                 Plug &amp; Play
               </span>
               <div className="text-right">
-                <span className="font-black text-amber-600 dark:text-amber-400">+ R$ 999,00</span>
-                <span className="text-[10px] text-slate-500 block leading-tight">ou 10x de R$ 99,90</span>
+                <span className="font-black text-amber-600 dark:text-amber-400">+ {formatBRL(ASSEMBLY_SERVICE_PRICE_CENTS)} no PIX</span>
+                <span className="text-[10px] text-slate-500 block leading-tight">
+                  ou 1x {formatBRL(simulateMercadoPagoCardBreakdown(ASSEMBLY_SERVICE_PRICE_CENTS).safeCardChargeCents)} · ~10x {formatBRL(simulateMercadoPagoCardBreakdown(ASSEMBLY_SERVICE_PRICE_CENTS).buyer10xInstallmentCents)} (MP)
+                </span>
               </div>
             </div>
           </button>

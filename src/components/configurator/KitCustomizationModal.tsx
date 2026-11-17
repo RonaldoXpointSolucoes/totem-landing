@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { KitSubItem } from "@/types/catalog";
-import { formatBRL } from "@/modules/pricing/pricingEngine";
+import { formatBRL, simulateMercadoPagoCardBreakdown } from "@/modules/pricing/pricingEngine";
 import { doesKitIncludeMonitor, doesKitIncludePrinter } from "@/modules/catalog/kitDefaults";
 import { Modal, Button, Badge } from "@/components/ui";
 import {
@@ -407,7 +407,7 @@ export const KitCustomizationModal: React.FC<KitCustomizationModalProps> = ({
                     {formatBRL(totalPixWithCabinet)} no PIX
                   </span>
                   <span className="block text-[10px] text-slate-500">
-                    ou {formatBRL(totalCardWithCabinet)} em até 10x no cartão
+                    Cartão: 1x {formatBRL(simulateMercadoPagoCardBreakdown(totalPixWithCabinet).safeCardChargeCents)} · até 10x de ~{formatBRL(simulateMercadoPagoCardBreakdown(totalPixWithCabinet).buyer10xInstallmentCents)} (juros MP)
                   </span>
                 </div>
               </div>

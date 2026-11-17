@@ -1,6 +1,7 @@
 import {
   calculateTotemPrice,
   calculateSafeCardChargeCents,
+  estimateMercadoPago10xFromCardCharge,
   formatBRL,
 } from "@/modules/pricing/pricingEngine";
 import {
@@ -415,6 +416,7 @@ export function buildSharedWhatsappSummaryText(params: {
     })
     .join("\n\n");
 
+  const card10xInfo = estimateMercadoPago10xFromCardCharge(cardTotalCents);
   const lines = [
     cleanTitle
       ? `🧩 *Montagem Totem Pro: ${cleanTitle}*`
@@ -426,7 +428,7 @@ export function buildSharedWhatsappSummaryText(params: {
     ``,
     ...(coupon ? [`🏷️ *Cupom aplicado:* \`${coupon.code}\` (${coupon.discountPercent}% OFF no gabinete)`] : []),
     `⚡ *Total no PIX à vista:* ${formatBRL(pixTotalCents)} *(+ frete do CEP)*`,
-    `💳 *Ou no Cartão em até 10x:* ${formatBRL(cardTotalCents)} *(+ frete do CEP)*`,
+    `💳 *No Cartão (1x):* ${formatBRL(cardTotalCents)} _(ou até 10x de ~${formatBRL(card10xInfo.buyer10xInstallmentCents)} • Total ~${formatBRL(card10xInfo.buyer10xTotalCents)} c/ juros do Mercado Pago + frete)_`,
     ``,
     `👉 *Abrir montagem pronta para finalizar:*`,
     shareUrl,

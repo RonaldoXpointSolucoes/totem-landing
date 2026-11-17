@@ -2,7 +2,11 @@
 
 import React, { useState } from "react";
 import { useCart } from "@/modules/cart/CartContext";
-import { formatBRL, calculateTotemPrice } from "@/modules/pricing/pricingEngine";
+import {
+  formatBRL,
+  calculateTotemPrice,
+  simulateMercadoPagoCardBreakdown,
+} from "@/modules/pricing/pricingEngine";
 import { resolveKitEquipmentSummary } from "@/modules/catalog/kitDefaults";
 import { Button, Card, Badge } from "@/components/ui";
 import {
@@ -374,7 +378,8 @@ export const CartView: React.FC<CartViewProps> = ({
 
   const cartPixSavings = Math.max(0, rawCardTotalCents - rawPixTotalCents);
   const finalPixTotal = Math.max(0, rawPixTotalCents - couponDiscountCents);
-  const finalCardTotal = Math.max(0, rawCardTotalCents - couponDiscountCents);
+  const cartPixWithShippingCents = Math.max(0, finalPixTotal + shippingCents);
+  const cartCardBreakdown = simulateMercadoPagoCardBreakdown(cartPixWithShippingCents);
 
   const handleQuoteWhatsappChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const digits = e.target.value.replace(/\D/g, "").slice(0, 11);
@@ -440,9 +445,12 @@ export const CartView: React.FC<CartViewProps> = ({
         const modeLabel = isKit
           ? "Gabinete + Kit Completo de Periféricos"
           : "Apenas Gabinete CNC (-50% • Furação Sob Medida)";
+        const itemPixTotal = itemPrice.pixTotalPriceCents * quantity;
         const unitPix = formatBRL(itemPrice.pixTotalPriceCents);
-        const subPix = formatBRL(itemPrice.pixTotalPriceCents * quantity);
-        const subCard = formatBRL(itemPrice.cardTotalPriceCents * quantity);
+        const subPix = formatBRL(itemPixTotal);
+        const itemCardSim = simulateMercadoPagoCardBreakdown(itemPixTotal);
+        const subCard1x = formatBRL(itemCardSim.safeCardChargeCents);
+        const subCard10xInst = formatBRL(itemCardSim.buyer10xInstallmentCents);
 
         return `
           <tr>
@@ -478,7 +486,8 @@ export const CartView: React.FC<CartViewProps> = ({
             </td>
             <td style="padding:12px;border-bottom:1px solid #e2e8f0;text-align:right;vertical-align:top;">
               <div style="font-weight:800;color:#047857;font-size:14px;">${subPix} (PIX)</div>
-              <div style="font-size:11px;color:#64748b;">10x: ${subCard}</div>
+              <div style="font-size:11px;color:#475569;">1x Cartão: ${subCard1x}</div>
+              <div style="font-size:10px;color:#64748b;">10x MP: ~10x de ${subCard10xInst}</div>
             </td>
           </tr>
         `;
@@ -659,10 +668,11 @@ export const CartView: React.FC<CartViewProps> = ({
             ${formatBRL(finalPixTotal + shippingCents)}
           </span>
         </div>
-        <div style="text-align:right;font-size:11px;color:#475569;margin-top:4px;">
-          Ou no Cartão em até 10x de <strong>${formatBRL(
-            Math.round((finalCardTotal + shippingCents) / 10)
-          )}</strong> (Total: ${formatBRL(finalCardTotal + shippingCents)})
+        <div style="text-align:right;font-size:11px;color:#475569;margin-top:6px;line-height:1.45;">
+          No Cartão: <strong>1x de ${formatBRL(cartCardBreakdown.safeCardChargeCents)}</strong> (sem juros adicionais)<br/>
+          Parcelado (MP): até <strong>10x de ~${formatBRL(
+            cartCardBreakdown.buyer10xInstallmentCents
+          )}</strong> (Total ~${formatBRL(cartCardBreakdown.buyer10xTotalCents)} c/ juros)
         </div>
       </div>
     </div>
@@ -808,7 +818,7 @@ export const CartView: React.FC<CartViewProps> = ({
       itemsLines,
       ``,
       `💰 *Total no PIX à vista:* ${formatBRL(finalPixTotal + shippingCents)}`,
-      `💳 *Ou em até 10x no Cartão:* ${formatBRL(finalCardTotal + shippingCents)}`,
+      `💳 *No Cartão (1x):* ${formatBRL(cartCardBreakdown.safeCardChargeCents)} _(ou até 10x de ~${formatBRL(cartCardBreakdown.buyer10xInstallmentCents)} • Total ~${formatBRL(cartCardBreakdown.buyer10xTotalCents)} c/ juros do Mercado Pago)_`,
     ]
       .filter(Boolean)
       .join("\n");
@@ -1035,16 +1045,21 @@ export const CartView: React.FC<CartViewProps> = ({
                             <span>no PIX</span>
                           </span>
                         </div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium flex items-center sm:justify-end gap-1">
-                          <CreditCard className="w-3 h-3 text-indigo-500 shrink-0" />
-                          <span>
-                            ou em até{" "}
-                            <strong className="text-slate-700 dark:text-slate-300 font-bold">
-                              10x de {formatBRL(Math.round(itemCardSubtotalCents / 10))}
-                            </strong>{" "}
-                            no cartão
-                          </span>
-                        </div>
+                        {(() => {
+                          const itemCardSim = simulateMercadoPagoCardBreakdown(itemPixSubtotalCents);
+                          return (
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium flex items-center sm:justify-end gap-1">
+                              <CreditCard className="w-3 h-3 text-indigo-500 shrink-0" />
+                              <span>
+                                Cartão:{" "}
+                                <strong className="text-slate-700 dark:text-slate-300 font-bold">
+                                  1x {formatBRL(itemCardSim.safeCardChargeCents)}
+                                </strong>{" "}
+                                · 10x de ~{formatBRL(itemCardSim.buyer10xInstallmentCents)} (MP)
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -1608,17 +1623,20 @@ export const CartView: React.FC<CartViewProps> = ({
                   )}
                 </div>
 
-                <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 px-1">
-                  <span className="flex items-center gap-1.5 font-medium">
-                    <CreditCard className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                    <span>No Cartão:</span>
-                  </span>
-                  <div className="text-right">
-                    <span className="font-bold text-slate-700 dark:text-slate-300">
-                      Cartão em até 10x, com condições informadas pelo Mercado Pago
+                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/70 border border-black/10 dark:border-slate-800 space-y-1 text-xs text-slate-600 dark:text-slate-400">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <CreditCard className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                      <span>Cartão 1x (à vista):</span>
                     </span>
-                    <span className="block text-[10px] text-slate-400">
-                      (Total no cartão: {formatBRL(finalCardTotal + shippingCents)})
+                    <span className="font-bold text-slate-800 dark:text-slate-200">
+                      {formatBRL(cartCardBreakdown.safeCardChargeCents)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 text-[11px]">
+                    <span>Parcelado em até 10x (MP):</span>
+                    <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                      ~10x de {formatBRL(cartCardBreakdown.buyer10xInstallmentCents)} (Total ~{formatBRL(cartCardBreakdown.buyer10xTotalCents)})
                     </span>
                   </div>
                 </div>
