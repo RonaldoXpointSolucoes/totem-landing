@@ -20,9 +20,9 @@ export const Navbar: React.FC<NavbarProps> = ({ className = "" }) => {
 
   useEffect(() => {
     fetch("/api/auth/customer/session")
-      .then((res) => res.json())
+      .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data.ok && data.authenticated) {
+        if (data?.ok && data.authenticated) {
           setCustomer(data.customer);
         }
       })

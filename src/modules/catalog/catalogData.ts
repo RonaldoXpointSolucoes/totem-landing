@@ -5,7 +5,12 @@ import {
   PrinterOption,
   BarcodeReaderOption,
 } from "@/types/catalog";
-import { DEFAULT_KIT_SUB_ITEMS } from "./kitDefaults";
+import {
+  DEFAULT_KIT_SUB_ITEMS,
+  GRASEP_KIT_SUB_ITEMS,
+  GRASEP_DAI25T_DESCRIPTION,
+  calculateKitTotalCents,
+} from "./kitDefaults";
 
 export const CABINET_MODELS: CabinetModel[] = [
   {
@@ -161,20 +166,55 @@ export const COLOR_OPTIONS: ColorOption[] = [
 
 export const HOMOLOGATED_MONITORS: MonitorOption[] = [
   {
-    id: "6ac6dbf90032d4f8586e",
-    brand: "Geral",
-    model: "kit",
-    displayName: "Kit de Montagem",
-    sizeInches: 23.8,
-    vesaPattern: "100x100",
-    technicalCode: "TP-9556",
-    notes: "Pacote completo com Computador All-in-One Touch 23.8, Impressora Térmica 80mm, Leitor 2D e Cabos blindados.",
+    id: "kit-grasep-215-i7",
+    brand: "Grasep",
+    model: "kit-grasep-215-i7",
+    displayName: 'Kit de Montagem — All-in-One Grasep 21,5" Touch Core i7',
+    sizeInches: 21.5,
+    vesaPattern: "Suporte CNC Sob Medida",
+    technicalCode: "KIT-GRS-DAI25T",
+    notes: JSON.stringify({
+      isKit: true,
+      kitItems: GRASEP_KIT_SUB_ITEMS,
+    }),
     active: true,
     sortOrder: 1,
     isKit: true,
-    priceAdjustmentCents: 361200,
+    priceAdjustmentCents: calculateKitTotalCents(GRASEP_KIT_SUB_ITEMS),
+    kitItems: GRASEP_KIT_SUB_ITEMS,
+    image: "/images/totems/kit-grasep-215.webp",
+  },
+  {
+    id: "6ac6dbf90032d4f8586e",
+    brand: "Aytek",
+    model: "kit",
+    displayName: 'Kit de Montagem — All-in-One Aytek 23.8" Core i5',
+    sizeInches: 23.8,
+    vesaPattern: "100x100",
+    technicalCode: "TP-9556",
+    notes: JSON.stringify({
+      isKit: true,
+      kitItems: DEFAULT_KIT_SUB_ITEMS,
+    }),
+    active: true,
+    sortOrder: 2,
+    isKit: true,
+    priceAdjustmentCents: calculateKitTotalCents(DEFAULT_KIT_SUB_ITEMS),
     kitItems: DEFAULT_KIT_SUB_ITEMS,
     image: "/images/totems/kit-completo.webp",
+  },
+  {
+    id: "mon-grasep-dai25t",
+    brand: "Grasep",
+    model: "Maximus D-AI25T 21,5\"",
+    displayName: 'Grasep Maximus D-AI25T 21,5" Touch',
+    sizeInches: 21.5,
+    vesaPattern: "Berço CNC Sob Medida",
+    technicalCode: "GRS-DAI25T-215",
+    notes: GRASEP_DAI25T_DESCRIPTION,
+    active: true,
+    sortOrder: 2,
+    image: "/images/equipments/grasep-d-ai25t.webp",
   },
   {
     id: "mon-elgin-215",

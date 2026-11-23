@@ -379,7 +379,14 @@ export function CatalogItemModal({
 
   const handleUpdateKitItem = (index: number, updates: Partial<KitSubItem>) => {
     setKitSubItems((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, ...updates } : item))
+      prev.map((item, i) => {
+        if (i !== index) return item;
+        const merged = { ...item, ...updates };
+        if (merged.paused) {
+          merged.selected = false;
+        }
+        return merged;
+      })
     );
   };
 
@@ -527,9 +534,13 @@ export function CatalogItemModal({
         let effectiveMonitorPriceCents = Number(formData.price_adjustment_cents) || 0;
         if (isKitEnabled || kitSubItems.length > 0) {
           const kitTotal = kitSubItems
-            .filter((it) => it.selected !== false)
+            .filter((it) => it.selected !== false && !it.paused)
             .reduce((acc, it) => acc + (it.priceCents || 0), 0);
-          const cleanKitItems = kitSubItems.map(({ _uid, ...rest }) => rest);
+          const cleanKitItems = kitSubItems.map(({ _uid, ...rest }) => ({
+            ...rest,
+            paused: Boolean(rest.paused),
+            selected: rest.paused ? false : rest.selected !== false,
+          }));
           notesValue = JSON.stringify({
             isKit: true,
             kitItems: cleanKitItems,
@@ -1377,7 +1388,12 @@ export function CatalogItemModal({
                               {kitSubItems.length} componente{kitSubItems.length !== 1 ? "s" : ""} vinculado{kitSubItems.length !== 1 ? "s" : ""}
                             </span>
                             <span className="text-[11px] text-emerald-400 font-extrabold">
-                              Total do Kit: {formatBRL(kitSubItems.reduce((acc, it) => acc + (it.priceCents || 0), 0))}
+                              Total do Kit:{" "}
+                              {formatBRL(
+                                kitSubItems
+                                  .filter((it) => it.selected !== false && !it.paused)
+                                  .reduce((acc, it) => acc + (it.priceCents || 0), 0)
+                              )}
                             </span>
                           </div>
                         </div>
@@ -2407,15 +2423,27 @@ export function CatalogItemModal({
                       <PackageCheck className="w-3.5 h-3.5 text-cyan-400" />
                       <span className="text-slate-400">Inclusos:</span>
                       <strong className="text-white font-mono">
-                        {kitSubItems.filter((i) => i.selected).length} ativos
+                        {kitSubItems.filter((i) => i.selected !== false && !i.paused).length} ativos
                       </strong>
                     </div>
+
+                    {kitSubItems.some((i) => i.paused) && (
+                      <div className="px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/35 flex items-center gap-2 text-xs">
+                        <span className="text-amber-300 font-bold">
+                          ⏸ Pausados: {kitSubItems.filter((i) => i.paused).length}
+                        </span>
+                      </div>
+                    )}
 
                     <div className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-2 text-xs">
                       <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
                       <span className="text-emerald-300">Valor Total do Kit:</span>
                       <strong className="text-emerald-400 font-extrabold text-sm font-mono">
-                        {formatBRL(kitSubItems.reduce((acc, it) => acc + (it.priceCents || 0), 0))}
+                        {formatBRL(
+                          kitSubItems
+                            .filter((it) => it.selected !== false && !it.paused)
+                            .reduce((acc, it) => acc + (it.priceCents || 0), 0)
+                        )}
                       </strong>
                     </div>
                   </div>

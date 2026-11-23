@@ -625,11 +625,13 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     async function loadCustomerSessionAndProfile() {
       try {
         const res = await fetch("/api/auth/customer/session");
-        const data = await res.json();
+        if (res.ok) {
+          const data = await res.json();
 
-        if (!isCancelled && data.ok && data.authenticated && data.customer) {
-          applyCustomerProfileToForm(data.customer);
-          return;
+          if (!isCancelled && data?.ok && data.authenticated && data.customer) {
+            applyCustomerProfileToForm(data.customer);
+            return;
+          }
         }
       } catch (err) {
         console.warn("Aviso ao carregar sessão no checkout:", err);

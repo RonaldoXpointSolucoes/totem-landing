@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { KitSubItem } from "@/types/catalog";
 import { formatBRL, simulateMercadoPagoCardBreakdown } from "@/modules/pricing/pricingEngine";
-import { doesKitIncludeMonitor, doesKitIncludePrinter } from "@/modules/catalog/kitDefaults";
+import { calculateKitTotalCents, doesKitIncludeMonitor, doesKitIncludePrinter } from "@/modules/catalog/kitDefaults";
 import { Modal, Button, Badge } from "@/components/ui";
 import {
   Boxes,
@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   Package,
   XCircle,
+  PauseCircle,
 } from "lucide-react";
 
 interface KitCustomizationModalProps {
@@ -44,38 +45,47 @@ export const KitCustomizationModal: React.FC<KitCustomizationModalProps> = ({
   const [items, setItems] = useState<KitSubItem[]>(initialItems);
   const [hasModifiedItems, setHasModifiedItems] = useState(false);
 
-  // Sincronizar sempre que abrir com os itens fornecidos
+  // Sincronizar sempre que abrir com os itens fornecidos (forçando itens pausados como não selecionados)
   useEffect(() => {
     if (isOpen) {
-      setItems(initialItems.map((item) => ({ ...item })));
+      setItems(
+        initialItems.map((item) => ({
+          ...item,
+          selected: item.paused ? false : item.selected !== false,
+        }))
+      );
       setHasModifiedItems(false);
     }
   }, [isOpen, initialItems]);
 
   const handleToggleItem = (id: string) => {
+    const target = items.find((i) => i.id === id);
+    if (target?.paused) return;
     setHasModifiedItems(true);
     setItems((prev) =>
       prev.map((item) =>
-        item.id === id ? { ...item, selected: !item.selected } : item
+        item.id === id && !item.paused ? { ...item, selected: !item.selected } : item
       )
     );
   };
 
   const handleSelectAll = (select: boolean) => {
     setHasModifiedItems(true);
-    setItems((prev) => prev.map((item) => ({ ...item, selected: select })));
+    setItems((prev) =>
+      prev.map((item) => ({ ...item, selected: select && !item.paused }))
+    );
   };
 
   const handleResetToDefault = () => {
     setHasModifiedItems(true);
-    setItems(initialItems.map((item) => ({ ...item, selected: true })));
+    setItems(
+      initialItems.map((item) => ({ ...item, selected: !item.paused }))
+    );
   };
 
-  const currentTotalCents = items
-    .filter((i) => i.selected)
-    .reduce((acc, i) => acc + (i.priceCents || 0), 0);
+  const currentTotalCents = calculateKitTotalCents(items);
 
-  const selectedCount = items.filter((i) => i.selected).length;
+  const selectedCount = items.filter((i) => i.selected && !i.paused).length;
   const hasMonitorSelected = doesKitIncludeMonitor(items);
   const hasPrinterSelected = doesKitIncludePrinter(items);
 
@@ -260,21 +270,28 @@ export const KitCustomizationModal: React.FC<KitCustomizationModalProps> = ({
         <div className="space-y-2 max-h-[38vh] sm:max-h-[42vh] overflow-y-auto pr-1">
           {items.map((item) => {
             const Icon = getItemIcon(item.category);
+            const isPaused = Boolean(item.paused);
+            const isSelected = !isPaused && Boolean(item.selected);
             return (
               <div
                 key={item.id}
-                onClick={() => handleToggleItem(item.id)}
-                className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 select-none ${
-                  item.selected
-                    ? "bg-blue-50/70 dark:bg-indigo-950/30 border-[#0071e3]/40 shadow-sm"
-                    : "bg-white dark:bg-slate-900/60 border-black/10 dark:border-slate-800 opacity-60 hover:opacity-90"
+                onClick={() => {
+                  if (!isPaused) handleToggleItem(item.id);
+                }}
+                aria-disabled={isPaused}
+                className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 select-none ${
+                  isPaused
+                    ? "bg-amber-50/70 dark:bg-amber-950/25 border-amber-300/70 dark:border-amber-800/60 cursor-not-allowed opacity-85"
+                    : isSelected
+                    ? "bg-blue-50/70 dark:bg-indigo-950/30 border-[#0071e3]/40 shadow-sm cursor-pointer"
+                    : "bg-white dark:bg-slate-900/60 border-black/10 dark:border-slate-800 opacity-60 hover:opacity-90 cursor-pointer"
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0">
                   {/* Foto Real do Sub-Item */}
                   <div
                     className={`w-13 h-13 rounded-xl border p-1 flex items-center justify-center shrink-0 overflow-hidden bg-white dark:bg-slate-950 transition-all ${
-                      item.selected
+                      isSelected
                         ? "border-[#0071e3]/30 shadow-xs"
                         : "border-black/10 dark:border-slate-800 grayscale"
                     }`}
@@ -297,7 +314,12 @@ export const KitCustomizationModal: React.FC<KitCustomizationModalProps> = ({
                       <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#0071e3] dark:text-cyan-400">
                         {getCategoryLabel(item.category)}
                       </span>
-                      {item.selected ? (
+                      {isPaused ? (
+                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/60 px-1.5 py-0.2 rounded border border-amber-300 dark:border-amber-700">
+                          <PauseCircle className="w-2.5 h-2.5" />
+                          Pausado / Sem Estoque
+                        </span>
+                      ) : isSelected ? (
                         <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-500/20">
                           ✓ Vai ser enviado junto
                         </span>
@@ -307,14 +329,24 @@ export const KitCustomizationModal: React.FC<KitCustomizationModalProps> = ({
                         </span>
                       )}
                     </div>
-                    <h4 className="text-xs sm:text-sm font-bold text-[#1d1d1f] dark:text-white leading-tight">
+                    <h4
+                      className={`text-xs sm:text-sm font-bold leading-tight ${
+                        isPaused
+                          ? "text-slate-600 dark:text-slate-300"
+                          : "text-[#1d1d1f] dark:text-white"
+                      }`}
+                    >
                       {item.name}
                     </h4>
-                    {item.description && (
+                    {isPaused && item.pausedReason ? (
+                      <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-300 leading-snug">
+                        {item.pausedReason}
+                      </p>
+                    ) : item.description ? (
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
                         {item.description}
                       </p>
-                    )}
+                    ) : null}
                   </div>
                 </div>
 
@@ -323,7 +355,9 @@ export const KitCustomizationModal: React.FC<KitCustomizationModalProps> = ({
                   <div className="text-right">
                     <span
                       className={`text-xs sm:text-sm font-black transition-colors ${
-                        item.selected
+                        isPaused
+                          ? "text-amber-700 dark:text-amber-400 line-through"
+                          : isSelected
                           ? "text-[#0071e3] dark:text-cyan-400"
                           : "text-slate-400 line-through"
                       }`}
@@ -331,18 +365,28 @@ export const KitCustomizationModal: React.FC<KitCustomizationModalProps> = ({
                       + {formatBRL(item.priceCents)}
                     </span>
                     <span className="block text-[9px] text-slate-400">
-                      {item.selected ? "adicional ao gabinete" : "removido"}
+                      {isPaused
+                        ? "indisponível"
+                        : isSelected
+                        ? "adicional ao gabinete"
+                        : "removido"}
                     </span>
                   </div>
 
                   <div
                     className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all ${
-                      item.selected
+                      isPaused
+                        ? "border-amber-400/70 bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300"
+                        : isSelected
                         ? "border-[#0071e3] bg-[#0071e3] text-white shadow-sm"
                         : "border-black/20 dark:border-slate-700 bg-black/5 dark:bg-slate-800"
                     }`}
                   >
-                    {item.selected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                    {isPaused ? (
+                      <PauseCircle className="w-3.5 h-3.5" />
+                    ) : (
+                      isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    )}
                   </div>
                 </div>
               </div>

@@ -305,10 +305,14 @@ export async function fetchCatalogFromAppwrite() {
         try {
           const parsed = JSON.parse(doc.notes);
           if (Array.isArray(parsed.kitItems)) {
-            kitItems = parsed.kitItems;
+            kitItems = parsed.kitItems.map((i: any) => ({
+              ...i,
+              paused: Boolean(i?.paused),
+              selected: Boolean(i?.paused) ? false : i?.selected !== false,
+            }));
             isKit = true;
-            priceAdjustmentCents = parsed.kitItems
-              .filter((i: any) => i.selected)
+            priceAdjustmentCents = kitItems
+              .filter((i: any) => i.selected !== false && !i.paused)
               .reduce((acc: number, i: any) => acc + (i.priceCents || 0), 0);
           }
         } catch (e) {}

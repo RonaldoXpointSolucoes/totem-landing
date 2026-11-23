@@ -62,6 +62,16 @@ export interface KitSubItem {
   priceCents: number;
   selected: boolean;
   required?: boolean;
+  /** Quando true, item fica pausado por falta de estoque e não pode ser incluído em novos pedidos */
+  paused?: boolean;
+  /** Motivo exibido no Admin e no configurador (ex: "Sem estoque no momento") */
+  pausedReason?: string;
+  /** Aviso de sistema operacional / licenciamento (ex: "Windows 10 Pro Trial") */
+  osNotice?: string;
+  /** Garantia informada (ex: "3 meses") */
+  warrantyInfo?: string;
+  /** Especificações técnicas estruturadas em tópicos curtos */
+  specs?: string[];
 }
 
 export interface EquipmentOption {
@@ -73,6 +83,8 @@ export interface EquipmentOption {
   technicalCode?: string;
   notes?: string;
   active: boolean;
+  paused?: boolean;
+  pausedReason?: string;
   sortOrder?: number;
   isKit?: boolean;
   kitItems?: KitSubItem[];

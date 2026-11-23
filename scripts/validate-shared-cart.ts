@@ -125,7 +125,9 @@ async function runTests() {
   assert.equal(dirtySerialized[0].quantity, 2);
   assert.equal(dirtySerialized[1].includeAssemblyService, true);
   assert.equal(dirtySerialized[1].customMonitor?.customDimensions?.screenWidthCm, 34.4);
-  const monFlag = dirtySerialized[1].kitItems?.find((k: any) => k.id === "kit-monitor-touch");
+  const monFlag = dirtySerialized[1].kitItems?.find(
+    (k: any) => k.category === "monitor" || k.id === "kit-monitor-touch"
+  );
   assert.equal(monFlag?.selected, false, "Desmarcação do monitor no kit deve ser preservada");
   console.log("✓ Teste 2: Serialização sanitizada preservou kit personalizado e medidas sob medida");
 

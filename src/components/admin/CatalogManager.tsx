@@ -1071,10 +1071,14 @@ export function CatalogManager({
                                   {kitInfo.kitItems.slice(0, 4).map((ki: any, kIdx: number) => (
                                     <span
                                       key={kIdx}
-                                      className="text-[9px] px-2 py-0.5 rounded-md bg-slate-900 text-slate-300 border border-slate-800"
-                                      title={ki.description || ki.name}
+                                      className={`text-[9px] px-2 py-0.5 rounded-md border ${
+                                        ki.paused
+                                          ? "bg-amber-500/15 text-amber-300 border-amber-500/35"
+                                          : "bg-slate-900 text-slate-300 border-slate-800"
+                                      }`}
+                                      title={ki.paused ? ki.pausedReason || "Pausado / Sem estoque" : ki.description || ki.name}
                                     >
-                                      ✓ {ki.name}
+                                      {ki.paused ? `⏸ ${ki.name} (Pausado)` : `✓ ${ki.name}`}
                                     </span>
                                   ))}
                                   {kitInfo.kitItems.length > 4 && (

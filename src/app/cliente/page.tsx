@@ -20,8 +20,12 @@ export default function ClientePage() {
   const checkSession = async () => {
     try {
       const res = await fetch("/api/auth/customer/session");
+      if (!res.ok) {
+        setIsAuthenticated(false);
+        return;
+      }
       const data = await res.json();
-      if (res.ok && data.ok && data.authenticated && data.customer) {
+      if (data?.ok && data.authenticated && data.customer) {
         setIsAuthenticated(true);
         setCustomer(data.customer);
         loadOrders();
@@ -38,8 +42,9 @@ export default function ClientePage() {
     setIsLoadingOrders(true);
     try {
       const res = await fetch("/api/customer/orders");
+      if (!res.ok) return;
       const data = await res.json();
-      if (res.ok && data.ok) {
+      if (data?.ok) {
         setOrders(data.orders || []);
       }
     } catch (err) {

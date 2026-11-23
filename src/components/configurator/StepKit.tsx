@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { MonitorOption, KitSubItem } from "@/types/catalog";
+import { Modal } from "@/components/ui";
 import {
   getEffectiveKitItems,
   calculateKitTotalCents,
@@ -26,10 +27,17 @@ import {
   Wrench,
   ArrowLeftRight,
   AlertTriangle,
+  PauseCircle,
+  ShieldCheck,
+  Info,
+  Maximize2,
+  Cpu,
 } from "lucide-react";
 
 interface StepKitProps {
   kitMonitor: MonitorOption;
+  availableKits?: MonitorOption[];
+  onSelectKitOption?: (kitMon: MonitorOption) => void;
   cabinetName: string;
   cabinetBasePixCents: number;
   includeAssemblyService: boolean;
@@ -43,13 +51,16 @@ interface StepKitProps {
 }
 
 /**
- * Rota do Kit de Montagem (Etapa focada pós-decisão):
- * - Deixa claro que Monitor Touch e Impressora já vêm no Kit.
- * - Só solicita escolha de Monitor/Impressora se o cliente remover esses itens do Kit.
- * - Permite definir de forma clara se prefere receber em peças (R$ 0,00) ou 100% Montado de Fábrica (+ R$ 999,00).
+ * Rota do Kit de Montagem:
+ * - Suporta múltiplos Kits no catálogo (ex: Kit Grasep 21,5" Touch i7 disponível vs Kit Aytek 24" com PC pausado).
+ * - Respeita itens pausados (sem estoque): bloqueia seleção, exibe motivo e oferece troca rápida para Kit disponível.
+ * - Destaca fotos, ficha técnica completa, aviso de Windows Trial e garantia de 3 meses.
+ * - Só solicita escolha de Monitor/Impressora para recorte CNC caso o item correspondente não esteja ativo no Kit.
  */
 export const StepKit: React.FC<StepKitProps> = ({
   kitMonitor,
+  availableKits = [],
+  onSelectKitOption,
   cabinetName,
   cabinetBasePixCents,
   includeAssemblyService,
@@ -62,6 +73,7 @@ export const StepKit: React.FC<StepKitProps> = ({
   onJumpToCutoutPrinter,
 }) => {
   const [isAccessoriesOpen, setIsAccessoriesOpen] = useState(false);
+  const [inspectedSubItem, setInspectedSubItem] = useState<KitSubItem | null>(null);
 
   const kitItems = React.useMemo(() => getEffectiveKitItems(kitMonitor), [kitMonitor]);
   const mainEquipment = React.useMemo(
@@ -70,6 +82,7 @@ export const StepKit: React.FC<StepKitProps> = ({
         (i) =>
           i.category === "monitor" ||
           i.id === "kit-monitor-touch" ||
+          i.id.startsWith("kit-monitor") ||
           i.category === "printer" ||
           i.id === "KIT-IMP-001"
       ),
@@ -81,6 +94,7 @@ export const StepKit: React.FC<StepKitProps> = ({
         (i) =>
           i.category !== "monitor" &&
           i.id !== "kit-monitor-touch" &&
+          !i.id.startsWith("kit-monitor") &&
           i.category !== "printer" &&
           i.id !== "KIT-IMP-001"
       ),
@@ -89,18 +103,27 @@ export const StepKit: React.FC<StepKitProps> = ({
 
   const hasMonitorInKit = doesKitIncludeMonitor(kitItems);
   const hasPrinterInKit = doesKitIncludePrinter(kitItems);
-  const activeCount = kitItems.filter((i) => i.selected).length;
-  const activeAccessoriesCount = accessories.filter((i) => i.selected).length;
+  const activeCount = kitItems.filter((i) => i.selected !== false && !i.paused).length;
+  const activeAccessoriesCount = accessories.filter((i) => i.selected !== false && !i.paused).length;
   const kitTotalCents = calculateKitTotalCents(kitItems);
   const accessoriesTotalCents = accessories
-    .filter((i) => i.selected)
+    .filter((i) => i.selected !== false && !i.paused)
     .reduce((acc, item) => acc + Math.max(0, item.priceCents || 0), 0);
 
+  const firstAvailableOtherKit = React.useMemo(() => {
+    return availableKits.find(
+      (k) => k.id !== kitMonitor.id && doesKitIncludeMonitor(getEffectiveKitItems(k))
+    );
+  }, [availableKits, kitMonitor.id]);
+
   const handleToggleItem = (itemId: string) => {
+    const target = kitItems.find((i) => i.id === itemId);
+    if (target?.paused) return;
+
     const nextItems = kitItems.map((item) =>
       item.id === itemId ? { ...item, selected: !item.selected } : item
     );
-    const nextActiveCount = nextItems.filter((i) => i.selected).length;
+    const nextActiveCount = nextItems.filter((i) => i.selected !== false && !i.paused).length;
     if (nextActiveCount === 0) {
       onSwitchToCabinet();
       return;
@@ -109,13 +132,16 @@ export const StepKit: React.FC<StepKitProps> = ({
   };
 
   const handleRestoreDefaults = () => {
-    const restored = kitItems.map((item) => ({ ...item, selected: true }));
+    const restored = kitItems.map((item) => ({
+      ...item,
+      selected: item.paused ? false : true,
+    }));
     onUpdateKitItems(restored);
   };
 
   return (
     <div className="space-y-4">
-      {/* Cabeçalho com indicação clara da Rota Kit + atalho para trocar modalidade */}
+      {/* Cabeçalho da Rota Kit */}
       <div className="space-y-1.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-indigo-950/60 border border-blue-200 dark:border-indigo-800 text-[#0071e3] dark:text-cyan-300 text-[10px] font-black uppercase tracking-wider">
@@ -142,6 +168,109 @@ export const StepKit: React.FC<StepKitProps> = ({
         </p>
       </div>
 
+      {/* SEÇÃO 0: Seletor entre Versões de Kit (exibido quando há 2+ Kits no catálogo) */}
+      {availableKits.length > 1 && onSelectKitOption && (
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-black/10 dark:border-slate-800 shadow-xs space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-xs sm:text-sm font-black text-[#1d1d1f] dark:text-white flex items-center gap-1.5">
+                <Cpu className="w-4 h-4 text-[#0071e3] shrink-0" />
+                <span>Escolha a Versão do Kit de Montagem</span>
+              </h3>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Compare os computadores All-in-One disponíveis para compor o Kit do seu Totem.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {availableKits.map((kitOpt) => {
+              const isSelected = kitOpt.id === kitMonitor.id;
+              const optItems = getEffectiveKitItems(kitOpt);
+              const optHasAvailableMon = doesKitIncludeMonitor(optItems);
+              const optPausedMon = optItems.find(
+                (i) =>
+                  (i.category === "monitor" || i.id === "kit-monitor-touch" || i.id.startsWith("kit-monitor")) &&
+                  i.paused
+              );
+              const optActiveMon = optItems.find(
+                (i) =>
+                  (i.category === "monitor" || i.id === "kit-monitor-touch" || i.id.startsWith("kit-monitor")) &&
+                  !i.paused
+              );
+              const optTotalCents = calculateKitTotalCents(optItems);
+
+              return (
+                <button
+                  key={kitOpt.id}
+                  type="button"
+                  onClick={() => onSelectKitOption(kitOpt)}
+                  aria-pressed={isSelected}
+                  className={`text-left p-3 rounded-xl border-2 transition-all active:scale-[0.985] cursor-pointer flex items-start gap-3 ${
+                    isSelected
+                      ? optHasAvailableMon
+                        ? "bg-blue-50/50 dark:bg-indigo-950/35 border-[#0071e3] ring-2 ring-[#0071e3]/20 shadow-xs"
+                        : "bg-amber-50/60 dark:bg-amber-950/25 border-amber-500 ring-2 ring-amber-500/20 shadow-xs"
+                      : optHasAvailableMon
+                      ? "bg-slate-50/70 dark:bg-slate-950/40 border-black/10 dark:border-slate-800 hover:border-[#0071e3]/60"
+                      : "bg-slate-50/50 dark:bg-slate-950/30 border-amber-300/60 dark:border-amber-800/50 opacity-85 hover:opacity-100"
+                  }`}
+                >
+                  <div className="w-12 h-12 rounded-xl border border-black/10 dark:border-slate-700 bg-white dark:bg-slate-950 p-1 shrink-0 flex items-center justify-center overflow-hidden">
+                    {kitOpt.image ? (
+                      <img
+                        src={kitOpt.image}
+                        alt={kitOpt.displayName}
+                        className="w-full h-full object-contain"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <Boxes className="w-5 h-5 text-[#0071e3]" />
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                      {optHasAvailableMon ? (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25">
+                          ✓ Disponível
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/35">
+                          <PauseCircle className="w-2.5 h-2.5" />
+                          PC Pausado / Sem Estoque
+                        </span>
+                      )}
+
+                      <span className="text-[11px] font-black text-[#0071e3] dark:text-cyan-400">
+                        + {formatBRL(optTotalCents)}
+                      </span>
+                    </div>
+
+                    <h4 className="text-xs font-black text-[#1d1d1f] dark:text-white leading-snug">
+                      {kitOpt.displayName}
+                    </h4>
+
+                    {optActiveMon ? (
+                      <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-snug">
+                        PC: <strong>{formatBRL(optActiveMon.priceCents)}</strong>
+                        {optActiveMon.osNotice || optActiveMon.warrantyInfo
+                          ? ` • ${[optActiveMon.osNotice ? "Windows Trial" : null, optActiveMon.warrantyInfo ? `Garantia ${optActiveMon.warrantyInfo}` : null].filter(Boolean).join(" • ")}`
+                          : ""}
+                      </p>
+                    ) : optPausedMon ? (
+                      <p className="text-[10px] font-semibold text-amber-800 dark:text-amber-300 leading-snug">
+                        {optPausedMon.pausedReason || "PC AIO deste kit está pausado por falta de estoque."}
+                      </p>
+                    ) : null}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* SEÇÃO 1: Equipamentos Principais Inclusos no Kit */}
       <div className="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-black/10 dark:border-slate-800 shadow-xs space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -150,92 +279,200 @@ export const StepKit: React.FC<StepKitProps> = ({
               1. Equipamentos Principais do Kit
             </h3>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Se remover algum equipamento abaixo, pediremos o seu modelo no próximo passo para o corte CNC exato (+ R$ 0,00).
+              Confira fotos, garantia e detalhes. Se remover algum item, pediremos seu modelo para o corte CNC grátis (+ R$ 0,00).
             </p>
           </div>
           <span className="text-[11px] font-extrabold text-[#0071e3] dark:text-cyan-400">
-            {activeCount} de {kitItems.length} itens no Kit •{" "}
+            {activeCount} de {kitItems.length} itens ativos •{" "}
             {formatBRL(cabinetBasePixCents + kitTotalCents)} no PIX
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {mainEquipment.map((sub) => {
-            const isMonitor = sub.category === "monitor" || sub.id === "kit-monitor-touch";
+            const isMonitor =
+              sub.category === "monitor" ||
+              sub.id === "kit-monitor-touch" ||
+              sub.id.startsWith("kit-monitor");
+            const isPaused = Boolean(sub.paused);
+            const isIncluded = !isPaused && sub.selected !== false;
             const Icon = isMonitor ? Tv : Printer;
 
             return (
               <div
                 key={sub.id}
-                className={`p-3 rounded-xl border-2 transition-all flex flex-col justify-between gap-2.5 ${
-                  sub.selected
+                className={`p-3.5 rounded-xl border-2 transition-all flex flex-col justify-between gap-3 ${
+                  isPaused
+                    ? "bg-amber-50/70 dark:bg-amber-950/25 border-amber-400/70 dark:border-amber-700/80"
+                    : isIncluded
                     ? "bg-blue-50/40 dark:bg-indigo-950/25 border-[#0071e3] shadow-2xs"
                     : "bg-amber-50/60 dark:bg-amber-950/20 border-amber-400/60 dark:border-amber-700"
                 }`}
               >
-                <div className="flex items-start gap-2.5">
-                  <div className="w-11 h-11 rounded-xl border border-black/10 dark:border-slate-700 bg-white dark:bg-slate-950 p-1 flex items-center justify-center shrink-0 overflow-hidden">
-                    {sub.image && sub.image !== ".webp" ? (
-                      <img
-                        src={sub.image}
-                        alt={sub.name}
-                        className="w-full h-full object-contain"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <Icon className="w-5 h-5 text-[#0071e3]" />
-                    )}
-                  </div>
+                <div className="space-y-2.5">
+                  <div className="flex items-start gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setInspectedSubItem(sub)}
+                      className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl border border-black/10 dark:border-slate-700 bg-white dark:bg-slate-950 p-1 flex items-center justify-center shrink-0 overflow-hidden relative group cursor-pointer"
+                      title="Ampliar foto e ver especificações completas"
+                    >
+                      {sub.image && sub.image !== ".webp" ? (
+                        <img
+                          src={sub.image}
+                          alt={sub.name}
+                          className={`w-full h-full object-contain transition-transform group-hover:scale-105 ${
+                            isPaused ? "opacity-55 grayscale" : ""
+                          }`}
+                          loading="lazy"
+                        />
+                      ) : (
+                        <Icon className="w-6 h-6 text-[#0071e3]" />
+                      )}
+                      <span className="absolute bottom-1 right-1 w-4 h-4 rounded-md bg-black/60 text-white flex items-center justify-center opacity-80 group-hover:opacity-100">
+                        <Maximize2 className="w-2.5 h-2.5" />
+                      </span>
+                    </button>
 
-                  <div className="min-w-0 flex-1 space-y-0.5">
-                    <div className="flex items-center justify-between gap-1.5">
-                      <span
-                        className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                          sub.selected
-                            ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-                            : "bg-amber-500/20 text-amber-800 dark:text-amber-300"
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                        {isPaused ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500 text-white shadow-2xs">
+                            <PauseCircle className="w-3 h-3" />
+                            <span>Pausado • Sem Estoque</span>
+                          </span>
+                        ) : (
+                          <span
+                            className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                              isIncluded
+                                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                                : "bg-amber-500/20 text-amber-800 dark:text-amber-300"
+                            }`}
+                          >
+                            {isIncluded ? "✓ Incluso no Kit" : "Removido do Kit"}
+                          </span>
+                        )}
+
+                        <span
+                          className={`text-xs font-black shrink-0 ${
+                            isPaused
+                              ? "text-amber-700 dark:text-amber-300"
+                              : "text-[#0071e3] dark:text-cyan-400"
+                          }`}
+                        >
+                          {isPaused
+                            ? "Indisponível"
+                            : isIncluded
+                            ? `+ ${formatBRL(sub.priceCents)}`
+                            : "R$ 0,00"}
+                        </span>
+                      </div>
+
+                      <h4
+                        className={`text-xs sm:text-sm font-extrabold leading-snug ${
+                          isPaused
+                            ? "text-slate-600 dark:text-slate-300 line-through decoration-amber-500/60"
+                            : "text-[#1d1d1f] dark:text-white"
                         }`}
                       >
-                        {sub.selected ? "✓ Incluso no Kit" : "Removido do Kit"}
-                      </span>
-                      <span className="text-xs font-black text-[#0071e3] dark:text-cyan-400 shrink-0">
-                        {sub.selected ? `+ ${formatBRL(sub.priceCents)}` : "R$ 0,00"}
-                      </span>
+                        {sub.name}
+                      </h4>
+
+                      {isPaused ? (
+                        <p className="text-[11px] font-semibold text-amber-800 dark:text-amber-300 leading-snug">
+                          {sub.pausedReason || "Equipamento temporariamente sem estoque para seleção."}
+                        </p>
+                      ) : !isIncluded ? (
+                        <p className="text-[10px] font-semibold text-amber-800 dark:text-amber-300 leading-snug">
+                          {isMonitor
+                            ? selectedCutoutMonitorName
+                              ? `Recorte selecionado: ${selectedCutoutMonitorName}`
+                              : "Perguntaremos seu monitor na próxima tela (corte grátis)."
+                            : selectedCutoutPrinterName
+                            ? `Recorte selecionado: ${selectedCutoutPrinterName}`
+                            : "Perguntaremos sua impressora na próxima tela (rasgo grátis)."}
+                        </p>
+                      ) : null}
                     </div>
-
-                    <h4 className="text-xs font-extrabold text-[#1d1d1f] dark:text-white leading-snug">
-                      {sub.name}
-                    </h4>
-
-                    {!sub.selected && (
-                      <p className="text-[10px] font-semibold text-amber-800 dark:text-amber-300 leading-snug">
-                        {isMonitor
-                          ? selectedCutoutMonitorName
-                            ? `Recorte selecionado: ${selectedCutoutMonitorName}`
-                            : "Perguntaremos seu monitor na próxima tela (corte grátis)."
-                          : selectedCutoutPrinterName
-                          ? `Recorte selecionado: ${selectedCutoutPrinterName}`
-                          : "Perguntaremos sua impressora na próxima tela (rasgo grátis)."}
-                      </p>
-                    )}
                   </div>
+
+                  {/* Chips resumidos + Avisos obrigatórios (Windows Trial e Garantia 3 meses) */}
+                  {!isPaused && (sub.osNotice || sub.warrantyInfo || (sub.specs && sub.specs.length > 0)) && (
+                    <div className="space-y-1.5">
+                      {sub.specs && sub.specs.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {sub.specs.slice(0, 4).map((sp, spIdx) => (
+                            <span
+                              key={spIdx}
+                              className="px-2 py-0.5 rounded-md bg-white/90 dark:bg-slate-950 border border-black/10 dark:border-slate-800 text-[10px] font-semibold text-slate-700 dark:text-slate-300"
+                            >
+                              {sp.replace(/^(Tela|Processador|Memória RAM|Armazenamento Híbrido|Marca \/ Linha):\s*/i, "")}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {(sub.osNotice || sub.warrantyInfo) && (
+                        <div className="p-2 rounded-lg bg-amber-50/90 dark:bg-amber-950/35 border border-amber-300/80 dark:border-amber-700/70 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-bold text-amber-900 dark:text-amber-200">
+                          {sub.osNotice && (
+                            <span className="inline-flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                              <span>{sub.osNotice}</span>
+                            </span>
+                          )}
+                          {sub.warrantyInfo && (
+                            <span className="inline-flex items-center gap-1 text-emerald-800 dark:text-emerald-300">
+                              <ShieldCheck className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                              <span>Garantia: {sub.warrantyInfo}</span>
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                <div className="flex items-center gap-2 pt-1.5 border-t border-black/5 dark:border-slate-800">
+                {/* Ações do card do equipamento */}
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black/5 dark:border-slate-800">
                   <button
                     type="button"
-                    onClick={() => handleToggleItem(sub.id)}
-                    aria-pressed={sub.selected}
-                    className={`flex-1 min-h-[38px] px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-[0.98] cursor-pointer ${
-                      sub.selected
-                        ? "bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-700 dark:text-slate-200 hover:text-rose-600 border border-black/10 dark:border-slate-700"
-                        : "bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-xs"
-                    }`}
+                    onClick={() => setInspectedSubItem(sub)}
+                    className="min-h-[38px] px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-[11px] font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
                   >
-                    {sub.selected ? "Já tenho — remover do Kit" : "Incluir novamente no Kit"}
+                    <Info className="w-3.5 h-3.5 text-[#0071e3] shrink-0" />
+                    <span>Fotos e Ficha</span>
                   </button>
 
-                  {!sub.selected && isMonitor && selectedCutoutMonitorName && onJumpToCutoutMonitor && (
+                  {isPaused ? (
+                    firstAvailableOtherKit && onSelectKitOption ? (
+                      <button
+                        type="button"
+                        onClick={() => onSelectKitOption(firstAvailableOtherKit)}
+                        className="flex-1 min-h-[38px] px-3 py-1.5 rounded-lg bg-[#0071e3] hover:bg-[#0077ed] text-white text-[11px] font-bold transition-all active:scale-[0.98] cursor-pointer shadow-xs"
+                      >
+                        Usar Kit Grasep Disponível →
+                      </button>
+                    ) : (
+                      <span className="flex-1 min-h-[38px] px-3 py-1.5 rounded-lg bg-amber-100/80 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 text-[11px] font-bold flex items-center justify-center cursor-not-allowed">
+                        Indisponível no estoque
+                      </span>
+                    )
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleToggleItem(sub.id)}
+                      aria-pressed={isIncluded}
+                      className={`flex-1 min-h-[38px] px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-[0.98] cursor-pointer ${
+                        isIncluded
+                          ? "bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-700 dark:text-slate-200 hover:text-rose-600 border border-black/10 dark:border-slate-700"
+                          : "bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-xs"
+                      }`}
+                    >
+                      {isIncluded ? "Já tenho — remover do Kit" : "Incluir novamente no Kit"}
+                    </button>
+                  )}
+
+                  {!isPaused && !isIncluded && isMonitor && selectedCutoutMonitorName && onJumpToCutoutMonitor && (
                     <button
                       type="button"
                       onClick={onJumpToCutoutMonitor}
@@ -245,7 +482,7 @@ export const StepKit: React.FC<StepKitProps> = ({
                     </button>
                   )}
 
-                  {!sub.selected && !isMonitor && selectedCutoutPrinterName && onJumpToCutoutPrinter && (
+                  {!isPaused && !isIncluded && !isMonitor && selectedCutoutPrinterName && onJumpToCutoutPrinter && (
                     <button
                       type="button"
                       onClick={onJumpToCutoutPrinter}
@@ -273,10 +510,10 @@ export const StepKit: React.FC<StepKitProps> = ({
             <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             <span>
               {!hasMonitorInKit && !hasPrinterInKit
-                ? "Você desmarcou Monitor e Impressora do Kit. Ao clicar em Continuar, solicitaremos os modelos para furação/rasgo CNC grátis (+ R$ 0,00)."
+                ? "Sem Monitor e sem Impressora ativos neste Kit. Ao clicar em Continuar, solicitaremos os seus modelos para furação/rasgo CNC grátis (+ R$ 0,00)."
                 : !hasMonitorInKit
-                ? "Você desmarcou o Monitor do Kit. Ao clicar em Continuar, perguntaremos apenas o modelo do seu monitor para a furação CNC grátis (+ R$ 0,00)."
-                : "Você desmarcou a Impressora do Kit. Ao clicar em Continuar, perguntaremos apenas o modelo da sua impressora para o rasgo CNC grátis (+ R$ 0,00)."}
+                ? "Sem Monitor ativo neste Kit (pausado ou removido). Ao clicar em Continuar, perguntaremos o modelo do seu monitor para a furação CNC grátis (+ R$ 0,00) — ou troque acima para o Kit Grasep disponível."
+                : "Impressora removida do Kit. Ao clicar em Continuar, perguntaremos apenas o modelo da sua impressora para o rasgo CNC grátis (+ R$ 0,00)."}
             </span>
           </div>
         )}
@@ -366,9 +603,12 @@ export const StepKit: React.FC<StepKitProps> = ({
                 Plug &amp; Play
               </span>
               <div className="text-right">
-                <span className="font-black text-amber-600 dark:text-amber-400">+ {formatBRL(ASSEMBLY_SERVICE_PRICE_CENTS)} no PIX</span>
+                <span className="font-black text-amber-600 dark:text-amber-400">
+                  + {formatBRL(ASSEMBLY_SERVICE_PRICE_CENTS)} no PIX
+                </span>
                 <span className="text-[10px] text-slate-500 block leading-tight">
-                  ou 1x {formatBRL(simulateMercadoPagoCardBreakdown(ASSEMBLY_SERVICE_PRICE_CENTS).safeCardChargeCents)} · ~10x {formatBRL(simulateMercadoPagoCardBreakdown(ASSEMBLY_SERVICE_PRICE_CENTS).buyer10xInstallmentCents)} (MP)
+                  ou 1x {formatBRL(simulateMercadoPagoCardBreakdown(ASSEMBLY_SERVICE_PRICE_CENTS).safeCardChargeCents)} · ~10x{" "}
+                  {formatBRL(simulateMercadoPagoCardBreakdown(ASSEMBLY_SERVICE_PRICE_CENTS).buyer10xInstallmentCents)} (MP)
                 </span>
               </div>
             </div>
@@ -409,38 +649,53 @@ export const StepKit: React.FC<StepKitProps> = ({
           {isAccessoriesOpen && (
             <div className="px-4 pb-4 pt-2 border-t border-black/10 dark:border-slate-800 space-y-2.5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                {accessories.map((sub) => (
-                  <button
-                    key={sub.id}
-                    type="button"
-                    onClick={() => handleToggleItem(sub.id)}
-                    aria-pressed={sub.selected}
-                    className={`min-h-[42px] px-3 py-2 rounded-xl border text-left text-[11px] flex items-center justify-between gap-2 transition-all active:scale-[0.985] cursor-pointer ${
-                      sub.selected
-                        ? "bg-white dark:bg-slate-900 border-blue-200 dark:border-indigo-800 text-[#1d1d1f] dark:text-slate-100 shadow-2xs"
-                        : "bg-slate-100/80 dark:bg-slate-950/40 border-black/5 text-slate-400 line-through"
-                    }`}
-                  >
-                    <span className="flex items-center gap-2 min-w-0 font-semibold">
+                {accessories.map((sub) => {
+                  const isAccPaused = Boolean(sub.paused);
+                  const isAccActive = !isAccPaused && sub.selected !== false;
+                  return (
+                    <button
+                      key={sub.id}
+                      type="button"
+                      disabled={isAccPaused}
+                      onClick={() => handleToggleItem(sub.id)}
+                      aria-pressed={isAccActive}
+                      className={`min-h-[42px] px-3 py-2 rounded-xl border text-left text-[11px] flex items-center justify-between gap-2 transition-all ${
+                        isAccPaused
+                          ? "bg-amber-50/70 dark:bg-amber-950/30 border-amber-300 text-amber-800 dark:text-amber-300 opacity-75 cursor-not-allowed"
+                          : isAccActive
+                          ? "bg-white dark:bg-slate-900 border-blue-200 dark:border-indigo-800 text-[#1d1d1f] dark:text-slate-100 shadow-2xs active:scale-[0.985] cursor-pointer"
+                          : "bg-slate-100/80 dark:bg-slate-950/40 border-black/5 text-slate-400 line-through active:scale-[0.985] cursor-pointer"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2 min-w-0 font-semibold">
+                        <span
+                          className={`w-4 h-4 rounded flex items-center justify-center shrink-0 text-[10px] font-black ${
+                            isAccPaused
+                              ? "bg-amber-500 text-white"
+                              : isAccActive
+                              ? "bg-[#0071e3] text-white"
+                              : "border border-slate-300 dark:border-slate-700"
+                          }`}
+                        >
+                          {isAccPaused ? "⏸" : isAccActive ? "✓" : ""}
+                        </span>
+                        <span className="truncate">{sub.name}</span>
+                      </span>
                       <span
-                        className={`w-4 h-4 rounded flex items-center justify-center shrink-0 text-[10px] font-black ${
-                          sub.selected
-                            ? "bg-[#0071e3] text-white"
-                            : "border border-slate-300 dark:border-slate-700"
+                        className={`font-black shrink-0 ${
+                          isAccPaused
+                            ? "text-amber-700 dark:text-amber-300"
+                            : "text-[#0071e3] dark:text-cyan-400"
                         }`}
                       >
-                        {sub.selected && "✓"}
+                        {isAccPaused ? "Pausado" : isAccActive ? `+${formatBRL(sub.priceCents)}` : "Removido"}
                       </span>
-                      <span className="truncate">{sub.name}</span>
-                    </span>
-                    <span className="font-black text-[#0071e3] dark:text-cyan-400 shrink-0">
-                      {sub.selected ? `+${formatBRL(sub.priceCents)}` : "Removido"}
-                    </span>
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
 
-              {activeCount < kitItems.length && (
+              {activeCount < kitItems.filter((i) => !i.paused).length && (
                 <div className="flex justify-end">
                   <button
                     type="button"
@@ -448,7 +703,7 @@ export const StepKit: React.FC<StepKitProps> = ({
                     className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#0071e3] hover:underline cursor-pointer"
                   >
                     <RotateCcw className="w-3 h-3" />
-                    Restaurar todos os {kitItems.length} itens padrão do Kit
+                    Restaurar itens disponíveis do Kit
                   </button>
                 </div>
               )}
@@ -456,6 +711,119 @@ export const StepKit: React.FC<StepKitProps> = ({
           )}
         </div>
       )}
+
+      {/* MODAL DETALHADO DE FOTOS, ESPECIFICAÇÕES, WINDOWS TRIAL & GARANTIA */}
+      <Modal
+        isOpen={Boolean(inspectedSubItem)}
+        onClose={() => setInspectedSubItem(null)}
+        title={inspectedSubItem?.name || "Detalhes do Equipamento"}
+        description={
+          inspectedSubItem?.paused
+            ? `Indisponível no momento • ${inspectedSubItem.pausedReason || "Sem estoque"}`
+            : `Componente integrante do ${kitMonitor.displayName}`
+        }
+        className="max-w-2xl sm:max-w-2xl p-4 sm:p-6"
+      >
+        {inspectedSubItem && (
+          <div className="space-y-4 text-xs sm:text-sm text-slate-700 dark:text-slate-300 max-h-[75vh] overflow-y-auto pr-1">
+            {/* Cabeçalho visual: Foto ampliada + Status e Valor */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-black/10 dark:border-slate-800">
+              <div className="sm:col-span-5 aspect-square rounded-xl bg-white dark:bg-slate-900 border border-black/10 dark:border-slate-800 p-3 flex items-center justify-center overflow-hidden">
+                {inspectedSubItem.image && inspectedSubItem.image !== ".webp" ? (
+                  <img
+                    src={inspectedSubItem.image}
+                    alt={inspectedSubItem.name}
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <Package className="w-12 h-12 text-[#0071e3]" />
+                )}
+              </div>
+
+              <div className="sm:col-span-7 space-y-2.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {inspectedSubItem.paused ? (
+                    <span className="px-2.5 py-1 rounded-full bg-amber-500 text-white text-[10px] font-black uppercase">
+                      ⏸ Pausado • Sem Estoque
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[10px] font-black uppercase border border-emerald-500/25">
+                      ✓ Disponível para o Kit
+                    </span>
+                  )}
+                  <span className="text-base sm:text-lg font-black text-[#0071e3] dark:text-cyan-400">
+                    {inspectedSubItem.paused ? "Indisponível" : formatBRL(inspectedSubItem.priceCents)}
+                  </span>
+                </div>
+
+                {/* Avisos Obrigatórios em Destaque (Windows Trial + Garantia 3 meses) */}
+                {(inspectedSubItem.osNotice || inspectedSubItem.warrantyInfo) && (
+                  <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 space-y-1.5 text-xs">
+                    {inspectedSubItem.osNotice && (
+                      <div className="flex items-start gap-2 font-bold text-amber-900 dark:text-amber-200">
+                        <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                        <span>Sistema Operacional: {inspectedSubItem.osNotice}</span>
+                      </div>
+                    )}
+                    {inspectedSubItem.warrantyInfo && (
+                      <div className="flex items-start gap-2 font-bold text-emerald-800 dark:text-emerald-300">
+                        <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                        <span>Garantia: {inspectedSubItem.warrantyInfo}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {inspectedSubItem.description && (
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed whitespace-pre-line">
+                    {inspectedSubItem.description}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Grade Estruturada de Especificações Técnicas */}
+            {Array.isArray(inspectedSubItem.specs) && inspectedSubItem.specs.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-xs font-black uppercase tracking-wider text-[#1d1d1f] dark:text-white">
+                  Ficha Técnica Completa
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {inspectedSubItem.specs.map((specLine, idx) => {
+                    const colonIdx = specLine.indexOf(":");
+                    const hasLabel = colonIdx > 0 && colonIdx < 38;
+                    const label = hasLabel ? specLine.slice(0, colonIdx).trim() : null;
+                    const val = hasLabel ? specLine.slice(colonIdx + 1).trim() : specLine;
+                    return (
+                      <div
+                        key={idx}
+                        className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-black/10 dark:border-slate-800 text-xs"
+                      >
+                        {label && (
+                          <span className="text-[10px] font-black uppercase tracking-wider text-[#0071e3] dark:text-cyan-400 block">
+                            {label}
+                          </span>
+                        )}
+                        <span className="font-semibold text-[#1d1d1f] dark:text-slate-100">{val}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setInspectedSubItem(null)}
+                className="min-h-[42px] px-5 py-2 rounded-xl bg-[#0071e3] hover:bg-[#0077ed] text-white text-xs font-bold cursor-pointer transition-all"
+              >
+                Fechar Detalhes
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

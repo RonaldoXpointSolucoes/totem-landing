@@ -185,7 +185,7 @@ export function serializeCartItemsForShare(items: CartItem[]): SharedCartItemInp
             id: String(sub.id),
             ...(sub.name ? { name: sub.name } : {}),
             ...(sub.category ? { category: sub.category } : {}),
-            selected: sub.selected !== false,
+            selected: !sub.paused && sub.selected !== false,
           }))
         : undefined;
 
@@ -244,11 +244,11 @@ export function hydrateSharedCartFromCatalog(
 
     let resolvedMonitor: MonitorOption | null = null;
     if (raw.monitorId) {
-      const catalogMatch = catalog.monitors.find(
-        (m) =>
-          m.id === raw.monitorId ||
-          (raw.kitItems && raw.kitItems.length > 0 && isItemKit(m))
-      );
+      const catalogMatch =
+        catalog.monitors.find((m) => m.id === raw.monitorId) ||
+        (raw.kitItems && raw.kitItems.length > 0
+          ? catalog.monitors.find((m) => isItemKit(m))
+          : undefined);
       if (catalogMatch) {
         resolvedMonitor = { ...catalogMatch };
       } else if (String(raw.monitorId).startsWith("custom-mon-") || raw.customMonitor) {

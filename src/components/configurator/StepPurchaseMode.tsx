@@ -22,6 +22,9 @@ interface StepPurchaseModeProps {
   kitCardCents: number;
   kitOnlyCents: number;
   kitAccessoryCount: number;
+  kitPcName?: string;
+  kitPcShortSpecs?: string[];
+  kitPcNotice?: string;
   onSelectCabinet: () => void;
   onSelectKit: () => void;
 }
@@ -40,6 +43,9 @@ export const StepPurchaseMode: React.FC<StepPurchaseModeProps> = ({
   kitCardCents,
   kitOnlyCents,
   kitAccessoryCount,
+  kitPcName = 'All-in-One Grasep 21,5" Touch Core i7 (16GB • SSD 128GB + HD 500GB)',
+  kitPcShortSpecs = ['PC Touch 21,5" i7 • 16GB', "Impressora 80mm"],
+  kitPcNotice = "Windows 10 Pro Trial • Garantia 3 meses",
   onSelectCabinet,
   onSelectKit,
 }) => {
@@ -177,17 +183,24 @@ export const StepPurchaseMode: React.FC<StepPurchaseModeProps> = ({
                 Quero Gabinete + Kit de Montagem
               </h3>
               <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                Receba o gabinete com PC All-in-One Touch 23.8&quot; Core i5, Impressora Térmica 80mm e todos os acessórios elétricos já compatíveis.
+                Receba o gabinete com <strong>{kitPcName}</strong>, Impressora Térmica 80mm e todos os acessórios elétricos compatíveis.
               </p>
+              {kitPcNotice && (
+                <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300">
+                  ⚠️ {kitPcNotice}
+                </p>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-1.5">
-              <span className="px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-blue-200/80 dark:border-indigo-800 text-[10px] font-bold text-slate-700 dark:text-slate-200">
-                ✓ PC Touch 23.8&quot; i5
-              </span>
-              <span className="px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-blue-200/80 dark:border-indigo-800 text-[10px] font-bold text-slate-700 dark:text-slate-200">
-                ✓ Impressora 80mm
-              </span>
+              {kitPcShortSpecs.map((chip, idx) => (
+                <span
+                  key={idx}
+                  className="px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-blue-200/80 dark:border-indigo-800 text-[10px] font-bold text-slate-700 dark:text-slate-200"
+                >
+                  ✓ {chip}
+                </span>
+              ))}
               <span className="px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-blue-200/80 dark:border-indigo-800 text-[10px] font-bold text-slate-700 dark:text-slate-200">
                 + {kitAccessoryCount} acessórios elétricos
               </span>

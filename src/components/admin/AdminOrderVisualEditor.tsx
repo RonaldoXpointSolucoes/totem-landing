@@ -20,6 +20,8 @@ import {
   DEFAULT_KIT_SUB_ITEMS,
   isItemKit,
   getEffectiveKitItems,
+  doesKitIncludeMonitor,
+  doesKitIncludePrinter,
   calculateKitTotalCents,
   resolveKitEquipmentSummary,
   buildOrderDeliveryChecklist,
@@ -58,6 +60,7 @@ import {
   Calculator,
   Cable,
   Sparkles,
+  PauseCircle,
 } from "lucide-react";
 
 export interface VisualEditableOrderItem {
@@ -141,6 +144,62 @@ function findMatchingColor(name: string, colors: ColorOption[]): ColorOption {
   return colors.find((c) => c.name.toLowerCase().includes("branco")) || colors[0];
 }
 
+function findMatchingKitCatalogMonitor(
+  monitors: MonitorOption[],
+  orderItem?: Partial<VisualEditableOrderItem> | null,
+  kitItemsSnapshot?: KitSubItem[] | null
+): MonitorOption | null {
+  const kits = monitors.filter((m) => isItemKit(m));
+  if (kits.length === 0) return null;
+
+  if (Array.isArray(kitItemsSnapshot) && kitItemsSnapshot.length > 0) {
+    const monSub = kitItemsSnapshot.find(
+      (sub) =>
+        sub.category === "monitor" ||
+        sub.id === "kit-monitor-touch" ||
+        sub.id.startsWith("kit-monitor")
+    );
+    if (monSub?.id) {
+      const bySubId = kits.find((k) =>
+        getEffectiveKitItems(k).some((kSub) => kSub.id === monSub.id)
+      );
+      if (bySubId) return bySubId;
+    }
+  }
+
+  const monNameLow = (orderItem?.monitor_name || "").toLowerCase();
+  if (monNameLow) {
+    if (monNameLow.includes("grasep")) {
+      const grasepKit = kits.find(
+        (k) =>
+          k.id.toLowerCase().includes("grasep") ||
+          k.displayName.toLowerCase().includes("grasep") ||
+          k.model.toLowerCase().includes("grasep")
+      );
+      if (grasepKit) return grasepKit;
+    }
+    if (monNameLow.includes("aytek")) {
+      const aytekKit = kits.find(
+        (k) =>
+          k.id === "6ac6dbf90032d4f8586e" ||
+          k.displayName.toLowerCase().includes("aytek") ||
+          k.model.toLowerCase().includes("aytek")
+      );
+      if (aytekKit) return aytekKit;
+    }
+    const byName = kits.find(
+      (k) =>
+        k.displayName.toLowerCase() === monNameLow ||
+        monNameLow.includes(k.model.toLowerCase())
+    );
+    if (byName) return byName;
+  }
+
+  return (
+    kits.find((k) => doesKitIncludeMonitor(getEffectiveKitItems(k))) || kits[0]
+  );
+}
+
 export const AdminOrderVisualEditor: React.FC<AdminOrderVisualEditorProps> = ({
   items,
   paymentMethod,
@@ -160,7 +219,7 @@ export const AdminOrderVisualEditor: React.FC<AdminOrderVisualEditorProps> = ({
   // Carrega o catálogo atualizado do Appwrite
   useEffect(() => {
     fetch("/api/catalog")
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : null))
       .then((res) => {
         if (res?.ok && res.data) {
           setCatalog({
@@ -211,11 +270,23 @@ export const AdminOrderVisualEditor: React.FC<AdminOrderVisualEditorProps> = ({
     return Boolean(resolvedEquipment?.isKit);
   }, [currentItem, resolvedEquipment]);
 
+  const matchedCatalogKitMonitor = useMemo(
+    () =>
+      findMatchingKitCatalogMonitor(
+        catalog.monitors,
+        currentItem,
+        Array.isArray(currentItem?.kit_items) ? currentItem.kit_items : null
+      ),
+    [catalog.monitors, currentItem]
+  );
+
   const kitItems: KitSubItem[] = useMemo(() => {
     if (Array.isArray(currentItem?.kit_items) && currentItem.kit_items.length > 0) {
       return currentItem.kit_items;
     }
-    const baseList = DEFAULT_KIT_SUB_ITEMS.map((sub) => ({ ...sub }));
+    const baseList = matchedCatalogKitMonitor
+      ? getEffectiveKitItems(matchedCatalogKitMonitor).map((sub) => ({ ...sub }))
+      : DEFAULT_KIT_SUB_ITEMS.map((sub) => ({ ...sub }));
     if (resolvedEquipment && resolvedEquipment.isKit) {
       return baseList.map((sub) => {
         if (sub.category === "monitor" && !resolvedEquipment.hasMonitorInKit) {
@@ -228,18 +299,18 @@ export const AdminOrderVisualEditor: React.FC<AdminOrderVisualEditorProps> = ({
       });
     }
     return baseList;
-  }, [currentItem?.kit_items, resolvedEquipment]);
+  }, [currentItem?.kit_items, matchedCatalogKitMonitor, resolvedEquipment]);
 
   const selectedMonitorObj: MonitorOption | null = useMemo(() => {
     if (!currentItem) return null;
     if (isKitSelected) {
       const kitCatalogMon =
-        catalog.monitors.find((m) => isItemKit(m)) || {
-          id: "6ac6dbf90032d4f8586e",
+        findMatchingKitCatalogMonitor(catalog.monitors, currentItem, kitItems) || {
+          id: "kit-grasep-215-i7",
           brand: "KIT COMPLETO",
           model: "Kit de Montagem",
           displayName: "Kit de Montagem",
-          sizeInches: 23.8,
+          sizeInches: 21.5,
           vesaPattern: "75x75 / 100x100",
           technicalCode: "MON-KIT",
           active: true,
@@ -456,10 +527,18 @@ export const AdminOrderVisualEditor: React.FC<AdminOrderVisualEditorProps> = ({
         readerName: it.reader_name,
       });
       const itemIsKit = typeof it.is_kit === "boolean" ? it.is_kit : resEq.isKit;
+      const fallbackKitMon = findMatchingKitCatalogMonitor(
+        catalog.monitors,
+        it,
+        Array.isArray(it.kit_items) ? it.kit_items : null
+      );
       const itemKitList =
         Array.isArray(it.kit_items) && it.kit_items.length > 0
           ? it.kit_items
-          : DEFAULT_KIT_SUB_ITEMS.map((sub) => {
+          : (fallbackKitMon
+              ? getEffectiveKitItems(fallbackKitMon)
+              : DEFAULT_KIT_SUB_ITEMS
+            ).map((sub) => {
               if (sub.category === "monitor" && !resEq.hasMonitorInKit) return { ...sub, selected: false };
               if (sub.category === "printer" && !resEq.hasPrinterInKit) return { ...sub, selected: false };
               return { ...sub };
@@ -469,7 +548,7 @@ export const AdminOrderVisualEditor: React.FC<AdminOrderVisualEditorProps> = ({
         cabinet: mod,
         color: col,
         monitor: itemIsKit
-          ? ({ id: "kit", isKit: true, kitItems: itemKitList } as any)
+          ? ({ id: fallbackKitMon?.id || "kit", isKit: true, kitItems: itemKitList } as any)
           : null,
         kitAdjustmentCents: itemIsKit ? calculateKitTotalCents(itemKitList) : 0,
         includeAssemblyService: itemIsKit && Boolean(it.include_assembly),
@@ -486,12 +565,14 @@ export const AdminOrderVisualEditor: React.FC<AdminOrderVisualEditorProps> = ({
     onUpdateItems(updatedAll);
   };
 
-  // Toggle individual de sub-item do Kit
+  // Toggle individual de sub-item do Kit (impede ativar itens pausados sem estoque)
   const handleToggleKitSubItem = (subId: string) => {
+    const target = kitItems.find((sub) => sub.id === subId);
+    if (target?.paused && !target.selected) return;
     const updatedKit = kitItems.map((sub) =>
-      sub.id === subId ? { ...sub, selected: !sub.selected } : sub
+      sub.id === subId ? { ...sub, selected: sub.paused ? false : !sub.selected } : sub
     );
-    const anySelected = updatedKit.some((s) => s.selected);
+    const anySelected = updatedKit.some((s) => s.selected && !s.paused);
     applyItemChanges({
       isKit: anySelected,
       kitItems: updatedKit,
@@ -532,7 +613,8 @@ export const AdminOrderVisualEditor: React.FC<AdminOrderVisualEditorProps> = ({
     setShowAddSubItemForm(false);
   };
 
-  const selectedKitCount = kitItems.filter((i) => i.selected).length;
+  const selectedKitCount = kitItems.filter((i) => i.selected && !i.paused).length;
+  const printerIncludedInKit = doesKitIncludePrinter(kitItems);
   const kitTotalCents = isKitSelected ? calculateKitTotalCents(kitItems) : 0;
   const cabinetBaseInActiveMethod =
     paymentMethod === "credit_card" ? pricing.cardBasePriceCents : pricing.pixBasePriceCents;
@@ -552,7 +634,7 @@ export const AdminOrderVisualEditor: React.FC<AdminOrderVisualEditorProps> = ({
       id: 4,
       label: "4. Impressora",
       subtitle: isKitSelected
-        ? kitItems.find((i) => i.category === "printer")?.selected
+        ? printerIncludedInKit
           ? "Inclusa no Kit"
           : "Removida do Kit"
         : selectedPrinterObj?.displayName || "Padrão",
@@ -659,9 +741,12 @@ export const AdminOrderVisualEditor: React.FC<AdminOrderVisualEditorProps> = ({
           <div
             onClick={() => {
               if (!isKitSelected) {
-                const restored = kitItems.some((i) => i.selected)
+                const defaultBaseItems = matchedCatalogKitMonitor
+                  ? getEffectiveKitItems(matchedCatalogKitMonitor)
+                  : DEFAULT_KIT_SUB_ITEMS;
+                const restored = kitItems.some((i) => i.selected && !i.paused)
                   ? kitItems
-                  : DEFAULT_KIT_SUB_ITEMS.map((s) => ({ ...s, selected: true }));
+                  : defaultBaseItems.map((s) => ({ ...s, selected: !s.paused }));
                 applyItemChanges({
                   isKit: true,
                   kitItems: restored,
@@ -711,19 +796,19 @@ export const AdminOrderVisualEditor: React.FC<AdminOrderVisualEditorProps> = ({
             onClick={() =>
               applyItemChanges({
                 isKit: true,
-                kitItems: kitItems.map((i) => ({ ...i, selected: true })),
+                kitItems: kitItems.map((i) => ({ ...i, selected: !i.paused })),
               })
             }
             className="px-2.5 py-1 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 text-blue-600 dark:text-cyan-300 border border-blue-500/30 text-[11px] font-black cursor-pointer"
           >
-            ✓ Marcar Todas ({kitItems.length})
+            ✓ Marcar Todas ({kitItems.filter((i) => !i.paused).length})
           </button>
           <button
             type="button"
             onClick={() => {
               // Atalho: Remover Monitor e Impressora (igual ao caso do Diego!)
               const withoutMonPrt = kitItems.map((i) =>
-                i.category === "monitor" || i.category === "printer"
+                i.paused || i.category === "monitor" || i.category === "printer"
                   ? { ...i, selected: false }
                   : { ...i, selected: true }
               );
@@ -751,12 +836,15 @@ export const AdminOrderVisualEditor: React.FC<AdminOrderVisualEditorProps> = ({
           </button>
           <button
             type="button"
-            onClick={() =>
+            onClick={() => {
+              const baseItems = matchedCatalogKitMonitor
+                ? getEffectiveKitItems(matchedCatalogKitMonitor)
+                : DEFAULT_KIT_SUB_ITEMS;
               applyItemChanges({
                 isKit: true,
-                kitItems: DEFAULT_KIT_SUB_ITEMS.map((i) => ({ ...i, selected: true })),
-              })
-            }
+                kitItems: baseItems.map((i) => ({ ...i, selected: !i.paused })),
+              });
+            }}
             className="px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
           >
             <RotateCcw className="w-3 h-3" />
@@ -816,7 +904,8 @@ export const AdminOrderVisualEditor: React.FC<AdminOrderVisualEditorProps> = ({
       {/* Lista Completa dos 11 Sub-Itens do Kit (Estilo Print 5 com Foto, Badge, Preço Editável e Checkbox) */}
       <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
         {kitItems.map((sub) => {
-          const isChecked = isKitSelected && Boolean(sub.selected);
+          const isPaused = Boolean(sub.paused);
+          const isChecked = isKitSelected && !isPaused && Boolean(sub.selected);
           const Icon =
             sub.category === "monitor"
               ? Tv
@@ -837,11 +926,17 @@ export const AdminOrderVisualEditor: React.FC<AdminOrderVisualEditorProps> = ({
           return (
             <div
               key={sub.id}
-              onClick={() => handleToggleKitSubItem(sub.id)}
-              className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 select-none ${
-                isChecked
-                  ? "bg-blue-50/80 dark:bg-indigo-950/35 border-[#0071e3]/50 dark:border-indigo-500/50 shadow-sm"
-                  : "bg-slate-50/70 dark:bg-slate-950/60 border-black/10 dark:border-slate-800 opacity-65 hover:opacity-95"
+              onClick={() => {
+                if (!isPaused || sub.selected) {
+                  handleToggleKitSubItem(sub.id);
+                }
+              }}
+              className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 select-none ${
+                isPaused
+                  ? "bg-amber-950/20 border-amber-500/40 opacity-80 cursor-not-allowed"
+                  : isChecked
+                  ? "bg-blue-50/80 dark:bg-indigo-950/35 border-[#0071e3]/50 dark:border-indigo-500/50 shadow-sm cursor-pointer"
+                  : "bg-slate-50/70 dark:bg-slate-950/60 border-black/10 dark:border-slate-800 opacity-65 hover:opacity-95 cursor-pointer"
               }`}
             >
               <div className="flex items-center gap-3 min-w-0">
@@ -872,7 +967,12 @@ export const AdminOrderVisualEditor: React.FC<AdminOrderVisualEditorProps> = ({
                     <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#0071e3] dark:text-cyan-400">
                       {catLabel}
                     </span>
-                    {isChecked ? (
+                    {isPaused ? (
+                      <span className="inline-flex items-center gap-1 text-[9px] font-black text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/35">
+                        <PauseCircle className="w-2.5 h-2.5" />
+                        Pausado / Sem Estoque
+                      </span>
+                    ) : isChecked ? (
                       <span className="text-[9px] font-black text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/30">
                         ✓ Vai ser enviado junto
                       </span>
@@ -891,11 +991,15 @@ export const AdminOrderVisualEditor: React.FC<AdminOrderVisualEditorProps> = ({
                   >
                     {sub.name}
                   </h4>
-                  {sub.description && (
+                  {isPaused && sub.pausedReason ? (
+                    <p className="text-[11px] font-semibold text-amber-300 line-clamp-1">
+                      {sub.pausedReason}
+                    </p>
+                  ) : sub.description ? (
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1">
                       {sub.description}
                     </p>
-                  )}
+                  ) : null}
                 </div>
               </div>
 
@@ -910,13 +1014,16 @@ export const AdminOrderVisualEditor: React.FC<AdminOrderVisualEditorProps> = ({
                     <input
                       type="number"
                       step="1"
+                      disabled={isPaused}
                       value={((sub.priceCents || 0) / 100).toFixed(2)}
                       onChange={(e) => {
                         const cents = Math.round((parseFloat(e.target.value) || 0) * 100);
                         handleChangeKitSubItemPrice(sub.id, cents);
                       }}
                       className={`w-20 px-2 py-1 rounded-lg text-right font-mono text-xs font-black border ${
-                        isChecked
+                        isPaused
+                          ? "bg-slate-950 border-amber-800/50 text-amber-400/70 line-through cursor-not-allowed"
+                          : isChecked
                           ? "bg-white dark:bg-slate-900 border-blue-500/40 text-[#0071e3] dark:text-cyan-300"
                           : "bg-slate-100 dark:bg-slate-950 border-slate-700 text-slate-500 line-through"
                       }`}
@@ -924,18 +1031,28 @@ export const AdminOrderVisualEditor: React.FC<AdminOrderVisualEditorProps> = ({
                     />
                   </div>
                   <span className="block text-[9px] text-slate-400 mt-0.5">
-                    {isChecked ? "somando no pedido" : "descontado (R$ 0)"}
+                    {isPaused
+                      ? "indisponível"
+                      : isChecked
+                      ? "somando no pedido"
+                      : "descontado (R$ 0)"}
                   </span>
                 </div>
 
                 <div
                   className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
-                    isChecked
+                    isPaused
+                      ? "border-amber-500/60 bg-amber-950/50 text-amber-400"
+                      : isChecked
                       ? "border-[#0071e3] bg-[#0071e3] text-white shadow-sm"
                       : "border-slate-400 dark:border-slate-600 bg-white dark:bg-slate-900"
                   }`}
                 >
-                  {isChecked && <Check className="w-4 h-4 stroke-[3]" />}
+                  {isPaused ? (
+                    <PauseCircle className="w-4 h-4" />
+                  ) : (
+                    isChecked && <Check className="w-4 h-4 stroke-[3]" />
+                  )}
                 </div>
               </div>
             </div>
@@ -1263,14 +1380,14 @@ export const AdminOrderVisualEditor: React.FC<AdminOrderVisualEditorProps> = ({
                 type="button"
                 onClick={() => setStep(isKitSelected ? 3 : 4)}
                 className={`font-bold flex items-center gap-1 cursor-pointer text-right ${
-                  isKitSelected && !kitItems.find((i) => i.category === "printer")?.selected
+                  isKitSelected && !printerIncludedInKit
                     ? "text-rose-400"
                     : "text-white hover:text-cyan-300"
                 }`}
               >
                 <span>
                   {isKitSelected
-                    ? kitItems.find((i) => i.category === "printer")?.selected
+                    ? printerIncludedInKit
                       ? "VT-8360 80mm (No Kit)"
                       : "Removida do Kit"
                     : selectedPrinterObj?.displayName || "Berço Homologado"}
@@ -1433,7 +1550,7 @@ export const AdminOrderVisualEditor: React.FC<AdminOrderVisualEditorProps> = ({
                     }}
                     className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs cursor-pointer"
                   >
-                    {kitItems.find((i) => i.category === "printer")?.selected
+                    {printerIncludedInKit
                       ? "✕ Remover Impressora do Kit (- R$ 450)"
                       : "✓ Incluir Impressora no Kit (+ R$ 450)"}
                   </button>

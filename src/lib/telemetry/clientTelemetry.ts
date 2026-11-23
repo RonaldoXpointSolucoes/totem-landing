@@ -344,11 +344,13 @@ export function initClientTelemetry(): void {
         const duration = Math.round(performance.now() - startTime);
         if (isInternalApi) {
           const errMessage = String(networkError?.message || "Sem resposta");
+          const isTransientReadUrl =
+            url.includes("/api/catalog") || url.includes("/api/auth/customer/session");
           const isAbortedOrBackground =
             networkError?.name === "AbortError" ||
             document.visibilityState === "hidden" ||
             !navigator.onLine ||
-            (url.includes("/api/catalog") &&
+            (isTransientReadUrl &&
               /load failed|failed to fetch|networkerror/i.test(errMessage));
 
           recordClientBreadcrumb(

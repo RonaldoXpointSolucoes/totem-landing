@@ -25,6 +25,7 @@ export const ModelsSection: React.FC<ModelsSectionProps> = ({
     async function loadDynamicCatalog() {
       try {
         const res = await fetch("/api/catalog");
+        if (!res.ok) return;
         const json = await res.json();
         if (
           isMounted &&

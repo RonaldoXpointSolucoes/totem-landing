@@ -134,7 +134,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
 
   useEffect(() => {
     fetch("/api/catalog")
-      .then((res) => res.json())
+      .then((res) => (res.ok ? res.json() : null))
       .then((res) => {
         if (res?.ok && res.data) {
           const freshModels: CabinetModel[] = res.data.cabinetModels?.length ? res.data.cabinetModels : CABINET_MODELS;
@@ -177,9 +177,11 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                 const modoParam = initialUrlParams.get("modo")?.trim() || "";
                 const monParam = initialUrlParams.get("monitor")?.trim() || "";
                 if (modoParam === "kit") {
+                  const freshKits = freshMonitors.filter((m) => isItemKit(m));
                   const foundKit =
-                    (monParam ? freshMonitors.find((m) => m.id === monParam && isItemKit(m)) : null) ||
-                    freshMonitors.find((m) => isItemKit(m));
+                    (monParam ? freshKits.find((m) => m.id === monParam) : null) ||
+                    freshKits.find((k) => doesKitIncludeMonitor(getEffectiveKitItems(k))) ||
+                    freshKits[0];
                   if (foundKit) {
                     return buildInitialKitMonitorFromUrl(foundKit, initialUrlParams, freshMonitors);
                   }
@@ -195,9 +197,13 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
               }
               return prev;
             }
-            const match = freshMonitors.find(
-              (m) => m.id === prev.id || (isItemKit(prev) && isItemKit(m))
-            );
+            const freshKits = freshMonitors.filter((m) => isItemKit(m));
+            const match =
+              freshMonitors.find((m) => m.id === prev.id) ||
+              (isItemKit(prev)
+                ? freshKits.find((k) => doesKitIncludeMonitor(getEffectiveKitItems(k))) ||
+                  freshKits[0]
+                : undefined);
             if (!match) return prev;
             if (isItemKit(prev)) {
               const merged = mergeServerCatalogKitItems(match, prev.kitItems);
@@ -288,9 +294,11 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
       const monParam = params.get("monitor");
       const modoParam = params.get("modo");
       if (modoParam === "kit") {
+        const kits = HOMOLOGATED_MONITORS.filter((m) => isItemKit(m));
         const defaultKit =
-          (monParam ? HOMOLOGATED_MONITORS.find((m) => m.id === monParam && isItemKit(m)) : null) ||
-          HOMOLOGATED_MONITORS.find((m) => isItemKit(m));
+          (monParam ? kits.find((m) => m.id === monParam) : null) ||
+          kits.find((k) => doesKitIncludeMonitor(getEffectiveKitItems(k))) ||
+          kits[0];
         if (defaultKit) {
           return buildInitialKitMonitorFromUrl(defaultKit, params, HOMOLOGATED_MONITORS);
         }
@@ -500,7 +508,9 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
           url.searchParams.delete("monitor");
         }
         if (isKitSelected) {
-          const removedIds = activeKitItems.filter((i) => !i.selected).map((i) => i.id);
+          const removedIds = activeKitItems
+            .filter((i) => !i.selected && !i.paused)
+            .map((i) => i.id);
           if (removedIds.length > 0) {
             url.searchParams.set("kitRemovidos", removedIds.join(","));
           } else {
@@ -628,19 +638,52 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     includeAssemblyService,
   ]);
 
+  // Lista de Kits ordenada com opções disponíveis em estoque primeiro
+  const availableKits = useMemo(() => {
+    const kits = catalog.monitors.filter((m) => isItemKit(m));
+    const source = kits.length > 0 ? kits : HOMOLOGATED_MONITORS.filter((m) => isItemKit(m));
+    return [...source].sort((a, b) => {
+      const aAvail = doesKitIncludeMonitor(getEffectiveKitItems(a)) ? 0 : 1;
+      const bAvail = doesKitIncludeMonitor(getEffectiveKitItems(b)) ? 0 : 1;
+      if (aAvail !== bAvail) return aAvail - bAvail;
+      return (a.sortOrder ?? 999) - (b.sortOrder ?? 999);
+    });
+  }, [catalog.monitors]);
+
   // Preços comparativos autoritativos para os 2 cards da pergunta inicial (Apenas Gabinete vs Gabinete + Kit)
   const defaultKitMonitor = useMemo(() => {
-    return (
-      catalog.monitors.find((m) => isItemKit(m)) ||
-      HOMOLOGATED_MONITORS.find((m) => isItemKit(m)) ||
-      null
-    );
-  }, [catalog.monitors]);
+    return availableKits[0] || null;
+  }, [availableKits]);
+
+  const previewKitMonitor = useMemo(() => {
+    return isKitSelected ? selectedMonitor : defaultKitMonitor;
+  }, [isKitSelected, selectedMonitor, defaultKitMonitor]);
 
   const previewKitItems = useMemo(() => {
     if (isKitSelected) return activeKitItems;
     return getEffectiveKitItems(defaultKitMonitor || undefined);
   }, [isKitSelected, activeKitItems, defaultKitMonitor]);
+
+  const previewKitActiveMonitor = useMemo(() => {
+    return previewKitItems.find(
+      (i) =>
+        (i.category === "monitor" || i.id === "kit-monitor-touch" || i.id.startsWith("kit-monitor")) &&
+        !i.paused &&
+        i.selected !== false
+    );
+  }, [previewKitItems]);
+
+  const previewKitPausedMonitor = useMemo(() => {
+    return previewKitItems.find(
+      (i) =>
+        (i.category === "monitor" || i.id === "kit-monitor-touch" || i.id.startsWith("kit-monitor")) &&
+        i.paused
+    );
+  }, [previewKitItems]);
+
+  const previewKitIncludesPrinter = useMemo(() => {
+    return doesKitIncludePrinter(previewKitItems);
+  }, [previewKitItems]);
 
   const previewKitOnlyCents = useMemo(() => {
     return calculateKitTotalCents(previewKitItems);
@@ -651,8 +694,11 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
       (i) =>
         i.category !== "monitor" &&
         i.id !== "kit-monitor-touch" &&
+        !i.id.startsWith("kit-monitor") &&
         i.category !== "printer" &&
-        i.id !== "KIT-IMP-001"
+        i.id !== "KIT-IMP-001" &&
+        !i.paused &&
+        i.selected !== false
     ).length;
   }, [previewKitItems]);
 
@@ -669,8 +715,8 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
   }, [selectedModel, selectedColor]);
 
   const kitPreviewPricing = useMemo(() => {
-    const kitTarget: MonitorOption | null = defaultKitMonitor
-      ? { ...defaultKitMonitor, isKit: true, kitItems: previewKitItems }
+    const kitTarget: MonitorOption | null = previewKitMonitor
+      ? { ...previewKitMonitor, isKit: true, kitItems: previewKitItems }
       : null;
     return calculateTotemPrice({
       cabinet: selectedModel,
@@ -682,7 +728,7 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
       kitAdjustmentCents: previewKitOnlyCents,
       includeAssemblyService: false,
     });
-  }, [selectedModel, selectedColor, defaultKitMonitor, previewKitItems, previewKitOnlyCents]);
+  }, [selectedModel, selectedColor, previewKitMonitor, previewKitItems, previewKitOnlyCents]);
 
   const isNextDisabled =
     (step === 3 && step3View === "choice" && !purchaseMode) ||
@@ -746,6 +792,30 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
     setStep(3);
     setStep3View("kit-config");
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Troca entre versões de Kit no catálogo (ex: Kit Grasep 21,5" Touch i7 vs Kit Aytek)
+  const handleSelectKitOption = (kitOpt: MonitorOption) => {
+    const effectiveItems = getEffectiveKitItems(kitOpt);
+    const totalCents = calculateKitTotalCents(effectiveItems);
+    const monIncluded = doesKitIncludeMonitor(effectiveItems);
+    const prtIncluded = doesKitIncludePrinter(effectiveItems);
+    if (prtIncluded) {
+      setSelectedPrinter(null);
+    }
+    const nextKitObj: MonitorOption = {
+      ...kitOpt,
+      isKit: true,
+      kitItems: effectiveItems,
+      priceAdjustmentCents: totalCents,
+      cutoutMonitor: monIncluded ? null : selectedMonitor?.cutoutMonitor || null,
+      notes: JSON.stringify({ kitItems: effectiveItems }),
+    };
+    setSelectedMonitor(nextKitObj);
+    trackEvent(ANALYTICS_EVENTS.SELECT_MONITOR, {
+      monitorId: nextKitObj.id,
+      monitorName: nextKitObj.displayName || "Kit de Montagem",
+    });
   };
 
   // Atualiza sub-itens do Kit e limpa recorte extra se o equipamento voltou para o Kit
@@ -1628,6 +1698,40 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                 kitCardCents={kitPreviewPricing.cardTotalPriceCents}
                 kitOnlyCents={previewKitOnlyCents}
                 kitAccessoryCount={previewKitAccessoryCount}
+                kitPcName={
+                  previewKitActiveMonitor?.name ||
+                  (previewKitPausedMonitor
+                    ? "acessórios e estrutura do Kit (PC All-in-One pausado sem estoque)"
+                    : "peças selecionadas do Kit (sem PC/Monitor incluso — furação grátis para sua tela)")
+                }
+                kitPcShortSpecs={
+                  previewKitActiveMonitor
+                    ? [
+                        ...(previewKitActiveMonitor.specs?.length
+                          ? previewKitActiveMonitor.specs
+                              .slice(1, 3)
+                              .map((s) => s.replace(/^[^:]+:\s*/, ""))
+                          : ['PC Touch 21,5" Core i7 • 16GB']),
+                        previewKitIncludesPrinter ? "Impressora Térmica 80mm" : "Sem Impressora no Kit",
+                      ]
+                    : [
+                        ...(previewKitIncludesPrinter ? ["Impressora Térmica 80mm"] : []),
+                        "Furação CNC p/ Seu Monitor",
+                      ]
+                }
+                kitPcNotice={
+                  previewKitActiveMonitor
+                    ? [
+                        previewKitActiveMonitor.osNotice,
+                        previewKitActiveMonitor.warrantyInfo
+                          ? `Garantia ${previewKitActiveMonitor.warrantyInfo}`
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" • ") || undefined
+                    : previewKitPausedMonitor?.pausedReason ||
+                      "Configuração atual do Kit sem PC/Monitor incluso (furação CNC para sua tela grátis)."
+                }
                 onSelectCabinet={handleChooseCabinetMode}
                 onSelectKit={handleChooseKitMode}
               />
@@ -1658,6 +1762,8 @@ export const ConfiguratorWizard: React.FC<ConfiguratorWizardProps> = ({
                   HOMOLOGATED_MONITORS.find((m) => isItemKit(m)) ||
                   HOMOLOGATED_MONITORS[0]
                 }
+                availableKits={availableKits}
+                onSelectKitOption={handleSelectKitOption}
                 cabinetName={selectedModel.name}
                 cabinetBasePixCents={cabinetPreviewPricing.pixTotalPriceCents}
                 includeAssemblyService={includeAssemblyService}

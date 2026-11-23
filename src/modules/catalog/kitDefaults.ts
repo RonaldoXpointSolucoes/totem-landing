@@ -1,16 +1,51 @@
 import { KitSubItem, MonitorOption } from "@/types/catalog";
 
+export const GRASEP_DAI25T_SPECS: string[] = [
+  "Marca / Linha: Grasep Maximus • Modelo: D-AI25T • Cor: Branco",
+  'Tela: 21,5" Touchscreen • Resolução Full HD (1920 × 1080)',
+  "Processador: Intel Core i7-3610QM (até 3,3 GHz)",
+  "Memória RAM: 16 GB DDR3 1600 MHz",
+  "Armazenamento Híbrido: 128 GB SSD + 500 GB HDD (628 GB combinados)",
+  "Placa Gráfica: Intel HD Graphics (Integrada)",
+  "Sem Fio & Rede: Wi-Fi 2,4 / 5,0 GHz (3D-M007), Bluetooth 4.2, LAN 10/100/1000 Mbps",
+  "Conexões: HDMI, VGA, Áudio P2, 4× USB 2.0 (placa-mãe) e 2× USB Type-C (externas)",
+  "Áudio & Vídeo: Webcam 3,0 MP, Microfone integrado, Alto-Falantes Estéreo (2× 3W / 4Ω)",
+  "Fonte AC/DC: Entrada 100–240 Vac (1,6 A / 50–60 Hz) • Saída 12 Vdc / 6,5 A",
+  "Itens inclusos: Fonte, Teclado, Mouse, Mousepad e Manual",
+  "Sistema Operacional: Windows 10 Pro Trial (licença de avaliação)",
+  "Garantia: 3 meses",
+];
+
+export const GRASEP_DAI25T_DESCRIPTION =
+  "O Computador All In One Grasep Maximus 21,5\" Touchscreen Core i7 16GB (SSD 128GB + HD 500GB) D-AI25T reúne praticidade, organização e uma configuração completa em um único equipamento na cor Branca. Sua tela de 21,5\" Full HD 1920×1080 com touchscreen permite interação direta por toque para autoatendimento, PDV, recepções e escritórios.\n\nEquipado com processador Intel Core i7-3610QM (até 3,3 GHz), 16 GB de memória DDR3 1600 MHz e armazenamento híbrido de 128 GB SSD + 500 GB HDD (628 GB nominais), conta ainda com Intel HD Graphics integrada, Wi-Fi 2.4/5.0 GHz (módulo 3D-M007), Bluetooth 4.2, Ethernet Gigabit (10/100/1000 Mbps), HDMI, VGA, Áudio P2, 4× USB 2.0 + 2× USB Type-C, webcam 3,0 MP com microfone integrado e alto-falantes estéreo 2× 3 W.\n\nAcompanha fonte AC/DC (100–240 Vac / 12 Vdc 6,5 A), teclado, mouse, mousepad e manual.\n\n⚠️ AVISO IMPORTANTE: O sistema operacional instalado é o Windows 10 Pro Trial (versão de avaliação, ativação não inclusa) e o equipamento possui garantia de 3 meses.";
+
+export const GRASEP_DAI25T_MONITOR_SUBITEM: KitSubItem = {
+  id: "kit-monitor-grasep-dai25t",
+  name: 'Computador All-in-One Grasep 21,5" Touch Core i7 (16GB • SSD 128GB + HD 500GB) D-AI25T',
+  category: "monitor",
+  description: GRASEP_DAI25T_DESCRIPTION,
+  image: "/images/equipments/grasep-d-ai25t.webp",
+  priceCents: 298000, // R$ 2.980,00
+  selected: true,
+  paused: false,
+  osNotice: "Windows 10 Pro Trial (versão de avaliação)",
+  warrantyInfo: "3 meses",
+  specs: GRASEP_DAI25T_SPECS,
+};
+
 export const DEFAULT_KIT_SUB_ITEMS: KitSubItem[] = [
   {
     id: "kit-monitor-touch",
-    name: 'Computador All-in-One Touch 23.8" Core i5',
+    name: 'Computador All-in-One Aytek 23.8" (24") Touch Core i5',
     category: "monitor",
     description:
       "Redução Significativa de Custos: Comprar monitor touchscreen e computador (ou mini PC) separadamente sai muito mais caro. No All-in-One, você tem ambos em um único investimento, economizando no hardware e na logística.\n\nProcessador: Intel Core i5 (3ª Geração) • Memória RAM: 8 GB • SSD NVMe de 256 GB • Wi-Fi integrado.",
     image:
       "https://http2.mlstatic.com/D_NQ_NP_2X_657397-MLB91414180451_092025-F-computador-allinone-238-touch-screen-intel-core-i5-3320.webp",
     priceCents: 279900, // R$ 2.799,00
-    selected: true,
+    selected: false,
+    paused: true,
+    pausedReason: "PC AIO Aytek 24\" temporariamente sem estoque",
   },
   {
     id: "KIT-IMP-001",
@@ -123,6 +158,15 @@ export const DEFAULT_KIT_SUB_ITEMS: KitSubItem[] = [
   },
 ];
 
+export const GRASEP_KIT_SUB_ITEMS: KitSubItem[] = [
+  { ...GRASEP_DAI25T_MONITOR_SUBITEM },
+  ...DEFAULT_KIT_SUB_ITEMS.slice(1).map((sub) => ({ ...sub })),
+];
+
+export function isKitSubItemPaused(sub?: Partial<KitSubItem> | null): boolean {
+  return Boolean(sub?.paused);
+}
+
 export interface DeliveryChecklistItem {
   id: string;
   name: string;
@@ -164,27 +208,31 @@ export interface ResolvedKitEquipment {
 }
 
 /**
- * Verifica se a lista de subitens do Kit contém o Monitor marcado como selecionado (`selected !== false`).
+ * Verifica se a lista de subitens do Kit contém algum Monitor ativo (não pausado) e selecionado (`selected !== false`).
  */
 export function doesKitIncludeMonitor(kitItems?: KitSubItem[] | null): boolean {
   if (!Array.isArray(kitItems) || kitItems.length === 0) return true;
-  const monSub = kitItems.find(
-    (sub) => sub.category === "monitor" || sub.id === "kit-monitor-touch"
+  return kitItems.some(
+    (sub) =>
+      (sub.category === "monitor" ||
+        sub.id === "kit-monitor-touch" ||
+        sub.id.startsWith("kit-monitor")) &&
+      sub.selected !== false &&
+      !sub.paused
   );
-  if (!monSub) return false;
-  return monSub.selected !== false;
 }
 
 /**
- * Verifica se a lista de subitens do Kit contém a Impressora marcada como selecionada (`selected !== false`).
+ * Verifica se a lista de subitens do Kit contém alguma Impressora ativa (não pausada) e selecionada (`selected !== false`).
  */
 export function doesKitIncludePrinter(kitItems?: KitSubItem[] | null): boolean {
   if (!Array.isArray(kitItems) || kitItems.length === 0) return true;
-  const prtSub = kitItems.find(
-    (sub) => sub.category === "printer" || sub.id === "KIT-IMP-001"
+  return kitItems.some(
+    (sub) =>
+      (sub.category === "printer" || sub.id === "KIT-IMP-001") &&
+      sub.selected !== false &&
+      !sub.paused
   );
-  if (!prtSub) return false;
-  return prtSub.selected !== false;
 }
 
 /**
@@ -203,15 +251,23 @@ export function isItemKit(item?: MonitorOption | null): boolean {
   return name.includes("kit") || slug.includes("kit") || model.includes("kit");
 }
 
+function normalizeSubItems(list: KitSubItem[]): KitSubItem[] {
+  return list.map((sub) => ({
+    ...sub,
+    paused: Boolean(sub.paused),
+    selected: Boolean(sub.paused) ? false : sub.selected !== false,
+  }));
+}
+
 /**
  * Retorna os subitens efetivos do Kit (do objeto ou os padrões caso ainda não inicializado)
  */
 export function getEffectiveKitItems(item?: MonitorOption | null): KitSubItem[] {
-  if (!item) return DEFAULT_KIT_SUB_ITEMS.map((sub) => ({ ...sub }));
+  if (!item) return normalizeSubItems(GRASEP_KIT_SUB_ITEMS);
 
   // Se já possui kitItems no objeto
   if (Array.isArray(item.kitItems) && item.kitItems.length > 0) {
-    return item.kitItems;
+    return normalizeSubItems(item.kitItems);
   }
 
   // Tenta recuperar do campo notes se for JSON serializado
@@ -219,12 +275,12 @@ export function getEffectiveKitItems(item?: MonitorOption | null): KitSubItem[] 
     try {
       const parsed = JSON.parse(item.notes);
       if (Array.isArray(parsed.kitItems) && parsed.kitItems.length > 0) {
-        return parsed.kitItems;
+        return normalizeSubItems(parsed.kitItems);
       }
     } catch (e) {}
   }
 
-  return DEFAULT_KIT_SUB_ITEMS.map((sub) => ({ ...sub }));
+  return normalizeSubItems(DEFAULT_KIT_SUB_ITEMS);
 }
 
 /**
@@ -266,6 +322,14 @@ export function mergeServerCatalogKitItems(
   }
 
   const mergedKitItems: KitSubItem[] = authoritativeSubItems.map((serverSub) => {
+    if (serverSub.paused) {
+      return {
+        ...serverSub,
+        paused: true,
+        selected: false,
+      };
+    }
+
     const cleanId = (serverSub.id || "").trim();
     const cleanName = (serverSub.name || "").trim().toLowerCase();
 
@@ -299,12 +363,12 @@ export function mergeServerCatalogKitItems(
 }
 
 /**
- * Calcula o somatório em centavos dos subitens selecionados do Kit
+ * Calcula o somatório em centavos dos subitens ativos (selecionados e não pausados) do Kit
  */
 export function calculateKitTotalCents(kitItems?: KitSubItem[]): number {
   if (!Array.isArray(kitItems) || kitItems.length === 0) return 0;
   return kitItems
-    .filter((i) => i.selected !== false)
+    .filter((i) => i.selected !== false && !i.paused)
     .reduce((acc, i) => acc + (i.priceCents || 0), 0);
 }
 
@@ -418,10 +482,15 @@ export function resolveKitEquipmentSummary(params: {
         return sub;
       });
 
-  const selectedSubItems = kitItems.filter((i) => i.selected !== false);
-  const removedSubItems = kitItems.filter((i) => i.selected === false);
-  const monSub = selectedSubItems.find((i) => i.category === "monitor");
-  const prtSub = selectedSubItems.find((i) => i.category === "printer");
+  const selectedSubItems = kitItems.filter((i) => i.selected !== false && !i.paused);
+  const removedSubItems = kitItems.filter((i) => i.selected === false || Boolean(i.paused));
+  const monSub = selectedSubItems.find(
+    (i) =>
+      i.category === "monitor" ||
+      i.id === "kit-monitor-touch" ||
+      i.id.startsWith("kit-monitor")
+  );
+  const prtSub = selectedSubItems.find((i) => i.category === "printer" || i.id === "KIT-IMP-001");
   const rdrSub = selectedSubItems.find((i) => i.category === "reader");
   const accSubs = selectedSubItems.filter((i) => i.category === "accessory");
 

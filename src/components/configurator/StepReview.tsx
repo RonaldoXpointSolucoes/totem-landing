@@ -49,7 +49,7 @@ export const StepReview: React.FC<StepReviewProps> = ({
 
   const isKit = isItemKit(monitor);
   const kitItems = isKit ? (monitor?.kitItems || getEffectiveKitItems(monitor)) : [];
-  const activeKitItems = kitItems.filter((i) => i.selected);
+  const activeKitItems = kitItems.filter((i) => i.selected !== false && !i.paused);
   const kitTotalCents = calculateKitTotalCents(kitItems);
 
   const itemDiscountCents = appliedCoupon
@@ -58,9 +58,20 @@ export const StepReview: React.FC<StepReviewProps> = ({
   const reviewPixTotal = Math.max(0, pricing.pixTotalPriceCents - itemDiscountCents);
   const reviewCardSim = simulateMercadoPagoCardBreakdown(reviewPixTotal);
 
-  const monitorSubItem = kitItems.find((i) => i.category === "monitor");
-  const printerSubItem = kitItems.find((i) => i.category === "printer");
-  const readerSubItem = kitItems.find((i) => i.category === "reader");
+  const monitorSubItem = kitItems.find(
+    (i) =>
+      (i.category === "monitor" ||
+        i.id === "kit-monitor-touch" ||
+        i.id.startsWith("kit-monitor")) &&
+      !i.paused &&
+      i.selected !== false
+  );
+  const printerSubItem = kitItems.find(
+    (i) => (i.category === "printer" || i.id === "KIT-IMP-001") && !i.paused && i.selected !== false
+  );
+  const readerSubItem = kitItems.find(
+    (i) => i.category === "reader" && !i.paused && i.selected !== false
+  );
   const customTargetMonitor = isKit ? monitor?.cutoutMonitor : monitor;
 
   return (
@@ -278,42 +289,71 @@ export const StepReview: React.FC<StepReviewProps> = ({
 
             {/* Sub-itens listados com fotos e valores individuais */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-blue-100 dark:border-indigo-900/60">
-              {kitItems.map((sub) => (
-                <div
-                  key={sub.id}
-                  className={`p-2 rounded-lg border flex items-center justify-between gap-2 text-xs transition-all ${
-                    sub.selected
-                      ? "bg-white/90 dark:bg-slate-900/90 border-blue-200/80 dark:border-indigo-900 shadow-2xs"
-                      : "bg-slate-50 dark:bg-slate-950/40 border-black/5 opacity-50"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    {sub.image && sub.image !== ".webp" && (
-                      <div className="w-8 h-8 rounded-md border border-black/10 bg-white p-0.5 shrink-0 flex items-center justify-center overflow-hidden">
-                        <img src={sub.image} alt={sub.name} className="w-full h-full object-contain" />
+              {kitItems.map((sub) => {
+                const isSubPaused = Boolean(sub.paused);
+                const isSubActive = !isSubPaused && sub.selected !== false;
+                return (
+                  <div
+                    key={sub.id}
+                    className={`p-2 rounded-lg border flex items-center justify-between gap-2 text-xs transition-all ${
+                      isSubPaused
+                        ? "bg-amber-50/70 dark:bg-amber-950/25 border-amber-300/70 opacity-75"
+                        : isSubActive
+                        ? "bg-white/90 dark:bg-slate-900/90 border-blue-200/80 dark:border-indigo-900 shadow-2xs"
+                        : "bg-slate-50 dark:bg-slate-950/40 border-black/5 opacity-50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      {sub.image && sub.image !== ".webp" && (
+                        <div className="w-8 h-8 rounded-md border border-black/10 bg-white p-0.5 shrink-0 flex items-center justify-center overflow-hidden">
+                          <img
+                            src={sub.image}
+                            alt={sub.name}
+                            className={`w-full h-full object-contain ${isSubPaused ? "grayscale opacity-60" : ""}`}
+                          />
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="font-bold text-[#1d1d1f] dark:text-white truncate text-[11px]">
+                          {sub.name}
+                        </p>
+                        <span
+                          className={`text-[10px] block ${
+                            isSubPaused ? "text-amber-800 dark:text-amber-300 font-semibold" : "text-slate-500"
+                          }`}
+                        >
+                          {isSubPaused
+                            ? `⏸ Pausado (${sub.pausedReason || "Sem estoque"})`
+                            : isSubActive
+                            ? `+ ${formatBRL(sub.priceCents)} (Incluso)`
+                            : "Não incluso (Desmarcado)"}
+                        </span>
+                        {isSubActive && (sub.osNotice || sub.warrantyInfo) && (
+                          <span className="text-[9px] font-bold text-amber-700 dark:text-amber-300 block truncate">
+                            {[sub.osNotice ? "Windows 10 Pro Trial" : null, sub.warrantyInfo ? `Garantia ${sub.warrantyInfo}` : null]
+                              .filter(Boolean)
+                              .join(" • ")}
+                          </span>
+                        )}
                       </div>
-                    )}
-                    <div className="min-w-0">
-                      <p className="font-bold text-[#1d1d1f] dark:text-white truncate text-[11px]">
-                        {sub.name}
-                      </p>
-                      <span className="text-[10px] text-slate-500">
-                        {sub.selected ? `+ ${formatBRL(sub.priceCents)} (Incluso)` : "Não incluso (Desmarcado)"}
-                      </span>
+                    </div>
+
+                    <div className="shrink-0">
+                      {isSubPaused ? (
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-800 dark:text-amber-300 text-[9px] font-black">
+                          PAUSADO
+                        </span>
+                      ) : isSubActive ? (
+                        <span className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px]">
+                          ✓
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 font-semibold">—</span>
+                      )}
                     </div>
                   </div>
-
-                  <div className="shrink-0">
-                    {sub.selected ? (
-                      <span className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px]">
-                        ✓
-                      </span>
-                    ) : (
-                      <span className="text-[10px] text-slate-400 font-semibold">—</span>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Equipamentos do Cliente (Furação/Recorte CNC quando Monitor ou Impressora do Kit foram desmarcados) */}
